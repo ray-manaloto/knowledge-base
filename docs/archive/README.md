@@ -59,17 +59,64 @@ regenerable at these digests*. This is the part worth knowing exists.
 
 ### Why it was deleted rather than kept
 
-Two paths reached `graph.json`: one shelled out to the `graphify` CLI, the other
-re-implemented what that CLI does inside — its own planning, slicing, provider
-calls and receipts. The second drifted every time the CLI changed, and in
-August 2026 it did: graphify added `.html` to its splittable set, a 1.85 MB
-excluded file went from one unit to ~93, and 24 tests went red on an assumption
-that had quietly expired.
+It imported graphify's **private** internals — `_estimate_file_tokens`,
+`_extraction_system`, `_pack_chunks_by_tokens` and `_read_files` from
+`graphify.llm` — and re-implemented planning, slicing and provider calls around
+them. That is the rule it broke, and the rule is worth stating in full because
+the first write-up of this removal got it backwards:
+
+1. **Best — call graphify's PUBLIC SDK directly**, 1:1 with the CLI verb
+   (`kb_setup.graphify_sdk`, which pins that surface via
+   `public_api_fingerprint()`). This is the destination.
+2. **Fallback — shell out to the CLI** for verbs with no public SDK method yet.
+3. **Never — import graphify's private internals.**
+
+"Extraction through the CLI only" was a lossy paraphrase of that: the CLI is the
+*stopgap*, the SDK is the goal, and the ban is on **re-implementation**, not on
+in-process calls. `graphify_baseline.py` was kept because it sits at rule 1.
+
+Depending on private functions is also why the layer drifted. graphify added
+`.html` to its splittable set, a 1.85 MB excluded file went from one unit to
+~93, and 24 tests went red on an assumption copied out of internals that nobody
+promised would hold.
 
 The evidence went with it because nothing will ever write to it again — a gate
 guarding a museum trains people to ignore gates. See
 `docs/artifacts/extraction-architecture.html` (published as **Two Extraction
 Paths**) for the diagrams.
+
+## ⚠️ The call-boundary telemetry is in here, and Ray wants it BACK
+
+Ray, 2026-08-24, after the removal: *"we want to keep all the code that tracked
+every graphify call being made with all metadata and arguments passed into it."*
+
+The deleted `graphify_semantic_adapter.py` wrote an `adapter-metadata.json`
+beside every chunk, and it is the richest record this repo has ever had of a
+model call. Recovered from `d2acb5535553`, one real file contains:
+
+| field | example |
+|---|---|
+| `argv` | the full command line, including `--model claude-opus-5 --effort high` |
+| `model_usage` | input / output / `cache_creation` / `cache_read` tokens |
+| `total_cost_usd` | `0.92874` |
+| `duration_ms` · `duration_api_ms` · `elapsed_ms` | `196045` · `195253` · `197542` |
+| identity | `claude_version`, executable `sha256`, auth method, subscription type |
+| integrity | `prompt_sha256` / `response_sha256` + sizes, `returncode`, `stop_reason` |
+
+**Two caveats before anyone rebuilds it.** It instrumented the **Claude CLI**
+(graphify's provider backend), not graphify itself — so it is a template, not a
+drop-in. And the mechanism to hang it on survives: `python/src/kb_setup/events.py`
+is the structured event stream, and `graphify_native_extract.py` already imports it.
+
+Recover the reference implementation with:
+
+```bash
+git show d2acb5535553:python/src/kb_setup/graphify_semantic_adapter.py
+git show d2acb5535553:graphify-out/graphify-semantic-corpus-chunks/9e1adc3b7df53844cdc50f4a69f801ef329a47df0d96b7f2f229e5423b1797ad/chunks/0001/adapter-metadata.json
+```
+
+Both were verified to round-trip out of git history on 2026-08-24 — that is a
+run, not an assumption.
 
 ## Adding an archive
 

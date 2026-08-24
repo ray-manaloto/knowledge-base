@@ -55,9 +55,9 @@ _BLANKET_PATHSPECS = frozenset({".", "./", ":/", "*"})
 _REASON = (
     "Do not stage with a blanket `git add`. Name the paths: "
     "`git add <path> [<path>...]`, or `git add -u` for tracked modifications "
-    "only. Untracked derived/evidence trees under graphify-out/ settle their "
-    "own tracking question by staying untracked until someone decides "
-    "otherwise (do-not.md #5) — a blanket add settles it silently. Measured "
+    "only. `graphify-out/` is committed ONLY for `memory/` (do-not.md #5), so "
+    "anything else that appears there is derived or evidence and a blanket add "
+    "commits it without anyone deciding to. Measured "
     "2026-08-18: `git add -A` swept one such tree into a commit THREE times "
     "in one session, the first two already caught and written up. Enforced "
     "by kb_setup.stage_explicitly; Ray's ruling, zero tolerance on repeating "

@@ -1,0 +1,238 @@
+<title>The Alarm and the Empty Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Martian+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground:  #ECEAF0;
+    --panel:   #F8F7FA;
+    --panel-2: #E1DDE9;
+    --edge:    #CFC9DB;
+    --ink:     #1A1626;
+    --ink-soft:#4C4460;
+    --ink-dim: #7E7593;
+    --accent:  #4A3D7A;
+    --accent-bg:#DFD9EE;
+    --warn:    #9A6708;
+    --warn-bg: #F2E6CC;
+    --ok:      #2F6349;
+    --ok-bg:   #D9E8E0;
+    --diagram-plate: #F8F7FA;
+    --shadow:  0 1px 2px rgba(26,22,38,.07), 0 12px 30px -20px rgba(26,22,38,.45);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #121019;
+      --panel:   #1B1726;
+      --panel-2: #241F33;
+      --edge:    #2E2840;
+      --ink:     #E7E3F0;
+      --ink-soft:#ABA2C0;
+      --ink-dim: #7E7593;
+      --accent:  #A796E0;
+      --accent-bg:#241D3D;
+      --warn:    #E0B45C;
+      --warn-bg: #2E2413;
+      --ok:      #7CBE9C;
+      --ok-bg:   #16291F;
+      --diagram-plate: #EFEDF4;
+      --shadow:  0 1px 2px rgba(0,0,0,.5), 0 12px 30px -20px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:  #121019;
+    --panel:   #1B1726;
+    --panel-2: #241F33;
+    --edge:    #2E2840;
+    --ink:     #E7E3F0;
+    --ink-soft:#ABA2C0;
+    --ink-dim: #7E7593;
+    --accent:  #A796E0;
+    --accent-bg:#241D3D;
+    --warn:    #E0B45C;
+    --warn-bg: #2E2413;
+    --ok:      #7CBE9C;
+    --ok-bg:   #16291F;
+    --diagram-plate: #EFEDF4;
+    --shadow:  0 1px 2px rgba(0,0,0,.5), 0 12px 30px -20px rgba(0,0,0,.9);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 18px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 1.25rem 7rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 40rem; margin: 0 auto; }
+  .wide { max-width: 58rem; margin: 0 auto; }
+
+  h1, h2, h3 { margin: 0; text-wrap: balance; font-family: "Archivo", system-ui, sans-serif; }
+  h1 { font-size: clamp(2.5rem, 7vw, 4rem); font-weight: 700; line-height: 1.0; letter-spacing: -.032em; }
+  h2 { font-size: clamp(1.6rem, 3.8vw, 2.2rem); font-weight: 700; line-height: 1.12; letter-spacing: -.02em; }
+  h3 { font-size: 1.02rem; font-weight: 600; font-family: "Archivo", sans-serif; letter-spacing: -.005em; }
+
+  .eyebrow {
+    font-family: "Martian Mono", ui-monospace, monospace;
+    font-size: .63rem; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600;
+  }
+
+  header { padding: 5rem 0 0; display: flex; flex-direction: column; gap: 1.3rem; }
+  .lede { font-size: 1.2rem; line-height: 1.52; color: var(--ink-soft); max-width: 31rem; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  section { padding-top: 4.2rem; display: flex; flex-direction: column; gap: 1.1rem; }
+  p { margin: 0; max-width: 33rem; }
+
+  code, .mono { font-family: "Martian Mono", ui-monospace, monospace; font-size: .78em; }
+  code { background: var(--panel-2); border-radius: 3px; padding: .1em .32em; }
+
+  .figbox {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 5px;
+    padding: 1.5rem 1.2rem; box-shadow: var(--shadow); overflow-x: auto;
+  }
+  figure { margin: 1rem 0 0; display: flex; flex-direction: column; gap: .7rem; }
+  figcaption { font-size: .88rem; color: var(--ink-dim); max-width: 33rem; font-family: "Archivo", sans-serif; }
+  .mermaid { background: var(--diagram-plate); border-radius: 4px; padding: 1.1rem .5rem; text-align: center; overflow-x: auto; }
+
+  .callout {
+    background: var(--accent-bg); border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0; padding: 1.05rem 1.25rem; font-size: 1.05rem; max-width: 33rem;
+  }
+  .callout.w { background: var(--warn-bg); border-left-color: var(--warn); }
+  .callout.g { background: var(--ok-bg); border-left-color: var(--ok); }
+
+  .states { display: grid; gap: 1rem; grid-template-columns: 1fr; padding-top: .4rem; }
+  @media (min-width: 50rem) { .states { grid-template-columns: repeat(3, 1fr); } }
+  .state {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 5px;
+    padding: 1.2rem 1.15rem 1.35rem; display: flex; flex-direction: column; gap: .55rem; box-shadow: var(--shadow);
+  }
+  .state.bad { border-color: var(--warn); border-width: 2px; padding: 1.13rem 1.08rem 1.28rem; }
+  .state .when { font-family: "Martian Mono", monospace; font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); font-weight: 600; }
+  .state.bad .when { color: var(--warn); }
+  .state p { font-size: .9rem; color: var(--ink-soft); max-width: none; font-family: "Archivo", sans-serif; }
+  .pair { font-family: "Martian Mono", monospace; font-size: .72rem; line-height: 1.9; }
+
+  .opts { display: grid; gap: 1rem; grid-template-columns: 1fr; padding-top: .4rem; }
+  @media (min-width: 50rem) { .opts { grid-template-columns: repeat(3, 1fr); } }
+  .opt {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 5px;
+    padding: 1.2rem 1.15rem 1.35rem; display: flex; flex-direction: column; gap: .55rem; box-shadow: var(--shadow);
+  }
+  .opt.pick { border-color: var(--ok); border-width: 2px; padding: 1.13rem 1.08rem 1.28rem; }
+  .opt .lbl { font-family: "Martian Mono", monospace; font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; color: var(--ink-dim); }
+  .opt.pick .lbl { color: var(--ok); }
+  .opt p { font-size: .89rem; color: var(--ink-soft); max-width: none; font-family: "Archivo", sans-serif; }
+
+  hr.rule { height: 1px; background: var(--edge); border: 0; margin: 0; }
+  footer { padding-top: 4rem; color: var(--ink-dim); font-size: .86rem; font-family: "Archivo", sans-serif; }
+  footer p { max-width: 33rem; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">One decision · the integrity gate</div>
+    <h1>The alarm and the empty room.</h1>
+    <p class="lede">We deleted some valuable files, and we deleted the alarm that watched them. A cold reviewer says: <strong>you tore down the fence, not just emptied the paddock.</strong> Here is whether that matters.</p>
+  </header>
+
+  <section>
+    <div class="eyebrow">The picture</div>
+    <h2>A smoke alarm in a demolished room</h2>
+    <p>You had a room full of expensive, irreplaceable things. On the ceiling was a smoke alarm that checked, every day, that nothing had been tampered with.</p>
+    <p>You emptied the room and knocked it down. <strong>The alarm came down with the walls.</strong></p>
+    <p>Nobody disputes that. The reviewer's point is different, and sharper:</p>
+    <div class="callout w"><strong>“One day you will build a new room, and put valuable things in it — and there will be no alarm, because you threw the alarm away with the old one.”</strong></div>
+  </section>
+
+  <section class="wide">
+    <figure class="figbox">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DFD9EE','primaryTextColor':'#1A1626','primaryBorderColor':'#4A3D7A','lineColor':'#4C4460','fontFamily':'Martian Mono, monospace','fontSize':'12px'}}}%%
+flowchart LR
+  subgraph T1 ["THEN — matched"]
+    E1[("evidence<br/>105 files")]
+    G1{{"gate<br/>checks hashes"}}
+    G1 --> E1
+  end
+
+  subgraph T2 ["NOW — still matched"]
+    E2(["nothing<br/>to guard"])
+    G2(["no gate"])
+  end
+
+  subgraph T3 ["LATER — the hole"]
+    E3[("new receipts<br/>from the CLI path")]
+    G3(["still no gate"])
+    G3 -. "nothing<br/>watches" .-> E3
+  end
+
+  T1 ==>|"this commit"| T2
+  T2 ==>|"if receipt caching<br/>is ever added"| T3
+
+  style T1 fill:#D9E8E0,stroke:#2F6349,stroke-width:2px
+  style T2 fill:#DFD9EE,stroke:#4A3D7A,stroke-width:2px
+  style T3 fill:#F2E6CC,stroke:#9A6708,stroke-width:2px
+</pre>
+      <figcaption>The middle state is <em>consistent</em> — no valuables, no alarm. The objection is entirely about the right-hand box, which does not exist yet and may never.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="eyebrow">The load-bearing question</div>
+    <h2>Is anything writing receipts today?</h2>
+    <p><strong>No.</strong> The path that wrote those receipts is the one we deleted. The surviving path hands the whole job to the <code>graphify</code> CLI and keeps no provider receipts of its own.</p>
+    <p>So the gate today would be watching an empty room. And this repo has a specific, measured opinion about that:</p>
+    <div class="callout">A gate that cannot fail is not a gate. Worse — a gate that sits <strong>permanently red</strong> teaches people to ignore gates, and then it costs you the <em>next</em> one too.</div>
+    <p>That is not hypothetical here. Had we kept it, it would have returned <code>Rc.NOT_RUN</code> with zero chunks to scan, and sat red on the ship path forever.</p>
+  </section>
+
+  <section class="wide">
+    <div class="eyebrow">Three answers</div>
+    <h2>What we can do</h2>
+    <div class="opts">
+      <div class="opt pick">
+        <span class="lbl">A · recommended</span>
+        <h3>File an issue, ship as-is</h3>
+        <p>Put the objection where the future builder will trip over it: whoever adds receipt caching to the CLI path has to answer "what guards these?" before merging.</p>
+        <p><strong>Why this one:</strong> it keeps the warning without keeping a dead module. The risk is real but <em>deferred</em>, and so is the fix.</p>
+      </div>
+      <div class="opt">
+        <span class="lbl">B</span>
+        <h3>Keep the gate dormant</h3>
+        <p>Restore the module, leave it out of the ship gates, repoint it at whatever the new path writes.</p>
+        <p><strong>The cost:</strong> a module nothing calls, sitting next to the extraction code — which is exactly the "which path is live?" confusion this whole round existed to remove.</p>
+      </div>
+      <div class="opt">
+        <span class="lbl">C</span>
+        <h3>Out of scope</h3>
+        <p>Guarding a feature nobody has built is speculative. Handle it when receipt caching actually exists.</p>
+        <p><strong>The risk:</strong> nothing records the objection, so the person who builds it never hears it. That is how the gap actually happens.</p>
+      </div>
+    </div>
+    <p style="max-width:33rem;padding-top:1.1rem">A and C reach the same code today. The only difference is <strong>whether the warning survives</strong> — and that difference is the entire decision.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Worth saying plainly</div>
+    <h2>The reviewer was right about the shape</h2>
+    <p>It is easy to read "we deleted a gate" as carelessness. It wasn't — the gate and its subject went together, which is the coherent move. But Gemini spotted something neither the ruling nor I had said out loud: <strong>the evidence and the ability to check evidence are different assets</strong>, and only one of them had a reason to go.</p>
+    <p>That distinction is the finding. Whether it becomes an issue or a restored module is the smaller question.</p>
+    <hr class="rule" style="margin:1.3rem 0">
+    <p style="font-size:.9rem;color:var(--ink-dim)">Measured, not recalled: the gate's zero-chunk behaviour is <code>Rc.NOT_RUN</code> at <code>corpus_integrity.py:166–184</code> and <code>:207–221</code> as it stood at <code>d2acb5535553</code>; <code>GATE_TASKS</code> went from 7 to 6 at <code>1e6eadd9</code>.</p>
+  </section>
+
+  <footer>
+    <hr class="rule" style="margin-bottom:1.2rem">
+    <p>Source at <code>docs/artifacts/the-alarm-and-the-empty-room.html</code>, tracked with the code it describes. Companion to <em>Two Extraction Paths</em>, which covers the removal this decision falls out of.</p>
+  </footer>
+</div>

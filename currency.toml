@@ -175,11 +175,19 @@ os = ["macos"]
 # THE SPLIT WAS 4/4 while the semantic-corpus layer existed: `graphify_baseline.py`
 # and `sources/graphify.dispositions.json` describe WHAT RUNS — the live AST
 # baseline for the installed graphify — so they track the manifest onto the fork.
-# The other four bindings, on `graphify_semantic_{corpus,slice}.py`, held SNAPSHOT
-# IDENTITIES of completed runs at the fork base rather than the moving manifest.
-# That layer was removed 2026-08-24 (see `docs/archive/README.md`), and its four
-# `ref_binding` rows left with it — the four below, all `tracks = "manifest"`, are
-# what remains.
+# The other four bindings, on `graphify_semantic_{corpus,slice}.py`, were
+# `tracks = "frozen"` — SNAPSHOT IDENTITIES of completed runs, pinned to an exact
+# commit rather than following the moving manifest. That layer was removed
+# 2026-08-24 (see `docs/archive/README.md`), and its four `ref_binding` rows left
+# with it — the four below, all `tracks = "manifest"`, are what remains.
+#
+# Read `frozen` above literally: the comment that stood here until 2026-08-24
+# called those four `tracks = "fork_base"`, and the rows themselves said
+# `frozen` the whole time. The prose was wrong, not the config, and the first
+# rewrite of it inherited the error before a cold review caught it against the
+# deleted rows. `base_ref`/`base_commit` at the bottom of this block belong to
+# the FORK SPEC and are unrelated to any binding's `tracks` mode — the rebase
+# instructions above stay correct however many bindings remain.
 [tool.graphify.fork]
 upstream = "Graphify-Labs/graphify"
 base_ref = "v0.9.49"

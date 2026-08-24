@@ -233,7 +233,19 @@ flowchart LR
   </section>
 
   <section>
-    <div class="eyebrow">Correction · measured after you answered</div>
+    <div class="eyebrow">Correction 2 · Ray, after the removal landed</div>
+    <h2>The ranking, and I had it upside down</h2>
+    <p>This page framed the choice as <em>CLI good, in-process suspect</em>. That is a lossy paraphrase of the actual rule, which runs the other way:</p>
+    <div class="ledger" style="padding-bottom:.6rem">
+      <div class="row k"><span class="tag t-k">best</span><span class="nm">graphify's PUBLIC SDK, 1:1 with the CLI verb</span><span class="sz">the goal</span></div>
+      <div class="row h"><span class="tag t-h">fallback</span><span class="nm">shell out to the CLI</span><span class="sz">a stopgap</span></div>
+      <div class="row d"><span class="tag t-d">never</span><span class="nm">import graphify's private internals</span><span class="sz">the ban</span></div>
+    </div>
+    <p>The deleted layer died on rule 3, and the evidence is unambiguous — it imported <code>_estimate_file_tokens</code>, <code>_extraction_system</code>, <code>_pack_chunks_by_tokens</code> and <code>_read_files</code> from <code>graphify.llm</code>. Four leading underscores.</p>
+    <p><code>graphify_baseline.py</code> was kept because it sits at rule <strong>1</strong>, not despite being in-process: it goes through <code>kb_setup.graphify_sdk</code>, whose <code>public_api_fingerprint()</code> exists to pin exactly that public surface. So <code>graphify_native_extract.py</code> — the subprocess module — should <em>shrink</em> as graphify promotes more verbs to its public API, not stand as the model.</p>
+    <div class="callout" style="background:var(--hold-bg);border-left-color:var(--hold)"><strong>Also recovered:</strong> the deleted adapter wrote the richest per-call record this repo has had — full argv with model and effort, token counts, <code>total_cost_usd</code>, three duration fields, executable hashes. Ray wants that capability back. It is a template rather than a drop-in (it instrumented the <em>Claude</em> CLI, not graphify), and <code>events.py</code> survives to hang it on. See <code>docs/archive/README.md</code>.</div>
+
+    <div class="eyebrow" style="padding-top:2.4rem">Correction 1 · measured after you answered</div>
     <h2>“Both stay” rested on a wrong premise</h2>
     <p>I told you <code>graphify_baseline.py</code> was part of the CLI-driving path and you answered on that basis. <strong>A read-only codex pass then refuted it.</strong> The two kept modules do not work the same way at all:</p>
     <div class="tablebox">
@@ -332,8 +344,8 @@ sequenceDiagram
     <div class="tablebox">
       <table>
         <tr><th>gate</th><th>now</th><th>after removal</th></tr>
-        <tr><td class="mono">test</td><td>FAIL rc=2 — 24 red</td><td style="color:var(--keep);font-weight:600">green (tests deleted with the layer)</td></tr>
-        <tr><td class="mono">kb-corpus-integrity</td><td>FAIL rc=1 — chunk 0009</td><td style="color:var(--hold);font-weight:600">depends on your answer below</td></tr>
+        <tr><td class="mono">test</td><td>FAIL rc=2 — 24 red</td><td style="color:var(--keep);font-weight:600">rc=0 — measured, 100%, zero failures</td></tr>
+        <tr><td class="mono">kb-corpus-integrity</td><td>FAIL rc=1 — chunk 0009</td><td style="color:var(--keep);font-weight:600">gone — left GATE_TASKS with its evidence</td></tr>
         <tr><td class="mono">lint · brain-audit · eval<br>graph-size · hk-test</td><td>PASS</td><td>PASS</td></tr>
       </table>
     </div>
@@ -341,8 +353,9 @@ sequenceDiagram
   </section>
 
   <section class="wide">
-    <div class="eyebrow">The one open question</div>
-    <h2>What happens to the receipts?</h2>
+    <div class="eyebrow">Settled 2026-08-24 · commit 1e6eadd9</div>
+    <h2>What happened to the receipts</h2>
+    <div class="callout" style="background:var(--keep-bg);border-left-color:var(--keep)"><strong>Decided: delete both</strong> — the evidence and its gate. Archived first at <code>d2acb5535553</code> (149 files, 556 K, sha256 <code>9399fe2a…</code>), documented in <code>docs/archive/README.md</code>, and recorded to graphify work-memory. Git history is the durable copy: <code>git show d2acb5535553:&lt;path&gt;</code> recovers any of it. The question below is kept because the reasoning is what a future reader will want, not the verdict alone.</div>
     <p style="max-width:35rem">The old path spent <strong>real money</strong> on provider calls, and it kept the receipts: <strong>105 files, ~1.97 MB, about $41.78</strong> of paid extraction, tracked in git on purpose. <code>corpus_integrity.py</code> is the gate that checks those receipts still hash to what was recorded.</p>
 
     <figure class="figbox">
@@ -406,7 +419,17 @@ flowchart TB
         <tr><td>the native path</td><td><strong>Both stay</strong> — <code>graphify_native_extract</code> + <code>graphify_baseline</code> become the only extraction route</td></tr>
         <tr><td>how it lands</td><td><strong>One branch</strong> — codex removes and commits, then a cold cross-family review before anything ships</td></tr>
         <tr><td>codex version</td><td><strong>0.149.1</strong> — bump the <code>mise.toml</code> pin; it affects the orchestration lane</td></tr>
-        <tr><td>the 24 red tests</td><td><strong>Answered by this</strong> — they live in the deleted layer, so no re-curation and no code fix is needed</td></tr>
+        <tr><td>the 24 red tests</td><td><strong>Answered by this</strong> — they lived in the deleted layer, so no re-curation and no code fix was needed</td></tr>
+        <tr><td>the receipts + their gate</td><td><strong>Both deleted</strong>, archived first — see the section above</td></tr>
+      </table>
+    </div>
+    <h2 style="padding-top:2.6rem">What actually landed</h2>
+    <div class="tablebox">
+      <table>
+        <tr><th>commit</th><th>what</th></tr>
+        <tr><td class="mono">d2acb553</td><td>the archive, taken before anything was deleted</td></tr>
+        <tr><td class="mono">1fdec5d1</td><td><code>docs/archive/README.md</code> + work-memory + the visual output style</td></tr>
+        <tr><td class="mono">1e6eadd9</td><td><strong>the removal</strong> — 132 files, 89 insertions, 18,992 deletions</td></tr>
       </table>
     </div>
   </section>

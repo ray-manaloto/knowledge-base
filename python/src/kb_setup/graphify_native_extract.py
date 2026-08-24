@@ -3,23 +3,49 @@
 
 ## Why this exists
 
-This repo already reaches semantic extraction through a bespoke eight-module
-layer (`graphify_semantic_corpus*.py` + `graphify_semantic_slice.py` +
-`graphify_semantic_adapter.py`) that shells out to graphify PER FILE SLICE
-through a `kb-semantic-claude` adapter shim. That layer's own comment records
-why it never gets cheaper on a second run: an AST walk of the pinned 0.9.45
-found no cache read anywhere in `extract_corpus_parallel`'s call chain from
-that entry point, only the checkpoint WRITER — so a restart re-buys the whole
-corpus at full price (see `graphify_semantic_corpus.py`'s
-`graphify_no_incremental_cache` comment).
+**This is now the ONLY semantic-extraction path in the repo — and it is a
+STOPGAP, not the destination.** Read the ranking before changing anything here
+(Ray, 2026-08-24):
 
-This module instead calls graphify's own `extract` verb directly —
+1. **Best — call graphify's PUBLIC SDK directly**, 1:1 with the CLI verb.
+   `graphify_baseline.py` already does this through `kb_setup.graphify_sdk`,
+   which exists precisely to pin that public surface
+   (`graphify_sdk.public_api_fingerprint()`).
+2. **Fallback — shell out to the CLI**, which is what THIS module does, for
+   verbs graphify does not yet expose as public SDK methods.
+3. **Never — import graphify's private internals.**
+
+So this module should SHRINK over time, not grow: as graphify promotes a verb to
+its public API, the call moves from here to a `graphify_sdk` seam. Do not read
+"the only path" as "the preferred shape".
+
+Until 2026-08-24 there was a second path, and it died on rule 3. A bespoke
+eight-module layer (`graphify_semantic_corpus*.py`, `graphify_semantic_slice.py`,
+`graphify_semantic_adapter.py`) imported `_estimate_file_tokens`,
+`_extraction_system`, `_pack_chunks_by_tokens` and `_read_files` from
+`graphify.llm` — four private functions — and re-implemented planning, slicing
+and provider calls around them. Archived and explained in
+`docs/archive/README.md`.
+
+Two facts about that layer are worth keeping, because they are why this module
+was written and why the ruling went the way it did:
+
+- **It never got cheaper on a second run.** An AST walk of the pinned 0.9.45
+  found no cache read anywhere in `extract_corpus_parallel`'s call chain from
+  that entry point, only the checkpoint WRITER — so a restart re-bought the
+  whole corpus at full price.
+- **It drifted.** It copied assumptions out of graphify's internals, and those
+  expired silently when graphify changed: `.html` joined
+  `_SPLITTABLE_TEXT_SUFFIXES` (#2900), a 1.85 MB excluded file went from one
+  unit to ~93, and 24 tests went red on an assumption nobody had touched.
+
+This module calls graphify's own `extract` verb directly —
 `graphify extract sources/graphify --mode deep --backend claude-cli` — which
 IS the code path with the semantic-deep cache namespace behind it
 (`graphify/cli.py`'s deep-mode block: "Deep mode reads/writes its own cache
 namespace (cache/semantic-deep/)"). Run 2 onward over an unchanged tree
-should be near-free through that cache; the bespoke layer's per-chunk driver
-never touches it.
+should be near-free through that cache; the removed layer's per-chunk driver
+never touched it.
 
 **Confirmed by a real run, 2026-08-23**: `--allow-parallel-claude-cli
 --max-concurrency 4` completed 19/19 chunks (three split-and-retried by
@@ -37,9 +63,7 @@ path: it never touches `opts.target`, runs under bare `clean_env()` with no
 
 ## What this does NOT do
 
-It does not replace the bespoke corpus layer (that pipeline has its own
-receipts, spend caps and provider-evidence retention this module has no
-opinion on) and it does not touch the aggregate `graphify-out/graph.json` —
+It does not touch the aggregate `graphify-out/graph.json` —
 `--out` always points outside both the repo root and the pinned clone (see
 `_refuse_out` below). Merging this extraction's output into the aggregate
 graph, if ever wanted, is a separate, later decision.
