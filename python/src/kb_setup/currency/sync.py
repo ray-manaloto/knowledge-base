@@ -36,7 +36,7 @@ from kb_setup import build_outcome
 from kb_setup.currency import _proc
 
 if TYPE_CHECKING:
-    from kb_setup.currency.config import ToolSpec
+    from kb_setup.currency.config import RefBinding, ToolSpec
 
 OK = "ok"
 DRIFT = "drift"
@@ -1244,21 +1244,127 @@ def _check_extra_probes(repo_root: Path, spec: ToolSpec, *, deep: bool) -> Findi
     )
 
 
+def _fork_pinned_sha(repo_root: Path, spec: ToolSpec) -> str:
+    """The 40-hex SHA `pyproject.toml` installs this tool's git dependency FROM.
+
+    Two shapes are accepted because both are legitimate and uv chose the second:
+
+    1. PEP 508 direct reference in `[project] dependencies` —
+       ``name @ git+https://host/owner/repo@<sha>``.
+    2. A `[tool.uv.sources]` override — ``name = {git = "...", rev = "<sha>"}``.
+
+    **Shape 2 is why this check has to exist at all.** `uv add` leaves the
+    `[project] dependencies` line reading ``graphifyy[all]==0.9.48`` — an ordinary
+    upstream PyPI pin — and redirects the install from a table 190 lines further
+    down. So the dependency list, the package name, the version string and
+    `graphify --version` ALL still say "upstream 0.9.48" while the bytes come from
+    a fork. Every obvious place a reader would look is unchanged. Nothing but the
+    `rev` below distinguishes the two.
+
+    Parsed with `tomllib` rather than a regex: the value is structured, a regex
+    over a 200-line file would happily match the wrong table (there is already a
+    second git dependency, `skillopt`, in shape 1), and a wrong SHA here reports a
+    confident mismatch about the one thing this check exists to confirm.
+
+    Returns `""` when no git pin is found, which the caller reports as DRIFT and
+    never as a pass: a fork declared in `currency.toml` while `pyproject.toml`
+    installs from PyPI is precisely the split this exists to catch.
+    """
+    pyproject = repo_root / "pyproject.toml"
+    try:
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except OSError, tomllib.TOMLDecodeError:
+        return ""
+    package = spec.python_package or spec.name
+    source = data.get("tool", {}).get("uv", {}).get("sources", {}).get(package)
+    if isinstance(source, dict) and source.get("git"):
+        rev = str(source.get("rev", ""))
+        return rev if re.fullmatch(r"[0-9a-f]{40}", rev) else ""
+    dependencies = data.get("project", {}).get("dependencies", [])
+    if isinstance(dependencies, list):
+        for raw in dependencies:
+            spec_text = str(raw)
+            # `name` then optional extras, then the PEP 508 ` @ ` separator, so a
+            # package whose name merely CONTAINS this one cannot match.
+            found = re.match(
+                rf"{re.escape(package)}(?:\[[^\]]*\])?\s*@\s*git\+\S+?@([0-9a-f]{{40}})$",
+                spec_text.strip(),
+            )
+            if found:
+                return found.group(1)
+    return ""
+
+
+def _check_forked_manifest(repo_root: Path, spec: ToolSpec) -> Finding:
+    """The manifest check for a tool installed from OUR fork.
+
+    A FORK CANNOT BE CHECKED BY VERSION, and saying so is the whole point. The
+    fork ships the same package name and the same version string as the release
+    it sits on — graphify's reports `graphifyy 0.9.48` either way — so the
+    `ref` <-> installed-version comparison in `_check_manifest` is not merely
+    unhelpful here: it is guaranteed to report drift forever, on a pin that is
+    exactly right. A permanent false DRIFT trains a reader to ignore the row,
+    which is how the real one gets missed (`tag_prefix` records the same lesson
+    from #245).
+
+    The substitute is STRONGER, not weaker. `sources/<tool>.manifest` and
+    `pyproject.toml` are ONE pin written in two files by two different tools —
+    `uv add` writes one, a human writes the other — so this asserts their exact
+    40-hex identity rather than a version string they would both round off.
+
+    Split out of `_check_manifest` because that function hit ruff's return-count
+    ceiling; the seam is real either way, since every line here is unreachable
+    for the unforked majority.
+    """
+    installed_from = _fork_pinned_sha(repo_root, spec)
+    if not installed_from:
+        return Finding(
+            "manifest",
+            DRIFT,
+            f"{spec.name} declares [tool.{spec.name}.fork] but pyproject installs no "
+            f"git dependency pinned to a 40-hex SHA — the fork is declared and not used",
+        )
+    commit = _manifest_field(repo_root, spec, "commit")
+    if commit != installed_from:
+        reason = spec.fork.reason if spec.fork is not None else ""
+        return Finding(
+            "manifest",
+            DRIFT,
+            f"{spec.manifest} commits {commit or 'UNKNOWN'} but pyproject installs "
+            f"{installed_from} — the two halves of one fork pin have separated ({reason})",
+        )
+    return _check_source_clone(repo_root, spec, installed_from)
+
+
+def _check_commit_pinned_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
+    """The manifest check for a tool whose pyproject pin is already a 40-hex SHA.
+
+    Behaviour is unchanged; this is a pure extraction, made because
+    `_check_manifest` reached ruff's return-count ceiling once the fork branch
+    joined it. The seam it falls on is the honest one: this and
+    `_check_forked_manifest` are the two SHA-identity paths, and everything left
+    behind in `_check_manifest` compares a version string.
+    """
+    commit = _manifest_field(repo_root, spec, "commit")
+    if commit != pinned:
+        return Finding(
+            "manifest",
+            DRIFT,
+            f"{spec.manifest} commits {commit or 'UNKNOWN'} but pyproject pins {pinned}",
+        )
+    return _check_source_clone(repo_root, spec, pinned)
+
+
 def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     if not spec.manifest:
         return Finding("manifest", SKIP, "this repo pins no source manifest for the tool")
     ref = manifest_ref(repo_root, spec)
     if not ref:
         return Finding("manifest", DRIFT, f"{spec.manifest} has no readable `ref =` line")
+    if spec.fork is not None:
+        return _check_forked_manifest(repo_root, spec)
     if re.fullmatch(r"[0-9a-f]{40}", pinned):
-        commit = _manifest_field(repo_root, spec, "commit")
-        if commit != pinned:
-            return Finding(
-                "manifest",
-                DRIFT,
-                f"{spec.manifest} commits {commit or 'UNKNOWN'} but pyproject pins {pinned}",
-            )
-        return _check_source_clone(repo_root, spec, pinned)
+        return _check_commit_pinned_manifest(repo_root, spec, pinned)
     # `rust-v0.147.0` -> `0.147.0`. Strip the project's declared prefix BEFORE
     # the `v`, or a `rust-v` tag compares literally against an installed
     # `0.147.0` and reports drift on a manifest pinned exactly right (#245).
@@ -1335,6 +1441,70 @@ def _check_manifest_commit(repo_root: Path, spec: ToolSpec, ref: str) -> Finding
     return Finding("manifest", OK, f"{spec.manifest} tracks the installed {ref} at {commit[:12]}")
 
 
+def _binding_want(binding: RefBinding, expected: dict[str, str], base: dict[str, str]) -> str:
+    """The revision THIS binding must equal. See `RefBinding.tracks` for the three."""
+    if binding.tracks == "frozen":
+        # A declared, reviewed value — not a lookup.
+        return binding.expect
+    source = base if binding.tracks == "fork_base" else expected
+    return source.get(binding.field, "")
+
+
+def _binding_against(binding: RefBinding, spec: ToolSpec) -> str:
+    """What a finding should NAME as the thing this binding disagreed with.
+
+    Under a fork the three kinds are compared against three different sources, so
+    "but <manifest> pins X" would be an outright false statement for a `fork_base`
+    or `frozen` binding — and a finding that misnames its own evidence teaches the
+    reader to distrust the check (the lesson `_check_manifest`'s `how` records
+    from #245).
+    """
+    if binding.tracks == "frozen":
+        return "its declared `expect`"
+    if binding.tracks == "fork_base" and spec.fork is not None:
+        return f"the fork base {spec.fork.base_ref}"
+    return spec.manifest
+
+
+def _binding_problem(
+    repo_root: Path,
+    binding: RefBinding,
+    spec: ToolSpec,
+    expected: dict[str, str],
+    base: dict[str, str],
+) -> str | None:
+    """One binding's complaint, or `None` when it agrees.
+
+    Extracted from `_check_ref_bindings` when the third `tracks` kind pushed that
+    function past ruff's complexity ceiling. Every `return` here is a state the
+    engine refuses to render green — a missing file, an unreadable one, and above
+    all an anchor that matched NOTHING, which is a declared check that has quietly
+    stopped checking.
+    """
+    want = _binding_want(binding, expected, base)
+    if not want:
+        return f"{binding.label}: {spec.manifest} has no readable `{binding.field} =`"
+    path = repo_root / binding.path
+    if not path.exists():
+        return f"{binding.label}: file is missing"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return f"{binding.label}: unreadable ({exc})"
+    found = re.search(binding.pattern, text)
+    if found is None:
+        return (
+            f"{binding.label}: the declared anchor matched nothing, so this binding "
+            f"checked NOTHING — repair the pattern or the file"
+        )
+    observed = found.group(1)
+    if observed != want:
+        return (
+            f"{binding.label}: reads {observed} but {_binding_against(binding, spec)} pins {want}"
+        )
+    return None
+
+
 def _check_ref_bindings(repo_root: Path, spec: ToolSpec) -> Finding:
     """Does every code constant and committed artifact name the manifest's revision?
 
@@ -1366,31 +1536,24 @@ def _check_ref_bindings(repo_root: Path, spec: ToolSpec) -> Finding:
         "ref": manifest_ref(repo_root, spec),
         "commit": _manifest_field(repo_root, spec, "commit"),
     }
-    findings: list[str] = []
-    for binding in spec.ref_bindings:
-        want = expected.get(binding.field, "")
-        if not want:
-            findings.append(f"{binding.label}: {spec.manifest} has no readable `{binding.field} =`")
-            continue
-        path = repo_root / binding.path
-        if not path.exists():
-            findings.append(f"{binding.label}: file is missing")
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
-            findings.append(f"{binding.label}: unreadable ({exc})")
-            continue
-        found = re.search(binding.pattern, text)
-        if found is None:
-            findings.append(
-                f"{binding.label}: the declared anchor matched nothing, so this binding "
-                f"checked NOTHING — repair the pattern or the file"
-            )
-            continue
-        observed = found.group(1)
-        if observed != want:
-            findings.append(f"{binding.label}: reads {observed} but {spec.manifest} pins {want}")
+    # A forked tool has TWO revisions that bindings may legitimately name, and
+    # collapsing them is how a fork falsifies history. `tracks = "manifest"` means
+    # "the revision we RUN", which follows the fork. `tracks = "fork_base"` means
+    # "the revision a completed piece of work was performed AGAINST" — a snapshot
+    # identity, digested into authorization ledgers, whose value is a statement
+    # about the past. Dragging those onto the fork head would re-authorize runs
+    # nobody re-approved. Both sets are still checked; they are just checked
+    # against different truths. Unforked tools never reach this branch.
+    base = (
+        {"ref": spec.fork.base_ref, "commit": spec.fork.base_commit}
+        if spec.fork is not None
+        else expected
+    )
+    findings = [
+        problem
+        for binding in spec.ref_bindings
+        if (problem := _binding_problem(repo_root, binding, spec, expected, base)) is not None
+    ]
     if findings:
         return Finding(
             "ref-binding",

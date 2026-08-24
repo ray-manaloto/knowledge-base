@@ -81,11 +81,86 @@ class RefBinding:
     pattern: str
     field: str = "ref"
     note: str = ""
+    #: WHICH revision this binding must equal — and the distinction only exists
+    #: once a tool is forked (`[tool.<name>.fork]`, 2026-08-24).
+    #:
+    #: `manifest` (the default, and every binding's behaviour before forks) means
+    #: "this states the revision we RUN", so it follows the manifest wherever the
+    #: manifest goes — including onto a fork.
+    #:
+    #: `fork_base` means "this records the revision a PAST, COMPLETED piece of
+    #: work was performed against". Those are historical snapshot identities, not
+    #: claims about the present, and forcing them onto the fork's head would
+    #: falsify the record — the semantic-corpus constants are digested into
+    #: authorization ledgers, so moving them silently re-authorizes a run nobody
+    #: re-approved, which is the loop `the-graphify-circle-is-mechanical` records.
+    #: They are still CHECKED, against the upstream release the fork sits on, so
+    #: they cannot rot unnoticed either.
+    #:
+    #: `frozen` is the third value and it exists because `fork_base` was still one
+    #: notch wrong. A constant recording "the release a COMPLETED run was performed
+    #: against" does not move when the fork rebases — that run used v0.9.48 and
+    #: always will. Tying it to `base_ref` meant the first rebase (v0.9.48 ->
+    #: v0.9.49, four hours later) demanded those constants move, which is
+    #: re-authorization by side effect: exactly what `fork_base` was introduced to
+    #: prevent, one release later.
+    #:
+    #: A `frozen` binding is compared against `expect`, declared beside it. That
+    #: keeps it a REAL check — edit the constant and it fails — while making the
+    #: reviewed value visible in config where a diff shows it, rather than
+    #: comparing a historical fact against a moving target.
+    tracks: str = "manifest"
+    #: Required by, and only meaningful for, `tracks = "frozen"`.
+    expect: str = ""
 
     @property
     def label(self) -> str:
         """How this binding names itself in a finding."""
         return f"{self.path} ({self.field})"
+
+
+#: What `RefBinding.tracks` accepts. Validated for the reason every other enum in
+#: this repo is: a misspelling would fall through to the `manifest` default and
+#: silently demand that a historical record follow the fork.
+_BINDING_TRACKS = frozenset({"manifest", "fork_base", "frozen"})
+
+
+@dataclass(frozen=True)
+class ForkSpec:
+    """This tool is installed from OUR fork, not from its upstream release.
+
+    Declared when a needed change exists only as an unmerged upstream PR. It is a
+    deliberately uncomfortable state and the config says so out loud, because the
+    failure it prevents is subtle: a fork can carry the same package NAME and the
+    same VERSION STRING as the release it is based on — graphify's does, both
+    `graphifyy` and `0.9.48` — so nothing about the version distinguishes a forked
+    install from an upstream one. Every check that reasons from the version number
+    is therefore blind to the fork, and two of them reported confident false drift
+    the moment the pin moved.
+
+    What this does NOT do is silence the upstream check. Ray's ruling (2026-08-24)
+    was fork-aware state AND rebase-on-each-release, so a new upstream version is
+    still a finding — it is the REBASE trigger. Only the remedy changes, and the
+    message has to change with it: telling a reader to "bump the pin" when the
+    real work is rebasing a fork branch sends them at the wrong file.
+    """
+
+    #: `owner/repo` of the upstream this was forked FROM. Kept so the engine can
+    #: keep watching upstream releases while the pin points elsewhere.
+    upstream: str
+    #: The upstream release tag the fork currently sits on. This is what
+    #: `tracks = "fork_base"` bindings are compared against.
+    base_ref: str
+    #: That tag's commit in upstream.
+    base_commit: str
+    #: Why the fork exists, in one line. Rendered into findings so a reader meets
+    #: the reason at the same moment they meet the anomaly.
+    reason: str
+    #: What returns this tool to an upstream pin. A fork with no stated exit is
+    #: how a temporary state becomes permanent.
+    clears_when: str
+    #: The upstream PR being carried, if any — `#2981`.
+    pr: str = ""
 
 
 @dataclass(frozen=True)
@@ -157,6 +232,10 @@ class ToolSpec:
     skill_stamp: str = ""
     # Every other place in this repo that re-states the manifest's revision.
     ref_bindings: tuple[RefBinding, ...] = ()
+    # Set when this tool is installed from OUR fork rather than an upstream
+    # release (see `ForkSpec`). `None` — the overwhelming majority — leaves every
+    # check exactly as it was, so forks cost nothing to the tools that have none.
+    fork: ForkSpec | None = None
     # `artifact` is the PRIMARY build output — the one whose `built_at_commit` is
     # read for identity (graphify writes it only into graph.json). `artifacts` is
     # the wider set of GENERATED outputs (wiki/graphml/svg/GRAPH_REPORT.md) that
@@ -325,8 +404,65 @@ def _ref_binding(name: str, entry: object) -> RefBinding:
         raise ValueError(
             f"{where} field must be one of {sorted(_REF_BINDING_FIELDS)}, got {field!r}"
         )
+    tracks = str(fields.get("tracks", "manifest"))
+    if tracks not in _BINDING_TRACKS:
+        raise ValueError(
+            f"{where} tracks must be one of {sorted(_BINDING_TRACKS)}, got {tracks!r} — "
+            "an unrecognised value would fall through to 'manifest' and silently demand "
+            "that a historical record follow the fork"
+        )
+    expect = str(fields.get("expect", ""))
+    if tracks == "frozen" and not expect:
+        raise ValueError(
+            f"{where} tracks = 'frozen' requires `expect` — a frozen binding compared "
+            "against nothing is a check that can only pass"
+        )
+    if tracks != "frozen" and expect:
+        raise ValueError(
+            f"{where} `expect` is set but tracks = {tracks!r} — it would be silently "
+            "ignored, which reads as a declared check that is not running"
+        )
     _assert_one_capture_group(where, path, pattern)
-    return RefBinding(path=path, pattern=pattern, field=field, note=str(fields.get("note", "")))
+    return RefBinding(
+        path=path,
+        pattern=pattern,
+        field=field,
+        note=str(fields.get("note", "")),
+        tracks=tracks,
+        expect=expect,
+    )
+
+
+def _fork(name: str, entry: object) -> ForkSpec | None:
+    """Parse `[tool.<name>.fork]`, or `None` when the tool is not forked.
+
+    Every field is REQUIRED except `pr`, and a missing one raises. A fork
+    declaration exists to make an uncomfortable state legible; one that omits why
+    it exists or what clears it does the opposite, and would let a temporary pin
+    become permanent with the config still reading as deliberate.
+    """
+    if entry is None:
+        return None
+    where = f"{CONFIG_NAME}: [tool.{name}.fork]"
+    if not isinstance(entry, dict):
+        raise TypeError(f"{where} must be a table")
+    fields = {str(k): v for k, v in entry.items()}
+    required = ("upstream", "base_ref", "base_commit", "reason", "clears_when")
+    missing = [k for k in required if not str(fields.get(k, "")).strip()]
+    if missing:
+        raise ValueError(
+            f"{where} is missing required field(s): {missing} — a fork must state what it "
+            "was forked from, what release it sits on, why it exists, and what returns it "
+            "to upstream"
+        )
+    return ForkSpec(
+        upstream=str(fields["upstream"]),
+        base_ref=str(fields["base_ref"]),
+        base_commit=str(fields["base_commit"]),
+        reason=str(fields["reason"]),
+        clears_when=str(fields["clears_when"]),
+        pr=str(fields.get("pr", "")),
+    )
 
 
 def _assert_one_capture_group(where: str, path: str, pattern: str) -> None:
@@ -404,6 +540,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         skill_install=_tuple("skill_install"),
         skill_stamp=_str("skill_stamp"),
         ref_bindings=_ref_bindings(name, table.get("ref_binding")),
+        fork=_fork(name, table.get("fork")),
         manifest=_str("manifest"),
         tag_prefix=_str("tag_prefix"),
         artifact=_str("artifact"),
