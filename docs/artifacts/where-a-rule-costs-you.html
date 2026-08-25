@@ -1,0 +1,281 @@
+<title>Where a Rule Costs You</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Public+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --bg:        #edeff1;
+    --card:      #ffffff;
+    --sunk:      #e0e4e8;
+    --ink:       #16191c;
+    --ink-soft:  #4e565d;
+    --ink-faint: #7f888f;
+    --rule:      #c9d0d6;
+    --rule-soft: #dfe4e9;
+    --rose:      #a8325f;
+    --rose-wash: #f7e0e9;
+    --moss:      #3d6b3f;
+    --moss-wash: #dcebdc;
+    --slate:     #46586b;
+    --amber:     #96601a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:        #101315;
+      --card:      #191d21;
+      --sunk:      #0b0e10;
+      --ink:       #e8ecef;
+      --ink-soft:  #a8b2b9;
+      --ink-faint: #79838a;
+      --rule:      #2d353c;
+      --rule-soft: #1f262b;
+      --rose:      #ec87ac;
+      --rose-wash: #33161f;
+      --moss:      #8bc48d;
+      --moss-wash: #17281a;
+      --slate:     #9fb3c6;
+      --amber:     #d8a45c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:        #101315;
+    --card:      #191d21;
+    --sunk:      #0b0e10;
+    --ink:       #e8ecef;
+    --ink-soft:  #a8b2b9;
+    --ink-faint: #79838a;
+    --rule:      #2d353c;
+    --rule-soft: #1f262b;
+    --rose:      #ec87ac;
+    --rose-wash: #33161f;
+    --moss:      #8bc48d;
+    --moss-wash: #17281a;
+    --slate:     #9fb3c6;
+    --amber:     #d8a45c;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Public Sans", system-ui, sans-serif;
+    font-size: 16.5px; line-height: 1.6; margin: 0; padding: 0 20px 88px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+
+  header.mast { padding: 58px 0 28px; }
+  .kicker {
+    font-family: "DM Mono", monospace; font-size: 11.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--rose); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: Fraunces, Georgia, serif; font-weight: 900;
+    font-size: clamp(38px, 7vw, 66px); line-height: .98; letter-spacing: -.02em;
+    text-wrap: balance; margin: 0 0 18px;
+  }
+  .standfirst { font-size: clamp(17px,2.3vw,20px); line-height: 1.5; color: var(--ink-soft); max-width: 58ch; margin: 0; }
+  .standfirst strong { color: var(--ink); font-weight: 700; }
+
+  .answer {
+    margin: 28px 0 0; background: var(--moss-wash); border-left: 5px solid var(--moss);
+    padding: 18px 22px; font-size: 16px;
+  }
+  .answer b { color: var(--ink); }
+
+  section { margin: 50px 0 0; }
+  h2 {
+    font-family: Fraunces, Georgia, serif; font-weight: 600;
+    font-size: clamp(24px,3.6vw,34px); line-height: 1.12; letter-spacing: -.012em;
+    text-wrap: balance; margin: 0 0 8px;
+  }
+  .sub { color: var(--ink-soft); font-size: 15px; margin: 0 0 22px; max-width: 62ch; }
+  p { max-width: 64ch; }
+
+  code, .mono { font-family: "DM Mono", monospace; font-size: .87em; }
+  code { background: var(--sunk); padding: .1em .36em; }
+
+  figure { margin: 0 0 22px; background: var(--card); border: 1px solid var(--rule); }
+  .fig-body { padding: 24px 18px 6px; overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink); }
+  figcaption { font-size: 14px; line-height: 1.5; color: var(--ink-soft); padding: 14px 22px 18px; border-top: 1px solid var(--rule-soft); }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(268px,1fr)); gap: 16px; }
+  .mech { background: var(--card); border: 1px solid var(--rule); padding: 20px 22px; }
+  .mech.win { border-top: 5px solid var(--moss); }
+  .mech.lose { border-top: 5px solid var(--rose); }
+  .mech.mid { border-top: 5px solid var(--slate); }
+  .mech h3 { font-size: 16.5px; font-weight: 700; margin: 0 0 3px; }
+  .mech .cost { font-family: "DM Mono", monospace; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 12px; }
+  .mech.win .cost { color: var(--moss); }
+  .mech.lose .cost { color: var(--rose); }
+  .mech.mid .cost { color: var(--slate); }
+  .mech p { font-size: 14.5px; margin: 0 0 9px; max-width: none; }
+  .mech p:last-child { margin: 0; }
+
+  .kill { background: var(--rose-wash); border-left: 5px solid var(--rose); padding: 20px 24px; }
+  .kill h3 { font-size: 16px; font-weight: 700; margin: 0 0 8px; color: var(--rose); }
+  .kill p { font-size: 15px; margin: 0 0 10px; }
+  .kill p:last-child { margin: 0; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 560px; }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th { font-family: "DM Mono", monospace; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.n { font-variant-numeric: tabular-nums; font-family: "DM Mono", monospace; font-size: 13px; }
+
+  .prov { margin-top: 48px; border-top: 1px solid var(--rule); padding-top: 20px; font-size: 13.5px; color: var(--ink-soft); }
+  .prov h2 { font-size: 19px; margin-bottom: 10px; }
+  .prov ul { padding-left: 20px; margin: 0; line-height: 1.6; }
+
+  a { color: var(--rose); }
+  a:focus-visible { outline: 2px solid var(--rose); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="kicker">Rule · path-scoped rule · hook</p>
+    <h1>Where a Rule Costs You</h1>
+    <p class="standfirst">You asked whether "use the LSP, not grep, for callers" should be a path-filtered rule instead of memory — and which option spends the fewest tokens. <strong>Neither rule form is right here</strong>, and the reason is specific to how this session actually reads files.</p>
+    <div class="kill" style="margin:26px 0 0">
+      <h3>Corrected 2026-08-25, after publication — the docs were fetched and three claims here were wrong</h3>
+      <p><b>1. Progressive disclosure via subdirectory <code>CLAUDE.md</code> is REAL, and this page did not consider it.</b> The docs say it plainly: <em>"Claude also discovers CLAUDE.md and CLAUDE.local.md files in subdirectories under your current working directory. Instead of loading them at launch, they are included when Claude reads files in those subdirectories."</em></p>
+      <p><b>2. The "front-loaded, not bounded" cost claim was too strong.</b> On compaction the docs say <em>"Nested CLAUDE.md files in subdirectories and rules with <code>paths:</code> frontmatter reload as Claude reads files they apply to"</em> — so on-demand instructions drop at compaction and return only on a fresh match. That is a better cost profile than the figure below draws.</p>
+      <p><b>3. <code>AGENTS.md</code> is NOT loaded and should never have been in the byte table.</b> <em>"Claude Code reads CLAUDE.md, not AGENTS.md."</em> This repo has no <code>@AGENTS.md</code> import, so its 2,369 bytes cost nothing. The always-loaded total is <b>≈185,000</b>, not 187,500.</p>
+      <p><b>What survives:</b> the recommendation. Rules with <code>paths:</code> do trigger <em>"when Claude reads files matching the pattern, not on every tool use"</em>, so the Bash-first concern below still stands — and it is now <b>measurable</b> rather than argued, via the <code>InstructionsLoaded</code> hook the docs provide for exactly this.</p>
+    </div>
+    <p class="answer"><b>Short answer: a sixth hook guard.</b> It costs <b>zero</b> context tokens until someone breaks the rule, the chain it joins already exists and is tested, and this repo has measured that a deny changes behaviour where a warning does not — <b>62 violations → 0</b>, against <b>0 compliance in 19 chances</b> for the warning it replaced.</p>
+  </header>
+
+  <section>
+    <h2>The three mechanisms, and when each spends</h2>
+    <p class="sub">Context cost is not one number — it depends on <em>when</em> the text enters the window. That is the whole comparison.</p>
+
+    <figure>
+      <div class="fig-body">
+        <svg viewBox="0 0 860 300" role="img" aria-label="A session timeline. An eager rule loads its full text at session start and pays that cost on every turn thereafter. A path-scoped rule pays nothing until Claude reads a matching file, then loads its full text — but only the Read tool triggers it, so a session that reads via Bash cat never pays and never gets the rule. A hook loads nothing at any point and emits a short message only at the moment a violating command is attempted.">
+          <defs>
+            <marker id="t1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <!-- timeline axis -->
+          <line x1="150" y1="266" x2="830" y2="266" stroke="currentColor" stroke-width="1.6" marker-end="url(#t1)" opacity=".6"/>
+          <text x="152" y="286" font-family="DM Mono, monospace" font-size="10.5" fill="currentColor" opacity=".6">session start</text>
+          <text x="470" y="286" text-anchor="middle" font-family="DM Mono, monospace" font-size="10.5" fill="currentColor" opacity=".6">…turns…</text>
+          <text x="820" y="286" text-anchor="end" font-family="DM Mono, monospace" font-size="10.5" fill="currentColor" opacity=".6">the violating command</text>
+          <line x1="160" y1="30" x2="160" y2="260" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".35"/>
+          <line x1="560" y1="30" x2="560" y2="260" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".35"/>
+          <line x1="790" y1="30" x2="790" y2="260" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".35"/>
+          <text x="560" y="24" text-anchor="middle" font-family="DM Mono, monospace" font-size="10.5" fill="currentColor" opacity=".6">a .py file is READ</text>
+
+          <!-- row 1: eager rule -->
+          <text x="0" y="62" font-family="Public Sans, sans-serif" font-size="12.5" font-weight="700" fill="#a8325f">EAGER RULE</text>
+          <text x="0" y="78" font-family="DM Mono, monospace" font-size="10.5" fill="currentColor" opacity=".6">20 of 22 rules here</text>
+          <rect x="160" y="44" width="670" height="26" fill="#a8325f" opacity=".28"/>
+          <rect x="160" y="44" width="670" height="26" fill="none" stroke="#a8325f" stroke-width="1.6"/>
+          <text x="495" y="62" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="12" font-weight="700" fill="#a8325f">full text resident — re-read every single turn</text>
+
+          <!-- row 2: scoped rule -->
+          <text x="0" y="132" font-family="Public Sans, sans-serif" font-size="12.5" font-weight="700" fill="#46586b">PATH-SCOPED RULE</text>
+          <text x="0" y="148" font-family="DM Mono, monospace" font-size="10.5" fill="currentColor" opacity=".6">2 of 22 rules here</text>
+          <line x1="160" y1="127" x2="558" y2="127" stroke="#46586b" stroke-width="1.6" stroke-dasharray="5 5" opacity=".55"/>
+          <text x="300" y="121" font-family="Public Sans, sans-serif" font-size="11.5" fill="#46586b">nothing yet</text>
+          <rect x="560" y="114" width="270" height="26" fill="#46586b" opacity=".26"/>
+          <rect x="560" y="114" width="270" height="26" fill="none" stroke="#46586b" stroke-width="1.6"/>
+          <text x="695" y="132" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="12" font-weight="700" fill="#46586b">full text, then resident</text>
+
+          <!-- row 3: hook -->
+          <text x="0" y="202" font-family="Public Sans, sans-serif" font-size="12.5" font-weight="700" fill="#3d6b3f">HOOK GUARD</text>
+          <text x="0" y="218" font-family="DM Mono, monospace" font-size="10.5" fill="currentColor" opacity=".6">5 already chained</text>
+          <line x1="160" y1="197" x2="788" y2="197" stroke="#3d6b3f" stroke-width="1.6" stroke-dasharray="5 5" opacity=".55"/>
+          <text x="380" y="191" font-family="Public Sans, sans-serif" font-size="11.5" fill="#3d6b3f">nothing — not at start, not on read, not on any turn</text>
+          <rect x="790" y="184" width="40" height="26" fill="#3d6b3f" opacity=".4"/>
+          <rect x="790" y="184" width="40" height="26" fill="none" stroke="#3d6b3f" stroke-width="2"/>
+          <text x="810" y="202" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="11" font-weight="700" fill="#3d6b3f">≈2</text>
+          <text x="700" y="232" font-family="Public Sans, sans-serif" font-size="11.5" font-weight="700" fill="#3d6b3f">one short denial, once</text>
+        </svg>
+      </div>
+      <figcaption>The scoped rule's saving is real but <b>front-loaded, not bounded</b>: once a matching file is read, its full text is resident for the rest of the session exactly like an eager rule. The hook never enters the window at all — it is a shell command the harness runs, and it only speaks when a command actually violates it.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Why the path filter would not fire here</h2>
+
+    <div class="kill">
+      <h3>This session is told to read Python with <code>cat</code> and <code>sed</code>, not the Read tool</h3>
+      <p>A path-scoped rule triggers when Claude <em>reads</em> a file matching the glob. But the standing instruction in this session is to do file work through Bash wherever it can — <code>cat</code>, <code>head</code>, <code>sed -n</code> — and to fall back to the Read tool only when Bash cannot do the job.</p>
+      <p>So a <code>**/*.py</code> filter would sit dark through exactly the sessions it exists to govern. That is not hypothetical: <b>every Python file I opened while getting this wrong today was opened with <code>sed -n</code> or <code>grep</code>, not Read.</b></p>
+      <p><b>Stated honestly:</b> I have not independently probed whether a Bash <code>cat</code> counts as a read for trigger purposes. This rests on the repo's own recorded reading of the docs, and it is the direction I would bet on — but it is a claim worth one probe before anyone builds on it.</p>
+    </div>
+
+    <p style="margin-top:22px;">There is a second, older reason, and this repo has paid for it four separate times. A rule whose trigger is an <strong>action</strong> — about to dismiss a warning, about to stage, about to shell out to an AI CLI, about to claim who calls something — cannot be predicted by any glob. Four rules here carry a written note saying they were path-scoped once, went dark in exactly the sessions that needed them, and were made eager on purpose.</p>
+
+    <p><strong>"Who calls X?" is an action trigger.</strong> The moment is when a callers claim is about to be made, not when a file is opened.</p>
+  </section>
+
+  <section>
+    <h2>The three options, priced</h2>
+    <div class="grid3">
+      <div class="mech lose">
+        <h3>Another eager rule</h3>
+        <p class="cost">every session · every turn</p>
+        <p>Joins the 20 eager rules already loading <b>137,349 bytes</b> — roughly 34k tokens — into every session before you type anything.</p>
+        <p>Always present, always correct, and the most expensive place to put anything.</p>
+      </div>
+      <div class="mech mid">
+        <h3>A path-scoped rule</h3>
+        <p class="cost">zero, then full · if it fires</p>
+        <p>Free until a matching file is read. Then resident for the rest of the session, same as eager.</p>
+        <p>And here it likely <b>never fires</b>, because this session reads Python through Bash.</p>
+      </div>
+      <div class="mech win">
+        <h3>A sixth hook guard</h3>
+        <p class="cost">zero until violated</p>
+        <p>Never enters the context window. Emits a short denial naming the LSP call, only when a caller-shaped grep is actually attempted.</p>
+        <p>Joins a chain that already exists, is already wired, and already has a test file per guard.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The precedent, and it is measured</h2>
+    <p class="sub">This repo has run the warning-versus-deny experiment four times. It has never come out in the warning's favour.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Guard</th><th>What it denies</th><th class="n">Before</th><th class="n">After</th></tr></thead>
+        <tbody>
+          <tr><td><code>graph_first</code></td><td>a repo-wide search before any graph query</td><td class="n">62 · 0/19 obeyed as a warning</td><td class="n">0</td></tr>
+          <tr><td><code>check_first</code></td><td>a hand-chained ruff/ty gate</td><td class="n">35, then 12 more</td><td class="n">0</td></tr>
+          <tr><td><code>stage_explicitly</code></td><td>a blanket <code>git add -A</code></td><td class="n">3 in one session</td><td class="n">0</td></tr>
+          <tr><td><code>secret_guard</code></td><td>a command that would print a credential</td><td class="n">caught its own author twice</td><td class="n">—</td></tr>
+          <tr><td><code>absent_binary</code></td><td>a probe using a binary absent on macOS</td><td class="n">1 near-false conclusion</td><td class="n">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:18px;">The pattern in every row: <strong>knowing the rule prevented nothing.</strong> Three of those violations happened in sessions where the rule was loaded, readable, and being ignored — which is the strongest possible argument against paying context rent for a sixth copy of the same advice.</p>
+  </section>
+
+  <section>
+    <h2>What the guard would actually do</h2>
+    <p class="sub">Narrow on purpose. Every measured defect in this repo's guards has been a false positive, never an evasion — so the design bias is precision.</p>
+    <p><strong>Deny:</strong> a repo-wide or directory-wide search whose pattern looks like a symbol-reference query over Python — a bare identifier, or one followed by <code>(</code> — and print the exact <code>LSP findReferences</code> / <code>incomingCalls</code> call to run instead.</p>
+    <p><strong>Never deny:</strong> a search scoped to one named file; a search for a string literal, a config key, or prose; anything outside Python; and any command already routed through a <code>mise run kb-</code> task. Same tokeniser the existing guards share, so a quoted commit message containing the pattern is one token and can never sit at a command position.</p>
+    <p>Cost to build: one module beside the other five, one test file, one row in the redirect table — the shape this repo's own extension note already prescribes.</p>
+  </section>
+
+  <section class="prov">
+    <h2>Measured this session</h2>
+    <ul>
+      <li><b>22 rule files: 20 eager, 2 path-scoped</b> (<code>ci-local-parity.md</code>, <code>md-size-budgets.md</code>) — counted by checking each file's frontmatter for a <code>paths:</code> key.</li>
+      <li><b>137,349 bytes</b> across <code>.claude/rules/*.md</code> — <code>cat … | wc -c</code>. The token figure is a conventional ~4-bytes-per-token estimate, not a measurement.</li>
+      <li>The PreToolUse hook is already wired to <code>uv run … kb-setup hookguard</code>, and <code>hook_guard.py</code> chains five guards — <code>stage_explicitly</code>, <code>secret_guard</code>, <code>absent_binary</code>, <code>check_first</code>, then <code>graph_first</code>.</li>
+      <li>The before/after violation counts are <b>inherited</b> from this repo's own rule files and memory, not re-derived here — treat them as this repo's recorded measurements rather than mine.</li>
+      <li>The trigger semantics for path-scoped rules come from the repo's recorded reading of the Claude Code docs, <b>not from a probe I ran</b>. Flagged in the body as the one claim worth arming before building on it.</li>
+    </ul>
+  </section>
+
+</div>

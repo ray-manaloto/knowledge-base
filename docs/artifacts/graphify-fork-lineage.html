@@ -1,0 +1,508 @@
+<title>The Fork's Lineage</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,400;0,700;0,900;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<style>
+  :root {
+    --ground:        #eef1f5;
+    --panel:         #ffffff;
+    --panel-sunk:    #e4e9ef;
+    --ink:           #131a22;
+    --ink-soft:      #4a5765;
+    --ink-faint:     #78858f;
+    --rule:          #c6cfd9;
+    --rule-soft:     #dbe2ea;
+    --indigo:        #3b5bdb;
+    --indigo-wash:   #dfe5fb;
+    --amber:         #8f5500;
+    --amber-wash:    #f7e9cf;
+    --moss:          #2b6d47;
+    --moss-wash:     #d9ecdf;
+    --clay:          #9c3218;
+    --clay-wash:     #f6ddd5;
+    --plate:         #f7f9fb;
+    --shadow:        0 1px 0 rgba(19,26,34,.06), 0 8px 24px -14px rgba(19,26,34,.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0c1218;
+      --panel:       #131b23;
+      --panel-sunk:  #0a1016;
+      --ink:         #e6ecf2;
+      --ink-soft:    #a3b0bd;
+      --ink-faint:   #74828f;
+      --rule:        #2b3742;
+      --rule-soft:   #1e2831;
+      --indigo:      #8aa2f5;
+      --indigo-wash: #1c2542;
+      --amber:       #e0a944;
+      --amber-wash:  #362a12;
+      --moss:        #74c795;
+      --moss-wash:   #122c1e;
+      --clay:        #e8917a;
+      --clay-wash:   #35181170;
+      --plate:       #f7f9fb;
+      --shadow:      0 1px 0 rgba(0,0,0,.4), 0 10px 28px -16px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0c1218;
+    --panel:       #131b23;
+    --panel-sunk:  #0a1016;
+    --ink:         #e6ecf2;
+    --ink-soft:    #a3b0bd;
+    --ink-faint:   #74828f;
+    --rule:        #2b3742;
+    --rule-soft:   #1e2831;
+    --indigo:      #8aa2f5;
+    --indigo-wash: #1c2542;
+    --amber:       #e0a944;
+    --amber-wash:  #362a12;
+    --moss:        #74c795;
+    --moss-wash:   #122c1e;
+    --clay:        #e8917a;
+    --clay-wash:   #351811;
+    --plate:       #f7f9fb;
+    --shadow:      0 1px 0 rgba(0,0,0,.4), 0 10px 28px -16px rgba(0,0,0,.9);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+  }
+
+  .wrap { max-width: 940px; margin: 0 auto; }
+
+  /* ---------- masthead ---------- */
+
+  .mast {
+    padding: 56px 0 30px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .eyebrow {
+    font-family: Chivo, "Helvetica Neue", sans-serif;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--indigo);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: Chivo, "Helvetica Neue", sans-serif;
+    font-weight: 900;
+    font-size: clamp(34px, 6.2vw, 58px);
+    line-height: 1.02;
+    letter-spacing: -.022em;
+    text-wrap: balance;
+    margin: 0 0 18px;
+  }
+  .standfirst {
+    font-size: clamp(18px, 2.4vw, 21px);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 60ch;
+    margin: 0;
+  }
+  .standfirst strong { color: var(--ink); font-weight: 600; }
+
+  .stamp {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    margin: 22px 0 0;
+    letter-spacing: .01em;
+  }
+
+  /* ---------- verdict bar ---------- */
+
+  .verdict {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 2px solid var(--ink);
+    border-top: none;
+    background: var(--panel);
+    margin: 0 0 56px;
+  }
+  .verdict > div {
+    flex: 1 1 220px;
+    padding: 20px 22px;
+    border-right: 1px solid var(--rule);
+  }
+  .verdict > div:last-child { border-right: none; }
+  .v-label {
+    font-family: Chivo, sans-serif;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 8px;
+  }
+  .v-value {
+    font-family: Chivo, sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    margin: 0 0 4px;
+    line-height: 1.15;
+  }
+  .v-note {
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin: 0;
+    line-height: 1.4;
+  }
+  .is-moss  .v-value { color: var(--moss); }
+  .is-amber .v-value { color: var(--amber); }
+  .is-clay  .v-value { color: var(--clay); }
+
+  /* ---------- sections ---------- */
+
+  section { margin: 0 0 60px; }
+
+  h2 {
+    font-family: Chivo, sans-serif;
+    font-weight: 700;
+    font-size: clamp(22px, 3.2vw, 29px);
+    letter-spacing: -.015em;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0 0 6px;
+  }
+  .sub {
+    font-size: 15px;
+    color: var(--ink-soft);
+    margin: 0 0 26px;
+    max-width: 64ch;
+  }
+
+  p { max-width: 66ch; }
+
+  code, .mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: .87em;
+  }
+  code {
+    background: var(--panel-sunk);
+    padding: .12em .38em;
+    border-radius: 2px;
+  }
+
+  /* ---------- figure ---------- */
+
+  figure {
+    margin: 0 0 26px;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    box-shadow: var(--shadow);
+  }
+  .fig-body { padding: 26px 20px 6px; overflow-x: auto; }
+  figure svg { display: block; width: 100%; max-width: 100%; height: auto; color: var(--ink); }
+  figcaption {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    padding: 14px 22px 18px;
+    border-top: 1px solid var(--rule-soft);
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  /* mermaid keeps its own light palette in both themes */
+  .mermaid {
+    background: var(--plate);
+    color: #131a22;
+    border: 1px solid var(--rule);
+    padding: 22px 16px;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+
+  /* ---------- pin table ---------- */
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--panel); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 620px; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th {
+    font-family: Chivo, sans-serif;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.file { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; white-space: nowrap; }
+  td.sha  { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--indigo); white-space: nowrap; }
+
+  /* ---------- valves ---------- */
+
+  .valves { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+  .valve {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-top: 4px solid var(--amber);
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+  }
+  .valve.merge { border-top-color: var(--moss); }
+  .valve h3 {
+    font-family: Chivo, sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    letter-spacing: -.008em;
+  }
+  .valve .trigger {
+    font-family: Chivo, sans-serif;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin: 0 0 12px;
+  }
+  .valve.merge .trigger { color: var(--moss); }
+  .valve p { font-size: 14.5px; margin: 0 0 10px; line-height: 1.5; }
+  .valve p:last-child { margin-bottom: 0; }
+  .valve ol { font-size: 14.5px; margin: 0; padding-left: 18px; line-height: 1.55; }
+
+  /* ---------- callout ---------- */
+
+  .callout {
+    background: var(--clay-wash);
+    border-left: 4px solid var(--clay);
+    padding: 20px 24px;
+  }
+  .callout h3 {
+    font-family: Chivo, sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    color: var(--clay);
+  }
+  .callout p { font-size: 15px; margin: 0 0 10px; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout ul { font-size: 14.5px; margin: 0 0 10px; padding-left: 20px; }
+
+  .drift {
+    background: var(--amber-wash);
+    border-left: 4px solid var(--amber);
+    padding: 20px 24px;
+  }
+  .drift h3 { font-family: Chivo, sans-serif; font-size: 16px; font-weight: 700; margin: 0 0 8px; color: var(--amber); }
+  .drift p { font-size: 15px; margin: 0 0 10px; }
+  .drift p:last-child { margin-bottom: 0; }
+
+  /* ---------- provenance ---------- */
+
+  .prov {
+    border-top: 2px solid var(--ink);
+    padding-top: 22px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  .prov h2 { font-size: 17px; margin-bottom: 12px; }
+  .prov ul { padding-left: 20px; margin: 0; line-height: 1.6; }
+  .prov code { font-size: 12px; }
+
+  a { color: var(--indigo); }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--indigo); outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="eyebrow">Knowledge-base · dependency provenance</p>
+    <h1>The Fork's Lineage</h1>
+    <p class="standfirst">We install graphify from our own fork. This page shows exactly what that fork sits on, why <strong>there is nothing newer to rebase onto right now</strong>, and the two events that would change that.</p>
+    <p class="stamp">Measured 2026-08-25 · every SHA below read this session from the GitHub API and the working tree</p>
+  </header>
+
+  <div class="verdict">
+    <div class="is-moss">
+      <p class="v-label">Rebase target</p>
+      <p class="v-value">Already there</p>
+      <p class="v-note">Upstream's newest commit <em>is</em> v0.9.49. Our fork sits directly on it.</p>
+    </div>
+    <div class="is-amber">
+      <p class="v-label">Upstream PR #2981</p>
+      <p class="v-value">Open · conflicting</p>
+      <p class="v-note">Untouched since before we forked. Nothing new to pull in.</p>
+    </div>
+    <div class="is-clay">
+      <p class="v-label">Graph rebuild</p>
+      <p class="v-value">Failed</p>
+      <p class="v-note">Separate problem — died at detect preflight, not in graphify's LLM path.</p>
+    </div>
+  </div>
+
+  <section>
+    <h2>The chain, drawn</h2>
+    <p class="sub">Three repositories are involved and it is easy to point at the wrong one. The trap is <code>main</code>: upstream's default branch is <code>v8</code>, and <code>main</code> has not moved since May.</p>
+
+    <figure>
+      <div class="fig-body">
+        <svg viewBox="0 0 860 400" role="img" aria-label="Commit lineage: upstream graphify's v8 branch ends at commit 282976b2, tagged v0.9.49, which is also its newest commit; the stale main branch stopped in May; PR 2981's head on TelB-io is 1d0a9338 and conflicts with v8; our fork replants seven of its commits onto 282976b2, ending at cdfb11c0, which is what we install.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" fill="currentColor"/>
+            </marker>
+            <marker id="ar-i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" fill="#3b5bdb"/>
+            </marker>
+            <marker id="ar-f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" fill="#8f5500"/>
+            </marker>
+          </defs>
+
+          <!-- lane labels -->
+          <text x="0" y="46" font-family="Chivo, sans-serif" font-size="11" font-weight="700" letter-spacing="1.4" fill="currentColor" opacity=".55">GRAPHIFY-LABS/GRAPHIFY</text>
+          <text x="0" y="196" font-family="Chivo, sans-serif" font-size="11" font-weight="700" letter-spacing="1.4" fill="currentColor" opacity=".55">TELB-IO/GRAPHIFY — PR #2981</text>
+          <text x="0" y="312" font-family="Chivo, sans-serif" font-size="11" font-weight="700" letter-spacing="1.4" fill="#3b5bdb">RAY-MANALOTO/GRAPHIFY — WHAT WE INSTALL</text>
+
+          <!-- upstream main, stale -->
+          <line x1="20" y1="80" x2="150" y2="80" stroke="currentColor" stroke-width="2" opacity=".3"/>
+          <circle cx="150" cy="80" r="7" fill="none" stroke="currentColor" stroke-width="2" opacity=".35"/>
+          <text x="20" y="72" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".5">main</text>
+          <text x="166" y="77" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".5">91f4d120 · frozen 2026-05-14</text>
+          <text x="166" y="92" font-family="Chivo, sans-serif" font-size="10.5" font-weight="700" fill="currentColor" opacity=".45">NOT THE DEFAULT BRANCH</text>
+
+          <!-- upstream v8 -->
+          <line x1="20" y1="130" x2="386" y2="130" stroke="currentColor" stroke-width="2.5"/>
+          <circle cx="130" cy="130" r="6" fill="currentColor"/>
+          <circle cx="240" cy="130" r="6" fill="currentColor"/>
+          <circle cx="386" cy="130" r="10" fill="currentColor"/>
+          <text x="20" y="122" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor">v8 (default)</text>
+          <text x="404" y="120" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="currentColor">282976b2</text>
+          <text x="404" y="136" font-family="Chivo, sans-serif" font-size="11" font-weight="700" fill="currentColor">tag v0.9.49 · 24 Aug 13:18</text>
+          <text x="404" y="151" font-family="Chivo, sans-serif" font-size="11" font-weight="700" fill="#2b6d47">← NEWEST UPSTREAM COMMIT</text>
+
+          <!-- end-of-line tick -->
+          <line x1="386" y1="112" x2="386" y2="148" stroke="#2b6d47" stroke-width="2.5"/>
+
+          <!-- PR head -->
+          <line x1="20" y1="230" x2="300" y2="230" stroke="currentColor" stroke-width="2" stroke-dasharray="7 5" opacity=".65"/>
+          <circle cx="300" cy="230" r="7" fill="none" stroke="currentColor" stroke-width="2.5"/>
+          <text x="316" y="227" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="currentColor">1d0a9338</text>
+          <text x="316" y="242" font-family="Chivo, sans-serif" font-size="11" fill="currentColor" opacity=".75">17 commits · 11 files · last touched 24 Aug 10:09</text>
+
+          <!-- conflict mark into v8 -->
+          <path d="M 300 218 C 300 180, 360 176, 380 146" fill="none" stroke="#9c3218" stroke-width="2" stroke-dasharray="5 4"/>
+          <text x="216" y="182" font-family="Chivo, sans-serif" font-size="11" font-weight="700" fill="#9c3218">cannot merge — conflicts</text>
+
+          <!-- replant arrow -->
+          <path d="M 306 244 C 330 292, 380 300, 424 300" fill="none" stroke="#8f5500" stroke-width="2.2" marker-end="url(#ar-f)"/>
+          <text x="318" y="286" font-family="Chivo, sans-serif" font-size="11" font-weight="700" fill="#8f5500">7 of 17 replanted</text>
+
+          <!-- base arrow from v8 down into our fork -->
+          <path d="M 386 142 C 386 250, 400 300, 420 300" fill="none" stroke="#3b5bdb" stroke-width="2.2" marker-end="url(#ar-i)"/>
+          <text x="398" y="230" font-family="Chivo, sans-serif" font-size="11" font-weight="700" fill="#3b5bdb">rebased onto</text>
+
+          <!-- our fork line -->
+          <line x1="430" y1="340" x2="770" y2="340" stroke="#3b5bdb" stroke-width="3"/>
+          <circle cx="430" cy="340" r="6" fill="#3b5bdb"/>
+          <circle cx="487" cy="340" r="5" fill="#3b5bdb"/>
+          <circle cx="544" cy="340" r="5" fill="#3b5bdb"/>
+          <circle cx="601" cy="340" r="5" fill="#3b5bdb"/>
+          <circle cx="658" cy="340" r="5" fill="#3b5bdb"/>
+          <circle cx="714" cy="340" r="5" fill="#3b5bdb"/>
+          <circle cx="770" cy="340" r="10" fill="#3b5bdb"/>
+          <text x="430" y="322" font-family="JetBrains Mono, monospace" font-size="11" fill="#3b5bdb">kb-pin/openai-cli-backend-v0.9.49</text>
+          <text x="430" y="374" font-family="Chivo, sans-serif" font-size="11" font-weight="700" fill="#3b5bdb">ahead 7 · behind 0</text>
+          <text x="612" y="374" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#3b5bdb">HEAD cdfb11c0</text>
+        </svg>
+      </div>
+      <figcaption><b>The rebase has no target.</b> Upstream's newest commit on its default branch <code>v8</code> is <code>282976b2</code> — which is the <code>v0.9.49</code> tag itself. Our fork is <b>ahead 7, behind 0</b> of exactly that commit, so it already sits on the latest upstream code with #2981's work replanted on top. The PR's own head has not moved since before we forked.</figcaption>
+    </figure>
+
+    <div class="drift">
+      <h3>One stale sentence found while checking</h3>
+      <p><code>sources/graphify.manifest</code> still says the fork reports <code>0.9.48</code> and that <code>pyproject.toml</code> installs <code>1d0a9338…</code>. Both were true before the v0.9.49 rebase and are wrong now — the tree installs <code>cdfb11c0</code> and reports <code>0.9.49</code>. The comment block needs correcting in the same commit as any pin work.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>One pin, written in five places</h2>
+    <p class="sub">A fork ships the same package name and version string as the release it sits on, so nothing that reasons from a <em>version number</em> can see it. The only honest check is that all five surfaces name the same 40-hex commit.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Surface</th><th>Written by</th><th>Commit it names</th><th>State</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="file">pyproject.toml <span style="color:var(--ink-faint)">[tool.uv.sources]</span></td><td>uv add</td><td class="sha">cdfb11c0…</td><td>agrees</td></tr>
+          <tr><td class="file">uv.lock</td><td>uv lock</td><td class="sha">cdfb11c0…</td><td>agrees</td></tr>
+          <tr><td class="file">sources/graphify.manifest</td><td>a human</td><td class="sha">cdfb11c0…</td><td>agrees</td></tr>
+          <tr><td class="file">currency.toml <span style="color:var(--ink-faint)">[tool.graphify.fork]</span></td><td>a human</td><td class="sha">282976b2… <span style="color:var(--ink-faint)">(base)</span></td><td>agrees</td></tr>
+          <tr><td class="file">graphify_baseline + dispositions</td><td>ref-binding check</td><td class="sha">cdfb11c0…</td><td>agrees</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figcaption style="border:none;padding:14px 2px 0;">The <code>ref-binding</code> check in the currency engine is the instrument that finds these — it is what caught four surfaces a research lane had not predicted when the fork was first cut. Run it after any pin move.</figcaption>
+  </section>
+
+  <section>
+    <h2>The two events that would move this</h2>
+    <p class="sub">Nothing else does. Neither is a schedule — both are things that happen upstream, so the mechanism has to be a watch, not a reminder.</p>
+
+    <div class="valves">
+      <div class="valve">
+        <h3>A newer upstream release lands</h3>
+        <p class="trigger">→ rebase the fork</p>
+        <p>Upstream shipped 15 releases in 15 days when last measured, so this is the likely one. The fork branch is replanted onto the new tag, pushed, and the commit is moved in <em>every</em> surface above in one commit.</p>
+      </div>
+      <div class="valve merge">
+        <h3>#2981 merges and ships to PyPI</h3>
+        <p class="trigger">→ retire the fork entirely</p>
+        <ol>
+          <li>Revert <code>pyproject.toml</code> to an ordinary <code>==</code> PyPI pin.</li>
+          <li>Point the manifest back at Graphify-Labs at the matching tag.</li>
+          <li>Delete the <code>[tool.graphify.fork]</code> block.</li>
+        </ol>
+      </div>
+    </div>
+
+    <p style="margin-top:22px;">Neither event notifies us. There is currently <strong>no command that records a watch item as re-probed</strong> — that gap is filed as issue #486, and it is the same gap that blocked five reviewed dependency bumps from landing last round.</p>
+  </section>
+
+  <section>
+    <h2>What the rebuild actually hit</h2>
+    <p class="sub">Unrelated to the fork, but it ran in the same session and the distinction matters: this is not the failure the build stamp predicted.</p>
+
+    <div class="callout">
+      <h3>Detect preflight failed on 6 of 84 sources — no artifact written</h3>
+      <p>The stamp predicted an <code>IncompleteGraphifyOperationError</code> from a <em>pruned-nodes</em> condition. What happened instead was a failure one stage earlier, in <em>detect</em>, on six of the eight manifests added last round:</p>
+      <ul>
+        <li><b>unclassified-files</b> (5) — <code>biome</code> (21 unresolved: licence files, <code>.ungram</code>, <code>.grit</code>), <code>gh</code> (15: CodeQL <code>.ql</code>/<code>.qhelp</code>, embed placeholders), <code>ctx7</code> (1: <code>.mcpb</code>), <code>firecrawl-cli</code> (1: a husky hook), <code>trafilatura</code> (1: a <code>.dtd</code>).</li>
+        <li><b>timeout</b> (1) — <code>ffmpeg</code> exceeded the detect budget.</li>
+      </ul>
+      <p>Because it failed closed, <b>no aggregate artifact and no stamp were mutated</b>. The graph is exactly as it was, and provenance is still absent — <code>.currency-stamp.json</code> and <code>.compose-manifest.json</code> both still do not exist.</p>
+    </div>
+  </section>
+
+  <section class="prov">
+    <h2>Where every number here came from</h2>
+    <ul>
+      <li>Upstream default branch, <code>v8</code> HEAD, <code>main</code> HEAD, the <code>v0.9.49</code> tag SHA, and PR #2981's state and head SHA — <code>gh api repos/Graphify-Labs/graphify/…</code>, run this session.</li>
+      <li><b>ahead 7 / behind 0</b> — <code>gh api repos/ray-manaloto/graphify/compare/282976b2…cdfb11c0</code>, run this session.</li>
+      <li>The five pin surfaces — read this session from <code>pyproject.toml:219-220</code>, <code>uv.lock:651-653</code>, <code>sources/graphify.manifest</code>, and <code>currency.toml:191-228</code>.</li>
+      <li>The build failure — the tail of this session's own <code>mise run kb-build</code>, which exited 1.</li>
+      <li><b>Inherited, not re-measured here:</b> "15 releases in 15 days" and the seven-surface blast radius are carried from the 2026-08-24 fork round's notes, and are labelled as such rather than restated as findings.</li>
+    </ul>
+  </section>
+
+</div>

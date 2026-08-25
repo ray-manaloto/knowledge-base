@@ -1,0 +1,273 @@
+<title>What the Generator Cannot Reach</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=Literata:opsz,wght@7..72,400;7..72,600&family=Roboto+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --bg:        #eceef0;
+    --card:      #ffffff;
+    --sunk:      #e0e4e7;
+    --ink:       #141a1c;
+    --ink-soft:  #4c585c;
+    --ink-faint: #7d888c;
+    --rule:      #c8cfd3;
+    --rule-soft: #dde2e5;
+    --teal:      #0f6d73;
+    --teal-wash: #d8ecec;
+    --amber:     #8a5e00;
+    --amber-wash:#f5e8cc;
+    --green:     #2f6b45;
+    --green-wash:#d9ebe0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:        #0e1316;
+      --card:      #161d21;
+      --sunk:      #0a0f11;
+      --ink:       #e4eaec;
+      --ink-soft:  #a4b0b4;
+      --ink-faint: #74807f;
+      --rule:      #2a343a;
+      --rule-soft: #1d2529;
+      --teal:      #63c2c6;
+      --teal-wash: #102c2e;
+      --amber:     #d9a441;
+      --amber-wash:#33270e;
+      --green:     #78c294;
+      --green-wash:#15291d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:        #0e1316;
+    --card:      #161d21;
+    --sunk:      #0a0f11;
+    --ink:       #e4eaec;
+    --ink-soft:  #a4b0b4;
+    --ink-faint: #74807f;
+    --rule:      #2a343a;
+    --rule-soft: #1d2529;
+    --teal:      #63c2c6;
+    --teal-wash: #102c2e;
+    --amber:     #d9a441;
+    --amber-wash:#33270e;
+    --green:     #78c294;
+    --green-wash:#15291d;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: Literata, Georgia, serif;
+    font-size: 16.5px; line-height: 1.62; margin: 0; padding: 0 20px 88px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+
+  header.mast { padding: 56px 0 30px; border-bottom: 3px double var(--rule); }
+  .kicker {
+    font-family: "Roboto Mono", monospace; font-size: 11.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--teal); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: Archivo, "Helvetica Neue", sans-serif; font-weight: 800;
+    font-size: clamp(36px, 6.4vw, 62px); line-height: 1.0; letter-spacing: -.026em;
+    text-wrap: balance; margin: 0 0 18px;
+  }
+  .standfirst { font-size: clamp(17px,2.3vw,20px); line-height: 1.5; color: var(--ink-soft); max-width: 58ch; margin: 0; }
+  .standfirst strong { color: var(--ink); font-weight: 600; }
+
+  section { margin: 46px 0 0; }
+  h2 {
+    font-family: Archivo, sans-serif; font-weight: 600;
+    font-size: clamp(23px,3.4vw,32px); letter-spacing: -.014em; line-height: 1.14;
+    text-wrap: balance; margin: 0 0 8px;
+  }
+  .sub { color: var(--ink-soft); font-size: 15px; margin: 0 0 22px; max-width: 62ch; }
+  p { max-width: 64ch; }
+
+  code, .mono { font-family: "Roboto Mono", monospace; font-size: .86em; }
+  code { background: var(--sunk); padding: .1em .36em; }
+
+  figure { margin: 0 0 22px; background: var(--card); border: 1px solid var(--rule); }
+  .fig-body { padding: 24px 18px 6px; overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink); }
+  figcaption { font-size: 14px; line-height: 1.5; color: var(--ink-soft); padding: 14px 22px 18px; border-top: 1px solid var(--rule-soft); }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  .evidence { background: var(--card); border: 1px solid var(--rule); border-left: 5px solid var(--teal); padding: 20px 24px; margin: 0 0 22px; }
+  .evidence h3 { font-family: Archivo, sans-serif; font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+  .evidence ul { margin: 0; padding-left: 20px; font-size: 14.5px; line-height: 1.6; }
+
+  .opts { display: grid; gap: 16px; }
+  .opt { background: var(--card); border: 1px solid var(--rule); padding: 20px 24px; display: grid; grid-template-columns: 46px 1fr; gap: 0 18px; align-items: start; }
+  .opt .n {
+    font-family: Archivo, sans-serif; font-weight: 800; font-size: 26px; line-height: 1;
+    color: var(--ink-faint); font-variant-numeric: tabular-nums; padding-top: 2px;
+  }
+  .opt h3 { font-family: Archivo, sans-serif; font-size: 17px; font-weight: 600; margin: 0 0 6px; }
+  .opt p { font-size: 14.5px; margin: 0 0 8px; max-width: none; }
+  .opt p:last-child { margin: 0; }
+  .verdict { font-family: "Roboto Mono", monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  .ok   { color: var(--green); }
+  .warn { color: var(--amber); }
+  .no   { color: #a33; }
+  .opt.pick { border-left: 5px solid var(--green); }
+
+  .prov { margin-top: 46px; border-top: 3px double var(--rule); padding-top: 20px; font-size: 13.5px; color: var(--ink-soft); }
+  .prov h2 { font-size: 19px; margin-bottom: 10px; }
+  .prov ul { padding-left: 20px; margin: 0; line-height: 1.6; }
+
+  a { color: var(--teal); }
+  a:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="kicker">An obstacle in the instruction, surfaced not worked around</p>
+    <h1>What the Generator Cannot Reach</h1>
+    <p class="standfirst">You asked for <code>decide()</code>'s six arguments to be wrapped into a request object <strong>generated by datamodel-code-generator</strong>. The resync is done. The wrapping has a real obstacle, and it is worth thirty seconds before an hour.</p>
+  </header>
+
+  <section>
+    <h2>The generator makes data. These arguments carry behaviour.</h2>
+    <p class="sub">datamodel-code-generator turns a JSON Schema into a model. A JSON Schema can describe a string, a number, a nested object — it cannot describe a method. So the models it produces are pure data, by construction, and this repo's three existing generated modules prove it.</p>
+
+    <figure>
+      <div class="fig-body">
+        <svg viewBox="0 0 860 340" role="img" aria-label="On the left, a JSON Schema feeds datamodel-code-generator, which produces pure-data msgspec Structs containing zero methods. On the right, decide's six arguments include types that carry properties the gates call — SyncStatus.drifted, ViewStatus.quiet, Observation.usable. The arrow from the generator to those types is blocked, because a JSON Schema cannot describe a method.">
+          <defs>
+            <marker id="g1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" fill="#0f6d73"/>
+            </marker>
+          </defs>
+
+          <!-- LEFT: what the generator does -->
+          <text x="0" y="18" font-family="Roboto Mono, monospace" font-size="11" fill="#0f6d73" letter-spacing="1">WHAT THE GENERATOR DOES</text>
+
+          <rect x="0" y="34" width="150" height="46" fill="none" stroke="#0f6d73" stroke-width="1.8"/>
+          <text x="75" y="55" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="11.5" fill="#0f6d73">*.schema.json</text>
+          <text x="75" y="70" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10.5" fill="#0f6d73" opacity=".8">a JSON Schema</text>
+
+          <line x1="158" y1="57" x2="204" y2="57" stroke="#0f6d73" stroke-width="1.8" marker-end="url(#g1)"/>
+
+          <rect x="212" y="34" width="150" height="46" fill="none" stroke="#0f6d73" stroke-width="1.8"/>
+          <text x="287" y="55" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="11.5" fill="#0f6d73">datamodel-codegen</text>
+          <text x="287" y="70" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10.5" fill="#0f6d73" opacity=".8">0.75.1, resynced</text>
+
+          <line x1="370" y1="57" x2="416" y2="57" stroke="#0f6d73" stroke-width="1.8" marker-end="url(#g1)"/>
+
+          <rect x="424" y="26" width="220" height="62" fill="none" stroke="#0f6d73" stroke-width="1.8"/>
+          <text x="534" y="47" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="11.5" fill="#0f6d73">msgspec.Struct</text>
+          <text x="534" y="63" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" font-weight="600" fill="#0f6d73">41 classes · 0 methods</text>
+          <text x="534" y="79" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10.5" fill="#0f6d73" opacity=".8">measured across all three modules</text>
+
+          <!-- divider -->
+          <line x1="0" y1="118" x2="860" y2="118" stroke="currentColor" stroke-width="1" opacity=".25" stroke-dasharray="4 4"/>
+
+          <!-- RIGHT: what decide needs -->
+          <text x="0" y="146" font-family="Roboto Mono, monospace" font-size="11" fill="currentColor" letter-spacing="1" opacity=".65">WHAT decide() ACTUALLY TAKES</text>
+
+          <g font-family="Roboto Mono, monospace" font-size="11.5">
+            <!-- pure data ones -->
+            <rect x="0" y="162" width="250" height="30" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".45"/>
+            <text x="10" y="181" fill="currentColor" opacity=".8">upstream: UpstreamStatus</text>
+            <text x="262" y="181" font-family="Archivo, sans-serif" font-size="10.5" fill="#2f6b45" font-weight="600">plain data</text>
+
+            <rect x="0" y="198" width="250" height="30" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".45"/>
+            <text x="10" y="217" fill="currentColor" opacity=".8">reviewed: dict[str, Reviewed]</text>
+            <text x="262" y="217" font-family="Archivo, sans-serif" font-size="10.5" fill="#2f6b45" font-weight="600">plain data</text>
+
+            <!-- behaviour-bearing -->
+            <rect x="0" y="240" width="250" height="30" fill="none" stroke="#8a5e00" stroke-width="2.2"/>
+            <text x="10" y="259" fill="#8a5e00">sync: SyncStatus</text>
+            <text x="262" y="259" font-family="Archivo, sans-serif" font-size="10.5" fill="#8a5e00" font-weight="600">.drifted · .ok</text>
+
+            <rect x="0" y="276" width="250" height="30" fill="none" stroke="#8a5e00" stroke-width="2.2"/>
+            <text x="10" y="295" fill="#8a5e00">views: ViewStatus</text>
+            <text x="262" y="295" font-family="Archivo, sans-serif" font-size="10.5" fill="#8a5e00" font-weight="600">.quiet</text>
+
+            <rect x="0" y="312" width="250" height="28" fill="none" stroke="#8a5e00" stroke-width="2.2"/>
+            <text x="10" y="330" fill="#8a5e00">observations: Observation[]</text>
+            <text x="262" y="330" font-family="Archivo, sans-serif" font-size="10.5" fill="#8a5e00" font-weight="600">.usable · .differs_from</text>
+          </g>
+
+          <!-- the blocked arrow -->
+          <path d="M 470 100 C 470 200, 460 250, 430 272" fill="none" stroke="#8a5e00" stroke-width="2" stroke-dasharray="6 5"/>
+          <g stroke="#8a5e00" stroke-width="3.4">
+            <line x1="436" y1="176" x2="470" y2="204"/>
+            <line x1="470" y1="176" x2="436" y2="204"/>
+          </g>
+          <text x="492" y="188" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="#8a5e00">a JSON Schema cannot</text>
+          <text x="492" y="205" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="#8a5e00">describe a method</text>
+          <text x="492" y="228" font-family="Archivo, sans-serif" font-size="11.5" fill="currentColor" opacity=".7">…and it cannot name a hand-written</text>
+          <text x="492" y="244" font-family="Archivo, sans-serif" font-size="11.5" fill="currentColor" opacity=".7">Python class as a field's type either.</text>
+        </svg>
+      </div>
+      <figcaption>Generating the request object means generating <b>its fields' types too</b> — and three of the six carry properties the gates call. A generated <code>SyncStatus</code> would arrive without <code>.drifted</code>, and <code>_gate_sync</code> reads it.</figcaption>
+    </figure>
+
+    <div class="evidence">
+      <h3>Measured this session, not assumed</h3>
+      <ul>
+        <li>The three generated modules import only <code>enum</code>, <code>typing</code>, <code>msgspec</code>, and <em>each other</em> — never a hand-written <code>kb_setup</code> type.</li>
+        <li><b>41 generated classes, 0 methods and 0 properties</b> among them.</li>
+        <li><code>SyncStatus.drifted</code> / <code>.ok</code> (<code>sync.py:88-94</code>), <code>ViewStatus.quiet</code> (<code>views.py:122</code>), <code>Observation.usable</code> / <code>.differs_from</code> (<code>issues.py:43-68</code>) — all read by the gates.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Four ways forward</h2>
+    <p class="sub">Only the last two actually remove the argument count. I have a recommendation but the call is yours, because option 3 is a real change to the engine's core and you may want it for other reasons.</p>
+
+    <div class="opts">
+      <div class="opt">
+        <span class="n">1</span>
+        <div>
+          <h3>Generate the request object anyway</h3>
+          <p class="verdict no">does not work</p>
+          <p>The generated container would carry generated field types, and three of them would lose the properties the gates call. It compiles and then the gates read attributes that no longer exist.</p>
+        </div>
+      </div>
+
+      <div class="opt pick">
+        <span class="n">2</span>
+        <div>
+          <h3>Hand-write a six-field frozen dataclass</h3>
+          <p class="verdict ok">works · ~10 lines · recommended</p>
+          <p>A <code>DecisionRequest</code> holding the existing types unchanged. Removes the suppression, keeps every property, touches the call sites and nothing else. The honest note: it is <em>not</em> generated, so it sits outside the codegen discipline you asked for.</p>
+        </div>
+      </div>
+
+      <div class="opt">
+        <span class="n">3</span>
+        <div>
+          <h3>Make the whole currency type family generated</h3>
+          <p class="verdict warn">works · large · changes the engine's shape</p>
+          <p>Describe <code>Observation</code>, <code>SyncStatus</code>, <code>UpstreamStatus</code>, <code>ViewStatus</code> and <code>Reviewed</code> in schemas, generate them as Structs, and move every property out into module functions. This is the version that genuinely honours "the ONE owner of generated models" — and it rewrites the core of the tool-currency engine to get there.</p>
+        </div>
+      </div>
+
+      <div class="opt">
+        <span class="n">4</span>
+        <div>
+          <h3>Raise <code>max-args</code> to 6</h3>
+          <p class="verdict warn">works · no object at all</p>
+          <p>The repo has never set it, so the 5 is ruff's default. No suppression, no refactor — but the check relaxes everywhere, not just here.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="prov">
+    <h2>Where this came from</h2>
+    <ul>
+      <li>The generator's flags and output path — <code>schemas/generate_source_groups.py:55-95</code>; output lands in <code>python/src/kb_setup/generated/</code>.</li>
+      <li>Import and method census of the generated modules — run this session over <code>python/src/kb_setup/generated/*.py</code>.</li>
+      <li><code>decide()</code>'s parameter types — <code>currency/decide.py:429-437</code>, with each type read at its own definition.</li>
+      <li><b>The resync is complete and green:</b> datamodel-code-generator 0.74.0 → 0.75.1 across six surfaces, and all three <code>check_*_codegen</code> comparisons pass byte-identical.</li>
+      <li><b>Not yet verified:</b> whether some datamodel-code-generator flag can type a generated field as an external hand-written class. Nothing in this repo's usage does, and no such option is known to me — but that is an absence of evidence on my side, stated as such rather than as a proof.</li>
+    </ul>
+  </section>
+
+</div>

@@ -141,3 +141,48 @@ Asked how to spend a session already over its context threshold, Ray chose
 `currency watch-reviewed` command, **ticket it and hand-append the notes for
 now** (#486). `currency.toml` is the record, not a pin, so hand-editing it does
 not violate the owning-tool rule.
+
+## 7. ADDENDUM — the code generator owns every model type (2026-08-25, later)
+
+Asked whether `decide()`'s six arguments should be wrapped by a hand-written
+dataclass or by generated Structs, Ray chose **generated**, and restated a
+standing requirement that is wider than the question asked. Verbatim:
+
+> i had already requested all model data types, enums and any other code a code
+> generator to generate be the protocol
+> and if there are common types and enums to move them to a base schema that is
+> available to the other schemas
+
+Two obligations, and the second is new here:
+
+1. **Anything a generator can generate, a generator generates.** Model data
+   types and enums are not hand-authored. `datamodel-code-generator` is the ONE
+   owner (Directive R6, 2026-08-08) and this extends it from the three existing
+   schemas to the currency engine's own type family.
+2. **Common types and enums live in a BASE schema the others `$ref`.** Not
+   copied per schema. Today there is no base schema — `source-groups`,
+   `fetch-receipt` and `session-select` each stand alone, and
+   `session_select.py` already imports from `source_groups.py`, which is
+   generated-module-to-generated-module coupling standing in for a shared base.
+
+### What that costs here, measured 2026-08-25
+
+The obstacle is real and was surfaced before the ruling
+(`docs/artifacts/what-the-generator-cannot-reach.html`): a JSON Schema cannot
+describe a method, and generated models in this repo carry **0 methods across 41
+classes**. Three of `decide()`'s six argument types carry properties the gates
+call — `SyncStatus.drifted`/`.ok` (`sync.py:88-94`), `ViewStatus.quiet`
+(`views.py:122`), `Observation.usable`/`.differs_from` (`issues.py:43-68`). So
+adopting this ruling means those properties move OUT of the types and into
+module-level functions. That is a change to the currency engine's core shape,
+accepted deliberately rather than discovered later.
+
+### Two gaps this uncovered, both open
+
+- **`session-select` has no mise task at all** — neither generate nor check,
+  though `schemas/generate_session_select.py` and
+  `schemas/check_session_select_codegen.py` both exist. One of three generators
+  is unregistered; control-armed, only four `*-codegen*` tasks exist and both
+  belong to the other two.
+- **No codegen check runs in any gate.** None appears in a `depends` anywhere,
+  so even the two registered ones only run when someone types them.

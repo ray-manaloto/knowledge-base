@@ -1968,7 +1968,7 @@ retires (1), and nothing retires (2) short of a version-sorted listing."""
 # `[tool.ruff]` / `[tool.ty]`, so it takes `expected` rather than pretending
 # mise owns it. Bump `expected` and the pyproject pin in the same change, or
 # this row asserts a review that did not happen.
-expected = "0.74.0"
+expected = "0.75.1"
 binary = "datamodel-codegen"
 github = "koxudaxi/datamodel-code-generator"
 pypi = "datamodel-code-generator"

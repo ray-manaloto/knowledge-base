@@ -133,8 +133,8 @@ def test_repository_rejects_skillopt_in_dependency_group(
     pyproject = repo / "pyproject.toml"
     pyproject.write_text(
         pyproject.read_text(encoding="utf-8").replace(
-            'codegen = ["datamodel-code-generator==0.74.0"]',
-            'codegen = ["datamodel-code-generator==0.74.0", "skillopt==0.2.0"]',
+            'codegen = ["datamodel-code-generator==0.75.1"]',
+            'codegen = ["datamodel-code-generator==0.75.1", "skillopt==0.2.0"]',
         ),
         encoding="utf-8",
     )
