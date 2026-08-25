@@ -245,3 +245,101 @@ def test_missing_evidence_is_incomplete_for_every_operation(
     receipt = assess(operation)
     assert receipt.state is GraphifyState.INCOMPLETE
     assert receipt.reasons == ("evidence-missing",)
+
+
+# The exact line `graphify-out/.build-failure.json` recorded on 2026-08-24: a
+# real `kb-build` failed closed on nothing but Graphify's own routine
+# node-pruning narration.
+_PRUNE_NODE_LINE = "[graphify] Pruned 3 node(s) from 3 deleted or excluded source file(s)."
+# The sibling Graphify prints for edges — same code path, no file count.
+_PRUNE_EDGE_LINE = "[graphify] Pruned 5 edge(s) from deleted or excluded source file(s)."
+
+
+@pytest.mark.parametrize(
+    "stderr",
+    [_PRUNE_NODE_LINE, _PRUNE_EDGE_LINE, f"{_PRUNE_NODE_LINE}\n{_PRUNE_EDGE_LINE}"],
+    ids=["node-line", "edge-line", "both-lines"],
+)
+def test_known_graphify_prune_progress_is_not_unaccounted_stderr(stderr: str) -> None:
+    """GREEN ARM: the observed benign line, alone, must not fail a build closed.
+
+    This is the reproduction of the real 2026-08-24 `kb-build` failure: nothing
+    was wrong, Graphify only narrated that a merge dropped nodes/edges for a
+    deleted source file, and the old fail-closed rule could not tell that apart
+    from a genuinely unaccounted warning. Reverting `_unaccounted_stderr`'s
+    filtering makes this fail.
+    """
+    receipt = assess(GraphifyOperation.EXTRACT, GraphifyEvidence(observed=True, stderr=stderr))
+    assert receipt.state is GraphifyState.COMPLETE
+    assert receipt.reasons == ()
+    require_complete(receipt)  # must not raise
+
+
+def test_known_graphify_prune_progress_is_accounted_for_as_a_residual_too() -> None:
+    """The same benign line reaches `_basic_reasons` via `residual_stderr` too.
+
+    A real caller (`graphify_sdk.account_for_extract_stderr`) computes a
+    residual after checking its OWN reviewed classes; when none of those match,
+    the residual is the full stderr, unfiltered for Graphify's routine lines.
+    This must still resolve to COMPLETE — the filtering lives in
+    `graphify_health` regardless of which field carried the text.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(observed=True, stderr=_PRUNE_NODE_LINE, residual_stderr=_PRUNE_NODE_LINE),
+    )
+    assert receipt.state is GraphifyState.COMPLETE
+
+
+def test_a_novel_line_still_blocks_alongside_the_benign_one() -> None:
+    """RED ARM: recognising one benign line is not license for the rest.
+
+    The failure message must name the line that actually blocked, not bury it
+    behind the benign narration.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(
+            observed=True,
+            stderr=f"{_PRUNE_NODE_LINE}\nWARNING: something genuinely unreviewed",
+        ),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert "stderr" in receipt.reasons
+    with pytest.raises(IncompleteGraphifyOperationError) as raised:
+        require_complete(receipt)
+    assert "something genuinely unreviewed" in str(raised.value)
+    assert "Pruned 3 node(s)" not in str(raised.value)
+
+
+def test_extra_text_on_the_same_line_as_the_benign_pattern_still_blocks() -> None:
+    """RED ARM: the match is anchored full-line — trailing text is not laundered.
+
+    A line that merely STARTS with Graphify's benign prefix but says more must
+    not be waved through: that shape is exactly how a real problem would slip
+    past a substring or prefix match.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(observed=True, stderr=f"{_PRUNE_NODE_LINE} also: 12 edges corrupted"),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert "stderr" in receipt.reasons
+
+
+def test_a_real_graphify_warning_sharing_the_prefix_still_blocks() -> None:
+    """RED ARM: `[graphify] ` is not itself a signal.
+
+    Graphify uses the same prefix for genuine `WARNING:` lines a few statements
+    away from the benign prune line. Matching on the prefix alone would
+    launder those through unread too.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(
+            observed=True,
+            stderr="[graphify] WARNING: dropped 2 out-of-scope node(s) during merge",
+        ),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert "stderr" in receipt.reasons

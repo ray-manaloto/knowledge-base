@@ -2005,3 +2005,45 @@ note = """Tags here are bare (`0.74.0`), not `v0.74.0`. A resolver that tries
 only `v<x>` finds nothing and an apply aborts rather than mispinning — the same
 class as `[tool.codex]`'s `rust-v<version>`, in the opposite direction. Stated
 so that abort reads as a known shape rather than a bug."""
+
+[tool.firecrawl-cli]
+# The Firecrawl CLI, pinned 2026-08-24 under Ray's standing rule that every tool
+# this project uses becomes a currency-tracked dependency. It is what the
+# `firecrawl@firecrawl` plugin's skills shell out to — without it those skills
+# are inert, which is the state they were in before this pin.
+#
+# npm publishes it; GitHub is `firecrawl/cli`, NOT `firecrawl/firecrawl-cli`
+# (guessed once, 404) — the npm `repository.url` is what settled it. Its tags
+# track the npm version exactly: npm latest 1.23.1, newest tag `v1.23.1`, so a
+# GitHub upstream check here is meaningful rather than decorative.
+#
+# `firecrawl --version` prints a BARE `1.23.1` with no tool name, unlike agnix
+# and ruff which anchor their own name. Measured by running it, not assumed.
+mise_key = "npm:firecrawl-cli"
+binary = "firecrawl"
+github = "firecrawl/cli"
+tag_prefix = "v"
+version_pattern = '^(\d+\.\d+\.\d+)$'
+
+[tool.ctx7]
+# The official Context7 CLI (npm `ctx7` -> github.com/upstash/context7), pinned
+# HERE 2026-08-24. It was previously reachable only through Ray's global
+# `~/.config/mise/config.toml`, which this repo is forbidden to manage
+# (`do-not.md` #11) — so the project depended on a file it could not reproduce.
+#
+# It is a real dependency, not a convenience: `research-doc-sources.md` step 3
+# names ctx7 as the doc fetcher, and the first-party `context7-cli` skill in
+# upstash/context7 drives this exact binary.
+#
+# DELIBERATELY NO `github` KEY, and that is the whole point of this comment.
+# `upstash/context7` is one repo publishing TWO differently-versioned things:
+# the Claude plugin / MCP server (tags `v1.0.30`) and this CLI (npm `0.5.8`).
+# Pointing an upstream check at those tags would compare 0.5.8 against 1.0.30 —
+# the exact non-comparable-pin failure `[tool.skillopt]` already reports as
+# UNKNOWN. The engine has no `npm` source field (`config.py:176-295` offers
+# `pypi` and `github` only), so there is no honest upstream check available for
+# an npm-only tool. Step 1 still verifies installed-vs-pinned, which is the part
+# that can be checked truthfully; upstream stays unchecked rather than wrong.
+mise_key = "npm:ctx7"
+binary = "ctx7"
+version_pattern = '^(\d+\.\d+\.\d+)$'

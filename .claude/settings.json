@@ -88,7 +88,12 @@
     "plugin-eval@claude-code-workflows": true,
     "codex@openai-codex": true,
     "mcp2cli@claude-community": true,
-    "eli5@claude-community": true
+    "eli5@claude-community": true,
+    "firecrawl@firecrawl": true,
+    "firecrawl@claude-plugins-official": false,
+    "exa@exa": true,
+    "context7@context7-marketplace": true,
+    "last30days@last30days-skill": true
   },
   "extraKnownMarketplaces": {
     "fable-orchestrator": {
@@ -119,6 +124,30 @@
       "source": {
         "source": "github",
         "repo": "wshobson/agents"
+      }
+    },
+    "firecrawl": {
+      "source": {
+        "source": "github",
+        "repo": "firecrawl/firecrawl-claude-plugin"
+      }
+    },
+    "exa": {
+      "source": {
+        "source": "github",
+        "repo": "exa-labs/exa-mcp-server"
+      }
+    },
+    "context7-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "upstash/context7"
+      }
+    },
+    "last30days-skill": {
+      "source": {
+        "source": "github",
+        "repo": "mvanhorn/last30days-skill"
       }
     }
   },

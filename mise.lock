@@ -6755,6 +6755,14 @@ checksum = "sha256:1d0fa7242d5af85586527eab2a7fc5799c54388e1394e34ef5af26db9bc64
 url = "https://github.com/jdx/hk/releases/download/v1.56.0/hk-x86_64-pc-windows-msvc.zip"
 url_api = "https://api.github.com/repos/jdx/hk/releases/assets/520698507"
 
+[[tools."npm:ctx7"]]
+version = "0.5.8"
+backend = "npm:ctx7"
+
+[[tools."npm:firecrawl-cli"]]
+version = "1.23.1"
+backend = "npm:firecrawl-cli"
+
 [[tools.pkl]]
 version = "0.32.1"
 backend = "aqua:apple/pkl"

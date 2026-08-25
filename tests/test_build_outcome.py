@@ -290,6 +290,26 @@ def test_supersession_needs_about_a_second_because_built_at_truncates(tmp_path) 
     assert build_outcome.describe(tmp_path, stamp_built_at=next_second) is None
 
 
+def test_the_failed_message_does_not_overclaim_the_next_attempt(tmp_path) -> None:
+    """The prose fix: a persisted record never re-tests its own cause.
+
+    Before this fix `describe()` unconditionally asserted "re-running
+    `mise run kb-build` will fail again" from a note this function never
+    re-tests — a claim a real record kept making on every session start for
+    three days after the file it named had already stopped existing. `DEFECT`
+    must still be said (control arm, same as the existing interrupt test's);
+    the unconditional future claim must not, and the message must say the
+    record does not re-test its own cause so a reader knows to just re-run it.
+    """
+    build_outcome.record_failure(tmp_path, "build", "SystemExit: refused")
+    described = build_outcome.describe(tmp_path)
+    assert described is not None
+    assert described.kind == build_outcome.FAILED
+    assert "DEFECT" in described.text
+    assert "will fail again" not in described.text
+    assert "does not re-test its own cause" in described.text
+
+
 def test_undecodable_bytes_do_not_escape_the_reader(tmp_path) -> None:
     """A decode error must not escape the reader; `UnicodeError` is no `OSError`.
 

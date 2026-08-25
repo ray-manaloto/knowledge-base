@@ -232,9 +232,43 @@ the second is normal for exactly one entry — `DOPPLER_TOKEN`, keychain-backed 
 design.
 
 **Measured 2026-08-21: five names were stranded that way.**
-`REPOWISE_KNOWLEDGE_BASE_API_KEY` was fixed the same day; **four remain** —
+`REPOWISE_KNOWLEDGE_BASE_API_KEY` was fixed the same day; four remained —
 `FIRECRAWL_API_KEY`, `GITHUB_PAT_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN`,
 `REPO_RECOVERY_AGE_IDENTITY_20260813`.
+
+**Re-measured 2026-08-24: FIVE are stranded, and none of the four was fixed** (#477).
+The same two names-only listings — 60 storable names in Doppler against 52 fnox
+declarations — now strand `OPENROUTER_API_KEY` as well. Doppler's own metadata
+(`DOPPLER_CONFIG`, `DOPPLER_ENVIRONMENT`, `DOPPLER_PROJECT`) and `NAME` also
+appear undeclared and are expected to be; they are not credentials and are
+excluded from the five. The reverse direction was re-verified the same run and
+still holds **exactly**: `DOPPLER_TOKEN` is the only name declared in fnox and
+absent from Doppler.
+
+⚠️ **This section is the worked example of its own thesis.** On 2026-08-24 Ray
+reported `FIRECRAWL_API_KEY` as *"somehow we lost it from the fnox/doppler/macos
+keychain sync"* and asked for documentation. **Nothing was lost, and the
+documentation already existed — this paragraph, naming that exact key, three
+days earlier.** The value never left Doppler; only the fnox declaration was
+missing, which is precisely the silent failure the top of this section describes.
+The gap was never a missing document. It was that a measured, written finding
+sat here with no ticket and no owner, so it was rediscovered from scratch as a
+lost credential.
+
+**The remedy is one line, and this repo may not apply it.** Steps 1–5 of
+*Adding a secret* are already satisfied for every stranded name — the value is
+stored. Only step 6 (the `fnox edit` declaration) and step 8 (the `doctor.toml`
+`env_true` entry) are outstanding. The declaration lives in
+`~/.config/fnox/config.toml` and `doctor.toml` lives in dotfiles, both **outside
+this project**, so `do-not.md` #11 bars an agent here from writing either. An
+agent in this repo diagnoses and reports; the fix is Ray's or dotfiles'.
+
+**Probe safely or not at all.** Presence is `[[ -v FIRECRAWL_API_KEY ]]` — never
+`${FIRECRAWL_API_KEY:+SET}`, which *prints the value* when set and looks correct
+on an unset control arm. Control-arm the probe itself (`[[ -v HOME ]]` must say
+present and a bogus name must say absent) before believing either answer;
+`kb_setup.secret_guard` denies the value-printing verbs, but it cannot tell you
+your probe was broken.
 
 ### ⚠️ `zsh -ic '<cmd>'` is a BROKEN probe for this
 
