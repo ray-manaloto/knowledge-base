@@ -1,6 +1,31 @@
 # Copyright (c) 2026 Raymond Manaloto
 """Drive graphify's OWN native deep extraction over the pinned graphify clone.
 
+## PARKED — no entry point reaches this module (2026-08-24)
+
+The `graphify-native-extract` CLI subcommand and the `kb-graphify-native-extract`
+mise task were both REMOVED, so nothing a human or an agent can invoke reaches the
+code below. The module and its 42 tests stay in the tree as groundwork; they are
+not dead code awaiting deletion, and they are not live code either.
+
+The cold cross-family review of `fa4ed551ac7e` confirmed three blocking defects,
+each armed rather than argued:
+
+* **#479** — `_parse` takes the token after `--out` as its value without asking
+  whether that token is a flag, so `--out --dry-run` sets `dry_run=False` and runs
+  a REAL, token-spending extraction into a directory named `--dry-run`.
+* **#480** — `_refuse_out` validates the `--out` flag, but `graphify/paths.py`
+  reads `GRAPHIFY_OUT` from the environment and `clean_env()` passes it through, so
+  the output root can be relocated without ever meeting the guard.
+* **#481** — `_run_real` and `_run_cluster`, the only functions that spawn the
+  subprocess, have no coverage: replacing both bodies with `return 0` leaves all
+  42 tests green.
+
+**Restoring the subcommand and the task is one gesture, and it requires those three
+closed first.** Reviving this module at all is a decision rather than a repair: the
+ranking below says the SDK path supersedes it, so the question to ask before
+un-parking is whether the SDK route has arrived, not whether these bugs are fixed.
+
 ## Why this exists
 
 **This is now the ONLY semantic-extraction path in the repo — and it is a
@@ -426,9 +451,9 @@ def _refuse_cluster_input(opts: Options) -> str | None:
     if not graph_json.is_file():
         return (
             f"[graphify-native-extract] refusing — {graph_json} does not exist. "
-            "Run `mise run kb-graphify-native-extract` (with neither --cluster nor "
-            f"--artifacts) first to produce it, or point --out at an existing "
-            "extraction tree."
+            "This module is PARKED (see the module docstring): there is no CLI "
+            "subcommand and no mise task that produces an extraction tree, so the "
+            "only way here is a direct call. Point --out at an existing tree."
         )
     return None
 

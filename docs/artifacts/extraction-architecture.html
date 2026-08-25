@@ -174,6 +174,12 @@
     <p class="lede">The repo has <strong>two ways</strong> to turn source files into graph nodes. One drives the <code>graphify</code> CLI. The other re-implements what that CLI already does inside. Your ruling: <strong>the second one goes.</strong></p>
   </header>
 
+  <div style="border:2px solid #b3402f;background:rgba(179,64,47,.08);padding:1.1rem 1.35rem;margin:0 0 2.5rem;">
+    <p style="margin:0 0 .55rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:.78rem;color:#b3402f;">Correction — 2026-08-24, after publication</p>
+    <p style="margin:0 0 .6rem;">This page said the surviving path <strong>stays</strong> and becomes the repo's only extraction route. As of the parking commit that is <strong>no longer true</strong>, and the original claim is left standing above rather than quietly rewritten, because it may already have been acted on.</p>
+    <p style="margin:0;"><code>graphify_native_extract</code> is now <strong>PARKED</strong>: the <code>graphify-native-extract</code> CLI subcommand and the <code>kb-graphify-native-extract</code> mise task are both removed, so nothing reaches it. A cold cross-family review of <code>fa4ed551ac7e</code> confirmed three blocking defects in it — <a href="https://github.com/ray-manaloto/knowledge-base/issues/479">#479</a> a mistyped <code>--dry-run</code> runs a real extraction, <a href="https://github.com/ray-manaloto/knowledge-base/issues/480">#480</a> <code>GRAPHIFY_OUT</code> bypasses the output guard, <a href="https://github.com/ray-manaloto/knowledge-base/issues/481">#481</a> the subprocess functions have zero coverage. The module and its tests remain in the tree as groundwork. Every sequence and table below that shows it as live describes the state <em>before</em> this correction.</p>
+  </div>
+
   <section>
     <div class="eyebrow">The picture in one line</div>
     <h2>A kitchen with two cooks</h2>
