@@ -214,11 +214,16 @@ from __future__ import annotations
 
 import os
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from kb_setup import events
-from kb_setup.graphify_env import assert_pinned_graphify, clean_env, graphify_exe
+from kb_setup.graphify_env import (
+    assert_pinned_graphify,
+    clean_env,
+    graphify_exe,
+    installed_backends,
+)
 from kb_setup.result import Rc
 
 #: The pinned clone this task extracts — never this repo itself. Gitignored,
@@ -260,6 +265,11 @@ _GRAPHIFY_OUT_NAME = "graphify-out"
 #: refusal message can never disagree about which variable is at issue (#480).
 _GRAPHIFY_OUT_ENV = "GRAPHIFY_OUT"
 
+#: The extraction backend when nothing asks for another. Claude, deliberately:
+#: `do-not.md` #4 makes Claude the corpus's only LLM, and a default that had to
+#: be opted OUT of would put an irreversible spending decision one typo away.
+DEFAULT_BACKEND = "claude-cli"
+
 
 @dataclass(frozen=True, slots=True)
 class Options:
@@ -270,6 +280,9 @@ class Options:
     token_budget: int | None = None
     max_concurrency: int | None = None
     allow_parallel_claude_cli: bool = False
+    #: The extraction backend, and with it the model/parallel env keys — ONE
+    #: coupled choice (`backend_env_keys`), never three that can drift apart.
+    backend: str = DEFAULT_BACKEND
     model: str = DEFAULT_MODEL
     dry_run: bool = False
     cluster: bool = False
@@ -350,14 +363,35 @@ _BOOL_FLAGS = {
     "--cluster": "cluster",
 }
 
+#: Flags that take a value, as `flag -> (Options field, how to read the token)`.
+#:
+#: Data for the same reason `_BOOL_FLAGS` above is data, and the comment there
+#: predicted exactly what happened: adding `--backend` as a sixth `elif` pushed
+#: `_parse` to cyclomatic 11 against a ceiling of 10. The honest fix for "one
+#: more branch" is the table the file already reaches for, never a suppression
+#: (`do-not.md` #9).
+#:
+#: The reader is `(repo_root, flag, raw) -> value` so a path can be anchored and
+#: an int validated without the caller knowing which is which — and every entry
+#: goes through `_flag_value` first, so #479's refusal covers a new flag by
+#: construction rather than by whoever adds it remembering to.
+_VALUE_FLAGS = {
+    "--out": ("out", lambda root, _f, raw: root / raw),
+    "--target": ("target", lambda root, _f, raw: root / raw),
+    "--token-budget": ("token_budget", lambda _r, f, raw: _parse_positive_int(f, raw)),
+    "--max-concurrency": ("max_concurrency", lambda _r, f, raw: _parse_positive_int(f, raw)),
+    "--model": ("model", lambda _r, _f, raw: raw),
+    "--backend": ("backend", lambda _r, _f, raw: raw),
+}
+
 
 def _parse(repo_root: Path, argv: list[str]) -> Options:
-    target = repo_root / DEFAULT_TARGET
-    out = repo_root / DEFAULT_OUT
-    token_budget: int | None = None
-    max_concurrency: int | None = None
-    model = DEFAULT_MODEL
-    bool_fields = dict.fromkeys(_BOOL_FLAGS.values(), False)
+    # Defaults come from `Options` itself and are applied by `replace` at the
+    # bottom, so this function holds only what argv actually asked for. The
+    # previous shape restated every default as a local, which is a second place
+    # for a default to live and therefore a second place for one to drift.
+    base = Options(target=repo_root / DEFAULT_TARGET, out=repo_root / DEFAULT_OUT)
+    fields: dict[str, object] = {}
     artifacts_requested = False
     artifacts_views: tuple[str, ...] = ()
 
@@ -365,22 +399,11 @@ def _parse(repo_root: Path, argv: list[str]) -> Options:
     while i < len(argv):
         a = argv[i]
         if a in _BOOL_FLAGS:
-            bool_fields[_BOOL_FLAGS[a]] = True
+            fields[_BOOL_FLAGS[a]] = True
             i += 1
-        elif a == "--out":
-            out = repo_root / _flag_value(argv, i, a)
-            i += 2
-        elif a == "--token-budget":
-            token_budget = _parse_positive_int(a, _flag_value(argv, i, a))
-            i += 2
-        elif a == "--max-concurrency":
-            max_concurrency = _parse_positive_int(a, _flag_value(argv, i, a))
-            i += 2
-        elif a == "--model":
-            model = _flag_value(argv, i, a)
-            i += 2
-        elif a == "--target":
-            target = repo_root / _flag_value(argv, i, a)
+        elif a in _VALUE_FLAGS:
+            field, read = _VALUE_FLAGS[a]
+            fields[field] = read(repo_root, a, _flag_value(argv, i, a))
             i += 2
         elif a == "--artifacts":
             artifacts_requested = True
@@ -388,18 +411,17 @@ def _parse(repo_root: Path, argv: list[str]) -> Options:
         else:
             raise _UsageError(f"unrecognised argument: {a!r}")
 
-    if bool_fields["cluster"] and artifacts_requested:
+    if fields.get("cluster") and artifacts_requested:
         raise _UsageError("pass at most one of --cluster / --artifacts")
 
-    return Options(
-        target=target,
-        out=out,
-        token_budget=token_budget,
-        max_concurrency=max_concurrency,
-        model=model,
+    return replace(
+        base,
         artifacts=artifacts_requested,
         artifacts_views=artifacts_views,
-        **bool_fields,
+        # Every key is an `Options` field name, and the two flag tables above are
+        # what guarantee it — a flag whose field does not exist raises here on the
+        # first parse rather than silently defaulting.
+        **fields,
     )
 
 
@@ -426,7 +448,7 @@ def resolve_argv(exe: str, opts: Options) -> list[str]:
         "--mode",
         "deep",
         "--backend",
-        "claude-cli",
+        opts.backend,
         "--out",
         str(opts.out),
     ]
@@ -442,10 +464,71 @@ def env_overlay(opts: Options) -> dict[str, str]:
 
     See the module docstring's dry-run section. Never the full subprocess env.
     """
-    overlay = {_MODEL_ENV: opts.model}
+    # Keyed on `opts.backend`, never on the module constants this used to read
+    # (#499's sibling, one layer over). `--backend`, the model env and the
+    # parallel env are ONE coupled choice: switching only the first left the
+    # model override pointing at `GRAPHIFY_CLAUDE_CLI_MODEL`, which an
+    # `openai-cli` run never reads — so `--model` went INERT while the dry-run
+    # below kept printing it as though it had applied. Three constants that must
+    # move together are not three settings; they are one, and they are derived
+    # from one value here so they cannot be moved apart.
+    model_env, parallel_env = backend_env_keys(opts.backend)
+    overlay = {model_env: opts.model}
     if opts.allow_parallel_claude_cli:
-        overlay[_PARALLEL_ENV] = "1"
+        overlay[parallel_env] = "1"
     return overlay
+
+
+def backend_env_keys(backend: str) -> tuple[str, str]:
+    """`(model_env, parallel_env)` for `backend`, cross-checked against the table.
+
+    Both follow one shape in graphify — `GRAPHIFY_<BACKEND>_MODEL` and
+    `_PARALLEL`, with `-` becoming `_` — verified in its source for both CLI
+    backends: `GRAPHIFY_CLAUDE_CLI_MODEL` is read at `llm.py:1776`,
+    `GRAPHIFY_OPENAI_CLI_MODEL` at `:1885`, and the two `_PARALLEL` keys at
+    `:2829-2831` and `:3628-3630`.
+
+    Derived AND checked, rather than either alone, because neither source is
+    complete on its own. The table is authoritative where it speaks — but
+    `claude-cli` declares **no** `model_env_key` at all while graphify plainly
+    reads one for it, so a table-only lookup returns nothing for the default
+    backend. And a shape-only derivation would guess past a backend that names
+    its variable differently. So: derive, then refuse if the table disagrees. A
+    disagreement is upstream drift, and guessing past it is how a model override
+    goes inert while the dry-run keeps printing it.
+    """
+    stem = "GRAPHIFY_" + backend.upper().replace("-", "_")
+    model_env = f"{stem}_MODEL"
+    declared = installed_backends().get(backend, {}).get("model_env_key")
+    if declared and declared != model_env:
+        raise _UsageError(
+            f"backend {backend!r} declares model_env_key {declared!r} but this module "
+            f"derives {model_env!r} — graphify's naming changed. Fix the derivation "
+            f"rather than setting a variable the backend will never read."
+        )
+    return model_env, f"{stem}_PARALLEL"
+
+
+def _refuse_backend(backend: str) -> str | None:
+    """`None` if `backend` exists in the installed graphify; else the refusal.
+
+    Fails closed on a spending regression, which is why it refuses rather than
+    warns. `openai-cli` is a PATCH THIS FORK CARRIES, not upstream — its own
+    comment in `llm.py` says that if an upgrade removes it "the backend silently
+    disappears and extraction can fall back to the metered OpenAI API". A run
+    that asked for a subscription-billed backend and silently got a metered one
+    is an irreversible cost, and the only safe answer to "the backend you named
+    is not here" is to not start.
+    """
+    backends = installed_backends()
+    if backend in backends:
+        return None
+    return (
+        f"[graphify-native-extract] refusing --backend {backend} — the installed "
+        f"graphify has no such backend. Available: {', '.join(sorted(backends))}. "
+        f"If you expected it, an upgrade may have dropped a fork-local patch; "
+        f"`mise run kb-currency-check` reports that."
+    )
 
 
 def resolve_env(opts: Options) -> dict[str, str]:
@@ -765,7 +848,7 @@ def native_extract_main(repo_root: Path, argv: list[str]) -> int:
             "graphify-native-extract` subcommand and no `kb-graphify-native-extract` "
             "mise task, so you reached this by importing it directly. Accepted argv: "
             "[--out DIR] [--target DIR] [--token-budget N] [--max-concurrency N] "
-            "[--model NAME] [--allow-parallel-claude-cli] [--cluster] "
+            "[--model NAME] [--backend NAME] [--allow-parallel-claude-cli] [--cluster] "
             "[--artifacts [VIEW...]] [--dry-run]"
         )
         return Rc.BAD_REQUEST
@@ -773,6 +856,14 @@ def native_extract_main(repo_root: Path, argv: list[str]) -> int:
     out_problem = _refuse_out(repo_root, opts)
     if out_problem:
         events.fail("graphify_native_extract.unsafe_out", out_problem)
+        return Rc.BAD_REQUEST
+
+    # Before the dry-run too, deliberately: a preview that renders a plan for a
+    # backend the installed graphify does not have is a preview of a run that
+    # cannot happen, and the point of a dry run is to find that out cheaply.
+    backend_problem = _refuse_backend(opts.backend)
+    if backend_problem:
+        events.fail("graphify_native_extract.unknown_backend", backend_problem)
         return Rc.BAD_REQUEST
 
     exe = graphify_exe(repo_root)

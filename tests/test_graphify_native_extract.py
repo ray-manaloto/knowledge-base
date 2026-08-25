@@ -690,3 +690,106 @@ def test_run_real_checks_the_pin_before_spawning(tmp_path, monkeypatch) -> None:
     )
     gne._run_real(tmp_path, "/bin/graphify", gne.Options(target=tmp_path, out=tmp_path / "o"))
     assert order == ["pin", "spawn"]
+
+
+# --- the backend parameter: three constants that must move together ----------
+
+
+def test_the_backend_reaches_argv(tmp_path: Path) -> None:
+    """`--backend` must actually change what is invoked, not just what is stored."""
+    opts = gne.Options(target=tmp_path, out=tmp_path / "o", backend="openai-cli")
+    argv = gne.resolve_argv("/bin/graphify", opts)
+    assert "--backend" in argv
+    assert argv[argv.index("--backend") + 1] == "openai-cli"
+
+
+def test_the_default_backend_is_still_claude_cli(tmp_path: Path) -> None:
+    """The control arm on the parameterisation, and a policy assertion.
+
+    `do-not.md` #4 makes Claude the corpus's only LLM. A default that had to be
+    opted OUT of would put an irreversible spending decision one typo away.
+    """
+    argv = gne.resolve_argv("/bin/graphify", gne.Options(target=tmp_path, out=tmp_path / "o"))
+    assert argv[argv.index("--backend") + 1] == "claude-cli"
+
+
+def test_the_model_env_key_follows_the_backend(tmp_path: Path) -> None:
+    """The coupled-constants defect, asserted directly.
+
+    Switching only `--backend` left the model override on
+    `GRAPHIFY_CLAUDE_CLI_MODEL`, which an `openai-cli` run never reads — so
+    `--model` went INERT while the dry-run kept printing it as though it applied.
+    Asserted as a DISAGREEMENT between the two backends' overlays: a test that
+    only checked "the model is in there" passes with the wrong key.
+    """
+    claude = gne.env_overlay(gne.Options(target=tmp_path, out=tmp_path / "o", model="m"))
+    openai = gne.env_overlay(
+        gne.Options(target=tmp_path, out=tmp_path / "o", model="m", backend="openai-cli")
+    )
+    assert "GRAPHIFY_CLAUDE_CLI_MODEL" in claude
+    assert "GRAPHIFY_OPENAI_CLI_MODEL" in openai
+    assert "GRAPHIFY_CLAUDE_CLI_MODEL" not in openai
+
+
+def test_the_parallel_env_key_follows_the_backend_too(tmp_path: Path) -> None:
+    """The third constant. graphify reads both (`llm.py:2829-2831`)."""
+    overlay = gne.env_overlay(
+        gne.Options(
+            target=tmp_path,
+            out=tmp_path / "o",
+            backend="openai-cli",
+            allow_parallel_claude_cli=True,
+        )
+    )
+    assert overlay["GRAPHIFY_OPENAI_CLI_PARALLEL"] == "1"
+    assert "GRAPHIFY_CLAUDE_CLI_PARALLEL" not in overlay
+
+
+def test_backend_env_keys_agree_with_graphifys_own_table() -> None:
+    """The cross-check that keeps the derivation honest.
+
+    graphify's table declares `model_env_key` for `openai-cli` and — measured,
+    not assumed — declares NONE for `claude-cli`, though `llm.py:1776` plainly
+    reads one. So neither source is complete alone: the table is authoritative
+    where it speaks, and the derivation covers where it does not.
+    """
+    model_env, parallel_env = gne.backend_env_keys("openai-cli")
+    assert model_env == gne.installed_backends()["openai-cli"]["model_env_key"]
+    assert parallel_env == "GRAPHIFY_OPENAI_CLI_PARALLEL"
+    assert gne.backend_env_keys("claude-cli")[0] == "GRAPHIFY_CLAUDE_CLI_MODEL"
+
+
+def test_an_unknown_backend_is_refused() -> None:
+    """Fails closed on a spending regression.
+
+    `openai-cli` is a patch this FORK carries; its own comment warns that an
+    upgrade dropping it lets extraction fall back to the metered OpenAI API. A
+    run that asked for a subscription-billed backend and silently got a metered
+    one is an irreversible cost.
+    """
+    problem = gne._refuse_backend("no-such-backend")
+    assert problem is not None
+    assert "no-such-backend" in problem
+
+
+def test_a_known_backend_is_not_refused() -> None:
+    """The control arm: a guard that refuses everything passes the test above."""
+    assert gne._refuse_backend("claude-cli") is None
+    assert gne._refuse_backend("openai-cli") is None
+
+
+def test_main_refuses_an_unknown_backend_before_the_dry_run(tmp_path: Path) -> None:
+    """Checked ahead of `--dry-run`, not after.
+
+    A preview of a run that cannot happen is worse than no preview: the point of
+    a dry run is to find that out cheaply.
+    """
+    _make_target(tmp_path)
+    rc = gne.native_extract_main(tmp_path, ["--backend", "no-such-backend", "--dry-run"])
+    assert rc == Rc.BAD_REQUEST
+
+
+def test_backend_parses_from_argv(tmp_path: Path) -> None:
+    opts = gne._parse(tmp_path, ["--backend", "openai-cli", "--dry-run"])
+    assert opts.backend == "openai-cli"
+    assert opts.dry_run is True

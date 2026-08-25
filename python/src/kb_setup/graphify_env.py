@@ -253,3 +253,26 @@ def _imports(py: str, module: str) -> bool:
         )
     except OSError, subprocess.SubprocessError:
         return False
+
+
+def installed_backends() -> dict[str, dict]:
+    """Graphify's OWN backend table, read from the installed package.
+
+    Imported LAZILY and not at module scope: this module is imported by callers
+    that only want `clean_env()`, and merely importing it must not fail wherever
+    graphify is absent — that is a state `assert_pinned_graphify` REPORTS rather
+    than crashes on.
+
+    `BACKENDS` is a public name (no underscore), so this stays inside Ray's
+    ranking; rule 3 forbids graphify's private internals, not its public table.
+
+    Read rather than mirrored, and living HERE rather than beside either caller,
+    because a second copy is how this repo's two worst recent defects survived:
+    #245 (one prefix rule, two spellings, one fixed) and #499 (one version, two
+    write targets, one string). `graphify_native_extract` needs it to derive a
+    backend's env keys; the currency engine needs it to notice a fork-local
+    backend disappearing on upgrade. One reader, two consumers.
+    """
+    from graphify.llm import BACKENDS
+
+    return dict(BACKENDS)

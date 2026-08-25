@@ -897,6 +897,11 @@ def test_a_present_ffmpeg_is_in_sync_with_no_manifest_or_stamp(tmp_path, monkeyp
         "ref-binding",
         "skill-stamp",
         "build-stamp",
+        # ffmpeg has no backend table of its own, so `backend_probes` is
+        # inapplicable — SKIP, like every other row here. Listing it rather than
+        # loosening the comparison to a subset is the point of this assertion:
+        # it is what makes a new check announce itself instead of arriving green.
+        "backend-probes",
     }
 
 
@@ -1404,3 +1409,36 @@ def test_a_corrupt_stamp_is_not_reported_as_never_run(tmp_path, monkeypatch) -> 
     # "this is NOT 'never run'", so that assertion fails on the remedy's own
     # wording rather than on the behaviour. A remedy has to clear its own text.
     assert "NOT 'never run'" in corrupt.detail
+
+
+# --- backend_probes: a fork-local backend dropped by an upgrade ---------------
+
+
+def test_backend_probes_skips_when_none_are_declared() -> None:
+    """SKIP, never OK. A tool that declares none was not checked, not verified."""
+    finding = sync._check_backend_probes(config.ToolSpec(name="x", binary="x"))
+    assert finding.status is sync.SKIP
+
+
+def test_backend_probes_reports_ok_when_every_backend_is_present() -> None:
+    """The control arm: the probe must be able to return OK, or DRIFT means nothing."""
+    finding = sync._check_backend_probes(
+        config.ToolSpec(
+            name="graphify", binary="graphify", backend_probes=("claude-cli", "openai-cli")
+        )
+    )
+    assert finding.status is sync.OK
+
+
+def test_backend_probes_reports_drift_when_one_is_missing() -> None:
+    """The failure this exists for, and the only one a version compare cannot see.
+
+    `openai-cli` is a patch this fork carries; graphify's own comment says that
+    losing it lets extraction fall back to the METERED OpenAI API. Every pin
+    still agrees on the day that happens.
+    """
+    finding = sync._check_backend_probes(
+        config.ToolSpec(name="graphify", binary="graphify", backend_probes=("no-such-backend",))
+    )
+    assert finding.status is sync.DRIFT
+    assert "no-such-backend" in finding.detail
