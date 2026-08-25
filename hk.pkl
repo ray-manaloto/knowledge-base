@@ -318,7 +318,17 @@ local proseExclude = baseExclude
 // one for a staged-scope command. Its FAIL direction was armed by hand instead
 // (isolated repo, planted key staged -> rc 1; cleaned -> rc 0; same key in a
 // gitignored file -> rc 0 where the old shape gave rc 1), and the builtin still
-// covers `check`/`fix`, so the 47 remaining step tests are unchanged.
+// covers `check`/`fix`, so the 46 remaining step tests are unchanged. (46, not
+// 47: the pre-fix run was 47 passed / 1 failed = 48 declared, and removing the
+// inherited PAIR leaves 46. A cold lane caught the off-by-one here while the
+// commit body had it right — the in-tree comment is the copy a reader lands on.)
+//
+// `--pre-commit` AND `--staged` are both passed, and that is deliberate upstream
+// parity: gitleaks' own `.pre-commit-hooks.yaml` passes both. `--staged` wins —
+// armed: secret on disk but unstaged -> rc 0; staged clean while the disk holds
+// it -> rc 0; staged WITH it, disk then cleaned -> rc 1. That last case is one
+// the old disk-scanning shape MISSED, so this gate is strictly stronger there.
+// Do not "tidy" either flag away; they are copied from upstream on purpose.
 local gitleaksStaged: Step = new Step {
   types = List("text")
   check = new CommandSpec {
