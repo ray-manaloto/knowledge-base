@@ -59,6 +59,18 @@ ul{margin:0; padding-left:1.15em} li{margin-bottom:6px}
   <p class="lede">Every dependency this repo uses has to agree with itself in four places. Ninety-four times. Here is where it doesn't.</p>
 </header>
 
+<div class="card" style="border-left:3px solid var(--drift)">
+  <p class="eyebrow" style="color:var(--drift)">Correction &middot; added 2026-08-25, after publication</p>
+  <h3>Three claims on this page were refuted by later measurement</h3>
+  <p>They are corrected here rather than silently overwritten, because the original was already read and acted on.</p>
+  <ul>
+    <li><strong>&ldquo;3 drifts&rdquo; was the wrong frame.</strong> <code>pkl</code>, <code>typos</code> and <code>codex</code> are drifted <em>manifest-side only</em> &mdash; <code>mise.toml</code> already pinned the newer version of all three. The real upstream drift was five other tools: <code>hk</code>, <code>rumdl</code>, <code>agnix</code>, <code>fnox</code>, <code>mise</code>.</li>
+    <li><strong>The gap count held, but one fix was wrong.</strong> All eight missing manifests were added (76 &rarr; 84 sources). <code>ffmpeg</code>&rsquo;s was then found to pin the <em>tag object</em> rather than the commit &mdash; <code>n9.0.1</code> is annotated, and <code>git ls-remote --tags</code> returns the tag object for those. Corrected within the hour; the other five tag-pinned sources are lightweight and were already right.</li>
+    <li><strong>&ldquo;The build&rsquo;s recorded cause no longer reproduces&rdquo; understated the situation.</strong> Both <code>.currency-stamp.json</code> and <code>.compose-manifest.json</code> are <em>absent</em>, with <code>.build-failure.json</code> present &mdash; so the graph has no provenance record at all. Every graph-derived figure is not stale but <strong>unanswerable</strong> until a rebuild.</li>
+  </ul>
+  <p style="font-size:.94rem;color:var(--slate)">One exclusion also flipped: <code>codex</code> moves from <code>skip</code> to <code>include</code>, confirmed by the code&rsquo;s own comment at <code>graph.py:203-205</code> saying it was excluded &ldquo;out of scope&rdquo; rather than by defect.</p>
+</div>
+
 <div class="card lead">
   <h3>The one-sentence version</h3>
   <p>A pinned tool is only <em>really</em> in the knowledge graph when four separate things say the same version. We measured all four for every first-level dependency: <strong>9 never start the chain</strong>, <strong>3 break at the second link</strong>, and <strong>6 are cut before the last one</strong>.</p>
