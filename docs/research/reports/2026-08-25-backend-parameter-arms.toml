@@ -1,0 +1,125 @@
+# Mutation arms for the backend parameter and its two guards (Ray, 2026-08-25).
+#
+# `--backend`, the model env key and the parallel env key are ONE coupled
+# choice, not three settings. Switching only the first left `--model` pointing at
+# `GRAPHIFY_CLAUDE_CLI_MODEL`, which an `openai-cli` run never reads — so the
+# override went INERT while the dry-run kept printing it as though it applied.
+# That is #499's shape one layer over: one value, several write targets, and the
+# targets do not agree.
+#
+# The guards are Ray's call, both halves: a currency check that notices the
+# fork-local `openai-cli` patch disappearing on upgrade, and a runtime refusal at
+# the moment of spend. `openai-cli` is not upstream — graphify's own comment
+# beside it warns that losing it lets extraction fall back to the METERED OpenAI
+# API. Every version number still agrees on the day that happens, which is
+# exactly why no pin-vs-pin check can see it.
+#
+# P4 and P7 are the CONTROL-shaped arms, and they are in for the same reason:
+# every measured defect in this repo's own guards has been a FALSE POSITIVE, not
+# an evasion. A refusal that fires on everything, and a default that quietly
+# stops being claude-cli, both pass every other arm here.
+#
+# SCOPE, stated so a clean sweep is not over-read. What is NOT armed here:
+#   - that `openai-cli` extraction WORKS. No arm starts a graphify process or
+#     makes a provider call; the whole batch is argv, env and refusal shape.
+#   - the vision degrade. graphify strips pixels for a non-vision backend and
+#     emits a text-reference node instead (`llm.py:2158-2164`); that is its
+#     behaviour, not ours, and no test here exercises it.
+#   - whether the module should be UN-PARKED. It is not, and this batch does not
+#     un-park it — the docstring records that the SDK route has arrived for this
+#     verb, which is a design decision rather than a test.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: that switching backends is safe to do. It
+# means the three constants can no longer drift apart silently, and that an
+# absent backend is refused rather than paid for.
+
+suites = [
+  "tests/test_graphify_native_extract.py",
+  "tests/test_currency_sync.py",
+]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''DEFAULT_BACKEND = "claude-cli"'''
+new = '''DEFAULT_BACKEND = "claude-cli"  # control'''
+
+# ── P1: the backend must reach argv, not merely be stored ─────────────────
+[[arm]]
+id = "P1"
+test = "test_the_backend_reaches_argv"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''        opts.backend,'''
+new = '''        "claude-cli",'''
+
+# ── P2: the MODEL env key must follow the backend ─────────────────────────
+# The defect itself. Reverting to the old module constant is the exact prior
+# shape, and it is the one that reads as harmless: everything still runs, the
+# dry-run still prints a model, and the model is simply never applied.
+[[arm]]
+id = "P2"
+test = "test_the_model_env_key_follows_the_backend"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    model_env, parallel_env = backend_env_keys(opts.backend)'''
+new = '''    model_env, parallel_env = backend_env_keys(DEFAULT_BACKEND)'''
+
+# ── P3: the derivation must be cross-checked against graphify's table ─────
+# Deriving without checking is guessing; a backend that names its variable
+# differently would get a variable it never reads, silently.
+[[arm]]
+id = "P3"
+test = "test_backend_env_keys_agree_with_graphifys_own_table"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    stem = "GRAPHIFY_" + backend.upper().replace("-", "_")'''
+new = '''    stem = "GRAPHIFY_" + backend.upper()'''
+
+# ── P4: the DEFAULT must stay claude-cli ──────────────────────────────────
+# A policy assertion, not a mechanical one: `do-not.md` #4 makes Claude the
+# corpus's only LLM. A default that had to be opted OUT of would put an
+# irreversible spending decision one typo away.
+[[arm]]
+id = "P4"
+test = "test_the_default_backend_is_still_claude_cli"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''DEFAULT_BACKEND = "claude-cli"'''
+new = '''DEFAULT_BACKEND = "openai-cli"'''
+
+# ── P5: the runtime refusal — guard half 2, at the moment of spend ────────
+[[arm]]
+id = "P5"
+test = "test_an_unknown_backend_is_refused"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    if backend in backends:
+        return None'''
+new = '''    return None'''
+
+# ── P6: the currency check — guard half 1, at session start ───────────────
+[[arm]]
+id = "P6"
+test = "test_backend_probes_reports_drift_when_one_is_missing"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    missing = [b for b in spec.backend_probes if b not in available]'''
+new = '''    missing = []'''
+
+# ── P7: neither guard may refuse a backend that IS present ───────────────
+# The false-positive direction, armed on the currency half. A check that
+# reports DRIFT for everything satisfies P6 while making every run red.
+[[arm]]
+id = "P7"
+test = "test_backend_probes_reports_ok_when_every_backend_is_present"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    missing = [b for b in spec.backend_probes if b not in available]'''
+new = '''    missing = list(spec.backend_probes)'''
+
+# ── P8: a tool declaring no backends is SKIP, never OK ───────────────────
+# The DRIFT/SKIP/OK collapse this engine refuses everywhere else. dotfiles
+# consumes this engine and has no graphify at all; reporting OK there would
+# claim a check that never ran.
+[[arm]]
+id = "P8"
+test = "test_backend_probes_skips_when_none_are_declared"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''        return Finding("backend-probes", SKIP, "no backend_probes declared for this tool")'''
+new = '''        return Finding("backend-probes", OK, "no backend_probes declared for this tool")'''

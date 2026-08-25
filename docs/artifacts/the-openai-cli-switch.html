@@ -1,0 +1,477 @@
+<title>The openai-cli Switch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground:  #EBEEF4;
+    --surface: #FFFFFF;
+    --sunken:  #DDE3EC;
+    --ink:     #151A23;
+    --muted:   #5A6579;
+    --rule:    #C3CCDA;
+
+    --route:   #1B4FC4;   /* the path taken */
+    --route-bg:#DCE5F8;
+    --degrade: #8A5A2B;   /* the path that still works, but with less */
+    --degrade-bg:#F3E6D4;
+    --stop:    #A02B2B;
+
+    --plate:      #FFFFFF;
+    --plate-rule: #C3CCDA;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #11141B;
+      --surface: #191E27;
+      --sunken:  #212836;
+      --ink:     #E5E9F0;
+      --muted:   #939EB2;
+      --rule:    #333C4C;
+      --route:   #7CA2F5;
+      --route-bg:#182642;
+      --degrade: #D6A05E;
+      --degrade-bg:#33261440;
+      --stop:    #E97C74;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:  #11141B;
+    --surface: #191E27;
+    --sunken:  #212836;
+    --ink:     #E5E9F0;
+    --muted:   #939EB2;
+    --rule:    #333C4C;
+    --route:   #7CA2F5;
+    --route-bg:#182642;
+    --degrade: #D6A05E;
+    --degrade-bg:#332614;
+    --stop:    #E97C74;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 1.25rem 5rem;
+  }
+
+  .wrap { max-width: 42rem; margin: 0 auto; }
+  .wide { max-width: 56rem; margin: 0 auto; }
+
+  header {
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 3.5rem 0 0;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-family: Archivo, "Helvetica Neue", sans-serif;
+    font-weight: 700;
+    font-size: clamp(1.9rem, 5.4vw, 2.7rem);
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0.85rem 0 0;
+  }
+
+  h2 {
+    font-family: Archivo, "Helvetica Neue", sans-serif;
+    font-weight: 700;
+    font-size: 1.35rem;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 3rem 0 0;
+  }
+
+  h3 {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    margin: 1.9rem 0 0;
+  }
+
+  p { margin: 0.9rem 0 0; text-wrap: pretty; }
+
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.86em;
+    background: var(--sunken);
+    padding: 0.08em 0.34em;
+    border-radius: 3px;
+  }
+
+  /* The lead: the finding that changes the question. */
+  .lede {
+    margin-top: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--route);
+    border-radius: 4px;
+    padding: 1.3rem 1.4rem;
+  }
+  .lede .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--route);
+  }
+  .lede p { margin-top: 0.5rem; font-size: 1.06rem; }
+
+  figure {
+    margin: 2.2rem auto 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.6rem 1.4rem 1.1rem;
+  }
+  figure svg { display: block; width: 100%; height: auto; }
+
+  figcaption {
+    margin-top: 1.15rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .mermaid {
+    background: var(--plate);
+    border: 1px solid var(--plate-rule);
+    border-radius: 3px;
+    padding: 1rem 0.7rem;
+    overflow-x: auto;
+  }
+
+  .scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.5rem;
+  }
+  th {
+    text-align: left;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 0.85rem 0.5rem 0;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.58rem 0.85rem 0.58rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  .pill {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.14em 0.5em;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .pill.sees   { color: var(--route);   background: var(--route-bg); }
+  .pill.names  { color: var(--degrade); background: var(--degrade-bg); }
+  .pill.stops  { color: var(--stop);    background: transparent; border: 1px solid currentColor; }
+
+  ul, ol { margin: 0.9rem 0 0; padding-left: 1.2rem; }
+  li { margin-top: 0.45rem; text-wrap: pretty; }
+
+  .num {
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  footer {
+    max-width: 42rem;
+    margin: 4rem auto 0;
+    padding-top: 1.3rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  a { color: var(--route); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--degrade); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<header>
+  <span class="eyebrow">knowledge-base · routing decision · 2026-08-25</span>
+  <h1>The openai-cli switch</h1>
+</header>
+
+<div class="wrap">
+
+  <div class="lede">
+    <span class="tag">The question is smaller than the handoff framed it</span>
+    <p>
+      The handoff says any image in the corpus must <em>“stay on claude-cli, be
+      skipped explicitly, or route elsewhere.”</em> There is a fourth option, and
+      graphify already implements it: a non-vision backend gets the
+      <strong>pixels stripped</strong> and the image still becomes a graph node,
+      described by its path instead of its contents.
+    </p>
+  </div>
+
+  <p>
+    So nothing breaks and nothing is dropped. What changes is that an image goes
+    from <span class="pill sees">SEEN</span> to
+    <span class="pill names">NAMED</span> — a real loss of fidelity, but a
+    graceful one, and reversible by re-extracting on claude-cli later.
+  </p>
+
+</div>
+
+<div class="wide">
+  <figure>
+    <svg viewBox="0 0 700 250" role="img" aria-label="How graphify routes an image file by backend: a vision backend receives pixels, a non-vision backend has the pixels stripped and receives a text reference, and in both cases a graph node is produced.">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 1 L 9 5 L 0 9 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <!-- input -->
+      <rect x="10" y="98" width="118" height="48" rx="3" fill="none" stroke="currentColor" stroke-opacity="0.45"/>
+      <text x="69" y="118" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity="0.75">an image file</text>
+      <text x="69" y="134" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity="0.55">.png .jpg .webp</text>
+
+      <path d="M 128 122 L 186 122" fill="none" stroke="currentColor" stroke-opacity="0.5" marker-end="url(#a1)"/>
+
+      <!-- the branch -->
+      <polygon points="266,80 348,122 266,164 184,122" fill="none" stroke="currentColor" stroke-opacity="0.55"/>
+      <text x="266" y="116" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity="0.8">_backend_supports</text>
+      <text x="266" y="130" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity="0.8">_vision(backend)</text>
+
+      <!-- yes branch -->
+      <path d="M 266 80 L 266 52 L 400 52" fill="none" stroke="#1B4FC4" stroke-width="1.6" marker-end="url(#a1)" color="#1B4FC4"/>
+      <text x="330" y="44" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="600" fill="#1B4FC4">True — claude-cli</text>
+
+      <rect x="402" y="30" width="180" height="44" rx="3" fill="#DCE5F8" stroke="#1B4FC4" stroke-opacity="0.6"/>
+      <text x="492" y="48" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" font-weight="600" fill="#1B4FC4">pixels passed by PATH</text>
+      <text x="492" y="63" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#1B4FC4" opacity="0.85">the model looks at it</text>
+
+      <!-- no branch -->
+      <path d="M 266 164 L 266 192 L 400 192" fill="none" stroke="#8A5A2B" stroke-width="1.6" marker-end="url(#a1)" color="#8A5A2B"/>
+      <text x="330" y="185" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="600" fill="#8A5A2B">False — openai-cli</text>
+
+      <rect x="402" y="170" width="180" height="44" rx="3" fill="#F3E6D4" stroke="#8A5A2B" stroke-opacity="0.6"/>
+      <text x="492" y="188" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" font-weight="600" fill="#8A5A2B">_strip_pixels(refs)</text>
+      <text x="492" y="203" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8A5A2B" opacity="0.9">a text reference instead</text>
+
+      <!-- converge -->
+      <path d="M 582 52 L 630 52 L 630 112" fill="none" stroke="currentColor" stroke-opacity="0.45"/>
+      <path d="M 582 192 L 630 192 L 630 132" fill="none" stroke="currentColor" stroke-opacity="0.45"/>
+      <path d="M 630 132 L 630 122" fill="none" stroke="currentColor" stroke-opacity="0.45"/>
+      <rect x="596" y="104" width="94" height="36" rx="3" fill="none" stroke="currentColor" stroke-opacity="0.6"/>
+      <text x="643" y="120" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="600" fill="currentColor">a graph node</text>
+      <text x="643" y="133" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity="0.65">either way</text>
+
+      <text x="10" y="238" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.6">llm.py:2158–2164 · _strip_pixels llm.py:885 · _backend_supports_vision llm.py:890</text>
+    </svg>
+    <figcaption>
+      Both branches converge on a node. The difference is what the node knows:
+      one was looked at, the other was only named. No path errors, and no image
+      is silently discarded — <code>_ImageRef</code>’s own docstring says the
+      renderers emit a text reference “in every such case”.
+    </figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <h2>How much of this corpus is actually at risk</h2>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Measure</th><th>Count</th><th>What it means</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Committed extraction chunks</td>
+          <td class="num">27</td>
+          <td>The corpus’s entire semantic-extraction history.</td>
+        </tr>
+        <tr>
+          <td>…sourced from an image</td>
+          <td class="num">0</td>
+          <td>Not one image has ever reached the LLM here.</td>
+        </tr>
+        <tr>
+          <td>Image files under <code>sources/</code></td>
+          <td class="num">1,289</td>
+          <td>Overwhelmingly inside <code>.venv</code>, test fixtures and asset directories.</td>
+        </tr>
+        <tr>
+          <td>Image files under <code>sources/media/</code></td>
+          <td class="num">0</td>
+          <td>The vendored, deliberately-curated half has none at all.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    The chunk probe is control-armed: the same grep shape finds a
+    <code>.md</code> source in <span class="num">27 of 27</span> chunks and an
+    image in <span class="num">0</span>, so the zero is an absence rather than a
+    broken pattern.
+  </p>
+
+  <p>
+    <strong>What this does not establish:</strong> that a future <code>detect</code>
+    run would classify none of those 1,289 as extractable. Answering that means
+    running detect, and <code>kb-build</code> is currently failing its preflight
+    (#491) — so the honest bound is the history, not a forecast.
+  </p>
+
+  <h2>The actual work: three coupled constants</h2>
+
+  <div class="lede" style="border-left-color: var(--degrade); margin-bottom: 1.4rem;">
+    <span class="tag" style="color: var(--degrade);">Updated 2026-08-25 — this section now describes FIXED code</span>
+    <p style="font-size: 1rem;">
+      The diagram below is the state this page was first published to explain.
+      It has since been closed in <code>118032e4</code>: <code>--backend</code>,
+      the model env key and the parallel env key are now derived from one value
+      (<code>backend_env_keys</code>) and cannot drift apart. The figure is kept
+      rather than redrawn, because the trap it shows is the reason the fix has
+      the shape it does — and because someone may have acted on the original.
+    </p>
+  </div>
+
+  <p>
+    The plan’s finding 7 says <code>kb_setup</code> “passes NO backend anywhere”.
+    It did — and switching it was not one edit.
+  </p>
+
+</div>
+
+<div class="wide">
+  <figure>
+    <div class="mermaid">
+flowchart LR
+    subgraph now["today — all three say claude"]
+        A["--backend claude-cli<br/>resolve_argv() :346"]
+        B["GRAPHIFY_CLAUDE_CLI_MODEL<br/>_MODEL_ENV :217"]
+        C["GRAPHIFY_CLAUDE_CLI_PARALLEL<br/>_PARALLEL_ENV :218"]
+    end
+    A --> D{"switch only<br/>the backend?"}
+    B --> D
+    C --> D
+    D --> E["backend becomes openai-cli"]
+    D --> F["<b>model env goes INERT</b><br/>openai-cli reads<br/>GRAPHIFY_OPENAI_CLI_MODEL"]
+    D --> G["<b>dry-run still PRINTS it</b><br/>env_overlay() :362<br/>as though it applied"]
+
+    style F fill:#F3E6D4,stroke:#8A5A2B,stroke-width:2px
+    style G fill:#F3E6D4,stroke:#8A5A2B,stroke-width:2px
+    style E fill:#DCE5F8,stroke:#1B4FC4
+    </div>
+    <figcaption>
+      The trap is the third box. <code>resolve_argv()</code> is shared by the
+      dry-run preview and the real run — which is why they cannot drift on the
+      <em>argv</em> — but the model env key is a separate module constant, so a
+      one-line backend switch leaves the preview confidently printing a variable
+      the new backend never reads.
+    </figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <h3>Two things that are already fine</h3>
+
+  <ul>
+    <li>
+      <strong>No API key needed.</strong> <code>openai-cli</code> is exempted
+      alongside <code>bedrock</code> and <code>claude-cli</code> from the
+      key check — <code>llm.py:2147</code>.
+    </li>
+    <li>
+      <strong><code>clean_env()</code> will not strip the new variables.</strong>
+      Its <code>_STRIP_BACKEND_ENV</code> is <span class="num">19</span> fixed
+      names and <span class="num">0</span> of them are <code>GRAPHIFY_*</code>
+      (<code>graphify_env.py:32–58</code>), so
+      <code>GRAPHIFY_OPENAI_CLI_MODEL</code> survives it. Control-armed: the same
+      grep finds <code>GEMINI</code>, so the zero discriminates.
+    </li>
+  </ul>
+
+  <h3>What actually shipped</h3>
+
+  <p>
+    Both guards, on the reading that the loss is a <em>degrade</em> and not a
+    break. <code>backend_probes</code> in <code>currency.toml</code> reports
+    DRIFT at session start if a declared backend vanishes from graphify’s table;
+    <code>_refuse_backend</code> refuses at the moment of spend, and does so
+    <em>before</em> the dry run, because a preview of a run that cannot happen is
+    worse than no preview. The default stayed <code>claude-cli</code> — a default
+    that had to be opted <em>out</em> of would put an irreversible spending
+    decision one typo away.
+  </p>
+
+  <p>
+    One measurement that shaped the fix and is easy to get wrong:
+    <code>openai-cli</code> declares a <code>model_env_key</code> in the table
+    and <strong><code>claude-cli</code> declares none</strong> — while graphify
+    plainly reads one for it at <code>llm.py:1776</code>. So a table-only lookup
+    returns nothing for the <em>default</em> backend, and a shape-only derivation
+    guesses past a backend that names its variable differently. The shipped code
+    derives, then refuses if the table disagrees.
+  </p>
+
+  <h3>One thing to read, not re-derive</h3>
+
+  <p>
+    graphify ships its own <code>BACKENDS</code> table at
+    <code>sources/graphify/graphify/llm.py:206–231</code>, carrying each
+    backend’s default model, model env key, pricing and vision flag. Read it
+    rather than hand-rolling a second copy — a second table is how <code>#245</code>
+    half-landed and how <code>#499</code> stayed invisible.
+  </p>
+
+  <p>
+    Worth knowing while reading it: the <code>openai-cli</code> entry is
+    <strong>a patch this fork carries</strong>, not upstream. Its own comment
+    warns that if an upgrade removes it, the backend disappears silently and
+    extraction can fall back to the metered OpenAI API — a spending regression.
+  </p>
+
+</div>
+
+<footer class="wrap">
+  Source: <code>docs/artifacts/the-openai-cli-switch.html</code>, tracked in
+  <code>ray-manaloto/knowledge-base</code>. Every line number above was read in
+  this session; the 1,289 and the 27/0 were counted in it.
+</footer>

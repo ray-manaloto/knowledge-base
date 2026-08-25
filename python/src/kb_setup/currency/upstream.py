@@ -180,6 +180,42 @@ class Version:
         return self.parts + (0,) * (width - len(self.parts))
 
 
+def bare_version(value: str, prefix: str = "") -> str:
+    """A git TAG (`v1.56.1`, `rust-v0.149.1`) reduced to the bare VERSION it names.
+
+    One rule, one place, because the two spellings are genuinely different things
+    and the engine writes BOTH: a `mise.toml` pin takes the bare version
+    (`hk = "1.56.1"`), while a `sources/*.manifest` `ref` takes the tag verbatim
+    (`ref = v1.56.1`). One resolved string cannot be correct for both targets, and
+    #499 is what happens when it is used as though it were — `apply` wrote
+    `hk = "v1.56.1"` and `mise ls hk` then reported that pin `(missing)`: nothing
+    resolved, so `mise run lint` could not find hk for anyone who pulled the commit.
+
+    The `v` survives that far because `Version.parse` keeps `raw` VERBATIM (`:159`)
+    and cleans only its comparison key (`:151`), while `github_versions` returns
+    `max(stable).raw` (`:581`) after stripping the declared `tag_prefix` and
+    nothing else (`:574`). So a tool whose tags carry a bare `v` and which declares
+    no `tag_prefix` — hk, agnix, fnox — carries the `v` all the way into the pin. A
+    tool that DOES declare one (`codex` = `rust-v`, `firecrawl-cli` = `v`) never
+    could, which is why this went unseen: the only two configured tools were the
+    only two that could not exhibit it.
+
+    The load-bearing property is that the prefix is stripped BY NAME and not
+    guessed: `lstrip("v")` alone leaves `rust-v0.149.1` untouched (it does not
+    start with `v`), so the prefix reaches a comparison against an installed
+    `0.149.1` and reports drift on a pin that is exactly right — #245, which
+    `sync.py` records at its own call site.
+
+    The ORDER of the two reductions is NOT load-bearing, and an earlier draft of
+    this docstring claimed it was. Armed and refuted: swapping them leaves every
+    real input unchanged, because `lstrip("v")` cannot eat any character of a
+    prefix that does not begin with `v`. It would matter only for a prefix like
+    `vX-`, which no tracked tool has. Stated because the arm that caught it
+    SURVIVED — the mutation was inert, and a surviving arm reads as coverage.
+    """
+    return value.removeprefix(prefix).lstrip("v")
+
+
 def same_release(left: str, right: str) -> bool:
     """Do these two strings name the SAME release, decoration and padding aside?
 

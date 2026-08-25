@@ -1,0 +1,92 @@
+# Mutation arms for #499 — the mise pin took a git TAG where it needs a VERSION.
+#
+# The live damage: `currency apply` bumped hk and wrote `hk = "v1.56.1"` into
+# `mise.toml`. `mise ls hk` reported that pin `(missing)` — nothing resolved —
+# so anyone pulling the commit got a `mise run lint` that could not find hk. The
+# manifest, written from the same string, was correct: `ref = v1.56.1` is what a
+# manifest `ref` should say. ONE resolved string, TWO targets that disagree
+# about its spelling.
+#
+# A1 is the arm that matters, and it is the whole ticket: revert the write to
+# `verdict.latest` and the new test must go red. The pre-existing happy-path
+# test (`test_a_successful_apply_edits_the_pin_and_reports_it`) is deliberately
+# NOT the named test for it — it passed throughout the defect's life, because
+# its verdict's `latest` is already bare and its assertion never sees a `v`.
+#
+# SCOPE, stated so a clean sweep is not over-read. What is NOT armed here:
+#   - that `mise` actually refuses a `v`-prefixed pin. That was measured live on
+#     the ticket (`mise ls hk` -> `(missing)`), not asserted in this suite, and
+#     no unit test in this repo can reach mise's resolver.
+#   - that hk, agnix and fnox are the affected population. That is a reading of
+#     `currency.toml` plus live tag spellings, and it is prose on #499.
+#   - whether normalising at WRITE time beats normalising in `github_versions`.
+#     That is a design call — the arms can only show the chosen one is enforced.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: that #499 is the only spelling divergence
+# between a resolved string and a write target — only that this one can fail.
+
+suites = [
+  "tests/test_currency_apply.py",
+  "tests/test_currency_upstream.py",
+  "tests/test_currency_sync.py",
+]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/currency/upstream.py"
+old = '''    return value.removeprefix(prefix).lstrip("v")'''
+new = '''    return value.removeprefix(prefix).lstrip("v")  # control'''
+
+# ── A1: the defect itself — the pin written from the raw resolved string ───
+# The REALISTIC break, and the exact shape the code had before this fix: the
+# pin write takes `verdict.latest` verbatim. For a v-tagged tool with no
+# declared `tag_prefix` that string IS the tag, so `mise.toml` gets the `v`.
+[[arm]]
+id = "A1"
+test = "test_a_v_tagged_bump_writes_a_bare_pin_and_a_tagged_manifest"
+file = "python/src/kb_setup/currency/apply.py"
+old = '''    pin_version = up.bare_version(verdict.latest, spec.tag_prefix)'''
+new = '''    pin_version = verdict.latest'''
+
+# ── A2: the reduction must actually reduce ─────────────────────────────────
+# A `bare_version` that returns its input is the no-op-shaped regression: every
+# caller still compiles, `sync.py` still compares, and the pin silently keeps
+# the `v` again. It is the failure a rename or a "simplification" would produce.
+[[arm]]
+id = "A2"
+test = "test_bare_version_reduces_a_tag_to_the_version_it_names"
+file = "python/src/kb_setup/currency/upstream.py"
+old = '''    return value.removeprefix(prefix).lstrip("v")'''
+new = '''    return value'''
+
+# ── A3: the declared prefix must be stripped AT ALL (#245's half) ──────────
+# The realistic break, and the one that already happened once in `sync.py`:
+# guess the decoration with `lstrip("v")` instead of removing the prefix the
+# config declares. It removes NOTHING from `rust-v0.149.1`, so the tag reaches a
+# comparison against an installed `0.149.1` and reports drift on a correct pin.
+#
+# ⚠️ This arm REPLACED one that swapped the two reductions, which SURVIVED. The
+# order is not load-bearing: `lstrip("v")` cannot eat a character of a prefix
+# that does not begin with `v`, so the swap is an INERT MUTANT and its survival
+# measured nothing. The docstring that claimed the order mattered was corrected
+# in the same change — the code was right and the sentence was not.
+[[arm]]
+id = "A3"
+test = "test_bare_version_strips_the_declared_prefix_by_name"
+file = "python/src/kb_setup/currency/upstream.py"
+old = '''    return value.removeprefix(prefix).lstrip("v")'''
+new = '''    return value.lstrip("v")'''
+
+# ── A4: `sync` must be reading the SHARED rule, not a private copy ─────────
+# The reason the two files were collapsed onto one expression. A `sync` that
+# quietly drops the prefix strip re-opens #245 while `apply` stays correct —
+# and the two would then disagree about the same tag, which is precisely the
+# state #245 was closed to end.
+[[arm]]
+id = "A4"
+test = "test_a_tag_prefix_is_stripped_before_the_version_compare"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    bare = up.bare_version(ref, spec.tag_prefix)'''
+new = '''    bare = up.bare_version(ref)'''

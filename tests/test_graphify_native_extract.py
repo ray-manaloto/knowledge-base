@@ -15,6 +15,7 @@ earns a real-dispatch test where extract/cluster do not.
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -525,3 +526,379 @@ def test_main_refuses_an_unknown_artifact_view_with_bad_request(tmp_path: Path) 
     _make_extracted_out(tmp_path)
     rc = gne.native_extract_main(tmp_path, ["--artifacts", "wiky", "--dry-run"])
     assert rc == Rc.BAD_REQUEST
+
+
+# --- #479: a value-taking flag must refuse a flag as its value ----------------
+
+
+def test_out_refuses_a_flag_as_its_value(tmp_path: Path) -> None:
+    """`--out --dry-run` must NOT run a real extraction into a dir named `--dry-run`.
+
+    The live shape of #479: `--dry-run` was taken as the OUT PATH and consumed,
+    so `dry_run` stayed False and a real, token-spending run followed. The user
+    asked for a preview and got a bill.
+    """
+    rc = gne.native_extract_main(tmp_path, ["--out", "--dry-run"])
+    assert rc == Rc.BAD_REQUEST
+
+
+def test_every_value_flag_refuses_a_flag_as_its_value(tmp_path: Path) -> None:
+    """Not just `--out` — the same `argv[i + 1]` shape was on all five.
+
+    Fixing only the flag the review cited would leave four identical defects
+    behind, which is this repo's `a-fix-at-one-layer-leaves-the-next`.
+    """
+    for flag in ("--out", "--token-budget", "--max-concurrency", "--model", "--target"):
+        rc = gne.native_extract_main(tmp_path, [flag, "--dry-run"])
+        assert rc == Rc.BAD_REQUEST, f"{flag} accepted a flag as its value"
+
+
+def test_a_trailing_value_flag_names_the_missing_value(tmp_path: Path) -> None:
+    """A flag at the end of argv reported `unrecognised argument: '--out'`.
+
+    It IS recognised; what is missing is its value. A message that misdescribes
+    its own failure sends the reader to check their spelling.
+    """
+    rc = gne.native_extract_main(tmp_path, ["--out"])
+    assert rc == Rc.BAD_REQUEST
+
+
+def test_a_single_dash_value_is_still_accepted(tmp_path: Path) -> None:
+    """The control arm: the refusal must not swallow legitimate values.
+
+    A guard that refuses everything passes every test above while making the
+    parser useless. Only `--`-prefixed tokens read as flags here.
+    """
+    opts = gne._parse(tmp_path, ["--model", "-weird-but-mine", "--dry-run"])
+    assert opts.model == "-weird-but-mine"
+    assert opts.dry_run is True
+
+
+# --- #480: GRAPHIFY_OUT must not relocate the output root --------------------
+
+#: A relocation target that is not `/tmp` — ruff S108 flags a hard-coded temp
+#: path, and the value here only has to be a non-empty string the code never
+#: reads, so the literal was the incidental half of the fixture.
+_ELSEWHERE = "somewhere-else"
+
+
+def test_resolve_env_drops_an_ambient_graphify_out(monkeypatch) -> None:
+    """`clean_env()` passed it through, so it went around `_refuse_out` entirely.
+
+    This is the arm for the DIRECT-IMPORT caller — `_run_real` meets no argv
+    guard — which is why the env pop exists as well as the refusal below.
+    """
+    monkeypatch.setenv("GRAPHIFY_OUT", _ELSEWHERE)
+    env = gne.resolve_env(gne.Options(target=Path("/t"), out=Path("/o")))
+    assert "GRAPHIFY_OUT" not in env
+
+
+def test_main_refuses_when_graphify_out_is_set(tmp_path: Path, monkeypatch) -> None:
+    """And says so, rather than silently overriding a deliberate export.
+
+    "Your setting was ignored" and "your setting relocated everything" are
+    indistinguishable from outside; the refusal is what tells them apart.
+    """
+    _make_target(tmp_path)
+    monkeypatch.setenv("GRAPHIFY_OUT", _ELSEWHERE)
+    rc = gne.native_extract_main(tmp_path, ["--dry-run"])
+    assert rc == Rc.BAD_REQUEST
+
+
+# --- #481: the two functions that actually spawn the subprocess --------------
+
+
+class _FakeCompleted:
+    def __init__(self, returncode: int) -> None:
+        self.returncode = returncode
+
+
+def _spy_subprocess(monkeypatch, returncode: int = 0) -> list[dict]:
+    """Replace `subprocess.run` and record every call. No process ever starts.
+
+    The same technique the `--artifacts` tests already use on
+    `artifacts.generate`, applied one layer down. It keeps this module's "NO
+    provider call, ever" promise intact while still executing the real function
+    body — which is the whole of #481: `_run_real` and `_run_cluster` were the
+    only functions that spawn a subprocess and stubbing both to `return 0` left
+    all 42 tests green.
+    """
+    calls: list[dict] = []
+
+    def _run(argv: list[str], **kwargs: object) -> _FakeCompleted:
+        calls.append({"argv": list(argv), **kwargs})
+        return _FakeCompleted(returncode)
+
+    monkeypatch.setattr(gne.subprocess, "run", _run)
+    monkeypatch.setattr(gne, "assert_pinned_graphify", lambda _root: None)
+    return calls
+
+
+def test_run_real_spawns_the_resolved_argv_and_returns_its_code(tmp_path, monkeypatch) -> None:
+    """Reverted to `return 0`, this fails on the first assertion — nothing is called."""
+    calls = _spy_subprocess(monkeypatch, returncode=3)
+    opts = gne.Options(target=tmp_path / "t", out=tmp_path / "o")
+
+    rc = gne._run_real(tmp_path, "/bin/graphify", opts)
+
+    assert rc == 3, "the subprocess's exit code must propagate, never a literal"
+    assert len(calls) == 1
+    assert calls[0]["argv"] == gne.resolve_argv("/bin/graphify", opts)
+    assert calls[0]["cwd"] == tmp_path
+    assert calls[0]["check"] is False
+
+
+def test_run_real_passes_an_env_with_no_graphify_out(tmp_path, monkeypatch) -> None:
+    """The end-to-end arm for #480, through the function that actually spawns.
+
+    `resolve_env`'s own unit test proves the pop; this proves the spawn USES it.
+    A fix at one layer leaves the next.
+    """
+    monkeypatch.setenv("GRAPHIFY_OUT", _ELSEWHERE)
+    calls = _spy_subprocess(monkeypatch)
+    gne._run_real(tmp_path, "/bin/graphify", gne.Options(target=tmp_path, out=tmp_path / "o"))
+    assert "GRAPHIFY_OUT" not in calls[0]["env"]
+
+
+def test_run_cluster_spawns_the_cluster_argv_and_returns_its_code(tmp_path, monkeypatch) -> None:
+    """The cluster half, which had the identical hole.
+
+    Asserted against `resolve_cluster_argv`, NOT `resolve_argv`: a body that
+    spawned the extract argv here would run a token-spending extraction where
+    the caller asked for deterministic re-clustering, and a test keyed on the
+    wrong helper could never see it.
+    """
+    calls = _spy_subprocess(monkeypatch, returncode=7)
+    opts = gne.Options(target=tmp_path / "t", out=tmp_path / "o", cluster=True)
+
+    rc = gne._run_cluster(tmp_path, "/bin/graphify", opts)
+
+    assert rc == 7
+    assert calls[0]["argv"] == gne.resolve_cluster_argv("/bin/graphify", opts)
+    assert "--backend" not in calls[0]["argv"], "cluster-only must never carry a backend"
+
+
+def test_run_real_checks_the_pin_before_spawning(tmp_path, monkeypatch) -> None:
+    """A stale binary rewriting output under an unverified version is the hazard.
+
+    Order matters: the check must happen BEFORE the spawn, so record both into
+    one list and assert the sequence rather than merely that both occurred.
+    """
+    order: list[str] = []
+    monkeypatch.setattr(gne, "assert_pinned_graphify", lambda _r: order.append("pin"))
+    monkeypatch.setattr(
+        gne.subprocess, "run", lambda *_a, **_k: (order.append("spawn"), _FakeCompleted(0))[1]
+    )
+    gne._run_real(tmp_path, "/bin/graphify", gne.Options(target=tmp_path, out=tmp_path / "o"))
+    assert order == ["pin", "spawn"]
+
+
+# --- the backend parameter: three constants that must move together ----------
+
+
+def test_the_backend_reaches_argv(tmp_path: Path) -> None:
+    """`--backend` must actually change what is invoked, not just what is stored."""
+    opts = gne.Options(target=tmp_path, out=tmp_path / "o", backend="openai-cli")
+    argv = gne.resolve_argv("/bin/graphify", opts)
+    assert "--backend" in argv
+    assert argv[argv.index("--backend") + 1] == "openai-cli"
+
+
+def test_the_default_backend_is_still_claude_cli(tmp_path: Path) -> None:
+    """The control arm on the parameterisation, and a policy assertion.
+
+    `do-not.md` #4 makes Claude the corpus's only LLM. A default that had to be
+    opted OUT of would put an irreversible spending decision one typo away.
+    """
+    argv = gne.resolve_argv("/bin/graphify", gne.Options(target=tmp_path, out=tmp_path / "o"))
+    assert argv[argv.index("--backend") + 1] == "claude-cli"
+
+
+def test_the_model_env_key_follows_the_backend(tmp_path: Path) -> None:
+    """The coupled-constants defect, asserted directly.
+
+    Switching only `--backend` left the model override on
+    `GRAPHIFY_CLAUDE_CLI_MODEL`, which an `openai-cli` run never reads — so
+    `--model` went INERT while the dry-run kept printing it as though it applied.
+    Asserted as a DISAGREEMENT between the two backends' overlays: a test that
+    only checked "the model is in there" passes with the wrong key.
+    """
+    claude = gne.env_overlay(gne.Options(target=tmp_path, out=tmp_path / "o", model="m"))
+    openai = gne.env_overlay(
+        gne.Options(target=tmp_path, out=tmp_path / "o", model="m", backend="openai-cli")
+    )
+    assert "GRAPHIFY_CLAUDE_CLI_MODEL" in claude
+    assert "GRAPHIFY_OPENAI_CLI_MODEL" in openai
+    assert "GRAPHIFY_CLAUDE_CLI_MODEL" not in openai
+
+
+def test_the_parallel_env_key_follows_the_backend_too(tmp_path: Path) -> None:
+    """The third constant. graphify reads both (`llm.py:2829-2831`)."""
+    overlay = gne.env_overlay(
+        gne.Options(
+            target=tmp_path,
+            out=tmp_path / "o",
+            backend="openai-cli",
+            allow_parallel_claude_cli=True,
+        )
+    )
+    assert overlay["GRAPHIFY_OPENAI_CLI_PARALLEL"] == "1"
+    assert "GRAPHIFY_CLAUDE_CLI_PARALLEL" not in overlay
+
+
+def test_backend_env_keys_agree_with_graphifys_own_table() -> None:
+    """The cross-check that keeps the derivation honest.
+
+    graphify's table declares `model_env_key` for `openai-cli` and — measured,
+    not assumed — declares NONE for `claude-cli`, though `llm.py:1776` plainly
+    reads one. So neither source is complete alone: the table is authoritative
+    where it speaks, and the derivation covers where it does not.
+    """
+    model_env, parallel_env = gne.backend_env_keys("openai-cli")
+    assert model_env == gne.installed_backends()["openai-cli"]["model_env_key"]
+    assert parallel_env == "GRAPHIFY_OPENAI_CLI_PARALLEL"
+    assert gne.backend_env_keys("claude-cli")[0] == "GRAPHIFY_CLAUDE_CLI_MODEL"
+
+
+def test_an_unknown_backend_is_refused() -> None:
+    """Fails closed on a spending regression.
+
+    `openai-cli` is a patch this FORK carries; its own comment warns that an
+    upgrade dropping it lets extraction fall back to the metered OpenAI API. A
+    run that asked for a subscription-billed backend and silently got a metered
+    one is an irreversible cost.
+    """
+    problem = gne._refuse_backend("no-such-backend")
+    assert problem is not None
+    assert "no-such-backend" in problem
+
+
+def test_a_known_backend_is_not_refused() -> None:
+    """The control arm: a guard that refuses everything passes the test above."""
+    assert gne._refuse_backend("claude-cli") is None
+    assert gne._refuse_backend("openai-cli") is None
+
+
+def test_main_refuses_an_unknown_backend_before_the_dry_run(tmp_path: Path) -> None:
+    """Checked ahead of `--dry-run`, not after.
+
+    A preview of a run that cannot happen is worse than no preview: the point of
+    a dry run is to find that out cheaply.
+    """
+    _make_target(tmp_path)
+    rc = gne.native_extract_main(tmp_path, ["--backend", "no-such-backend", "--dry-run"])
+    assert rc == Rc.BAD_REQUEST
+
+
+def test_backend_parses_from_argv(tmp_path: Path) -> None:
+    opts = gne._parse(tmp_path, ["--backend", "openai-cli", "--dry-run"])
+    assert opts.backend == "openai-cli"
+    assert opts.dry_run is True
+
+
+# --- round-1 cold review findings (14756ebb8212) ------------------------------
+
+
+def test_the_dry_run_note_names_the_backends_own_parallel_var(tmp_path, capsys) -> None:
+    """The MAJOR: the NOTE hardcoded claude-cli's variable regardless of --backend.
+
+    Same coupled-constants defect as `env_overlay`, surviving one function over —
+    and worse here, because the env overlay is merely wrong while this is wrong
+    OUT LOUD, in the output a reader consults to check what a run will do.
+    """
+    _make_target(tmp_path)
+    gne.native_extract_main(tmp_path, ["--backend", "openai-cli", "--dry-run"])
+    out = capsys.readouterr().out
+    assert "GRAPHIFY_OPENAI_CLI_PARALLEL" in out
+    assert "GRAPHIFY_CLAUDE_CLI_PARALLEL" not in out
+
+
+def test_the_dry_run_does_not_carry_claude_evidence_to_another_backend(tmp_path, capsys) -> None:
+    """A true fact past its condition is how this repo ships confident wrong claims.
+
+    The 19-chunk run and `--no-session-persistence` are claude-cli's. Printing
+    them under `--backend openai-cli` asserts evidence nobody gathered.
+    """
+    _make_target(tmp_path)
+    gne.native_extract_main(tmp_path, ["--backend", "openai-cli", "--dry-run"])
+    out = capsys.readouterr().out
+    assert "19-chunk" not in out
+    assert "no-session-persistence" not in out
+    assert "NO evidence either way" in out
+
+
+def test_the_dry_run_still_carries_that_evidence_for_claude_cli(tmp_path, capsys) -> None:
+    """The control arm: scoping the evidence must not delete it where it applies."""
+    _make_target(tmp_path)
+    gne.native_extract_main(tmp_path, ["--dry-run"])
+    out = capsys.readouterr().out
+    assert "19-chunk" in out
+    assert "GRAPHIFY_CLAUDE_CLI_PARALLEL" in out
+
+
+def test_an_empty_but_exported_graphify_out_is_still_refused(tmp_path, monkeypatch) -> None:
+    """PRESENCE, not truthiness — and the empty value is the worst one.
+
+    graphify reads `os.environ.get("GRAPHIFY_OUT", "graphify-out")`, so an empty
+    string is USED as the directory name rather than falling back to the default.
+    `.strip()` read that as "not set".
+    """
+    _make_target(tmp_path)
+    monkeypatch.setenv("GRAPHIFY_OUT", "")
+    assert gne.native_extract_main(tmp_path, ["--dry-run"]) == Rc.BAD_REQUEST
+
+
+def test_an_unset_graphify_out_is_not_refused(tmp_path, monkeypatch) -> None:
+    """The control arm: presence-checking must not refuse the ordinary case."""
+    _make_target(tmp_path)
+    monkeypatch.delenv("GRAPHIFY_OUT", raising=False)
+    assert gne.native_extract_main(tmp_path, ["--dry-run"]) == 0
+
+
+# --- round-2 cold review: the THIRD instance of the class (65f39b172ddc) ------
+
+
+def test_a_non_default_backend_gets_no_invented_model(tmp_path) -> None:
+    """The MAJOR: the env KEY was backend-derived, the VALUE was not.
+
+    `Options.model` defaulted to `DEFAULT_MODEL`, so every run that did not pass
+    `--model` wrote `GRAPHIFY_OPENAI_CLI_MODEL=claude-opus-5` — a Claude
+    identifier into an OpenAI backend's own variable. graphify's table records
+    that backend's default as `gpt-5.6-sol`.
+
+    Omitting, not substituting: graphify already knows its own default, and
+    copying it here is the second-copy-that-drifts this module has been bitten by
+    twice (#245, #499).
+    """
+    overlay = gne.env_overlay(
+        gne.Options(target=tmp_path, out=tmp_path / "o", backend="openai-cli")
+    )
+    assert "GRAPHIFY_OPENAI_CLI_MODEL" not in overlay
+    assert gne.DEFAULT_MODEL not in overlay.values()
+
+
+def test_the_default_backend_still_gets_its_model(tmp_path) -> None:
+    """The control arm: omitting for others must not omit for claude-cli.
+
+    This repo has a recorded opinion there, and it deliberately differs from
+    graphify's own `claude-code-plan`. Losing it would be the over-correction.
+    """
+    overlay = gne.env_overlay(gne.Options(target=tmp_path, out=tmp_path / "o"))
+    assert overlay[gne._MODEL_ENV] == gne.DEFAULT_MODEL
+
+
+def test_an_explicit_model_is_honoured_on_any_backend(tmp_path) -> None:
+    """An explicit `--model` is the caller being explicit; do not second-guess it."""
+    overlay = gne.env_overlay(
+        gne.Options(target=tmp_path, out=tmp_path / "o", backend="openai-cli", model="gpt-5.6-sol")
+    )
+    assert overlay["GRAPHIFY_OPENAI_CLI_MODEL"] == "gpt-5.6-sol"
+
+
+def test_resolve_model_covers_all_three_cases(tmp_path) -> None:
+    """The decision itself, armed directly rather than through the overlay."""
+    o = gne.Options(target=tmp_path, out=tmp_path / "o")
+    assert gne.resolve_model(o) == gne.DEFAULT_MODEL
+    assert gne.resolve_model(replace(o, backend="openai-cli")) == ""
+    assert gne.resolve_model(replace(o, backend="openai-cli", model="m")) == "m"
+    assert gne.resolve_model(replace(o, model="m")) == "m"

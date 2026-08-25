@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING
 
 from kb_setup import build_outcome
 from kb_setup.currency import _proc
+from kb_setup.currency import upstream as up
 
 if TYPE_CHECKING:
     from kb_setup.currency.config import RefBinding, ToolSpec
@@ -1244,6 +1245,56 @@ def _check_extra_probes(repo_root: Path, spec: ToolSpec, *, deep: bool) -> Findi
     )
 
 
+def _check_backend_probes(spec: ToolSpec) -> Finding:
+    """Do the backends this repo depends on still exist in the installed tool?
+
+    The sibling `_check_extra_probes` above asks whether a declared EXTRA
+    delivered its package. This asks whether a declared BACKEND survived the
+    upgrade — a different failure with a worse consequence, because it is
+    silent and it costs money.
+
+    `openai-cli` is a patch this repo's graphify FORK carries, not upstream.
+    graphify's own comment beside that table entry says it plainly: if an
+    upgrade removes it, "the backend silently disappears and extraction can fall
+    back to the metered OpenAI API". Nothing in a pin-vs-pin or config-vs-config
+    comparison can see that — the version numbers all agree, and the spend
+    changes anyway.
+
+    Reads the tool's OWN table through `graphify_env.installed_backends()`, the
+    one reader `graphify_native_extract` also uses, so the check and the code it
+    protects can never disagree about which backends exist. Imported lazily and
+    only when a tool declares `backend_probes`, so the shared engine stays usable
+    in a repo (dotfiles) that has no graphify at all.
+    """
+    if not spec.backend_probes:
+        return Finding("backend-probes", SKIP, "no backend_probes declared for this tool")
+    try:
+        from kb_setup.graphify_env import installed_backends
+
+        available = installed_backends()
+    except (ImportError, AttributeError) as exc:
+        # BLIND, never OK: "the tool is not installed here" and "the backend is
+        # gone" are different answers, and collapsing them into a green row is
+        # the DRIFT/SKIP/OK collapse this engine refuses everywhere else.
+        # Caught narrowly rather than bare - an ImportError means no graphify on
+        # this host, an AttributeError means the table was renamed, and anything
+        # else is a real fault that should escape rather than be reported as
+        # "could not check".
+        return Finding("backend-probes", BLIND, f"could not read the backend table here: {exc}")
+    missing = [b for b in spec.backend_probes if b not in available]
+    if missing:
+        return Finding(
+            "backend-probes",
+            DRIFT,
+            f"{missing} absent from the installed backend table "
+            f"({len(available)} present) - a fork-local patch may have been dropped by an "
+            f"upgrade, and extraction can silently fall back to a METERED backend",
+        )
+    return Finding(
+        "backend-probes", OK, f"all {len(spec.backend_probes)} declared backend(s) present"
+    )
+
+
 def _fork_pinned_sha(repo_root: Path, spec: ToolSpec) -> str:
     """The 40-hex SHA `pyproject.toml` installs this tool's git dependency FROM.
 
@@ -1368,7 +1419,12 @@ def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     # `rust-v0.147.0` -> `0.147.0`. Strip the project's declared prefix BEFORE
     # the `v`, or a `rust-v` tag compares literally against an installed
     # `0.147.0` and reports drift on a manifest pinned exactly right (#245).
-    bare = ref.removeprefix(spec.tag_prefix).lstrip("v") if spec.tag_prefix else ref.lstrip("v")
+    #
+    # The rule itself moved to `upstream.bare_version` with #499, which needed the
+    # same tag->version reduction on the WRITE side. Two spellings of one rule in
+    # two files is how #245 half-landed in the first place; this call site keeps
+    # the reason and lends the rule.
+    bare = up.bare_version(ref, spec.tag_prefix)
     if bare != pinned:
         # "mise installs" is TRUE only on the mise-managed path. Since 2026-08-08
         # this is also reached for `expected`-based tools (mise itself,
@@ -1835,6 +1891,7 @@ def check_sync(repo_root: Path, spec: ToolSpec, *, deep: bool = False) -> SyncSt
             resolution,
             _check_extras(spec, declared_extras),
             _check_extra_probes(repo_root, spec, deep=deep),
+            _check_backend_probes(spec),
             _check_manifest(repo_root, spec, pinned),
             _check_ref_bindings(repo_root, spec),
             _check_skill_stamp(repo_root, spec, pinned),

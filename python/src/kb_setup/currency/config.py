@@ -186,6 +186,15 @@ class ToolSpec:
     # (graspologic/leidenalg/igraph → Louvain fallback, an accepted state), so a
     # naive "every extra must import" check would report drift that is not drift.
     extra_probes: tuple[str, ...] = ()
+    #: Backend names that MUST exist in the installed tool's own backend
+    #: table. Sibling of `extra_probes`: that one asks whether a declared
+    #: extra delivered a package, this one asks whether a declared BACKEND
+    #: survived an upgrade. It exists because `openai-cli` is a patch this
+    #: repo's graphify FORK carries, and graphify's own comment beside it
+    #: warns that if an upgrade drops it the backend disappears silently and
+    #: extraction can fall back to the METERED OpenAI API — a spending
+    #: regression no config-vs-config comparison can see.
+    backend_probes: tuple[str, ...] = ()
     manifest: str = ""
     tag_prefix: str = ""
     """What this project prefixes its release tags with, e.g. `rust-v` for codex.
@@ -536,6 +545,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         github=_str("github"),
         extras=_tuple("extras"),
         extra_probes=_tuple("extra_probes"),
+        backend_probes=_tuple("backend_probes"),
         skill_dir=_str("skill_dir"),
         skill_install=_tuple("skill_install"),
         skill_stamp=_str("skill_stamp"),

@@ -1,0 +1,89 @@
+# Mutation arms for the round-1 cold-review fixes on `14756ebb8212`.
+#
+# The skill's own rule: the fix you just wrote to close a finding is the
+# LEAST-reviewed code in the diff. Both fixes here are armed before round 2 sees
+# anything.
+#
+# F1 is the MAJOR, and it is worth stating what it actually was: the SAME
+# coupled-constants defect this branch fixed in `env_overlay`, surviving one
+# function over in `_print_dry_run`. A fix at one layer leaves the next — in my
+# own commit, on the very defect class the commit is about. It is worse in the
+# printer than in the overlay: a wrong env var is merely wrong, while a wrong
+# NOTE is wrong OUT LOUD, in the one output a reader consults to check what a run
+# will do before spending tokens on it.
+#
+# F2/F3 are one finding split by direction. The evidence in that NOTE (a 19-chunk
+# run, `--no-session-persistence`) is claude-cli's, and carrying a true fact past
+# its condition is how this repo has shipped confident wrong claims before. F3 is
+# the control: scoping evidence must not DELETE it where it does apply, which is
+# the obvious way to over-correct F2.
+#
+# F4/F5 are the MINOR, likewise paired. `.strip()` read an empty-but-exported
+# `GRAPHIFY_OUT=""` as absent — and empty is the value worth refusing hardest,
+# because graphify USES it (`paths.py:26` defaults only on ABSENCE), giving an
+# empty output-directory name rather than the default. F5 arms the over-broad
+# direction: presence-checking must not refuse the ordinary unset case.
+#
+# SCOPE. What is NOT armed here: whether `--allow-parallel-claude-cli` should be
+# RENAMED now that it sets whichever backend's parallel var. The flag name is
+# backend-specific for a setting that no longer is, which is a real wart — but it
+# is an argv-surface decision, not a correctness one, and no arm can settle it.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: that no third instance of the coupled-
+# constants class remains in this module. Two were found by two different
+# readers; that is a sample, not a census.
+
+suites = ["tests/test_graphify_native_extract.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''        _, parallel_env = backend_env_keys(opts.backend)'''
+new = '''        _, parallel_env = backend_env_keys(opts.backend)  # control'''
+
+# ── F1: the MAJOR — the NOTE must name the BACKEND'S OWN parallel var ─────
+[[arm]]
+id = "F1"
+test = "test_the_dry_run_note_names_the_backends_own_parallel_var"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''        _, parallel_env = backend_env_keys(opts.backend)'''
+new = '''        _, parallel_env = backend_env_keys(DEFAULT_BACKEND)'''
+
+# ── F2: claude-cli's evidence must not travel to another backend ─────────
+[[arm]]
+id = "F2"
+test = "test_the_dry_run_does_not_carry_claude_evidence_to_another_backend"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''        if opts.backend == DEFAULT_BACKEND:'''
+new = '''        if True:'''
+
+# ── F3: ...and must not be deleted where it DOES apply ───────────────────
+# The over-correction arm. Suppressing the evidence everywhere satisfies F2.
+[[arm]]
+id = "F3"
+test = "test_the_dry_run_still_carries_that_evidence_for_claude_cli"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''        if opts.backend == DEFAULT_BACKEND:'''
+new = '''        if False:'''
+
+# ── F4: the MINOR — presence, not truthiness ─────────────────────────────
+[[arm]]
+id = "F4"
+test = "test_an_empty_but_exported_graphify_out_is_still_refused"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    ambient_out = os.environ.get(_GRAPHIFY_OUT_ENV)
+    if ambient_out is not None:'''
+new = '''    ambient_out = os.environ.get(_GRAPHIFY_OUT_ENV, "").strip()
+    if ambient_out:'''
+
+# ── F5: ...and the unset case must still pass ────────────────────────────
+[[arm]]
+id = "F5"
+test = "test_an_unset_graphify_out_is_not_refused"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    ambient_out = os.environ.get(_GRAPHIFY_OUT_ENV)
+    if ambient_out is not None:'''
+new = '''    ambient_out = _GRAPHIFY_OUT_ENV
+    if ambient_out is not None:'''

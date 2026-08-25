@@ -31,6 +31,23 @@ extra_probes = [
   "tree_sitter_cpp",
   "tree_sitter_ocaml",
 ]
+
+# Backends that must survive an upgrade. `extra_probes` above asks whether a
+# declared extra delivered its package; this asks whether a declared BACKEND is
+# still in graphify's own `BACKENDS` table.
+#
+# It exists for `openai-cli`, which is a patch THIS FORK carries and not
+# upstream. graphify's own comment beside that entry states the consequence:
+# "If an upgrade removes it, the backend silently disappears and extraction can
+# fall back to the metered OpenAI API — a spending regression." No pin-vs-pin or
+# config-vs-config check can see that; every version agrees and the bill changes.
+#
+# `claude-cli` is listed too, and not as padding: it is `DEFAULT_BACKEND` in
+# `graphify_native_extract`, so its absence would break the default path rather
+# than an opt-in one. A probe that watched only the exotic case would report OK
+# on the day the ordinary one vanished.
+backend_probes = ["claude-cli", "openai-cli"]
+
 # The ingested corpus must describe the release we actually run.
 manifest = "sources/graphify.manifest"
 # The project-scoped `/graphify` skill, refreshed by `currency.apply` in the SAME

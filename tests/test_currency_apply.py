@@ -155,6 +155,41 @@ def test_apply_with_a_manifest_repins_ref_and_commit(tmp_path, monkeypatch) -> N
     assert "commit = cafe1234" in manifest_text
 
 
+# --- #499: one version, two spellings, two write targets ---------------------
+
+
+def test_a_v_tagged_bump_writes_a_bare_pin_and_a_tagged_manifest(tmp_path, monkeypatch) -> None:
+    """The two targets must DISAGREE on spelling, and each must be right (#499).
+
+    The live defect: `apply` wrote `hk = "v1.56.1"` into `mise.toml`, and `mise ls
+    hk` reported that pin `(missing)` — nothing resolved, so `mise run lint` could
+    not find hk for anyone who pulled the commit. A `v` reaches `verdict.latest`
+    whenever the tool's tags carry one and it declares no `tag_prefix`, which is
+    hk, agnix and fnox today.
+
+    Asserted as a DISAGREEMENT deliberately. A test that only checked "both got
+    0.9.26" passed while the defect was live, because the manifest was correct
+    and the pin's `v` never entered the assertion. Both halves are pinned here,
+    and `pin != ref` is the property that could not hold before the fix.
+    """
+    root = _repo(tmp_path, manifest=True)
+    monkeypatch.setattr(
+        apply_mod.mf, "resolve_tag", lambda _u, v, *, prefix="": (f"{prefix}{v}", "cafe1234")
+    )
+    # `latest` as `github_versions` actually returns it for a v-tagged tool with
+    # no declared prefix: `max(stable).raw`, the tag verbatim.
+    result = apply(root, _spec(manifest=True), _verdict(latest="v0.9.26"))
+
+    assert '"pipx:graphifyy" = { version = "0.9.26"' in (root / "mise.toml").read_text(
+        encoding="utf-8"
+    )
+    assert "ref = v0.9.26" in (root / "sources" / "graphify.manifest").read_text(encoding="utf-8")
+    assert result.manifest_ref == "v0.9.26"
+    # The reported version matches the pin, so both halves of the run line are in
+    # one spelling; the tag is on `manifest_ref` where a reader can still see it.
+    assert result.to_version == "0.9.26"
+
+
 def test_a_tag_that_resolves_nowhere_aborts_before_touching_mise(tmp_path, monkeypatch) -> None:
     """The v1.0.0-not-on-PyPI trap's git mirror: a version tagged nowhere.
 
