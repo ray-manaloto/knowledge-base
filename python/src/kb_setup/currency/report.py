@@ -25,11 +25,12 @@ from typing import TYPE_CHECKING
 # ViewStatus, so deferring this import would NameError the moment a record is
 # built without one — which is every fixture and every pre-#182 call site.
 from kb_setup.currency import views as views_mod
+from kb_setup.currency.issues import cleared_for
 from kb_setup.currency.views import ViewStatus
 
 if TYPE_CHECKING:
     from kb_setup.currency.decide import Verdict
-    from kb_setup.currency.issues import Observation
+    from kb_setup.currency.issues import Observation, Reviewed
     from kb_setup.currency.sync import SyncStatus
     from kb_setup.currency.upstream import UpstreamStatus
 
@@ -68,6 +69,12 @@ class RunRecord:
     #: not-verifiable-is-not-a-pass rule the rest of this engine runs on.
     views: ViewStatus = field(default_factory=lambda: ViewStatus("", views_mod.SKIP))
     answers: tuple[tuple[str, str], ...] = ()
+    #: Recorded re-probe claims for this tool's local watch items (#486), keyed by
+    #: `WatchItem.key`. Defaulted to `{}` for the same reason `views` defaults to
+    #: SKIP — the many fixtures that build a RunRecord with no reviewed records at
+    #: all must keep working, and "nothing recorded" is the correct empty state
+    #: here (every local item renders as un-reviewed), not a sentinel for "unknown".
+    reviewed: dict[str, Reviewed] = field(default_factory=dict)
 
     @property
     def has_content(self) -> bool:
@@ -138,21 +145,45 @@ def _findings_table(sync: SyncStatus) -> str:
     return "\n".join(rows)
 
 
-def _watch_table(observations: tuple[Observation, ...], moved: tuple[Observation, ...]) -> str:
+def _watch_table(
+    observations: tuple[Observation, ...],
+    moved: tuple[Observation, ...],
+    reviewed: dict[str, Reviewed] | None = None,
+    target: str = "",
+) -> str:
     if not observations:
         return "_No watch items configured for this tool._"
     moved_keys = {o.key for o in moved}
+    reviewed = reviewed or {}
     rows = [
-        "| item | state | updated | comments | moved? |",
-        "|---|---|---|---|---|",
+        "| item | state | updated | comments | moved? | reviewed |",
+        "|---|---|---|---|---|---|",
     ]
     for o in observations:
         state = o.error or o.state or "?"
         rows.append(
             f"| {_cell(o.key)} | {_cell(state)} | {_cell(o.updated_at or '—')} | "
-            f"{o.comments} | {'**yes**' if o.key in moved_keys else 'no'} |"
+            f"{o.comments} | {'**yes**' if o.key in moved_keys else 'no'} | "
+            f"{_cell(_reviewed_cell(reviewed, o.key, target))} |"
         )
     return "\n".join(rows)
+
+
+def _reviewed_cell(reviewed: dict[str, Reviewed], key: str, target: str) -> str:
+    """This watch item's clearance state (#486) — a stale record must not read as clean.
+
+    `docs/currency/` detail pages are committed and read later as evidence, so a
+    local item cleared for an OLD release must render visibly different from one
+    cleared for the release actually being adopted — the exact ambiguity the
+    prose-note form could never show, because it had no column that could.
+    """
+    record = reviewed.get(key)
+    if record is None:
+        return "—"
+    when = f" ({record.at})" if record.at else ""
+    if cleared_for(reviewed, key, target):
+        return f"cleared @ {record.version}{when}"
+    return f"STALE @ {record.version}{when} — target is {target or 'unknown'}"
 
 
 def _ambiguity_section(verdict: Verdict, answers: tuple[tuple[str, str], ...]) -> str:
@@ -331,7 +362,7 @@ Pinned `{record.sync.pinned or "—"}` · resolved `{record.sync.resolved or "�
 
 ## Step 4 — tracked issues and watch items
 
-{_watch_table(record.observations, record.moved)}
+{_watch_table(record.observations, record.moved, record.reviewed, record.verdict.latest)}
 
 ## Step 5 — decision
 

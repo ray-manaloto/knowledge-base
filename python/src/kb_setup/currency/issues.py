@@ -10,6 +10,13 @@ The previous observation lives in the committed report, not in a cache: the
 whole point of step 6 is that this history is reviewable, and a diff against an
 untracked `~/.cache` would be neither reviewable nor reproducible on a fresh
 clone.
+
+A local item's OPEN status (gate 5, second half, `decide._gate_local`) used to
+close only via a hand-appended `currency.toml` note — prose nothing read, and
+indistinguishable from one written for THIS release or six releases ago.
+`Reviewed` / `load_reviewed` / `record_reviewed` / `cleared_for` (#486) make
+that a checkable claim instead: a re-probe is recorded AGAINST a version, and
+it clears the gate only when that is the SAME RELEASE as the one being adopted.
 """
 
 from __future__ import annotations
@@ -19,6 +26,7 @@ from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
 
 from kb_setup.currency import _proc
+from kb_setup.currency.upstream import Version, same_release
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,6 +35,7 @@ if TYPE_CHECKING:
 
 _TIMEOUT_S = 20.0
 STATE_FILE = "watch-state.json"
+REVIEWED_FILE = "watch-reviewed.json"
 
 
 @dataclass(frozen=True)
@@ -198,3 +207,93 @@ def changes(
 ) -> tuple[Observation, ...]:
     """Watch items whose watched fields moved since the previous run."""
     return tuple(o for o in observations if o.differs_from(previous.get(o.key)))
+
+
+@dataclass(frozen=True)
+class Reviewed:
+    """One local watch item, asserted re-probed against a specific release (#486)."""
+
+    key: str
+    version: str
+    at: str
+    note: str = ""
+
+
+def _reviewed_path(report_dir: Path, tool: str) -> Path:
+    return report_dir / f"{tool}-{REVIEWED_FILE}"
+
+
+def load_reviewed(report_dir: Path, tool: str) -> dict[str, Reviewed]:
+    """Recorded re-probe claims for this tool's local items ({} on missing/unreadable).
+
+    Same shape as `load_previous`: a missing or corrupt store reads as empty
+    rather than raising. That is what makes this fail-closed — a store this
+    function cannot read leaves every local item looking un-reviewed, never
+    silently clears a gate it could not actually check.
+    """
+    path = _reviewed_path(report_dir, tool)
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, Reviewed] = {}
+    for key, value in raw.items():
+        if isinstance(value, dict) and value.get("version"):
+            out[str(key)] = Reviewed(
+                key=str(key),
+                version=str(value.get("version") or ""),
+                at=str(value.get("at") or ""),
+                note=str(value.get("note") or ""),
+            )
+    return out
+
+
+def record_reviewed(report_dir: Path, tool: str, record: Reviewed) -> Path:
+    """Persist one local watch item's re-probe claim, merged with what is already stored.
+
+    Takes a whole `Reviewed` rather than its four fields spread across the call
+    site — `record.key` already carries everything `load_reviewed` needs to key
+    the merge, so the caller builds one value instead of four loose parameters.
+
+    Never writes to `currency.toml` — the claim is engine state, keyed like every
+    other per-tool store under the report root, not repo config a human hand-authors
+    (this repo's pins/config move by their owning tool, and a programmatic edit to a
+    hand-authored TOML has already been measured here to eat the comment above the
+    key it touches).
+    """
+    path = _reviewed_path(report_dir, tool)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    current = load_reviewed(report_dir, tool)
+    current[record.key] = record
+    payload: dict[str, dict[str, object]] = {
+        k: {kk: vv for kk, vv in asdict(v).items() if kk != "key"} for k, v in current.items()
+    }
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def cleared_for(reviewed: dict[str, Reviewed], key: str, target: str) -> bool:
+    """Whether `key`'s recorded re-probe covers `target` — the SAME release, not merely present.
+
+    Fail-closed by construction, and deliberately does not lean on `same_release`'s
+    documented fallback for an unparsable string (that fallback's behaviour on an
+    EMPTY or unparsable version was never read for this change): both
+    `record.version` and `target` must parse as a `Version` before `same_release`
+    is even consulted, so a blank or garbled version on either side reads as NOT
+    cleared rather than falling through to whatever string-equality `same_release`
+    would otherwise fall back to. A record at "1.56.0" must not clear a target of
+    "1.56.1" — that comparison is the entire reason this function exists instead
+    of the prose note it replaces.
+    """
+    if not target:
+        return False
+    record = reviewed.get(key)
+    if record is None or not record.version:
+        return False
+    if Version.parse(record.version) is None or Version.parse(target) is None:
+        return False
+    return same_release(record.version, target)

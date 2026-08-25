@@ -22,10 +22,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from kb_setup.currency import views as views_mod
+from kb_setup.currency.issues import cleared_for
 from kb_setup.currency.upstream import UpstreamStatus, Version, same_release
 
 if TYPE_CHECKING:
-    from kb_setup.currency.issues import Observation
+    from kb_setup.currency.issues import Observation, Reviewed
     from kb_setup.currency.sync import SyncStatus
     from kb_setup.currency.views import ViewStatus
 
@@ -288,7 +289,12 @@ def _gate_issues(
     )
 
 
-def _gate_local(observations: tuple[Observation, ...]) -> Ambiguity | None:
+def _gate_local(
+    observations: tuple[Observation, ...],
+    *,
+    reviewed: dict[str, Reviewed] | None = None,
+    target: str = "",
+) -> Ambiguity | None:
     """Gate 5, second half — local watch items, which movement can never surface.
 
     A `kind = "local"` item is a finding of ours with no upstream ticket, so it
@@ -302,8 +308,18 @@ def _gate_local(observations: tuple[Observation, ...]) -> Ambiguity | None:
     construction (it exists precisely because nobody has closed it), so a pending
     bump always stops for it. Only reached on the upgrade path — a local item is
     not a reason to interrupt a run with no bump pending.
+
+    An item stops being open once a human has RECORDED a re-probe against THE
+    VERSION BEING ADOPTED (`kb-setup currency watch-reviewed`, #486) — the fix
+    for the prose form's whole failure, since a hand-appended `currency.toml` note
+    read identically whether it was written for this release or six releases ago.
+    `issues.cleared_for` compares parsed releases, so a record stamped at an older
+    version leaves the item open exactly as if nothing had been recorded at all:
+    the engine now CHECKS the claim instead of believing it forever.
     """
     local = [o for o in observations if o.state == "local"]
+    if reviewed:
+        local = [o for o in local if not cleared_for(reviewed, o.key, target)]
     if not local:
         return None
     return Ambiguity(
@@ -311,8 +327,10 @@ def _gate_local(observations: tuple[Observation, ...]) -> Ambiguity | None:
         question=f"{len(local)} local watch item(s) must be re-probed against this release. Done?",
         detail="; ".join(f"{o.key}: {o.title}".replace("\n", " ") for o in local),
         recommendation=(
-            "Re-probe each against the new version, then record the result in "
-            "currency.toml — an untested local finding is folklore, not a finding."
+            "Re-probe each against the new version, then record it: `kb-setup currency "
+            "watch-reviewed --tool <name> --ref <ref> --version <ver>` — an untested "
+            "local finding is folklore, not a finding, and this gate cannot see a "
+            "hand-written currency.toml note."
         ),
     )
 
@@ -415,11 +433,18 @@ def decide(
     moved: tuple[Observation, ...],
     observations: tuple[Observation, ...] = (),
     views: ViewStatus | None = None,
+    reviewed: dict[str, Reviewed] | None = None,
 ) -> Verdict:
     """Apply the six gates and return what should happen next.
 
     A run with no available upgrade still reports its ambiguities: an out-of-sync
     install or a moved issue is worth surfacing whether or not a bump is pending.
+
+    `reviewed` (#486) is `issues.load_reviewed`'s output — recorded re-probe
+    claims for this tool's local watch items — threaded straight into
+    `_gate_local` against `latest`, the version actually being adopted. Keyword-
+    only with a default so `decide`'s one caller (`run._run_one`) is free to pass
+    it, and every other caller (there is exactly one) keeps today's behaviour.
     """
     current = sync.pinned
     latest = upstream.latest
@@ -479,7 +504,7 @@ def decide(
             _gate_patch(current, latest),
             _gate_tag(upstream, latest),
             _gate_markers(upstream),
-            _gate_local(observations),
+            _gate_local(observations, reviewed=reviewed, target=latest),
         )
         if gate
     ]

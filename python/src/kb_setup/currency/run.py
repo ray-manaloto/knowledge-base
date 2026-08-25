@@ -20,6 +20,7 @@ import json
 import sys
 from collections.abc import Mapping
 from dataclasses import asdict
+from datetime import UTC, datetime
 from pathlib import Path
 
 from kb_setup.currency import (
@@ -223,6 +224,11 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
     report_root = repo_root / report.REPORT_DIR
     previous = issues.load_previous(report_root, spec.name)
     moved = issues.changes(observations, previous)
+    # Recorded re-probe claims for this tool's local watch items (#486). Loaded
+    # here, not inside `decide`, for the same reason `previous`/`view_status` are:
+    # `decide` is pure judgment over facts handed to it, and the disk read stays
+    # in the one function that already does every other disk read for this tool.
+    reviewed = issues.load_reviewed(report_root, spec.name)
     # The derived-views verdict reaches gate 6 (#182). Without this it was
     # reported under its own header and nowhere else, so `apply()`'s
     # auto-authorization — which is built from THIS verdict — could clear a
@@ -238,6 +244,7 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
         # so a views check that could not verify anything reached gate 6 looking
         # exactly like a clean one.
         views=view_status,
+        reviewed=reviewed,
     )
     return report.RunRecord(
         tool=spec.name,
@@ -248,8 +255,10 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
         verdict=verdict,
         # Round 2's second P2: this was computed, used for the verdict, and then
         # dropped — so `_payload` serialized the SKIP default forever, breaking the
-        # machine surface its own docstring says it exists to provide.
+        # machine surface its own docstring says it exists to provide. `reviewed`
+        # below is the same lesson applied on arrival rather than found later.
         views=view_status,
+        reviewed=reviewed,
     )
 
 
@@ -272,8 +281,9 @@ def _payload(
 
     `views` is present because the human path prints the derived-views verdict and
     the machine path did not, so a `--json` consumer — including `daily()` — saw a
-    record with no trace of it (#182). A signal that exists in one rendering and
-    not the other is worse than absent: it reads as verified in both.
+    record with no trace of it (#182). `reviewed` (#486) follows the identical
+    precedent rather than repeating that gap: it is consulted to build the
+    verdict, so it belongs beside it here too.
     """
     return {
         "tool": tool,
@@ -283,6 +293,7 @@ def _payload(
         "views": asdict(record.views),
         "observations": [asdict(o) for o in record.observations],
         "moved": [asdict(o) for o in record.moved],
+        "reviewed": {key: asdict(value) for key, value in record.reviewed.items()},
         "detail_page": str(detail.relative_to(repo_root)) if detail else None,
     }
 
@@ -397,6 +408,92 @@ def docs_reviewed(repo_root: Path, *, only: str = "") -> int:
             file=sys.stderr,
         )
         return 1
+    return 0
+
+
+def watch_reviewed(
+    repo_root: Path, *, only: str = "", ref: str = "", version: str = "", note: str = ""
+) -> int:
+    """Record that one LOCAL watch item has been re-probed against a release (#486).
+
+    The counterpart to `docs_reviewed` for gate 5's other half. Until this
+    existed, "N local watch item(s) must be re-probed against this release.
+    Done?" had no answer the engine could check — a human hand-appended prose to
+    a `currency.toml` note, which nothing read and which looked identical
+    whether it described THIS release or one six bumps ago. This records the
+    claim as data: which item, re-probed against which version, and when.
+    `decide._gate_local` then clears an item only when the recorded version is
+    the SAME RELEASE (`issues.cleared_for`, built on `upstream.same_release`) as
+    the one currently being adopted — a record at an older version leaves the
+    gate exactly as open as no record at all.
+
+    Requires `--tool`, `--ref` and `--version`, all three for the reason
+    `docs_reviewed` requires `--tool` and one more: this asserts a human
+    re-probed ONE finding against ONE release, never a fan-out, so a dangling
+    flag (present with no value — `_opt`'s own definition of absent) must never
+    be silently read as "" and recorded as an empty claim. `cli._currency` also
+    guards each value against being another flag's name (`--tool --version
+    1.2.3` must not read `only` as `"--version"`) before this function is ever
+    reached; this function still refuses on its own, because it must not trust a
+    caller other than the CLI to have done that.
+
+    Returns 2 for any unusable request, below, and writes NOTHING in that case —
+    never partially. There is no `docs_reviewed`-style partial-success `1`: that
+    command fans a network fetch out over several watched pages, so some can
+    succeed while others 503; this command touches no network and records
+    exactly one item, so the only two outcomes are "refused, nothing written" and
+    "written".
+    """
+    required = (
+        ("--tool <name>", only),
+        ("--ref <watch-item-ref>", ref),
+        ("--version <release>", version),
+    )
+    missing = [flag for flag, value in required if not value]
+    if missing:
+        print(f"[currency] watch-reviewed requires {' '.join(missing)}", file=sys.stderr)
+        return 2
+
+    specs = _specs(repo_root, only)
+    if not specs:
+        configured = ", ".join(s.name for s in config.load(repo_root))
+        print(f"[currency] unknown tool {only!r}; configured: {configured}", file=sys.stderr)
+        return 2
+    spec = specs[0]
+
+    # `kind != "issue"` is how `issues.observe` itself decides a watch item is
+    # local (`state="local"`) — matched here rather than testing `kind ==
+    # "local"` so this command can never disagree with the gate it clears about
+    # which items are in scope.
+    local_items = [item for item in spec.watch if item.kind != "issue"]
+    match = next((item for item in local_items if item.ref == ref), None)
+    if match is None:
+        # Fail closed: a recorded clearance for a key nothing observes could
+        # never be checked again, and it would look, in the store, exactly like
+        # a valid one — refuse before writing anything rather than record it.
+        known = ", ".join(item.ref for item in local_items) or "none"
+        print(
+            f"[currency] {only!r} has no local watch item with ref {ref!r} (local refs: {known})",
+            file=sys.stderr,
+        )
+        return 2
+
+    if upstream.Version.parse(version) is None:
+        print(
+            f"[currency] {version!r} does not parse as a version — refusing to "
+            "record an unreadable clearance (fail-closed)",
+            file=sys.stderr,
+        )
+        return 2
+
+    report_root = repo_root / report.REPORT_DIR
+    at = datetime.now(UTC).date().isoformat()
+    record = issues.Reviewed(key=match.key, version=version, at=at, note=note)
+    path = issues.record_reviewed(report_root, spec.name, record)
+    print(
+        f"[currency] {spec.name}: {match.key} recorded reviewed @ {version} — "
+        f"{path.relative_to(repo_root)}"
+    )
     return 0
 
 
