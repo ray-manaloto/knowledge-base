@@ -1,0 +1,412 @@
+<title>One Version, Three Spellings</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ink:        #16191f;
+    --ink-soft:   #4a525e;
+    --ink-faint:  #7c8695;
+    --paper:      #f7f6f3;
+    --card:       #ffffff;
+    --rule:       #dfdcd5;
+    --broken:     #a8410d;
+    --broken-bg:  #fbeee6;
+    --ok:         #0f6b63;
+    --ok-bg:      #e6f2f0;
+    --plate:      #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:       #e8e6e1;
+      --ink-soft:  #a6adb8;
+      --ink-faint: #6f7783;
+      --paper:     #12141a;
+      --card:      #1a1d25;
+      --rule:      #2c313b;
+      --broken:    #f0955e;
+      --broken-bg: #2b1a10;
+      --ok:        #5fc9bd;
+      --ok-bg:     #0e2523;
+      --plate:     #1a1d25;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink:       #e8e6e1;
+    --ink-soft:  #a6adb8;
+    --ink-faint: #6f7783;
+    --paper:     #12141a;
+    --card:      #1a1d25;
+    --rule:      #2c313b;
+    --broken:    #f0955e;
+    --broken-bg: #2b1a10;
+    --ok:        #5fc9bd;
+    --ok-bg:     #0e2523;
+    --plate:     #1a1d25;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 1.25rem 6rem;
+  }
+
+  .wrap { max-width: 47rem; margin: 0 auto; }
+
+  header { padding: 5rem 0 3rem; border-bottom: 1px solid var(--rule); }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .74rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 0 0 1.75rem;
+  }
+
+  h1 {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 600; font-size: clamp(2rem, 6.5vw, 3.1rem);
+    line-height: 1.12; letter-spacing: -.02em;
+    text-wrap: balance; margin: 0 0 1.5rem;
+  }
+  h1 .vee { color: var(--broken); }
+
+  .standfirst {
+    font-size: 1.16rem; color: var(--ink-soft);
+    max-width: 34rem; margin: 0;
+  }
+
+  h2 {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 1.5rem; font-weight: 700; letter-spacing: -.01em;
+    text-wrap: balance; margin: 4.5rem 0 .5rem;
+  }
+  h3 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .78rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 500;
+    margin: 0 0 .6rem;
+  }
+
+  p { margin: 0 0 1.1rem; max-width: 36rem; }
+  .lede { color: var(--ink-soft); margin-bottom: 2rem; }
+
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .88em;
+    background: var(--broken-bg); color: var(--broken);
+    padding: .1em .38em; border-radius: 3px;
+  }
+  code.ok { background: var(--ok-bg); color: var(--ok); }
+  code.plain { background: transparent; color: var(--ink-soft); padding: 0; }
+
+  figure {
+    margin: 2rem 0 2.5rem; padding: 0;
+    background: var(--plate); border: 1px solid var(--rule);
+    border-radius: 6px; overflow: hidden;
+  }
+  .figbody { padding: 1.6rem 1.4rem .6rem; overflow-x: auto; }
+  figure svg { display: block; width: 100%; max-width: 100%; height: auto; color: var(--ink); }
+  figcaption {
+    font-size: .85rem; color: var(--ink-faint);
+    padding: .9rem 1.4rem 1.1rem; border-top: 1px solid var(--rule);
+    background: var(--card);
+  }
+
+  .verdict {
+    display: flex; gap: .7rem; align-items: baseline;
+    border-left: 3px solid var(--broken);
+    background: var(--broken-bg);
+    padding: 1rem 1.15rem; border-radius: 0 4px 4px 0;
+    margin: 0 0 1.5rem; max-width: 36rem;
+  }
+  .verdict.good { border-left-color: var(--ok); background: var(--ok-bg); }
+  .verdict strong {
+    font-family: "IBM Plex Mono", monospace; font-size: .72rem;
+    letter-spacing: .1em; text-transform: uppercase;
+    color: var(--broken); flex: 0 0 auto;
+  }
+  .verdict.good strong { color: var(--ok); }
+  .verdict span { font-size: .95rem; color: var(--ink); }
+
+  table {
+    width: 100%; border-collapse: collapse;
+    font-size: .93rem; margin: 0 0 1.5rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .scroller { overflow-x: auto; }
+  th {
+    text-align: left; font-family: "IBM Plex Mono", monospace;
+    font-size: .7rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 500;
+    padding: 0 .9rem .55rem 0; border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  td {
+    padding: .6rem .9rem .6rem 0; border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  td.mono { font-family: "IBM Plex Mono", monospace; font-size: .86rem; white-space: nowrap; }
+
+  .tally {
+    display: flex; flex-wrap: wrap; gap: 1px;
+    background: var(--rule); border: 1px solid var(--rule);
+    border-radius: 5px; overflow: hidden; margin: 0 0 1.5rem;
+  }
+  .tally div { flex: 1 1 8rem; background: var(--card); padding: 1rem 1.1rem; }
+  .tally dt {
+    font-family: "IBM Plex Mono", monospace; font-size: .68rem;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint);
+    margin: 0 0 .3rem;
+  }
+  .tally dd {
+    margin: 0; font-family: "IBM Plex Mono", monospace;
+    font-size: 1.7rem; font-weight: 600; line-height: 1;
+  }
+  .tally dd small { font-size: .8rem; font-weight: 400; color: var(--ink-faint); }
+
+  footer {
+    margin-top: 5rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    font-size: .85rem; color: var(--ink-faint);
+  }
+  footer p { max-width: 36rem; }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">knowledge-base · dependency sweep · 2026-08-25</p>
+  <h1>One version,<br><span class="vee">three</span> spellings</h1>
+  <p class="standfirst">A routine bump of four pinned tools. The version number was
+  correct every time. It was written down wrong anyway — and each of the three
+  places it goes wants it spelled differently.</p>
+</header>
+
+<h2>The thing that goes wrong</h2>
+<p class="lede">A tool has one version. But that version lives in three files, and
+each file has its own idea of what a version <em>looks like</em>. Get the number
+right and the spelling wrong, and everything still reads green.</p>
+
+<figure>
+  <div class="figbody">
+    <svg viewBox="0 0 660 300" role="img" aria-label="One resolved version, 1.56.1, fans out to three files. The manifest wants the git tag v1.56.1 and gets it right. The mise pin wants a bare 1.56.1 but received v1.56.1 and cannot resolve. The pkl schema URLs want both forms and were not updated by the tool at all.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="currentColor"/>
+        </marker>
+        <marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="#a8410d"/>
+        </marker>
+      </defs>
+
+      <!-- source -->
+      <rect x="14" y="118" width="150" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="89" y="139" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity=".65">upstream release</text>
+      <text x="89" y="160" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="15" font-weight="600" fill="currentColor">1.56.1</text>
+
+      <!-- fan lines -->
+      <path d="M164 140 C 215 140, 215 52, 268 52" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+      <path d="M164 147 L 268 147" fill="none" stroke="#a8410d" stroke-width="2" marker-end="url(#arB)"/>
+      <path d="M164 154 C 215 154, 215 242, 268 242" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+
+      <!-- target 1 -->
+      <rect x="272" y="24" width="374" height="56" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="288" y="45" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".65">sources/hk.manifest</text>
+      <text x="288" y="65" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="currentColor">ref = v1.56.1</text>
+      <text x="632" y="65" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#0f6b63" font-weight="600">git tag — correct</text>
+
+      <!-- target 2 : broken -->
+      <rect x="272" y="119" width="374" height="56" rx="5" fill="none" stroke="#a8410d" stroke-width="2.5"/>
+      <text x="288" y="140" font-family="IBM Plex Mono, monospace" font-size="11" fill="#a8410d" opacity=".85">mise.toml</text>
+      <text x="288" y="160" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="#a8410d">hk = "v1.56.1"</text>
+      <text x="632" y="160" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#a8410d" font-weight="600">(missing) — wants bare</text>
+
+      <!-- target 3 -->
+      <rect x="272" y="214" width="374" height="56" rx="5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="288" y="235" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".65">hk.pkl — amends + import</text>
+      <text x="288" y="255" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="currentColor">…/v1.56.1/hk@1.56.1</text>
+      <text x="632" y="255" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity=".7" font-weight="600">both forms — tool skips it</text>
+
+      <text x="216" y="290" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10.5" fill="currentColor" opacity=".55">one string, written to all three</text>
+    </svg>
+  </div>
+  <figcaption>The bump tool resolves one version and writes that same string everywhere.
+  The manifest wants the git tag, so it lands correctly. The mise pin wants a bare number
+  and receives the tag. The two pkl URLs need <em>both</em> forms in one line and the tool
+  never touches them at all.</figcaption>
+</figure>
+
+<div class="verdict">
+  <strong>measured</strong>
+  <span><code>mise ls hk</code> reported <code>v1.56.1 (missing)</code>. Every version mise
+  had ever installed was bare — <code class="plain">1.48.0</code>, <code class="plain">1.52.0</code>,
+  <code class="plain">1.54.1</code> — which is the control arm: the probe <em>can</em> report a
+  resolving pin, and for this one it did not. Anyone pulling that commit gets a
+  <code class="plain">mise run lint</code> that cannot find hk.</span>
+</div>
+
+<h2>The trap underneath it</h2>
+<p class="lede">Fixing the spelling means asking git what a tag points at. That question
+has two different answers, and the command most people reach for hides which one you got.</p>
+
+<figure>
+  <div class="figbody">
+    <svg viewBox="0 0 660 250" role="img" aria-label="The same git ls-remote --refs command run against two repositories. For fnox, which uses lightweight tags, it returns the commit directly. For agnix, which uses annotated tags, it returns the tag object instead of the commit, and the real commit is only visible with the peeled ref.">
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="currentColor"/>
+        </marker>
+        <marker id="ar2B" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="#a8410d"/>
+        </marker>
+      </defs>
+
+      <rect x="150" y="10" width="360" height="40" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="330" y="35" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="currentColor">git ls-remote --tags --refs …</text>
+      <text x="330" y="66" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10.5" fill="currentColor" opacity=".55">one command, two repos</text>
+
+      <path d="M250 50 C 250 88, 165 88, 165 106" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar2)"/>
+      <path d="M410 50 C 410 88, 495 88, 495 106" fill="none" stroke="#a8410d" stroke-width="2" marker-end="url(#ar2B)"/>
+
+      <!-- left: lightweight -->
+      <rect x="14" y="108" width="300" height="126" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="30" y="130" font-family="IBM Plex Sans, sans-serif" font-size="12" font-weight="600" fill="currentColor">fnox — lightweight tag</text>
+      <line x1="30" y1="142" x2="298" y2="142" stroke="currentColor" stroke-width="1" opacity=".25"/>
+      <text x="30" y="163" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".6">v1.34.0</text>
+      <text x="30" y="184" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="600" fill="currentColor">c5dd4d2f…</text>
+      <text x="30" y="212" font-family="IBM Plex Sans, sans-serif" font-size="11.5" font-weight="600" fill="#0f6b63">that IS the commit ✓</text>
+
+      <!-- right: annotated -->
+      <rect x="346" y="108" width="300" height="126" rx="5" fill="none" stroke="#a8410d" stroke-width="2.5"/>
+      <text x="362" y="130" font-family="IBM Plex Sans, sans-serif" font-size="12" font-weight="600" fill="#a8410d">agnix — annotated tag</text>
+      <line x1="362" y1="142" x2="630" y2="142" stroke="#a8410d" stroke-width="1" opacity=".3"/>
+      <text x="362" y="163" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".6">v0.50.0</text>
+      <text x="362" y="184" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="600" fill="#a8410d">7e168bc4…</text>
+      <text x="362" y="212" font-family="IBM Plex Sans, sans-serif" font-size="11.5" font-weight="600" fill="#a8410d">that is the TAG OBJECT ✗</text>
+      <text x="630" y="184" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".75">commit: faaeed49…</text>
+      <text x="630" y="163" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity=".5">only via v0.50.0^{}</text>
+    </svg>
+  </div>
+  <figcaption>The <code>--refs</code> flag strips the peeled <code class="plain">^{}</code> entries.
+  For a lightweight tag that changes nothing. For an annotated tag it removes the only line
+  carrying the actual commit — and returns a plausible, wrong SHA with no error.</figcaption>
+</figure>
+
+<div class="verdict good">
+  <strong>caught</strong>
+  <span>The control arm was accidental and decisive: re-reading the <em>current</em>
+  tag first. <code class="ok">v0.49.0</code> came back as <code class="plain">dc388699…</code>
+  while the manifest already held <code class="plain">b0401135…</code>. Two values for a pin
+  nobody had changed — so the command, not the file, was wrong.</span>
+</div>
+
+<h2>The third failure: the number moved, the record didn't</h2>
+<p class="lede">Nothing was misspelled here. The pin was simply updated in one file and
+not the other — by following the documented workaround for a known bug.</p>
+
+<figure>
+  <div class="figbody">
+    <svg viewBox="0 0 660 210" role="img" aria-label="The ty bump. A review produced a six-of-six-gates verdict. Because currency apply cannot edit pyproject.toml, the documented remedy is uv add, which moves the pin in pyproject.toml but leaves the expected value in currency.toml untouched, so the record claims a version behind the pin.">
+      <defs>
+        <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <rect x="14" y="76" width="132" height="54" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="80" y="98" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity=".65">review verdict</text>
+      <text x="80" y="117" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="#0f6b63">6/6 gates</text>
+
+      <path d="M146 103 L 214 103" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar3)"/>
+      <text x="180" y="94" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="currentColor" opacity=".6">apply</text>
+
+      <rect x="218" y="60" width="150" height="86" rx="5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="293" y="88" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".65">currency apply</text>
+      <text x="293" y="110" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11.5" font-weight="600" fill="#a8410d">refuses</text>
+      <text x="293" y="128" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="currentColor" opacity=".6">cannot edit pyproject</text>
+
+      <path d="M368 103 L 436 103" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar3)"/>
+      <text x="402" y="94" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="currentColor" opacity=".6">uv add</text>
+
+      <!-- moved -->
+      <rect x="440" y="26" width="206" height="56" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="456" y="47" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor" opacity=".65">pyproject.toml</text>
+      <text x="456" y="67" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="#0f6b63">ty==0.0.74</text>
+      <text x="630" y="67" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="10.5" fill="#0f6b63" opacity=".9">moved</text>
+
+      <!-- not moved -->
+      <rect x="440" y="124" width="206" height="56" rx="5" fill="none" stroke="#a8410d" stroke-width="2.5"/>
+      <text x="456" y="145" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#a8410d" opacity=".85">currency.toml</text>
+      <text x="456" y="165" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="#a8410d">expected 0.0.73</text>
+      <text x="630" y="165" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="10.5" fill="#a8410d">left behind</text>
+
+      <path d="M402 118 C 402 160, 420 152, 436 152" fill="none" stroke="#a8410d" stroke-width="1.6" stroke-dasharray="4 4" marker-end="url(#ar3)" opacity=".5"/>
+      <text x="360" y="176" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="#a8410d" opacity=".75">never reached</text>
+    </svg>
+  </div>
+  <figcaption>The review happened and passed. The remedy for the tool's own limitation
+  moves exactly one of the two files — so the record ends up asserting a version older
+  than the pin it is supposed to vouch for.</figcaption>
+</figure>
+
+<h2>What the register actually covers</h2>
+<p class="lede">The sweep's incidental finding, and the larger one. Of seventeen tracked
+tools, only four carry a reviewed <code class="plain">expected</code> version at all — and
+roughly the same number again are pinned with no record anywhere.</p>
+
+<div class="tally">
+  <div><dt>tracked</dt><dd>17<small> blocks</small></dd></div>
+  <div><dt>carry expected</dt><dd>4<small> of 17</small></dd></div>
+  <div><dt>disagreed</dt><dd>1<small> (ty)</small></dd></div>
+  <div><dt>pinned, untracked</dt><dd>~14</dd></div>
+</div>
+
+<h3>Pinned with no currency record</h3>
+<div class="scroller">
+<table>
+  <tr><th>where</th><th>tools</th></tr>
+  <tr>
+    <td class="mono">mise.toml</td>
+    <td>python · pkl · typos · taplo · <strong>rumdl</strong> · biome · gitleaks · gh</td>
+  </tr>
+  <tr>
+    <td class="mono">pyproject.toml</td>
+    <td>msgspec · pytest · pytest-xdist · trafilatura · mcp2cli</td>
+  </tr>
+</table>
+</div>
+<p>These are the reason drift goes unreported rather than unnoticed — nothing is
+watching them, so nothing can say they moved.</p>
+
+<h2>What landed</h2>
+<div class="scroller">
+<table>
+  <tr><th>tool</th><th>from → to</th><th>route</th><th>note</th></tr>
+  <tr><td class="mono">hk</td><td class="mono">1.56.0 → 1.56.1</td><td>engine</td><td>pin spelling corrected by hand; all three copies moved</td></tr>
+  <tr><td class="mono">agnix</td><td class="mono">0.49.0 → 0.50.0</td><td>by hand</td><td>minor bump; measured identical to control before adopting</td></tr>
+  <tr><td class="mono">fnox</td><td class="mono">1.33.1 → 1.34.0</td><td>by hand</td><td>closes a skew the comment said it would widen</td></tr>
+  <tr><td class="mono">ty</td><td class="mono">record only</td><td>by hand</td><td>pin had already landed; the record had not</td></tr>
+</table>
+</div>
+
+<div class="verdict good">
+  <strong>gates</strong>
+  <span><code class="ok">lint rc=0</code> with the new hk binary against the new pkl schemas.
+  agnix 0.50.0 under <code class="plain">--strict</code> gave 0 errors, 0 warnings, 8 info —
+  byte-identical to the 0.49.0 control, measured <em>before</em> adoption rather than after.</span>
+</div>
+
+<footer>
+  <p>Every figure and number on this page was measured in the session of 2026-08-25 on
+  branch <code class="plain">round/2026-08-25-e-currency-map</code>, commit
+  <code class="plain">e5bfa961</code>. The "~14 pinned, untracked" figure is a count of live
+  declarations in <code class="plain">mise.toml</code> and <code class="plain">pyproject.toml</code>
+  with no matching <code class="plain">[tool.*]</code> block; the two dependency floors
+  (<code class="plain">anthropic</code>, <code class="plain">structlog</code>) are counted, which is
+  why it is written as approximate rather than exact.</p>
+</footer>
+
+</div>
