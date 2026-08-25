@@ -1,0 +1,372 @@
+<title>One Gate, Two Meanings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@700;900&family=Literata:opsz,wght@7..72,400;7..72,600&family=Roboto+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --ground:    #f7f6f3;
+    --panel:     #ffffff;
+    --sunk:      #edebe6;
+    --ink:       #1c1b19;
+    --ink-soft:  #4f4d48;
+    --ink-faint: #85827a;
+    --rule:      #dcd9d2;
+    --rule-hard: #b5b1a7;
+    --narrow:    #1d6a5a;   /* the one-file gate */
+    --wide:      #b8860b;   /* the multi-file gate */
+    --alarm:     #a32b1c;
+    --plate:     #ffffff;   /* light in BOTH themes */
+    --plate-ink: #1c1b19;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:    #14130f;
+      --panel:     #1c1b17;
+      --sunk:      #23221d;
+      --ink:       #efece5;
+      --ink-soft:  #b0aca2;
+      --ink-faint: #837f76;
+      --rule:      #302e28;
+      --rule-hard: #474439;
+      --narrow:    #4fbfa4;
+      --wide:      #e2b23f;
+      --alarm:     #f08a78;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:    #14130f;
+    --panel:     #1c1b17;
+    --sunk:      #23221d;
+    --ink:       #efece5;
+    --ink-soft:  #b0aca2;
+    --ink-faint: #837f76;
+    --rule:      #302e28;
+    --rule-hard: #474439;
+    --narrow:    #4fbfa4;
+    --wide:      #e2b23f;
+    --alarm:     #f08a78;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Literata", Georgia, serif;
+    font-size: 17px;
+    line-height: 1.68;
+    margin: 0;
+    padding: 0 20px 110px;
+  }
+
+  .wrap { max-width: 66ch; margin: 0 auto; }
+  .wide-col { max-width: 100ch; margin: 0 auto; }
+
+  h1, h2, h3 { font-family: "Chivo", sans-serif; margin: 0; text-wrap: balance; line-height: 1.08; }
+  h1 { font-size: clamp(2.3rem, 6vw, 3.6rem); font-weight: 900; letter-spacing: -0.028em; }
+  h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.012em; }
+  h3 { font-size: 1.02rem; font-weight: 700; }
+
+  p, li { color: var(--ink-soft); }
+  p { margin: 0 0 1.05em; }
+  strong { color: var(--ink); font-weight: 600; }
+
+  .stamp {
+    font-family: "Roboto Mono", monospace;
+    font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--alarm);
+  }
+
+  code { font-family: "Roboto Mono", ui-monospace, monospace; font-size: 0.85em; }
+  p code, li code, td code { background: var(--sunk); border-radius: 2px; padding: 0.08em 0.34em; }
+
+  header {
+    padding: 90px 0 34px;
+    border-bottom: 3px double var(--rule-hard);
+    margin-bottom: 46px;
+  }
+  header .stamp { display: block; margin-bottom: 18px; }
+  .standfirst { font-size: 1.2rem; color: var(--ink); margin-top: 22px; max-width: 54ch; }
+
+  section { margin-bottom: 54px; }
+  section > h2 { margin-bottom: 10px; }
+  .lede { color: var(--ink-faint); font-size: 0.93rem; margin: 0 0 20px; font-family: "Chivo", sans-serif; }
+
+  figure { margin: 30px 0; }
+  .plate { background: var(--plate); border: 1px solid var(--rule-hard); padding: 24px 18px 14px; overflow-x: auto; }
+  .plate svg { display: block; width: 100%; height: auto; color: var(--plate-ink); }
+  figcaption { font-size: 0.86rem; color: var(--ink-faint); margin-top: 12px; max-width: 62ch; }
+
+  .term {
+    background: var(--sunk); border-left: 3px solid var(--rule-hard);
+    padding: 14px 16px; overflow-x: auto;
+    font-family: "Roboto Mono", monospace; font-size: 0.76rem; line-height: 1.7;
+    white-space: pre; color: var(--ink-soft); margin: 20px 0;
+  }
+  .term b { color: var(--ink); font-weight: 500; }
+  .term .w { color: var(--wide); font-weight: 500; }
+  .term .n { color: var(--narrow); font-weight: 500; }
+  .term .dim { color: var(--ink-faint); }
+
+  .tablewrap { overflow-x: auto; margin: 22px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.89rem; }
+  th, td { text-align: left; padding: 10px 13px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-family: "Roboto Mono", monospace; font-size: 0.64rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint);
+    font-weight: 400; border-bottom: 1px solid var(--rule-hard);
+  }
+  td { color: var(--ink-soft); font-family: "Chivo", sans-serif; font-size: 0.87rem; }
+  td.num { font-family: "Roboto Mono", monospace; font-variant-numeric: tabular-nums; }
+  .red { color: var(--alarm); font-weight: 700; }
+  .grn { color: var(--narrow); font-weight: 700; }
+
+  .callout {
+    background: var(--panel); border: 1px solid var(--rule-hard);
+    border-left: 4px solid var(--mark, var(--alarm));
+    padding: 18px 20px; margin: 24px 0;
+  }
+  .callout h3 { margin-bottom: 8px; }
+  .callout p:last-child { margin-bottom: 0; }
+  .c-fix { --mark: var(--narrow); }
+  .c-own { --mark: var(--wide); }
+
+  .cite { font-family: "Roboto Mono", monospace; font-size: 0.75rem; color: var(--ink-faint); }
+
+  .provenance { border-top: 1px solid var(--rule); padding-top: 24px; margin-top: 62px; font-size: 0.85rem; color: var(--ink-faint); }
+  .provenance h2 { font-size: 0.97rem; margin-bottom: 12px; color: var(--ink-soft); }
+  .provenance li { font-size: 0.85rem; color: var(--ink-faint); margin-bottom: 7px; }
+</style>
+
+<header>
+  <div class="wrap">
+    <span class="stamp">Security gate · found 2026-08-25 · issue #506</span>
+    <h1>One Gate, Two Meanings</h1>
+    <p class="standfirst">
+      Commit one file and the secret scanner reads that file. Commit two and it
+      reads fifty megabytes of your working tree instead — including everything
+      git is configured to ignore. Same gate, same config, different question.
+    </p>
+  </div>
+</header>
+
+<div class="wrap">
+<section>
+  <h2>How it was found</h2>
+  <p class="lede">Not by looking. By two commits disagreeing about the same gate.</p>
+  <p>
+    A one-file commit passed. A nine-file commit, minutes later on the same tree,
+    was refused for a secret in a scraped web page that nobody was committing —
+    a gitignored Firecrawl cache. Two probes of one gate, two answers. One of
+    them had to be broken.
+  </p>
+  <p>
+    The mechanism is a single line of CLI grammar. <code>gitleaks dir</code> takes
+    <strong>one</strong> path — its own usage is <code>gitleaks dir [flags] [path]</code>
+    — and silently ignores extra positionals, falling back to the current
+    directory. The hk builtin hands it the whole file list
+    <span class="cite">sources/hk/pkl/builtins/gitleaks.pkl:17</span>.
+  </p>
+</section>
+</div>
+
+<div class="wide-col">
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 920 330" role="img" aria-label="With one staged file the gitleaks step scans that file; with two or more the extra path arguments are discarded and it scans the entire working tree including gitignored directories.">
+      <defs>
+        <marker id="an" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1d6a5a"/></marker>
+        <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#b8860b"/></marker>
+        <marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#a32b1c"/></marker>
+      </defs>
+
+      <!-- ONE FILE -->
+      <text x="22" y="26" font-family="Roboto Mono, monospace" font-size="11" letter-spacing="1.5" fill="#1d6a5a">STAGE 1 FILE</text>
+
+      <rect x="22" y="42" width="180" height="52" fill="none" stroke="#1d6a5a" stroke-width="1.6"/>
+      <text x="112" y="73" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="12" fill="#1d6a5a">gitleaks dir … A</text>
+
+      <line x1="206" y1="68" x2="330" y2="68" stroke="#1d6a5a" stroke-width="1.6" marker-end="url(#an)"/>
+      <text x="268" y="58" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="10" fill="#1d6a5a">1 positional — honoured</text>
+
+      <rect x="334" y="46" width="150" height="44" fill="none" stroke="#1d6a5a" stroke-width="1.6"/>
+      <text x="409" y="73" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="12" fill="#1d6a5a">file A only</text>
+
+      <text x="500" y="74" font-family="Roboto Mono, monospace" font-size="13" font-weight="500" fill="#1d6a5a">20,490 bytes</text>
+      <text x="640" y="74" font-family="Roboto Mono, monospace" font-size="11" fill="#85827a">— the gate hk.pkl describes</text>
+
+      <line x1="22" y1="118" x2="898" y2="118" stroke="currentColor" stroke-width="0.7" stroke-dasharray="3 4" opacity="0.3"/>
+
+      <!-- TWO FILES -->
+      <text x="22" y="150" font-family="Roboto Mono, monospace" font-size="11" letter-spacing="1.5" fill="#b8860b">STAGE 2 OR MORE</text>
+
+      <rect x="22" y="166" width="180" height="52" fill="none" stroke="#b8860b" stroke-width="1.6"/>
+      <text x="112" y="197" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="12" fill="#b8860b">gitleaks dir … A B</text>
+
+      <line x1="206" y1="192" x2="330" y2="192" stroke="#a32b1c" stroke-width="1.8" marker-end="url(#ax)"/>
+      <text x="268" y="182" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="10" fill="#a32b1c">args DISCARDED</text>
+      <text x="268" y="209" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="10" fill="#a32b1c">falls back to `.`</text>
+
+      <rect x="334" y="150" width="220" height="86" fill="none" stroke="#b8860b" stroke-width="1.8"/>
+      <text x="444" y="176" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="12" fill="#b8860b">the WHOLE tree</text>
+      <text x="444" y="198" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="10.5" fill="#a32b1c">.firecrawl/  .agent/</text>
+      <text x="444" y="216" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="10.5" fill="#a32b1c">— gitignored, uncommittable</text>
+
+      <text x="570" y="198" font-family="Roboto Mono, monospace" font-size="13" font-weight="500" fill="#b8860b">49,957,227 bytes</text>
+      <text x="740" y="198" font-family="Roboto Mono, monospace" font-size="11" fill="#85827a">— 2,439× more</text>
+
+      <text x="22" y="272" font-family="Roboto Mono, monospace" font-size="10.5" fill="#85827a">Only 19,972,251 bytes of that tree are tracked. The gate reads 2.5× more than exists in git.</text>
+      <text x="22" y="296" font-family="Roboto Mono, monospace" font-size="10.5" fill="#a32b1c">Direction of the defect: OVER-scanning. Nothing staged ever escaped it — the cost is false positives, not a hole.</text>
+    </svg>
+  </div>
+  <figcaption>
+    The threshold is the file count, and nothing in the config mentions it. Both
+    numbers were measured on this repo; the multi-path figure is byte-identical to
+    scanning <code>.</code>, which is what proves the arguments were discarded
+    rather than merely widened.
+  </figcaption>
+</figure>
+</div>
+
+<div class="wrap">
+<section>
+  <h2>The three arms</h2>
+  <p class="lede">One path, two paths, and the repo root — the third is what makes it a finding.</p>
+
+  <div class="term"><span class="dim">$</span> gitleaks dir --redact --no-banner <b>manifest.py</b>
+  scanned ~<span class="n">20,490</span> bytes
+
+<span class="dim">$</span> gitleaks dir --redact --no-banner <b>manifest.py test_manifest_add.py</b>
+  scanned ~<span class="w">49,957,227</span> bytes
+
+<span class="dim">$</span> gitleaks dir --redact --no-banner <b>.</b>
+  scanned ~<span class="w">49,957,227</span> bytes      <span class="dim">&lt;- identical. the paths were discarded.</span></div>
+
+  <p>
+    Two paths and the repo root agreeing to the byte is the whole argument. A tool
+    that merely <em>widened</em> its scan would not land on exactly the number you
+    get by naming no path at all.
+  </p>
+</section>
+
+<section>
+  <h2>What it cost</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>surface</th><th>state</th></tr></thead>
+      <tbody>
+        <tr><td><code>git commit</code>, 9 files</td><td class="red">refused — on a file nobody was committing</td></tr>
+        <tr><td><code>mise run lint</code></td><td class="red">rc 1 — so <code>kb-ship</code> was blocked too</td></tr>
+        <tr><td>per-commit cost</td><td class="num">50 MB / 1.67 s instead of 20 KB / 6 ms</td></tr>
+        <tr><td>secrets missed</td><td class="grn">none — it over-scans, it does not under-scan</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    The last row is the one to hold on to. This was never a hole; every staged
+    byte was read. What leaked was <em>attention</em> — a gate that cries on other
+    people's junk is a gate people learn to route around.
+  </p>
+</section>
+
+<div class="callout c-own">
+  <h3>The repo already knew, and I didn't check</h3>
+  <p>
+    <code>hk.pkl:24-35</code> and <code>:79-97</code> record this behaviour,
+    measured on <strong>2026-07-28</strong>: <em>“<code>gitleaks dir</code> IGNORES
+    its path arguments once there is more than one (measured: 1 arg → 5.01 KB
+    scanned, 2 args → 8.62 MB).”</em> The figures on this page are an independent
+    re-derivation at today's tree size, not a discovery, and the commit that fixed
+    the pre-commit half does not cite that prior art. The implementer lane caught
+    the omission; recording it here is the correction.
+  </p>
+  <p>
+    Those same comments are explicit that the whole-tree scan was a <strong>hazard
+    they refused to rest on</strong>, not a feature: <em>“a gitleaks release that
+    starts honouring its args would have silently removed the only tool coverage
+    these paths have.”</em> Which makes the fix below the controlled version of the
+    exact event they were bracing for.
+  </p>
+</div>
+
+<section>
+  <h2>The fix, and whose idea it was</h2>
+  <p class="lede">Not an invention — gitleaks ships the answer in its own hook definition.</p>
+
+  <div class="term"><span class="dim"># sources/gitleaks/.pre-commit-hooks.yaml</span>
+entry: gitleaks git --pre-commit --redact --staged --verbose
+<b>pass_filenames: false</b>     <span class="dim">&lt;- it asks NOT to be given filenames</span></div>
+
+  <p>
+    hk's builtin cites that very file — <code>builtins/gitleaks.pkl:14</code>
+    references <code>.pre-commit-hooks.yaml#L4</code> — and line 4 is the
+    <code>git --staged</code> entry. It quotes the line that says don't pass
+    filenames, then passes filenames.
+  </p>
+  <p>
+    <code>--staged</code> scopes the scan to what is actually being committed, so
+    gitignored paths are excluded <strong>by construction</strong> — no second
+    list beside <code>.gitignore</code> to drift.
+  </p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>arm — same secret, same file, same tree</th><th>rc</th></tr></thead>
+      <tbody>
+        <tr><td>planted token in a <strong>staged tracked</strong> file</td><td class="red">1 — still catches real leaks</td></tr>
+        <tr><td>same file cleaned and restaged</td><td class="grn">0</td></tr>
+        <tr><td>planted token in a <strong>gitignored</strong> file, <strong>old</strong> shape</td><td class="red">1 — control: it is detectable</td></tr>
+        <tr><td>planted token in a <strong>gitignored</strong> file, <strong>new</strong> shape</td><td class="grn">0 — the point</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    <strong>The third arm was added because the fourth was vacuous.</strong> The
+    first draft planted a bare token with no <code>key = "…"</code> context, which
+    the rule does not match — so the old shape didn't flag it either, and the
+    “pass” proved nothing. A control arm that cannot produce the other answer is
+    not a control arm.
+  </p>
+
+  <p>
+    And because <code>hk.pkl</code> calls that coverage load-bearing, it was
+    checked rather than assumed, with this repo's real <code>.gitleaks.toml</code>
+    copied into the fixture: a token staged under <code>graphify-out/memory/</code>
+    → <strong>rc 1</strong>; under <code>docs/research/</code> → <strong>rc 1</strong>;
+    a clean file → <strong>rc 0</strong>. Coverage survives, and is now deterministic
+    rather than accidental.
+  </p>
+</section>
+
+<div class="callout c-fix">
+  <h3>Half fixed, and the half that isn't</h3>
+  <p>
+    The <code>pre-commit</code> hook is done. <code>check</code> and <code>fix</code>
+    still run the builtin, so <strong><code>mise run lint</code> is still red on
+    this finding</strong> — and it cannot simply take the same command, because
+    <code>check --all</code> has nothing staged. <code>--staged</code> there would
+    be <em>a gate that can only pass</em>, which is a worse defect than the one
+    being fixed.
+  </p>
+  <p>
+    The open question is how to scope a whole-tree scan without copying
+    <code>.gitignore</code> into a second list. Tracked in <strong>#506</strong>;
+    the option that fits this repo's own doctrine is to <em>generate</em> the
+    allowlist from <code>.gitignore</code> and gate it with a byte comparison,
+    the way the existing codegen checks work.
+  </p>
+</div>
+
+<div class="provenance">
+  <h2>Provenance</h2>
+  <ul>
+    <li>Every byte count was measured on this repo this session. 20,490 / 49,957,227 / 49,957,227 come from three consecutive runs differing only in their positional arguments.</li>
+    <li>19,972,251 tracked bytes is the sum over <code>git ls-files</code>, not an estimate.</li>
+    <li>The four arms ran in a throwaway git repository, never against this checkout, so no index belonging to a running lane was touched. The load-bearing-coverage arms used a copy of this repo's real <code>.gitleaks.toml</code>.</li>
+    <li>No secret value was read or printed at any point. The 24 findings were characterised by rule id, count, and a SHA-256 digest of the matched string — 24 findings, <strong>one</strong> distinct value, prefix <code>AKIA</code>, length 20, not one of AWS's published examples.</li>
+    <li>Not measured: whether a newer hk has changed this builtin, and whether gitleaks documents the multi-argument behaviour as intentional. Both are due diligence owed before anything is filed upstream, and neither has been done.</li>
+  </ul>
+</div>
+</div>

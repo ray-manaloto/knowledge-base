@@ -1,0 +1,416 @@
+<title>Two Roads to a Commit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground:      #fbfbfc;
+    --panel:       #ffffff;
+    --sunk:        #f0f0f4;
+    --ink:         #17171d;
+    --ink-soft:    #50505f;
+    --ink-faint:   #82828f;
+    --rule:        #dedee6;
+    --rule-hard:   #b9b9c6;
+    --git:         #55555f;   /* the wire protocol */
+    --gh:          #4c3bcf;   /* the API */
+    --built:       #157a52;   /* what already exists */
+    --gap:         #b23a2e;   /* where the defects live */
+    --plate:       #ffffff;   /* light in BOTH themes */
+    --plate-ink:   #17171d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:    #0f0f14;
+      --panel:     #17171e;
+      --sunk:      #1e1e27;
+      --ink:       #eaeaf1;
+      --ink-soft:  #a8a8b8;
+      --ink-faint: #7d7d8c;
+      --rule:      #2a2a35;
+      --rule-hard: #3d3d4b;
+      --git:       #a9a9b8;
+      --gh:        #9d90ff;
+      --built:     #4fc294;
+      --gap:       #ef8a7c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:    #0f0f14;
+    --panel:     #17171e;
+    --sunk:      #1e1e27;
+    --ink:       #eaeaf1;
+    --ink-soft:  #a8a8b8;
+    --ink-faint: #7d7d8c;
+    --rule:      #2a2a35;
+    --rule-hard: #3d3d4b;
+    --git:       #a9a9b8;
+    --gh:        #9d90ff;
+    --built:     #4fc294;
+    --gap:       #ef8a7c;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+    font-size: 17.5px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 20px 110px;
+  }
+
+  .wrap { max-width: 70ch; margin: 0 auto; }
+  .wide { max-width: 104ch; margin: 0 auto; }
+
+  h1, h2, h3 { font-family: "Archivo", sans-serif; margin: 0; text-wrap: balance; line-height: 1.1; }
+  h1 { font-size: clamp(2.4rem, 6.5vw, 3.8rem); font-weight: 700; letter-spacing: -0.03em; }
+  h2 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.018em; }
+  h3 { font-size: 1.05rem; font-weight: 700; }
+
+  p, li { color: var(--ink-soft); }
+  p { margin: 0 0 1em; }
+  strong { color: var(--ink); font-weight: 600; }
+
+  .kicker {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem; letter-spacing: 0.17em; text-transform: uppercase;
+    color: var(--gh);
+  }
+
+  code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.85em; }
+  p code, li code, td code { background: var(--sunk); border-radius: 3px; padding: 0.08em 0.35em; }
+
+  header {
+    padding: 92px 0 38px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 50px;
+  }
+  header .kicker { display: block; margin-bottom: 18px; }
+  .answer {
+    font-size: 1.24rem; color: var(--ink); margin-top: 24px; max-width: 58ch;
+    font-weight: 400;
+  }
+  .answer em { font-style: normal; background: linear-gradient(transparent 62%, color-mix(in srgb, var(--gh) 24%, transparent) 62%); }
+
+  section { margin-bottom: 58px; }
+  section > h2 { margin-bottom: 10px; }
+  .lede { color: var(--ink-faint); font-size: 0.95rem; margin: 0 0 20px; }
+
+  figure { margin: 32px 0; }
+  .plate {
+    background: var(--plate); border: 1px solid var(--rule);
+    padding: 26px 20px 16px; overflow-x: auto;
+  }
+  .plate svg { display: block; width: 100%; height: auto; color: var(--plate-ink); }
+  figcaption { font-size: 0.87rem; color: var(--ink-faint); margin-top: 12px; max-width: 64ch; }
+
+  .term {
+    background: var(--sunk); border-left: 3px solid var(--rule-hard);
+    padding: 15px 17px; overflow-x: auto;
+    font-family: "IBM Plex Mono", monospace; font-size: 0.77rem; line-height: 1.7;
+    white-space: pre; color: var(--ink-soft); margin: 20px 0;
+  }
+  .term b { color: var(--ink); font-weight: 600; }
+  .term .g  { color: var(--gh); font-weight: 600; }
+  .term .r  { color: var(--gap); font-weight: 600; }
+  .term .ok { color: var(--built); font-weight: 600; }
+  .term .dim { color: var(--ink-faint); }
+
+  .tablewrap { overflow-x: auto; margin: 22px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 10px 13px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.65rem;
+    letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+    font-weight: 400; border-bottom: 1px solid var(--rule-hard);
+  }
+  td { color: var(--ink-soft); }
+  .y { color: var(--built); font-weight: 600; }
+  .n { color: var(--gap); font-weight: 600; }
+
+  .verdict {
+    background: var(--panel); border: 1px solid var(--rule-hard);
+    border-top: 3px solid var(--mark, var(--gh));
+    padding: 20px 22px; margin: 22px 0;
+  }
+  .verdict h3 { margin-bottom: 6px; }
+  .verdict .tagline {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.68rem;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--mark, var(--gh));
+    display: block; margin-bottom: 12px;
+  }
+  .verdict p:last-child { margin-bottom: 0; }
+  .v-yes { --mark: var(--built); }
+  .v-no  { --mark: var(--git); }
+
+  .cite { font-family: "IBM Plex Mono", monospace; font-size: 0.76rem; color: var(--ink-faint); }
+
+  .provenance {
+    border-top: 1px solid var(--rule); padding-top: 24px; margin-top: 64px;
+    font-size: 0.85rem; color: var(--ink-faint);
+  }
+  .provenance h2 { font-size: 0.98rem; margin-bottom: 12px; color: var(--ink-soft); }
+  .provenance li { font-size: 0.85rem; color: var(--ink-faint); margin-bottom: 7px; }
+</style>
+
+<header>
+  <div class="wrap">
+    <span class="kicker">Design question · 2026-08-25</span>
+    <h1>Two Roads to a Commit</h1>
+    <p class="answer">
+      Yes for the half you asked about — and <em>you already built it</em> for the other
+      half, better than the obvious version. The gap is the handoff between them, and
+      all three open tickets live exactly there.
+    </p>
+  </div>
+</header>
+
+<div class="wrap">
+<section>
+  <h2>Syncing a source is two questions, not one</h2>
+  <p class="lede">They have different right answers, and only one of them is a git question.</p>
+  <p>
+    <strong>“Which version should we be on?”</strong> is a <em>release</em> question — it
+    needs to know what is a real release and what is an alpha someone tagged on a Tuesday.
+    Git has no idea. A tag is a tag.
+  </p>
+  <p>
+    <strong>“Which commit is that version?”</strong> is an <em>object</em> question — given
+    a name, what does it point at. Git answers this natively; the difficulty is that an
+    annotated tag has two valid answers and the wire protocol makes you infer which is which.
+  </p>
+</section>
+</div>
+
+<div class="wide">
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 940 340" role="img" aria-label="Syncing a source has two hops: choosing a version, already answered correctly by the gh releases API, and resolving that version to a commit, currently answered by git ls-remote, where all three open defects live.">
+      <defs>
+        <marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+        <marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#4c3bcf"/></marker>
+        <marker id="mr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#b23a2e"/></marker>
+      </defs>
+
+      <!-- HOP 1 -->
+      <text x="24" y="26" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.5" fill="#157a52">HOP 1 — WHICH VERSION?   ALREADY BUILT, ALREADY CORRECT</text>
+
+      <rect x="24" y="42" width="196" height="58" fill="none" stroke="#157a52" stroke-width="1.7"/>
+      <text x="122" y="66" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#157a52">currency/upstream.py</text>
+      <text x="122" y="84" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#157a52">:519-533</text>
+
+      <line x1="224" y1="71" x2="316" y2="71" stroke="#157a52" stroke-width="1.6" marker-end="url(#mg)"/>
+      <text x="270" y="61" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#157a52">gh api</text>
+
+      <rect x="320" y="36" width="290" height="70" fill="none" stroke="#4c3bcf" stroke-width="1.7"/>
+      <text x="465" y="60" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#4c3bcf">repos/{r}/releases?per_page=100</text>
+      <text x="465" y="80" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#4c3bcf">drop draft · drop prerelease</text>
+      <text x="465" y="96" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#4c3bcf">then GREATEST BY VERSION, not by date</text>
+
+      <line x1="614" y1="71" x2="700" y2="71" stroke="#157a52" stroke-width="1.6" marker-end="url(#mg)"/>
+
+      <rect x="704" y="42" width="212" height="58" fill="none" stroke="#157a52" stroke-width="1.7"/>
+      <text x="810" y="66" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#157a52">a version STRING</text>
+      <text x="810" y="85" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="#157a52">"rust-v0.149.1"</text>
+
+      <!-- THE HANDOFF -->
+      <line x1="810" y1="104" x2="810" y2="150" stroke="#b23a2e" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#mr)"/>
+      <text x="822" y="132" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#b23a2e">a bare string —</text>
+      <text x="822" y="146" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#b23a2e">the object is forgotten</text>
+
+      <line x1="24" y1="168" x2="916" y2="168" stroke="currentColor" stroke-width="0.7" stroke-dasharray="3 4" opacity="0.3"/>
+
+      <!-- HOP 2 -->
+      <text x="24" y="200" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.5" fill="#b23a2e">HOP 2 — WHICH COMMIT?   ALL THREE TICKETS LIVE HERE</text>
+
+      <rect x="24" y="216" width="196" height="58" fill="none" stroke="#55555f" stroke-width="1.7"/>
+      <text x="122" y="240" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#55555f">manifest.resolve_tag</text>
+      <text x="122" y="258" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#55555f">:246</text>
+
+      <line x1="224" y1="245" x2="316" y2="245" stroke="#55555f" stroke-width="1.6" marker-end="url(#m1)"/>
+      <text x="270" y="235" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#55555f">git</text>
+
+      <rect x="320" y="210" width="290" height="70" fill="none" stroke="#55555f" stroke-width="1.7"/>
+      <text x="465" y="234" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#55555f">ls-remote --tags &lt;url&gt; &lt;ref&gt;</text>
+      <text x="465" y="252" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#b23a2e">no object TYPE · pattern is a TAIL match</text>
+      <text x="465" y="268" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#b23a2e">the peel is a `^{}` string you must parse</text>
+
+      <line x1="614" y1="245" x2="700" y2="245" stroke="#b23a2e" stroke-width="1.6" marker-end="url(#mr)"/>
+
+      <rect x="704" y="216" width="212" height="58" fill="none" stroke="#b23a2e" stroke-width="1.7"/>
+      <text x="810" y="240" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#b23a2e">a SHA — but which</text>
+      <text x="810" y="258" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#b23a2e">object? #500 #501 #503</text>
+
+      <text x="24" y="316" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#82828f">Hop 1 asks an API that knows what a release IS. Hop 2 asks a protocol that only knows names.</text>
+    </svg>
+  </div>
+  <figcaption>
+    The dashed arrow is the whole finding. Hop 1 resolves a real release object and then
+    throws everything away except its <code>tag_name</code>; hop 2 has to rediscover, from
+    a bare string and over a different protocol, what hop 1 was already holding.
+  </figcaption>
+</figure>
+</div>
+
+<div class="wrap">
+<section>
+  <h2>Hop 1 is already right, and more carefully than I'd have written it</h2>
+  <p class="lede">Measured against <code>openai/codex</code>, the worst case in the corpus.</p>
+
+  <div class="term"><span class="dim">$</span> gh api repos/openai/codex/releases?per_page=6
+  rust-v0.150.0-alpha.9    <span class="r">prerelease=true</span>
+  rust-v0.150.0-alpha.8    <span class="r">prerelease=true</span>
+  <span class="ok">rust-v0.149.1            prerelease=false</span>   <span class="dim">&lt;- the only real release here</span>
+  rust-v0.149.0-alpha.4.3  <span class="r">prerelease=true</span>
+  rust-v0.150.0-alpha.7    <span class="r">prerelease=true</span>
+  rust-v0.149.0-alpha.7.2  <span class="r">prerelease=true</span></div>
+
+  <p>
+    <code>git ls-remote --tags</code> sees all six as equals — it returns
+    <strong>26 lines over 13 distinct tags</strong> for the <code>rust-v0.149.0</code>
+    prefix alone, twelve of them alphas. Nothing in the git protocol says which is
+    shippable.
+  </p>
+  <p>
+    And <code>upstream.py:519-533</code> does not merely call the easy endpoint. Its own
+    comment: <em>“greatest by VERSION order among non-draft, non-prerelease releases —
+    deliberately NOT <code>/releases/latest</code>, which GitHub orders by</em> publish
+    date. That distinction is real: <code>/releases/latest</code> returns
+    <code>rust-v0.149.1</code> here only because the alphas happen to sort that way, and a
+    backported patch published tomorrow would flip it.
+  </p>
+</section>
+
+<section>
+  <h2>Hop 2 is where <code>gh</code> would actually earn its keep</h2>
+  <p class="lede">Both arms probed live. The API states what the protocol makes you infer.</p>
+
+  <div class="term"><span class="dim">$</span> gh api repos/agent-sh/agnix/git/ref/tags/v0.50.0
+  {"sha":"7e168bc4a84c357807b519db2eb103351e545fdb", <span class="g">"type":"tag"</span>}      <span class="dim">&lt;- ANNOTATED, stated</span>
+
+<span class="dim">$</span> gh api repos/agent-sh/agnix/git/tags/7e168bc4a84c357807b519db2eb103351e545fdb
+  {"object":{"sha":"faaeed49b5d018aaadecc2b2d21dcf049ed817c0", <span class="g">"type":"commit"</span>}}
+
+<span class="dim">$</span> gh api repos/jdx/hk/git/ref/tags/v1.56.1        <span class="dim">&lt;- control arm</span>
+  {"sha":"fdbb35c1cb9d1487e8350a0888877c0d74d4b611", <span class="g">"type":"commit"</span>}      <span class="dim">&lt;- LIGHTWEIGHT, stated</span></div>
+
+  <p>
+    That single <code>type</code> field is the difference. Every one of the three open
+    tickets exists because the git protocol does not have it:
+  </p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>ticket</th><th>the defect</th><th>would it exist under <code>gh</code>?</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>#500</strong></td>
+          <td>which identity a manifest records, inferred from a <code>^{}</code> suffix</td>
+          <td class="y">No — <code>type</code> says it outright</td>
+        </tr>
+        <tr>
+          <td><strong>#501</strong></td>
+          <td>two functions inferring differently, so a raw compare is always false</td>
+          <td class="y">No — one stated answer, nothing to diverge</td>
+        </tr>
+        <tr>
+          <td><strong>#503</strong></td>
+          <td>a ref pattern tail-matching <code>sub/v1.0.0</code> when asked for <code>v1.0.0</code></td>
+          <td class="y">No — the ref path is exact and 404s</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    The 404 arm is worth stating precisely, because the obvious probe does not show it:
+    asking <code>codex</code> for <code>v0.149.0</code> returns 404 from the API and
+    <em>also</em> returns nothing from git, since <code>v0.149.0</code> is not a suffix of
+    <code>rust-v0.149.0</code> at a <code>/</code> boundary. The trap needs a genuine
+    nested name, and the arm that shows it is a local repo holding only
+    <code>sub/v1.0.0</code> — where git answers a query for <code>v1.0.0</code> and the
+    API would not.
+  </p>
+</section>
+
+<section>
+  <h2>What it costs, stated honestly</h2>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th></th><th><code>git ls-remote</code></th><th><code>gh api</code></th></tr></thead>
+      <tbody>
+        <tr><td>Names the object type</td><td class="n">no — infer from <code>^{}</code></td><td class="y">yes, explicitly</td></tr>
+        <tr><td>Exact ref lookup</td><td class="n">no — tail match</td><td class="y">yes — 404 on a miss</td></tr>
+        <tr><td>Knows what a release is</td><td class="n">no</td><td class="y">yes</td></tr>
+        <tr><td>Round trips, annotated tag</td><td class="y">1</td><td class="n">2</td></tr>
+        <tr><td>Needs auth</td><td class="y">no</td><td class="n">yes</td></tr>
+        <tr><td>Rate limited</td><td class="y">no</td><td class="n">yes</td></tr>
+        <tr><td>Works off GitHub</td><td class="y">any host</td><td class="n">GitHub only</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    The bottom three rows are the reason this is a scoping question rather than a
+    straight swap. Two of them are already paid for: <strong>all 84 manifests are
+    <code>github.com</code></strong>, and <code>gh</code> is already a hard dependency of
+    the currency engine, of <code>kb-ship</code> and of <code>kb-land</code>. The third —
+    rate limits — is the one that bites, and this repo has already been bitten by it:
+    a rate-limited response parsed through a <code>jq</code> fallback reads as
+    <em>NOT FOUND</em>, which is a wrong answer wearing the costume of a real one.
+  </p>
+</section>
+
+<section>
+  <h2>The recommendation</h2>
+
+  <div class="verdict v-yes">
+    <span class="tagline">Do this</span>
+    <h3>Give hop 2 to <code>gh</code>, on the bump path only</h3>
+    <p>
+      <code>currency apply</code> and <code>kb-manifest-add</code> already require
+      <code>gh</code> and already run online. Resolving a version to a commit there via
+      <code>git/ref/tags/{tag}</code> deletes the inference that produced #500, #501 and
+      #503 rather than fixing it — the type is stated, the lookup is exact, and there is
+      no <code>^{}</code> string to parse.
+    </p>
+  </div>
+
+  <div class="verdict v-no">
+    <span class="tagline">Do NOT do this</span>
+    <h3>Leave the build path on git</h3>
+    <p>
+      <code>_ensure_clone</code> already has the repository in hand and resolves against
+      it locally — no network, no auth, no rate limit, and correct by construction. A
+      <code>kb-build</code> that needs a GitHub token to reproduce a corpus from committed
+      inputs is a worse build. The precedent is in the tree:
+      <code>sync.py</code>'s <code>_tag_commit</code> asks the local clone and gets both
+      identities for free.
+    </p>
+  </div>
+
+  <p>
+    One thing to settle before it is built, because it is the failure mode the rate-limit
+    lesson names: <strong>a 404 and a 403 must not resolve to the same word.</strong>
+    “That tag does not exist” and “we asked too often” are different facts, and a
+    resolver that collapses them will pin the wrong thing quietly. That is the same
+    distinction this repo already draws between DRIFT, SKIP and OK.
+  </p>
+</section>
+
+<div class="provenance">
+  <h2>Provenance</h2>
+  <ul>
+    <li>Every command shown was run live this session against the named repository. Both arms in each case: an annotated tag beside a lightweight control, an existing ref beside a missing one.</li>
+    <li>SHAs are written full-length deliberately — an abbreviated one is not verifiable against a remote, and a commit-hook spell-checker rewrote one in a sibling artifact earlier today.</li>
+    <li>Line citations are against the working tree at <code>73d42b03</code>. <code>upstream.py:519-533</code> and its comment about <code>/releases/latest</code> were read, not summarised.</li>
+    <li>“All 84 manifests are github.com” is a count of every <code>url =</code> line in <code>sources/</code>, not a sample.</li>
+    <li>Not measured here: the actual rate-limit budget a full-corpus resolve would consume, and whether any non-GitHub source is planned. Both would change the scoping, neither changes the mechanism.</li>
+  </ul>
+</div>
+</div>
