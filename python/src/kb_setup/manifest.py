@@ -207,17 +207,21 @@ def load_all(sources_dir: Path) -> list[Manifest]:
 
 
 def latest_commit(m: Manifest) -> str:
-    """Upstream HEAD of the manifest's ref (a `git ls-remote`, no clone)."""
-    out = subprocess.run(
-        ["git", "ls-remote", m.url, m.ref],
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=60,
-    ).stdout.strip()
-    if not out:
+    """Upstream HEAD of the manifest's ref (a `git ls-remote`, no clone).
+
+    Shares `_resolve_ref` with `resolve_tag` (#500), so the two can never again
+    disagree on what a ref names. `m.ref` may itself be either a branch or a
+    tag — this repo pins both under one field — so the call omits `--tags`
+    (baking it in would return EMPTY for every branch source, silently) and
+    `_resolve_ref` checks `refs/heads/` then `refs/tags/` against that one
+    UNRESTRICTED result. Checking both namespaces costs no extra round trip:
+    `--tags` only narrows what git includes in the reply, never how many of the
+    already-returned lines this function is allowed to look at.
+    """
+    sha = _resolve_ref(m.url, m.ref, tags=False)
+    if sha is None:
         raise RuntimeError(f"{m.name}: ref {m.ref!r} not found at {m.url}")
-    return out.split()[0]
+    return sha
 
 
 def write_commit(m: Manifest, commit: str) -> Manifest:
@@ -243,6 +247,58 @@ def _tag_candidates(version: str, prefix: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(ordered))
 
 
+def _resolve_ref(url: str, ref: str, *, tags: bool) -> str | None:
+    """One `git ls-remote` for `ref` (+ its dereference), resolved to a commit sha.
+
+    Returns the PEELED commit when `ref` names an annotated tag, the ref's own
+    sha for a lightweight tag or a branch, or `None` — a MISS — when `ref`
+    matches nothing at `url`. Shared by `resolve_tag` and `latest_commit` (#500)
+    so the two can never again disagree on what a ref names.
+
+    `tags=True` passes `--tags` — restricting the remote search to
+    `refs/tags/*`, which also disambiguates a GUESSED tag name from a
+    same-named branch — and only ever needs to check that one namespace, since
+    git already filtered to it. `resolve_tag`'s candidate loop always uses this
+    shape. `tags=False` omits the flag: the search is UNRESTRICTED, so the
+    match is checked against `refs/heads/` and `refs/tags/`, in that order —
+    whichever namespace `ref` actually lives in is the one that comes back, at
+    no extra network cost (`--tags` only narrows what git returns, not how many
+    of the returned lines get compared afterwards). `latest_commit` uses this
+    shape, because a manifest's `ref` may name either kind of pin.
+
+    `git ls-remote` patterns are TAIL matches on `/` boundaries, not exact
+    names — a repo holding `sub/v1.0.0` and no `v1.0.0` answers a `v1.0.0`
+    pattern too (`refs/tags/sub/v1.0.0`). So a non-empty result is not itself a
+    match: every candidate refname is checked for EXACT equality against the
+    namespace this call asked for, and a non-empty output with no exact match
+    is still a MISS.
+    """
+    namespaces = ("refs/tags/",) if tags else ("refs/heads/", "refs/tags/")
+    argv = ["git", "ls-remote", *(["--tags"] if tags else []), url, ref, f"{ref}^{{}}"]
+    out = subprocess.run(
+        argv,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    ).stdout.strip()
+    by_refname: dict[str, str] = {}
+    for line in out.splitlines():
+        sha, _, refname = line.partition("\t")
+        by_refname[refname] = sha
+    # Peeled entries first, across every candidate namespace, THEN plain ones —
+    # an annotated tag's dereference always outranks its own tag-object line.
+    for namespace in namespaces:
+        sha = by_refname.get(f"{namespace}{ref}^{{}}")
+        if sha is not None:
+            return sha
+    for namespace in namespaces:
+        sha = by_refname.get(f"{namespace}{ref}")
+        if sha is not None:
+            return sha
+    return None
+
+
 def resolve_tag(url: str, version: str, *, prefix: str = "") -> tuple[str, str]:
     """Resolve a release version to its (ref, commit) via `git ls-remote --tags`.
 
@@ -250,8 +306,16 @@ def resolve_tag(url: str, version: str, *, prefix: str = "") -> tuple[str, str]:
     bare `<version>` — projects tag all three ways. Raises if NONE exists at the
     remote, so the currency engine can never pin a manifest to a version that was
     published to PyPI but tagged nowhere in git (the mirror of graphify's
-    v1.0.0-tagged-not-on-PyPI trap). `--refs` strips the `^{}` dereference line so
-    a peeled annotated tag yields one clean SHA.
+    v1.0.0-tagged-not-on-PyPI trap). Each candidate resolves through
+    `_resolve_ref(..., tags=True)`, which returns the PEELED commit for an
+    annotated tag — never the tag object `write_pin` used to record (#500).
+
+    The old call carried `--refs`, which strips exactly that dereference line.
+    It never had anything to strip: the exact-ref pattern this function has
+    always used never matched `<ref>^{}` in the first place, so `--refs` was
+    dead weight, not a fix, under the old shape. It is removed here precisely
+    BECAUSE the new shape asks for the peel on purpose — keeping `--refs` would
+    turn this fix into a silent no-op that passes its own test.
 
     `prefix` exists because the two halves of #245 were fixed in different
     places and only one of them landed: `ToolSpec.tag_prefix` taught the *sync*
@@ -268,21 +332,15 @@ def resolve_tag(url: str, version: str, *, prefix: str = "") -> tuple[str, str]:
     candidates = _tag_candidates(version, prefix)
     for ref in candidates:
         try:
-            out = subprocess.run(
-                ["git", "ls-remote", "--tags", "--refs", url, ref],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=60,
-            ).stdout.strip()
+            sha = _resolve_ref(url, ref, tags=True)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
             # An unreachable host, a bad URL, or a timeout is a resolution
             # FAILURE, not a "tag not found" — but the currency engine's apply()
             # catches RuntimeError, so surface every failure mode as one, or a
             # raw traceback escapes instead of the clean "[currency] apply failed".
             raise RuntimeError(f"git ls-remote failed for {url} @ {ref}: {e}") from e
-        if out:
-            return ref, out.split()[0]
+        if sha is not None:
+            return ref, sha
     # Name EVERY candidate actually tried. The old wording hard-coded two, so a
     # prefixed miss would have reported that `rust-v` was never attempted when it
     # was — a failure message that misdescribes its own probe sends the reader to

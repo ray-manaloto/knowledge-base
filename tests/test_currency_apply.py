@@ -185,11 +185,16 @@ def _prefixed_remote(monkeypatch, *tags: str) -> None:
     `apply()` never PASSED the prefix, and a stub that answers for any input
     passes identically with and without the wiring — a test that cannot fail,
     which is the sibling finding this batch also fixes.
+
+    argv now ends `[..., ref, f"{ref}^{{}}"]` (#500: `_resolve_ref` asks for
+    the dereference too), so the REF is the second-to-last element, not the
+    last — keyed on `argv[-1]` this would key on the peel PATTERN instead and
+    never match a real tag name again.
     """
     import subprocess
 
     def _ls_remote(argv: list[str], **_k: object) -> subprocess.CompletedProcess[str]:
-        ref = argv[-1]
+        ref = argv[-2]
         out = f"cafe1234\trefs/tags/{ref}\n" if ref in tags else ""
         return subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")
 
@@ -217,6 +222,11 @@ def test_without_the_prefix_that_same_bump_aborts_untouched(tmp_path, monkeypatc
 
     And the abort must still be clean — the resolve happens before any write,
     so mise.toml is byte-identical afterwards.
+
+    Left AS-IS, deliberately (#500 spec §5): every unprefixed candidate misses
+    this fake regardless of the peeling shape, so this test's green is not
+    evidence for #500 either way — it is evidence for #245's wiring, which is
+    what it was written to cover.
     """
     root = _repo(tmp_path, manifest=True)
     before = (root / "mise.toml").read_text(encoding="utf-8")

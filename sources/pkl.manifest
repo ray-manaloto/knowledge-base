@@ -12,15 +12,18 @@
 # "how does graphify work?" answer came from the wrong source.
 #
 # Pin the RELEASE TAG, never a branch head — a branch drifts ahead of the release.
-# To bump: change the version in its source above, then
-#   git ls-remote --tags --refs https://github.com/apple/pkl | grep <version>
-# and set ref/commit here to match, then `mise run kb-build`.
+# ⚠️ THIS TAG IS ANNOTATED. Do NOT use `--refs` — it strips the peeled line,
+# and a bump recorded from it pins the TAG OBJECT, not the commit `kb-build`
+# checks out (#500). To bump: change the version in its source above, then
+#   git ls-remote --tags https://github.com/apple/pkl <version> '<version>^{}'
+# and set ref/commit here to the `^{}` (peeled) line's SHA — NOT the bare
+# `<version>` line — then `mise run kb-build`.
 #
 # kind = code: AST extraction only, no LLM, no cost. NOTE this extracts the
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/apple/pkl
 ref = 0.32.0
-commit = 67a681c60dda191365eeaabc40f9342132aaa0e7
+commit = e51fb2f91774265666f94980ec630db794a4db2d
 kind = code
 added = 2026-08-02
