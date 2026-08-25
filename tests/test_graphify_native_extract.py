@@ -15,6 +15,7 @@ earns a real-dispatch test where extract/cluster do not.
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -852,3 +853,52 @@ def test_an_unset_graphify_out_is_not_refused(tmp_path, monkeypatch) -> None:
     _make_target(tmp_path)
     monkeypatch.delenv("GRAPHIFY_OUT", raising=False)
     assert gne.native_extract_main(tmp_path, ["--dry-run"]) == 0
+
+
+# --- round-2 cold review: the THIRD instance of the class (65f39b172ddc) ------
+
+
+def test_a_non_default_backend_gets_no_invented_model(tmp_path) -> None:
+    """The MAJOR: the env KEY was backend-derived, the VALUE was not.
+
+    `Options.model` defaulted to `DEFAULT_MODEL`, so every run that did not pass
+    `--model` wrote `GRAPHIFY_OPENAI_CLI_MODEL=claude-opus-5` — a Claude
+    identifier into an OpenAI backend's own variable. graphify's table records
+    that backend's default as `gpt-5.6-sol`.
+
+    Omitting, not substituting: graphify already knows its own default, and
+    copying it here is the second-copy-that-drifts this module has been bitten by
+    twice (#245, #499).
+    """
+    overlay = gne.env_overlay(
+        gne.Options(target=tmp_path, out=tmp_path / "o", backend="openai-cli")
+    )
+    assert "GRAPHIFY_OPENAI_CLI_MODEL" not in overlay
+    assert gne.DEFAULT_MODEL not in overlay.values()
+
+
+def test_the_default_backend_still_gets_its_model(tmp_path) -> None:
+    """The control arm: omitting for others must not omit for claude-cli.
+
+    This repo has a recorded opinion there, and it deliberately differs from
+    graphify's own `claude-code-plan`. Losing it would be the over-correction.
+    """
+    overlay = gne.env_overlay(gne.Options(target=tmp_path, out=tmp_path / "o"))
+    assert overlay[gne._MODEL_ENV] == gne.DEFAULT_MODEL
+
+
+def test_an_explicit_model_is_honoured_on_any_backend(tmp_path) -> None:
+    """An explicit `--model` is the caller being explicit; do not second-guess it."""
+    overlay = gne.env_overlay(
+        gne.Options(target=tmp_path, out=tmp_path / "o", backend="openai-cli", model="gpt-5.6-sol")
+    )
+    assert overlay["GRAPHIFY_OPENAI_CLI_MODEL"] == "gpt-5.6-sol"
+
+
+def test_resolve_model_covers_all_three_cases(tmp_path) -> None:
+    """The decision itself, armed directly rather than through the overlay."""
+    o = gne.Options(target=tmp_path, out=tmp_path / "o")
+    assert gne.resolve_model(o) == gne.DEFAULT_MODEL
+    assert gne.resolve_model(replace(o, backend="openai-cli")) == ""
+    assert gne.resolve_model(replace(o, backend="openai-cli", model="m")) == "m"
+    assert gne.resolve_model(replace(o, model="m")) == "m"

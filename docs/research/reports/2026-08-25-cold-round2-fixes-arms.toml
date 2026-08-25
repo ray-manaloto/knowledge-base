@@ -1,0 +1,87 @@
+# Mutation arms for the ROUND-2 cold-review fixes (lane read `65f39b172ddc`).
+#
+# Round 2 was briefed to hunt a THIRD instance of this branch's defect class —
+# one value, several consumers that must agree — after the first two were fixed.
+# It found one, and it is the sharpest of the three:
+#
+#   The env KEY was correctly derived from `--backend`. The VALUE under it was
+#   not. `Options.model` defaulted to `DEFAULT_MODEL = "claude-opus-5"`, so every
+#   run that did not pass `--model` wrote `GRAPHIFY_OPENAI_CLI_MODEL=claude-opus-5`
+#   — a Claude identifier into an OpenAI backend's own model variable. graphify's
+#   own table records that backend's default as `gpt-5.6-sol`. Reproduced live on
+#   the clean tree by the lane, and again by the architect before acting.
+#
+# It is sharper than the first two because both of those were *reachable by
+# reading the function that was wrong*. This one is only visible by holding two
+# facts together: that the key is derived and the value is a constant. Fixing the
+# key made the value's blindness harder to see, not easier — the overlay now
+# looks backend-aware at a glance.
+#
+# R3 is the CONTROL-shaped arm and the one that matters most here. The obvious
+# over-correction is to omit the model for EVERY backend, which satisfies R1
+# while silently dropping a deliberate choice this repo records a reason for
+# (`DEFAULT_MODEL` differs from graphify's own `claude-code-plan` on purpose).
+#
+# SCOPE. What is NOT armed:
+#   - that `gpt-5.6-sol` is the right model for openai-cli. We do not choose it;
+#     we decline to override it. graphify's table owns that value.
+#   - the two stale DOCSTRINGS this round also fixed. They are prose, no test can
+#     fail on them, and pretending otherwise with a text-matching test would be
+#     the "gate that measures the wrong thing" this repo already has a rule about.
+#     They are recorded in the commit message instead.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: that no FOURTH instance exists. Three were
+# found by three readers over two rounds. Each was invisible to the reader who
+# had just fixed the previous one.
+
+suites = ["tests/test_graphify_native_extract.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    return DEFAULT_MODEL if opts.backend == DEFAULT_BACKEND else ""'''
+new = '''    return DEFAULT_MODEL if opts.backend == DEFAULT_BACKEND else ""  # control'''
+
+# ── R1: the defect — a non-default backend must not be handed our model ───
+[[arm]]
+id = "R1"
+test = "test_a_non_default_backend_gets_no_invented_model"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    return DEFAULT_MODEL if opts.backend == DEFAULT_BACKEND else ""'''
+new = '''    return DEFAULT_MODEL'''
+
+# ── R2: an empty resolution must OMIT the key, not write an empty value ───
+# Writing `GRAPHIFY_OPENAI_CLI_MODEL=""` is not the same as saying nothing:
+# graphify reads its own default only when the variable is ABSENT, so an empty
+# value would override with emptiness — the #480 shape, one variable over.
+[[arm]]
+id = "R2"
+test = "test_a_non_default_backend_gets_no_invented_model"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    model = resolve_model(opts)
+    if model:
+        overlay[model_env] = model'''
+new = '''    overlay[model_env] = resolve_model(opts)'''
+
+# ── R3: ...and the DEFAULT backend must still get its model ───────────────
+# The over-correction arm, and the likely one: omitting everywhere satisfies R1.
+[[arm]]
+id = "R3"
+test = "test_the_default_backend_still_gets_its_model"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    return DEFAULT_MODEL if opts.backend == DEFAULT_BACKEND else ""'''
+new = '''    return ""'''
+
+# ── R4: an EXPLICIT --model must win on any backend ──────────────────────
+# The caller being explicit is not a case to second-guess. A resolver that
+# consulted only the backend would pass R1 and R3 and silently discard --model.
+[[arm]]
+id = "R4"
+test = "test_an_explicit_model_is_honoured_on_any_backend"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    if opts.model:
+        return opts.model'''
+new = '''    if False:
+        return opts.model'''

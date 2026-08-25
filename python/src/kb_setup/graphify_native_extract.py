@@ -180,9 +180,16 @@ that whole dict on `--dry-run` would be exactly the "emit a credential value
 to stdout" this repo's `secret_guard` hook exists to deny elsewhere — an
 invariant that does not stop applying just because the emitter is our own
 code rather than a shell one-liner. So the dry-run prints only the small
-OVERLAY this module adds on top of the inherited environment
-(`GRAPHIFY_CLAUDE_CLI_MODEL` and, opted in, `GRAPHIFY_CLAUDE_CLI_PARALLEL`),
-never the full resolved dict handed to `subprocess.run`.
+OVERLAY this module adds on top of the inherited environment — the CHOSEN
+BACKEND's model variable and, opted in, its parallel one, derived by
+`backend_env_keys` — never the full resolved dict handed to `subprocess.run`.
+
+This sentence named `GRAPHIFY_CLAUDE_CLI_MODEL`/`_PARALLEL` unconditionally until
+the round-2 cold lane read it against the code, which had been backend-derived
+since `--backend` landed. It was the third and fourth place the same hardcoding
+survived after the first two were fixed, and both were prose rather than
+behaviour — which is exactly why they lasted: nobody re-reads a comment they
+agree with.
 
 ## Verification scope
 
@@ -244,8 +251,27 @@ DEFAULT_OUT = ".agent/kb/native-extract"
 #: `GET /v1/models/claude-opus-5` -> 200 on 2026-08-17. "Confirmed" means the
 #: identifier's FORM: this module makes no provider call, so nothing here
 #: sends a prompt to check it is accepted.
+#:
+#: ⚠️ THIS IS `claude-cli`'S MODEL, AND ONLY ITS MODEL — a distinction that did
+#: not exist until `--backend` did, and was not made when it arrived. Applied
+#: unconditionally it wrote `GRAPHIFY_OPENAI_CLI_MODEL=claude-opus-5`: a Claude
+#: identifier into an OpenAI backend's own model variable, silently, on any run
+#: that did not pass `--model`. graphify's table records that backend's default
+#: as `gpt-5.6-sol`. Third instance of this branch's own defect class — one
+#: value, several consumers that must agree — found by the round-2 cold lane
+#: after the first two were fixed.
+#:
+#: Note it deliberately DIFFERS from graphify's own `claude-cli` default
+#: (`claude-code-plan`): overriding that is the point of setting the variable at
+#: all, and the paragraph above is why this identifier and not another.
 DEFAULT_MODEL = "claude-opus-5"
 
+#: `claude-cli`'s env keys, kept ONLY as the expected value in tests that assert
+#: what the default backend resolves to. Production code must call
+#: `backend_env_keys(opts.backend)` — these two constants are what `env_overlay`
+#: used to read unconditionally, which is how the backend and its model variable
+#: came apart. Naming them here rather than deleting them keeps the tests'
+#: expectation legible; using them in `python/src/` would reintroduce the defect.
 _MODEL_ENV = "GRAPHIFY_CLAUDE_CLI_MODEL"
 _PARALLEL_ENV = "GRAPHIFY_CLAUDE_CLI_PARALLEL"
 
@@ -283,7 +309,11 @@ class Options:
     #: The extraction backend, and with it the model/parallel env keys — ONE
     #: coupled choice (`backend_env_keys`), never three that can drift apart.
     backend: str = DEFAULT_BACKEND
-    model: str = DEFAULT_MODEL
+    #: Empty means "the caller did not ask for one", which is NOT the same as
+    #: `DEFAULT_MODEL` and could not be distinguished from it while that was the
+    #: default here. `resolve_model` turns the absence into the right answer per
+    #: backend — including "say nothing", which no non-empty default can express.
+    model: str = ""
     dry_run: bool = False
     cluster: bool = False
     artifacts: bool = False
@@ -473,10 +503,43 @@ def env_overlay(opts: Options) -> dict[str, str]:
     # move together are not three settings; they are one, and they are derived
     # from one value here so they cannot be moved apart.
     model_env, parallel_env = backend_env_keys(opts.backend)
-    overlay = {model_env: opts.model}
+    overlay = {}
+    model = resolve_model(opts)
+    if model:
+        overlay[model_env] = model
     if opts.allow_parallel_claude_cli:
         overlay[parallel_env] = "1"
     return overlay
+
+
+def resolve_model(opts: Options) -> str:
+    """The model to override with, or `""` to let graphify choose (round-2 lane).
+
+    Three cases, and the third is the one that did not exist before `--backend`:
+
+    1. `--model` was passed — use it, whatever the backend. The caller is
+       explicit and this function does not second-guess them.
+    2. No `--model`, backend is `claude-cli` — `DEFAULT_MODEL`. This repo has an
+       opinion there, recorded beside that constant, and it deliberately differs
+       from graphify's own `claude-code-plan`.
+    3. No `--model`, any other backend — **say nothing**, and let graphify apply
+       the default its own table records for that backend.
+
+    Case 3 is the fix. `Options.model` used to default to `DEFAULT_MODEL`, so
+    `env_overlay` wrote `GRAPHIFY_OPENAI_CLI_MODEL=claude-opus-5` — a Claude
+    identifier into an OpenAI backend's own variable — on every run that did not
+    pass `--model`. The env KEY was correctly derived from the backend by then;
+    the VALUE under it was not, which is the same one-value-several-consumers
+    defect one level in.
+
+    Omitting beats substituting graphify's `default_model` here: that value
+    already lives in graphify's table, and copying it into ours is precisely the
+    second-copy-that-drifts this module has now been bitten by twice (#245, #499).
+    Not setting the variable is how you say "use yours" without restating it.
+    """
+    if opts.model:
+        return opts.model
+    return DEFAULT_MODEL if opts.backend == DEFAULT_BACKEND else ""
 
 
 def backend_env_keys(backend: str) -> tuple[str, str]:
@@ -633,10 +696,13 @@ def resolve_cluster_argv(exe: str, opts: Options) -> list[str]:
 def resolve_cluster_env(opts: Options) -> dict[str, str]:
     """The environment `--cluster` runs under: bare `clean_env()`.
 
-    Deliberately NOT `resolve_env(opts)` — that adds `GRAPHIFY_CLAUDE_CLI_MODEL`
-    (and, opted in, `_PARALLEL`), which would be inert here (no `--backend` is
-    ever passed to `cluster-only` from this module) but would misleadingly
-    suggest an LLM labelling backend is in play. `opts` is accepted for
+    Deliberately NOT `resolve_env(opts)` — that adds the CHOSEN BACKEND's model
+    variable (and, opted in, its parallel one), which would be inert here (no
+    `--backend` is ever passed to `cluster-only` from this module) but would
+    misleadingly suggest an LLM labelling backend is in play. It said
+    `GRAPHIFY_CLAUDE_CLI_MODEL` unconditionally until the round-2 cold lane
+    checked it against `env_overlay`; that is only this variable when the backend
+    is `claude-cli`. `opts` is accepted for
     signature symmetry with `resolve_env` even though it is currently unused.
     """
     del opts
@@ -711,6 +777,12 @@ def _refuse_target(opts: Options) -> str | None:
 def _print_dry_run(exe: str, opts: Options) -> None:
     argv = resolve_argv(exe, opts)
     overlay = env_overlay(opts)
+    # Resolved ONCE and passed down, rather than re-derived inside the NOTE below.
+    # Two calls could not disagree today (`backend_env_keys` is pure over
+    # `opts.backend`), but "two derivations of one value that must agree" is the
+    # exact shape this whole branch keeps finding defects in — including twice in
+    # this function. Not worth leaving a fourth instance lying around.
+    _, parallel_env = backend_env_keys(opts.backend)
     print("[graphify-native-extract] DRY RUN — nothing was invoked")
     print(f"  $ {' '.join(argv)}")
     print("  environment overlay (added on top of clean_env(); nothing else is printed —")
@@ -728,7 +800,6 @@ def _print_dry_run(exe: str, opts: Options) -> None:
         # layer leaves the next. Worse here than there, because the env overlay is
         # merely wrong while this is wrong OUT LOUD, in the one output a reader
         # consults to check what a run will do.
-        _, parallel_env = backend_env_keys(opts.backend)
         print(
             f"  NOTE: {parallel_env} is NOT set — {opts.backend} runs serially "
             "(graphify's own default)."
