@@ -253,7 +253,7 @@
     <span class="tag crit">Blocking</span>
     <span class="tag armed">Armed</span>
     <h3>A mistyped preview silently becomes a real extraction</h3>
-    <p class="cite">python/src/kb_setup/graphify_native_extract.py:253–264</p>
+    <p class="cite">graphify_native_extract.py <code>_parse</code> · :262–311 (the <code>--out</code> branch at :278)</p>
   </header>
 
   <p>The argument parser reads <code>--out</code> and takes <em>whatever token follows</em> as its value. It never asks whether that token is itself a flag. So <code>--out --dry-run</code> does not fail, and does not warn: it quietly assigns the string <code>--dry-run</code> as the output directory, steps the cursor past both tokens, and leaves <code>dry_run</code> at its default of <code>False</code>.</p>
@@ -322,7 +322,7 @@
     <span class="tag crit">Blocking</span>
     <span class="tag armed">Armed</span>
     <h3>The output guard checks one door and leaves the other open</h3>
-    <p class="cite">graphify_native_extract.py:359–370 · graphify_env.py · graphify/paths.py:26</p>
+    <p class="cite">graphify_native_extract.py <code>_refuse_out</code> · :369–402 · graphify_env.py · graphify/paths.py:26</p>
   </header>
 
   <p><code>_refuse_out</code> exists to stop the extraction writing somewhere it must not. It validates <code>opts.out</code> — the value of the <code>--out</code> flag. But <code>--out</code> is not the only way to move graphify's output root.</p>
@@ -391,7 +391,7 @@
     <span class="tag crit">Blocking</span>
     <span class="tag armed">Armed</span>
     <h3>The only code that actually runs graphify is untested</h3>
-    <p class="cite">graphify_native_extract.py:446–454, 495–508 · tests/test_graphify_native_extract.py</p>
+    <p class="cite">graphify_native_extract.py <code>_run_cluster</code> :471–479 · <code>_run_real</code> :520–533 · tests/test_graphify_native_extract.py</p>
   </header>
 
   <p>Forty-two tests cover this module, and they are green. Every one of them exercises the <code>--dry-run</code> short-circuit — the branch that prints what <em>would</em> happen and returns. <code>_run_real</code> and <code>_run_cluster</code>, the two functions that spawn the subprocess, spend the tokens and write the disk, are reached by none of them.</p>
@@ -506,6 +506,7 @@ mutation : _run_real     -&gt; return 0
 <footer class="foot">
   <p>Round 1 of a two-round bound. Reports persisted verbatim at <code>.agent/kb/review/reports/review-fa4ed551…-cold.md</code>. No receipt is written while blocking findings stand — <code>kb-review-receipt</code> refuses <code>--blocking &gt; 0</code> before writing anything, so an unfixed branch leaves the same empty disk as an unreviewed one, and the lane reports are what tell the two apart.</p>
   <p>Every figure on this page was measured in this session. Nothing here is inherited from a prior round.</p>
+  <p><strong>Corrected after publication, 2026-08-24.</strong> The module was subsequently parked, and the parking commit inserted ~25 lines of docstring at the top of the same file — which shifted every line citation on this page. The numbers were correct when published and were invalidated by the very commit that acted on them; the round-2 cold review of that commit is what caught it. Citations now name the <em>symbol</em> first and the line second, so the next edit cannot silently falsify them. Disposition: the three defects are filed as #479, #480 and #481 and are <em>not fixed</em> — they are unreachable, which is a different claim, and the module's own docstring states its exact scope.</p>
 </footer>
 
 </div>

@@ -119,8 +119,10 @@ def generate(
     `graph_root` differs. Neither has an existence check or a fallback —
     `graphify_exe` string-joins `.venv/bin/graphify` onto whatever root it is
     given and returns it regardless — so a caller scoping `graph_root` to an
-    output tree with no `.venv/` of its own (e.g. `kb-graphify-native-extract
-    --artifacts`) MUST still pass the real project root as `repo_root`, or
+    output tree with no `.venv/` of its own (the `kb-graphify-native-extract
+    --artifacts` case this was built for — that task is PARKED as of 2026-08-24,
+    so treat it as the illustrating shape, not something to run) MUST still pass
+    the real project root as `repo_root`, or
     every generator subprocess fails against a binary that does not exist.
     """
     graph_root = graph_root or repo_root

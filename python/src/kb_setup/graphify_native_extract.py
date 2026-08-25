@@ -4,9 +4,19 @@
 ## PARKED — no entry point reaches this module (2026-08-24)
 
 The `graphify-native-extract` CLI subcommand and the `kb-graphify-native-extract`
-mise task were both REMOVED, so nothing a human or an agent can invoke reaches the
-code below. The module and its 42 tests stay in the tree as groundwork; they are
-not dead code awaiting deletion, and they are not live code either.
+mise task were both REMOVED. The module and its 42 tests stay in the tree as
+groundwork; they are not dead code awaiting deletion, and they are not live code
+either.
+
+**Scope of that claim, stated precisely because the loose version is false.** What
+is closed is every *invoked-command* surface: there is no `kb-setup` subcommand and
+no mise task, and `uv run kb-setup graphify-native-extract` now exits 2 with
+`unknown command`. What is NOT closed is a direct Python import — `from kb_setup
+import graphify_native_extract` still works and can call `native_extract_main`, or
+`_run_real`/`_run_cluster` directly, bypassing `_parse` and `_refuse_out` entirely.
+The test suite does exactly that, deliberately. So this is a park against
+*accidental invocation*, not a sandbox; a caller who imports this module is making
+a decision, and the defects below are what they are deciding to accept.
 
 The cold cross-family review of `fa4ed551ac7e` confirmed three blocking defects,
 each armed rather than argued:
@@ -627,15 +637,22 @@ def _dispatch_artifacts(repo_root: Path, opts: Options) -> int:
 
 
 def native_extract_main(repo_root: Path, argv: list[str]) -> int:
-    """`uv run kb-setup graphify-native-extract [-- <flags>]`."""
+    """The module's entry point — PARKED, reachable only by a direct import.
+
+    No `kb-setup` subcommand and no mise task dispatches here as of 2026-08-24;
+    see the module docstring for the exact scope of that claim, and #479/#480/#481
+    for the three confirmed defects a direct caller is accepting.
+    """
     try:
         opts = _parse(repo_root, argv)
     except _UsageError as exc:
         print(
             "[graphify-native-extract] "
-            f"{exc} — usage: kb-setup graphify-native-extract [--out DIR] "
-            "[--target DIR] [--token-budget N] [--max-concurrency N] [--model NAME] "
-            "[--allow-parallel-claude-cli] [--cluster] "
+            f"{exc} — this module is PARKED: there is no `kb-setup "
+            "graphify-native-extract` subcommand and no `kb-graphify-native-extract` "
+            "mise task, so you reached this by importing it directly. Accepted argv: "
+            "[--out DIR] [--target DIR] [--token-budget N] [--max-concurrency N] "
+            "[--model NAME] [--allow-parallel-claude-cli] [--cluster] "
             "[--artifacts [VIEW...]] [--dry-run]"
         )
         return Rc.BAD_REQUEST
