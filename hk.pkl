@@ -271,6 +271,49 @@ local proseExclude = baseExclude
 // separation is measured and deliberate; see the comment on the step itself before
 // moving it back up. The `depends` note above still stands as the reason it is a
 // barrier at all; the note below is the reason for WHERE the barrier sits.
+// THE PRE-COMMIT GITLEAKS STEP IS NOT THE BUILTIN, and the reason is measured.
+//
+// `Builtins.gitleaks` runs `gitleaks dir … {{files}}`. But `gitleaks dir` takes ONE
+// path — its own usage line is `gitleaks dir [flags] [path]` — so extra positionals
+// are IGNORED and it falls back to `.`. Armed 2026-08-25 against this repo:
+//
+//   1 path  -> scanned ~20,490 bytes      (that file)
+//   2 paths -> scanned ~49,957,227 bytes  } byte-identical: it scanned the
+//   `.`     -> scanned ~49,957,227 bytes  } whole tree, not the file list
+//
+// So a ONE-file commit and a NINE-file commit ran different gates, and the
+// multi-file one scanned gitignored content `git` can never commit. It found 24
+// hits of one repeated `AKIA`-shaped string inside a 263 KB scraped web page under
+// `.firecrawl/` — untrusted fetched content, ignored since #502 — and blocked both
+// `git commit` AND `mise run lint` (real rc 1, read without a pipe).
+//
+// The direction of the defect is over-scanning, not under-scanning: nothing staged
+// escaped it. The cost is false positives on other people's junk plus 50 MB per
+// commit instead of kilobytes.
+//
+// The fix is gitleaks' OWN prescription, not an invention. Its
+// `.pre-commit-hooks.yaml` entry is `gitleaks git --pre-commit --redact --staged
+// --verbose` with `pass_filenames: false` — it explicitly tells hook frameworks not
+// to hand it filenames. hk's builtin CITES that very file (`builtins/gitleaks.pkl:14`
+// references `.pre-commit-hooks.yaml#L4`) and then passes filenames anyway. Reported
+// as a repo issue; upstream only after further diligence.
+//
+// `--staged` scopes the scan to what is actually being committed, so gitignored
+// paths are excluded BY CONSTRUCTION — no second list beside `.gitignore` to drift.
+//
+// ONLY the `pre-commit` hook uses this. `check --all` has nothing staged, so this
+// command there would be a gate that can only pass — the exact failure
+// `probes-need-a-control-arm.md` rule 2 exists to prevent. `check`/`fix` keep the
+// builtin until the whole-tree profile is scoped properly (its own ticket).
+local gitleaksStaged: Step = (Builtins.gitleaks) {
+  check = new CommandSpec {
+    command = new Command {
+      argv = List("gitleaks", "git", "--pre-commit", "--redact", "--staged", "--verbose", "--no-banner")
+    }
+    effect = "read"
+  }
+}
+
 local pyGlob = List("python/src/**/*.py", "tests/**/*.py")
 
 local lintSteps: Mapping<String, Step> = new {
@@ -445,7 +488,10 @@ hooks {
   }
   ["pre-commit"] {
     fix = true
-    steps = lintSteps
+    // gitleaks ONLY is swapped for its staged-scope form; see `gitleaksStaged`.
+    steps = (lintSteps) {
+      ["gitleaks"] = gitleaksStaged
+    }
   }
   ["commit-msg"] {
     steps {
