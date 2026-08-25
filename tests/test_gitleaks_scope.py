@@ -59,6 +59,10 @@ _MUST_SKIP = (
     "brain/graphify-out/graph.json",
     "sources/some-repo/README.md",
     "raw/fetched.md",
+    # The Firecrawl scrape cache: untrusted third-party page text, gitignored
+    # since #502, so it can never be committed. One page produced 24
+    # `aws-access-token` findings and turned `mise run lint` red on 2026-08-25.
+    ".firecrawl/search-observability-services-scraped.json",
     ".self-graph/graphify-out/cache/stat-index.json",
     ".self-graph/graphify-out/graph.json",
     # The raw-API-body telemetry sink: a verbatim copy of the conversation, so a

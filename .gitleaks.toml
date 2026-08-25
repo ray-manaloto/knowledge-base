@@ -57,6 +57,28 @@ paths = [
   # If anything authored is ever put here, narrow this the way graphify-out was.
   '''^\.self-graph/''',
   '''^raw/''',
+  # `.firecrawl/` — the Firecrawl scrape cache. UNTRUSTED FETCHED CONTENT, and
+  # gitignored since #502 precisely for that reason, so nothing here can ever
+  # reach a commit. Same class as `^raw/` one line up: someone else's words,
+  # landing in scope only because `gitleaks dir` walks directories rather than
+  # tracked files.
+  #
+  # Measured 2026-08-25: ONE 263 KB scraped page produced 24 `aws-access-token`
+  # findings — 24 hits of a SINGLE repeated `AKIA`-shaped string in a third
+  # party's prose, characterised by digest and prefix without reading the value.
+  # It turned `mise run lint` red (real rc 1) and refused an unrelated
+  # nine-file commit.
+  #
+  # This only affects the `check`/`fix` profiles. Since `ce6be1b4` the
+  # `pre-commit` hook runs `gitleaks git --pre-commit --staged`, which is scoped
+  # to staged content and never sees a gitignored path at all — so this entry is
+  # the whole-tree profile catching up with a scope the commit gate already has.
+  #
+  # Upstream, for the next reader: `gitleaks dir` takes ONE path and silently
+  # falls back to `.` when handed more (gitleaks/gitleaks#1888, open since
+  # 2025-06-05), and hk's builtin passes `{{files}}`. Allowlisting is the
+  # documented remedy (gitleaks/gitleaks#1328), not a workaround we invented.
+  '''^\.firecrawl/''',
   # The raw-API-body telemetry sink (Ray, 2026-08-17, approved with the cost
   # stated). `OTEL_LOG_RAW_API_BODIES=file:.agent/telemetry/` writes the ENTIRE
   # conversation on every request, so these files are a verbatim copy of what was
