@@ -69,10 +69,22 @@ paths = [
   # It turned `mise run lint` red (real rc 1) and refused an unrelated
   # nine-file commit.
   #
-  # This only affects the `check`/`fix` profiles. Since `ce6be1b4` the
-  # `pre-commit` hook runs `gitleaks git --pre-commit --staged`, which is scoped
-  # to staged content and never sees a gitignored path at all — so this entry is
-  # the whole-tree profile catching up with a scope the commit gate already has.
+  # ⚠️ THIS ENTRY BLINDS THE COMMIT GATE TOO, and an earlier revision of this
+  # comment claimed the opposite. `.gitleaks.toml` is read by EVERY gitleaks
+  # invocation, `git` mode included, and `git add -f` puts a gitignored file in
+  # the INDEX — which is exactly what `--staged` reads. Armed, control first:
+  #
+  #   non-ignored staged file, no config    -> rc 1   (the probe discriminates)
+  #   `.firecrawl/` staged, no config       -> rc 1   (gitleaks would flag it)
+  #   `.firecrawl/` staged, WITH this file  -> rc 0   (this entry blinds it)
+  #
+  # So `git add -f .firecrawl/<anything>` commits past the gate. The residual is
+  # accepted because it is the CLASS this list already has — `^raw/`,
+  # `^sources/` and `^\.agent/telemetry/` reach exactly as far, and all of it
+  # needs a deliberate `-f`. Tracked, because nobody had ever decided it.
+  #
+  # Do not restore the old wording. It read as a safety argument for widening
+  # the list, and it was false.
   #
   # Upstream, for the next reader: `gitleaks dir` takes ONE path and silently
   # falls back to `.` when handed more (gitleaks/gitleaks#1888, open since
