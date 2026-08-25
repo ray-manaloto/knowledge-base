@@ -152,21 +152,47 @@ def _reviewed(tmp_path, oid: str) -> None:
     )
 
 
+#: The stub's answer for `gh pr view <n> --json headRefName ...` — a plain,
+#: well-formed branch name so `check-ref-format` (routed to the catch-all,
+#: which answers rc 0 for anything unmatched) passes it without special-casing.
+_LAND_LOCAL_BRANCH = "feat/local-ahead-stub"
+
+
 def _land_handler(seen: list[list[str]]) -> Callable[[list[str]], _Proc]:
-    """A PR whose checks are green and whose head is a fixed SHA."""
+    """A PR whose checks are green, head is a fixed SHA, with NO matching local branch.
+
+    `git rev-parse --verify --quiet` is stubbed to answer ABSENT (#493's state
+    1: no local branch of that name here, nothing to compare) so every land
+    test written before the local-ahead guard keeps merging without having to
+    know about it. A test that wants a different local-ahead state layers its
+    own handler over this one — `test_land_refuses_when_checks_red` and
+    `test_land_refuses_when_head_sha_unreadable` already do exactly that for
+    their own concerns.
+    """
 
     def handler(cmd: list[str]) -> _Proc:
         seen.append(cmd)
         if cmd[:3] == ["gh", "pr", "checks"]:
             return _Proc(0, json.dumps([{"name": "CodeRabbit", "bucket": "pass"}]))
         if cmd[:3] == ["gh", "pr", "view"]:
+            # `_land_handler` used to answer every `--json` field with the SAME
+            # oid-shaped string, so `pr_head_branch` received the head OID as a
+            # "branch name" — a different code path went untested wearing this
+            # stub's clothes (#493 premise-verifier M5). Dispatch on the field.
+            if "headRefName" in cmd:
+                return _Proc(0, f"{_LAND_LOCAL_BRANCH}\n")
+            # Matches `_reviewed`'s `fixed_point_sha`, so the branch-coverage
+            # check `land` applies sees a receipt that covers the whole branch.
+            # Without it `base_sha` returns "" and every land test refuses on
+            # "could not resolve" — fail-closed working, but testing the wrong
+            # thing.
             return _Proc(0, "deadbeefcafe1234\n")
-        # Matches `_reviewed`'s `fixed_point_sha`, so the branch-coverage check
-        # `land` now applies sees a receipt that covers the whole branch. Without
-        # it `base_sha` returns "" and every land test refuses on "could not
-        # resolve" — fail-closed working, but testing the wrong thing.
         if cmd[:2] == ["git", "merge-base"]:
             return _Proc(0, "a" * 40)
+        if cmd[:3] == ["git", "rev-parse", "--verify"]:
+            # No such local branch — real git's own shape for "absent": rc 1,
+            # empty output (`--quiet` suppresses the diagnostic).
+            return _Proc(1, "")
         return _Proc(0, "")
 
     return handler
@@ -305,6 +331,192 @@ def test_land_refuses_when_head_sha_unreadable(monkeypatch, tmp_path):
     _stub_run(monkeypatch, handler)
     assert pr.land_main(tmp_path, 42) == 1
     assert not any(c[:3] == ["gh", "pr", "merge"] for c in seen)
+
+
+# --------------------------------------------------------------------------
+# land — refuses when the local branch is ahead of the PR head (#493)
+#
+# `land` merges the PR HEAD, never the local branch it came from. On
+# 2026-08-25 that merged a PR 10 commits behind local, then `--delete-branch`
+# removed the branch holding the newer, reviewed state in the same breath.
+# `_local_ahead_gap` is the question nobody asked; these tests drive it both
+# through `land_main` (stubbed subprocess, for the merge-blocking property) and
+# directly (real git, for the ref-resolution property no stub can exhibit).
+# --------------------------------------------------------------------------
+
+
+def _ahead_handler(seen: list[list[str]], *, count: str) -> Callable[[list[str]], _Proc]:
+    """`_land_handler`, but the local branch EXISTS and `rev-list --count` says ``count``."""
+    inner = _land_handler(seen)
+
+    def handler(cmd: list[str]) -> _Proc:
+        if cmd[:3] == ["git", "rev-parse", "--verify"]:
+            seen.append(cmd)
+            return _Proc(0, "1111111111222222222233333333334444444444")
+        if cmd[:3] == ["git", "rev-list", "--count"]:
+            seen.append(cmd)
+            return _Proc(0, count)
+        return inner(cmd)
+
+    return handler
+
+
+def test_land_refuses_when_local_branch_is_strictly_ahead(monkeypatch, tmp_path):
+    """The regression this guard exists for: local work the merge would discard."""
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    _stub_run(monkeypatch, _ahead_handler(seen, count="3"))
+
+    assert pr.land_main(tmp_path, 42) == 1
+    assert not any(c[:3] == ["gh", "pr", "merge"] for c in seen), "must not merge"
+    assert any(c[:3] == ["git", "rev-list", "--count"] for c in seen), "must actually compare"
+
+
+def test_land_merges_when_local_branch_equals_pr_head(monkeypatch, tmp_path):
+    """CONTROL ARM — same local branch, zero commits ahead, must still merge."""
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    _stub_run(monkeypatch, _ahead_handler(seen, count="0"))
+
+    assert pr.land_main(tmp_path, 42) == 0
+    assert any(c[:3] == ["gh", "pr", "merge"] for c in seen)
+
+
+def test_land_merges_when_no_local_branch_exists(monkeypatch, tmp_path):
+    """State 1 — nothing local to lose, so nothing to refuse.
+
+    `_land_handler`'s default already answers this way (rc 1, empty, on
+    `rev-parse --verify`); asserted explicitly per #493's required case list
+    rather than left to inference from another test's pass, and checked that
+    the guard actually ran rather than merging for an unrelated reason.
+    """
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    _stub_run(monkeypatch, _land_handler(seen))
+
+    assert pr.land_main(tmp_path, 42) == 0
+    assert any(c[:3] == ["gh", "pr", "merge"] for c in seen)
+    assert any(c[:3] == ["git", "rev-parse", "--verify"] for c in seen), (
+        "the guard must actually have asked whether a local branch exists"
+    )
+
+
+def test_land_refuses_when_the_ahead_comparison_is_unanswerable(monkeypatch, tmp_path):
+    """State 2 — the branch exists, but `rev-list` itself cannot answer.
+
+    An unresolvable range reports rc 128, never 0 — real git does not silently
+    report "0 ahead" on a broken comparison (premise-verifier M3). This must
+    refuse rather than merge on the strength of an answer it never got.
+    """
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    inner = _land_handler(seen)
+
+    def handler(cmd: list[str]) -> _Proc:
+        if cmd[:3] == ["git", "rev-parse", "--verify"]:
+            seen.append(cmd)
+            return _Proc(0, "1111111111222222222233333333334444444444")
+        if cmd[:3] == ["git", "rev-list", "--count"]:
+            seen.append(cmd)
+            return _Proc(128, "fatal: bad revision 'deadbeefcafe1234..refs/heads/feat'")
+        return inner(cmd)
+
+    _stub_run(monkeypatch, handler)
+    assert pr.land_main(tmp_path, 42) == 1
+    assert not any(c[:3] == ["gh", "pr", "merge"] for c in seen), "must not merge"
+
+
+def test_land_refuses_when_head_branch_name_is_unreadable(monkeypatch, tmp_path):
+    """State 2, entered by the other door: `gh pr view --json headRefName` fails."""
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    inner = _land_handler(seen)
+
+    def handler(cmd: list[str]) -> _Proc:
+        if cmd[:3] == ["gh", "pr", "view"] and "headRefName" in cmd:
+            seen.append(cmd)
+            return _Proc(1, "")
+        return inner(cmd)
+
+    _stub_run(monkeypatch, handler)
+    assert pr.land_main(tmp_path, 42) == 1
+    assert not any(c[:3] == ["gh", "pr", "merge"] for c in seen), "must not merge"
+
+
+# --------------------------------------------------------------------------
+# _local_ahead_gap — unit level, against REAL git (#493)
+#
+# `_stub_run` cannot exhibit the property below: it patches `pr.subprocess.run`,
+# so no real git ever runs, and a tag-shadowing test written inside it could
+# only assert the ARGV shape (that `refs/heads/` appears somewhere) — a
+# spelling check, not a behaviour check, which would pass against a guard that
+# builds the right command and then misreads the answer. The `git` fixture
+# (`tests/conftest.py`) gives a real repo instead; `pr.pr_head_branch` is
+# patched as a module attribute so no `gh` is needed while git stays real —
+# which is exactly why `_local_ahead_gap` calls the module-level function
+# rather than inlining the `gh` call.
+# --------------------------------------------------------------------------
+
+
+def test_local_ahead_gap_is_not_fooled_by_a_same_named_tag(monkeypatch, git, tmp_path):
+    """THE test that proves this guard is real, not decorative (#493).
+
+    A tag sharing the head branch's name shadows the BARE form in git's own ref
+    disambiguation (`refs/tags/` resolves ahead of `refs/heads/`), so
+    `<base>..<name>` reports 0 even though the branch is genuinely ahead. If
+    `_local_ahead_gap` ever regresses to a bare name instead of
+    `refs/heads/<name>`, this is what catches it.
+    """
+    base = git("rev-parse", "main")
+    git("checkout", "-q", "-b", "feat", "main")
+    (tmp_path / "one.txt").write_text("1\n", encoding="utf-8")
+    git("add", "--", "one.txt")
+    git("commit", "-q", "-m", "one")
+    (tmp_path / "two.txt").write_text("2\n", encoding="utf-8")
+    git("add", "--", "two.txt")
+    git("commit", "-q", "-m", "two")
+    git("tag", "feat", "main")  # shadows the bare name at the OLD tip
+
+    monkeypatch.setattr(pr, "pr_head_branch", lambda _n: "feat")
+    gap = pr._local_ahead_gap(tmp_path, 42, base)
+
+    assert gap is not None, "the branch IS 2 commits ahead — a bare-name bug reads this as 0"
+    assert "feat" in gap
+    assert "2 commit" in gap
+
+
+def test_local_ahead_gap_proceeds_when_the_tagged_branch_is_not_ahead(monkeypatch, git, tmp_path):
+    """CONTROL ARM — same tag-shadowing setup, but the branch tip IS the PR head."""
+    tip = git("rev-parse", "main")
+    git("checkout", "-q", "-b", "feat", "main")
+    git("tag", "feat", "main")
+
+    monkeypatch.setattr(pr, "pr_head_branch", lambda _n: "feat")
+    assert pr._local_ahead_gap(tmp_path, 42, tip) is None
+
+
+@pytest.mark.parametrize("bad_name", ["bad..name", "has space", "", "   ", "x~1"])
+def test_local_ahead_gap_refuses_a_malformed_head_branch_name(monkeypatch, git, tmp_path, bad_name):
+    """A `headRefName` that is not a legal ref must REFUSE, not read as absent.
+
+    `rev-parse --verify --quiet` answers rc 1 + empty output for a malformed
+    name too — indistinguishable from "branch does not exist" unless the name
+    is validated FIRST (premise-verifier M14). Not tested here:
+    `-weird` — `git check-ref-format` accepts it (a ref MAY start a path
+    component with `-`); it is an unusual but legal branch name, and a repo
+    with no such branch correctly reports state 1, not a refusal.
+    """
+    monkeypatch.setattr(pr, "pr_head_branch", lambda _n: bad_name)
+    head = git("rev-parse", "main")
+    gap = pr._local_ahead_gap(tmp_path, 42, head)
+    assert gap is not None
+
+
+def test_local_ahead_gap_proceeds_when_no_local_branch_exists(monkeypatch, git, tmp_path):
+    """State 1, driven through the real function against a real repo lacking it."""
+    monkeypatch.setattr(pr, "pr_head_branch", lambda _n: "some/branch/never/created")
+    head = git("rev-parse", "main")
+    assert pr._local_ahead_gap(tmp_path, 42, head) is None
 
 
 # --------------------------------------------------------------------------
