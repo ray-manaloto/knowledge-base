@@ -1891,7 +1891,7 @@ manifest = "sources/agnix.manifest"
 
 [[tool.agnix.watch]]
 kind = "local"
-id = "agnix-tags-are-annotated-and-unsorted"
+ref = "agnix-tags-are-annotated-and-unsorted"
 note = """TWO probe traps live on this repo's tag list, both hit on the 0.49.0
 bump and both recorded in `sources/agnix.manifest`.
 
@@ -1911,6 +1911,36 @@ bump and both recorded in `sources/agnix.manifest`.
 
 Re-probe both on each bump: an upstream that switches to lightweight tags
 retires (1), and nothing retires (2) short of a version-sorted listing."""
+
+[tool.rumdl]
+# The markdown linter, and the SECOND of this repo's two warnings-as-errors
+# gates — `hk.pkl:280-281` wires `Builtins.rumdl` and `Builtins.rumdl_format`
+# into `lintSteps`, so an upstream rule change lands as a red `mise run lint`
+# exactly the way `[tool.agnix]` describes. It was pinned and manifested but
+# NOT tracked here until 2026-08-25 (#485), which is why its 0.2.58 -> 0.2.60
+# drift was invisible to `kb-currency-check` while every other gate tool's was
+# reported. A tool that can fail the lint and cannot report its own drift is
+# the worst combination in this file.
+#
+# Ray, 2026-08-25: bump to 0.2.60. Adopted after RUNNING it, not after reading
+# the notes: 0.2.59 carries three rule-behaviour fixes (MD033 escaped HTML
+# openers, MD013 setext reflow, config symlink matching) any of which could
+# move output on this corpus, and 0.2.60 is a lone `h2` dependency bump. The
+# arm was `mise run lint` itself — rc=0 at 0.2.58 and rc=0 at 0.2.60 — rather
+# than a reconstructed `rumdl check`, because hk applies `proseExclude` and a
+# hand-built invocation measures a different thing than the gate does.
+mise_key = "rumdl"
+binary = "rumdl"
+github = "rvben/rumdl"
+# `mise exec -- rumdl --version` prints `rumdl 0.2.60` — the house form, name
+# anchored, as at `[tool.agnix]` / `[tool.ruff]` / `[tool.ty]`.
+version_pattern = '^rumdl (\d+\.\d+\.\d+)'
+manifest = "sources/rumdl.manifest"
+
+[[tool.rumdl.watch]]
+kind = "local"
+ref = "rumdl-tags-are-annotated"
+note = """rumdl publishes ANNOTATED tags, so `git ls-remote --tags --refs` returns the TAG OBJECT and not the commit — `v0.2.60` is `510d056a` as a tag and `50dbfef7` as a commit, and only the latter belongs in the manifest. Verified by control arm at the 0.2.58 -> 0.2.60 bump: `v0.2.58^{}` resolves to `023027472dbcb502aeb89760f4122e2235d36490`, which is exactly what the manifest already held, so the probe discriminates rather than merely agreeing. This is the THIRD repo tracked here with annotated tags (agnix and rumdl yes; fnox and hk lightweight), which is why the peeled form must be read every time rather than assumed per-repo."""
 
 [tool.datamodel-code-generator]
 # Ray, 2026-08-19: "make a critical/currency dependency / make github repo a
@@ -1977,7 +2007,7 @@ manifest = "sources/datamodel-code-generator.manifest"
 
 [[tool.datamodel-code-generator.watch]]
 kind = "local"
-id = "codegen-version-literal-is-load-bearing-in-a-test"
+ref = "codegen-version-literal-is-load-bearing-in-a-test"
 note = """`tests/test_skillopt_contract.py` copies the REAL `pyproject.toml`
 into a tmp dir and `.replace()`s the exact string
 `codegen = ["datamodel-code-generator==<version>"]`. The bump to 0.74.0 made
@@ -2000,7 +2030,7 @@ BEFORE assuming the pin change is complete."""
 
 [[tool.datamodel-code-generator.watch]]
 kind = "local"
-id = "codegen-tags-carry-no-v-prefix"
+ref = "codegen-tags-carry-no-v-prefix"
 note = """Tags here are bare (`0.74.0`), not `v0.74.0`. A resolver that tries
 only `v<x>` finds nothing and an apply aborts rather than mispinning — the same
 class as `[tool.codex]`'s `rust-v<version>`, in the opposite direction. Stated

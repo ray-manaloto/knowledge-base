@@ -1,0 +1,8 @@
+{
+  "local:rumdl-tags-are-annotated": {
+    "comments": 0,
+    "state": "local",
+    "title": "rumdl publishes ANNOTATED tags, so `git ls-remote --tags --refs` returns the TAG OBJECT and not the commit \u2014 `v0.2.60` is `510d056a` as a tag and `50dbfef7` as a commit, and only the latter belongs in the manifest. Verified by control arm at the 0.2.58 -> 0.2.60 bump: `v0.2.58^{}` resolves to `023027472dbcb502aeb89760f4122e2235d36490`, which is exactly what the manifest already held, so the probe discriminates rather than merely agreeing. This is the THIRD repo tracked here with annotated tags (agnix and rumdl yes; fnox and hk lightweight), which is why the peeled form must be read every time rather than assumed per-repo.",
+    "updated_at": ""
+  }
+}

@@ -173,6 +173,19 @@
     font-size: .85rem; color: var(--ink-faint);
   }
   footer p { max-width: 36rem; }
+
+  .corrected {
+    border: 1px solid var(--broken);
+    background: var(--broken-bg);
+    border-radius: 5px;
+    padding: 1rem 1.15rem;
+    margin: 2rem 0 0;
+    max-width: 36rem;
+  }
+  .corrected h3 {
+    color: var(--broken); margin: 0 0 .45rem;
+  }
+  .corrected p { font-size: .93rem; margin: 0; color: var(--ink); }
 </style>
 
 <div class="wrap">
@@ -359,7 +372,7 @@ roughly the same number again are pinned with no record anywhere.</p>
 
 <div class="tally">
   <div><dt>tracked</dt><dd>17<small> blocks</small></dd></div>
-  <div><dt>carry expected</dt><dd>4<small> of 17</small></dd></div>
+  <div><dt>carry expected</dt><dd>5<small> of 17</small></dd></div>
   <div><dt>disagreed</dt><dd>1<small> (ty)</small></dd></div>
   <div><dt>pinned, untracked</dt><dd>~14</dd></div>
 </div>
@@ -397,6 +410,16 @@ watching them, so nothing can say they moved.</p>
   <span><code class="ok">lint rc=0</code> with the new hk binary against the new pkl schemas.
   agnix 0.50.0 under <code class="plain">--strict</code> gave 0 errors, 0 warnings, 8 info —
   byte-identical to the 0.49.0 control, measured <em>before</em> adoption rather than after.</span>
+</div>
+
+<div class="corrected">
+  <h3>Corrected after publication</h3>
+  <p>This page first said <strong>4 of 17</strong> blocks carry a reviewed
+  <code class="plain">expected</code> version. <strong>It is 5</strong> —
+  <code class="plain">currency.toml</code> lines 631, 1018, 1730, 1742 and 1971.
+  The original figure was miscounted from an intermediate listing rather than
+  counted from the file. Corrected 2026-08-25; the tally above now reads 5, and
+  no other figure on this page changed.</p>
 </div>
 
 <footer>

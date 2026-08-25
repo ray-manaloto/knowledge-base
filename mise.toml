@@ -51,7 +51,7 @@ typos = "1.49.0"
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
 "conda:ffmpeg" = "9.0.1"
 taplo = "0.10.0"
-rumdl = "0.2.58"
+rumdl = "0.2.60"
 # biome: the JS/TS linter for `.claude/workflows/*.js` (U8b0). Rust-native, per
 # this repo's toolset comment in hk.pkl. Was installed and used unpinned before
 # this — `grep -c biome mise.toml` returned 0 — so the `workflow_lint` gate
