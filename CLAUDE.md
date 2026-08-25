@@ -134,7 +134,10 @@ mise run kb-currency          # the full loop; writes docs/currency/
   the config also names packages that must be present. It is author-chosen on
   purpose: `graspologic`/`leidenalg`/`igraph` auto-skip by PEP 508 marker on
   Python 3.14 (the accepted Louvain fallback), so demanding every extra would
-  report drift that is not drift.
+  report drift that is not drift. **`backend_probes` is its sibling**: not "did an
+  extra deliver a package" but "did a declared BACKEND survive the upgrade" —
+  `openai-cli` is a patch our FORK carries, and losing it lets extraction fall back
+  to the METERED OpenAI API while every version number still agrees.
 - **Step 5 can never live in a hook.** A hook is a shell command; only the model
   can call `AskUserQuestion`. The SessionStart hook therefore runs step 1 only and
   is **silent unless something drifted** — always exiting 0, because a session must
