@@ -177,6 +177,18 @@ sources/media/*.pdf.txt   # regenerable from the committed .pdf via pypdf
 # it for real is a ~/.claude/settings.json change — user-level config this repo
 # does not edit.
 .omc/
+# `.artifacts/` is the mde (macos-development-environment) tooling's per-cwd
+# telemetry/state dir — this machine's secrets-bootstrap hook writes
+# `.artifacts/mde-events.jsonl` (loguru sink, `src/mde/observability.py`) into
+# whichever repo is cwd, and the sibling `mde.statusline`/`mde.hooks` modules
+# write `daily-totals.json`, `statusline-mode`, `statusline-widgets.json`,
+# `agent-state.jsonl`, `statusline-events.jsonl`, and `edit-outcomes.jsonl`
+# beside it — every file under it is machine-generated telemetry, none of it
+# authored. Same shape as `.agent/` above: left untracked-but-unignored it is
+# one `git add` away from being committed, which is the class this repo's
+# blanket-`git add -A` DENY exists for (`clean-git-state.md`). No code in this
+# repo reads or writes `.artifacts/`.
+.artifacts/
 # reflect derived doc (regenerable via `graphify reflect`); memory/ IS tracked (authored)
 graphify-out/reflections/
 # graphify dated backup dirs (redundant with git history)
