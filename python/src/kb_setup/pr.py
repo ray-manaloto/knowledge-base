@@ -283,6 +283,124 @@ def pr_head_oid(pr_number: int) -> str | None:
     return oid if rc == 0 and oid else None
 
 
+def pr_head_branch(pr_number: int) -> str | None:
+    """Return the PR's head branch NAME, or None if it cannot be read."""
+    rc, out = _run(
+        ["gh", "pr", "view", str(pr_number), "--json", "headRefName", "--jq", ".headRefName"],
+        timeout=_GH_TIMEOUT,
+    )
+    name = out.strip()
+    return name if rc == 0 and name else None
+
+
+def _resolve_head_branch_ref(repo_root: Path, pr_number: int) -> tuple[str | None, str | None]:
+    """Return ``(refs/heads/<name>, None)``, or ``(None, refusal reason)``.
+
+    Only resolves and VALIDATES the name — existence is `_local_ahead_gap`'s
+    concern. Split out so that function's own return count stays under the
+    lint threshold, not for reuse.
+
+    `--verify --quiet` (used downstream) reports a MALFORMED name
+    (`bad..name`, embedded whitespace, empty) as rc 1 with empty output —
+    indistinguishable from "absent" once `--quiet` has suppressed the
+    diagnostic that would have said otherwise. Validate the shape FIRST with
+    the native validator, or a bad name reaches "no local branch" having
+    verified nothing.
+    """
+    branch = pr_head_branch(pr_number)
+    if not branch:
+        return None, (
+            f"could not read PR #{pr_number}'s head branch name; refusing rather than merging blind"
+        )
+    rc, _out = _run(["git", "check-ref-format", f"refs/heads/{branch}"], cwd=repo_root)
+    if rc != 0:
+        return None, (
+            f"PR #{pr_number}'s head branch name {branch!r} is not a usable git "
+            "ref; refusing rather than merging blind"
+        )
+    return f"refs/heads/{branch}", None
+
+
+def _local_ahead_gap(repo_root: Path, pr_number: int, oid: str) -> str | None:
+    """Return why the local branch would lose work by merging ``oid``, or None.
+
+    `land` merges the PR HEAD — never the local branch it came from — and until
+    now nothing asked whether the two had diverged. Three states, kept distinct
+    because collapsing any two of them is how this module's prior defects
+    happened:
+
+    1. no local branch of this name exists here — there is no local work to
+       lose — proceed (``None``);
+    2. the comparison could not be made (an unreadable branch name, a name that
+       is not a legal git ref, a git call erroring) — the question was never
+       asked — refuse, fails closed, exactly as :func:`review._base_coverage_gap`
+       does on an unresolvable base;
+    3. the local branch exists and is not STRICTLY ahead of ``oid`` — proceed.
+
+    Anything else — the branch exists and has commits ``oid`` lacks — refuses,
+    naming the branch, the gap, and both tips, so the merge that would discard
+    them never runs.
+
+    Resolves the branch by NAME via the module-level :func:`pr_head_branch`
+    (through :func:`_resolve_head_branch_ref`), never via :func:`current_branch`:
+    `land` is routinely run from `main`, and `land` itself checks out `main`
+    after a successful merge, so on any re-run for the same PR the checked-out
+    branch is guaranteed wrong. Calling the module-level function (rather than
+    inlining the `gh` call) is what lets a test patch ``pr.pr_head_branch`` and
+    drive this function against a real repo with no `gh` involved.
+    """
+    ref, reason = _resolve_head_branch_ref(repo_root, pr_number)
+    if ref is None:
+        return reason
+    branch = ref.removeprefix("refs/heads/")
+
+    rc, out = _run(["git", "rev-parse", "--verify", "--quiet", ref, "--"], cwd=repo_root)
+    if rc == 1 and not out.strip():
+        # State 1: well-formed name, no such ref here. Nothing local to lose.
+        return None
+    if rc != 0:
+        return (
+            f"could not tell whether local branch '{branch}' exists here "
+            f"({out.strip()[:200]}); refusing rather than merging blind"
+        )
+    # On success `--verify` printed exactly the resolved oid — reuse it as the
+    # local tip below rather than a second `rev-parse` call.
+    local_tip = out.strip().splitlines()[-1][:12] if out.strip() else "?"
+
+    # A BARE branch name is shadowed by a same-named tag: git's ref
+    # disambiguation puts `refs/tags/<name>` ahead of `refs/heads/<name>`, so
+    # `<oid>..<name>` on a branch genuinely ahead can print `0`. The fully
+    # qualified `ref` above is unambiguous. The trailing `--` (house precedent:
+    # `review.py:1069`) stops an unresolvable right-hand side from being read as
+    # a pathspec instead of a revision — the branch name is remote-supplied.
+    rc, out = _run(["git", "rev-list", "--count", f"{oid}..{ref}", "--"], cwd=repo_root)
+    # `_run` concatenates stdout+stderr, and a shadowed bare name would have put
+    # an ambiguity WARNING on stderr — never `int()` the raw output blindly, even
+    # though the qualified `ref` above should never trigger one. Both failure
+    # shapes (a non-zero rc, and an rc-0 output with no clean integer) collapse
+    # to the same refusal: either way the question was never answered.
+    non_empty = [line.strip() for line in out.splitlines() if line.strip()] if rc == 0 else []
+    count_text = non_empty[-1] if non_empty else ""
+    if rc != 0 or not count_text.isdigit():
+        return (
+            f"could not compare local '{branch}' against PR head {oid[:12]} "
+            f"(got {out.strip()[:200]!r}); refusing rather than merging blind"
+        )
+    ahead = int(count_text)
+    if ahead == 0:
+        # State 3: exists, not ahead — safe to merge.
+        return None
+
+    return (
+        f"local branch '{branch}' is {ahead} commit(s) ahead of PR head {oid[:12]} "
+        f"(local tip {local_tip}) — merging now would discard them, and this "
+        f"command deletes the branch too. If '{branch}' is where this PR's work "
+        f"lives, push it and re-review; if it merely reuses that name for "
+        "unrelated history (e.g. a deleted-and-recreated branch), confirm that "
+        "before trusting this refusal, and land by hand."
+    )
+
+
 def _ship_preflight(repo_root: Path) -> str | None:
     """Return the branch to ship, or None (having explained why) if it must not."""
     branch = current_branch(repo_root)
@@ -655,6 +773,31 @@ def land_main(repo_root: Path, pr_number: int) -> int:
         )
         return 1
 
+    # The question `ship`'s SHA pin never had to ask: is the LOCAL branch this
+    # PR came from ahead of the head we are about to merge? On 2026-08-25 this
+    # merged a PR 10 commits behind local, then `--delete-branch` removed the
+    # branch holding the newer state in the same breath (#493).
+    ahead_gap = _local_ahead_gap(repo_root, pr_number, oid)
+    if ahead_gap is not None:
+        events.say(
+            "land.refused_local_ahead",
+            f"land: refusing — {ahead_gap}",
+            pr=pr_number,
+            sha=oid,
+            refused=True,
+        )
+        return 1
+
+    return _execute_merge(repo_root, pr_number, oid)
+
+
+def _execute_merge(repo_root: Path, pr_number: int, oid: str) -> int:
+    """Squash-merge ``oid`` pinned, then sync local `main`. Every prior gate passed.
+
+    Split out of :func:`land_main` so that function's own return count stays
+    under the lint threshold — a formatting concern, not a behaviour change:
+    every event, ordering, and field below is unchanged from before the split.
+    """
     events.say(
         "land.merging",
         f"==> merging PR #{pr_number} pinned to {oid[:12]}",
