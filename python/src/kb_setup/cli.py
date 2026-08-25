@@ -734,13 +734,20 @@ def _opt(rest: list[str], flag: str, default: str | None = None) -> str | None:
 
 
 def _currency(repo_root: Path, rest: list[str]) -> int:
-    """Dispatch `kb-setup currency {check|run|apply|daily|docs-reviewed|stamp}`."""
+    """Dispatch `kb-setup currency`.
+
+    Modes: check | run | apply | daily | docs-reviewed | watch-reviewed |
+    prune-reviewed | stamp.
+    """
     from kb_setup.currency import run as currency_run
 
     only = _opt(rest, "--tool", "") or ""
     # Skip the VALUES of value-taking flags when looking for the positional mode,
     # or `currency --tool graphify` reads "graphify" as the mode and errors out.
-    value_flags = {"--tool", "--version", "--source-ref"}
+    # `--ref`/`--note` are `watch-reviewed`'s (#486) — omitting either from this
+    # set has its VALUE collected as a positional and misread as the mode, which
+    # breaks the command's invocation outright rather than merely misparsing a flag.
+    value_flags = {"--tool", "--version", "--source-ref", "--ref", "--note"}
     positional: list[str] = []
     skip_next = False
     for arg in rest:
@@ -768,6 +775,37 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
         return currency_run.daily(repo_root)
     if mode == "docs-reviewed":
         return currency_run.docs_reviewed(repo_root, only=only)
+    if mode == "watch-reviewed":
+        ref = _opt(rest, "--ref", "") or ""
+        version = _opt(rest, "--version", "") or ""
+        note = _opt(rest, "--note", "") or ""
+        # `_opt` returns whatever token follows a flag, never checking whether
+        # that token is itself another flag's name — `--tool --version 1.2.3`
+        # yields only="--version". Guard every value THIS branch reads
+        # explicitly; `_opt` itself is unchanged, so every other mode keeps
+        # today's (also imperfect) behaviour rather than this task silently
+        # changing it everywhere.
+        for flag_name, value in (
+            ("--tool", only),
+            ("--ref", ref),
+            ("--version", version),
+            ("--note", note),
+        ):
+            if value.startswith("--"):
+                print(
+                    f"kb-setup currency watch-reviewed: {flag_name} looks dangling — "
+                    f"got {value!r}, which is itself a flag",
+                    file=sys.stderr,
+                )
+                return 2
+        return currency_run.watch_reviewed(
+            repo_root, only=only, ref=ref, version=version, note=note
+        )
+    if mode == "prune-reviewed":
+        # A SEPARATE mode from watch-reviewed, deliberately (cold review, MAJ-1):
+        # pruning is destructive and recording is not, so they do not share an
+        # entry point or a flag — see `run.prune_reviewed`.
+        return currency_run.prune_reviewed(repo_root, only=only)
     if mode == "stamp":
         if not only:
             print(
@@ -783,7 +821,7 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
         )
     print(
         f"kb-setup currency: unknown mode {mode!r} "
-        "(check | run | apply | daily | docs-reviewed | stamp)",
+        "(check | run | apply | daily | docs-reviewed | watch-reviewed | prune-reviewed | stamp)",
         file=sys.stderr,
     )
     return 2

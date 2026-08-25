@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# knowsuchagency/mcp2cli has ZERO tags (control-armed via git ls-remote --tags against sibling repos, which returned tags) -- pinned to a branch head by necessity, not oversight.
+url = https://github.com/knowsuchagency/mcp2cli
+ref = main
+commit = a4cfaa4c360805fc10a933a57be1da2ff9174290
+kind = code

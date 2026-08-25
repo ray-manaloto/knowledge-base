@@ -58,6 +58,6 @@
 #
 # kind = code: AST extraction only, no LLM, no cost.
 url = https://github.com/koxudaxi/datamodel-code-generator
-ref = 0.74.0
-commit = 5d313d72b001e4b830b581c5d2be6c2da6e00000
+ref = 0.75.1
+commit = d8151e11fb8679bda624ab9e6a4f9b7c5ab98208
 kind = code

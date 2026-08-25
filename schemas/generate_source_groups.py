@@ -6,7 +6,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-GENERATOR_VERSION = "0.74.0"
+GENERATOR_VERSION = "0.75.1"
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "schemas" / "source-groups.schema.json"
 OUTPUT = ROOT / "python" / "src" / "kb_setup" / "generated" / "source_groups.py"

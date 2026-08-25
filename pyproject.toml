@@ -78,14 +78,14 @@ fetch = ["trafilatura>=2.0"]
 # parallelises well; a suite dominated by one slow test would not have been.
 dev = [
   "ruff==0.16.4",
-  "ty==0.0.73",
+  "ty==0.0.74",
   "pytest==9.1.1",
   "pytest-xdist==3.8.0",
   "trafilatura==2.2.0",
   "mcp2cli==3.6.0",
 ]
 
-codegen = ["datamodel-code-generator==0.74.0"]
+codegen = ["datamodel-code-generator==0.75.1"]
 
 [build-system]
 requires = ["hatchling"]
@@ -177,6 +177,16 @@ ignore = [
 # is not ignored — it is decomposed into named `_resolve_*`/`_load_*` helpers
 # instead, each under the limit on its own.
 "python/src/kb_setup/session_review_archive.py" = ["PLR0913"]
+# `decide()`'s six keyword-only parameters are the currency engine's one public
+# judgment function (currency watch-reviewed spec #486 §3) — `sync`/`upstream`/
+# `moved`/`observations`/`views`/`reviewed` are each an independent fact the
+# six-gate bar reads, and dozens of EXISTING tests across test_currency_decide.py
+# already call it with this exact flat kwarg shape. Bundling them into a request
+# object now would only rename this same information while breaking every one of
+# those call sites — the same "FIXED interface" reasoning as
+# session_review_archive.py's archive() above, on the read side instead of the
+# write side.
+"python/src/kb_setup/currency/decide.py" = ["PLR0913"]
 # S310: the only URL this module opens is the module-level DOCS_URL constant, an
 # https platform.claude.com docs path — never a caller-supplied string, so the
 # audited hazard (an attacker-chosen scheme such as file://) is unreachable.

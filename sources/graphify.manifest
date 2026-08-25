@@ -25,29 +25,41 @@
 # ⚠️ FORKED 2026-08-24 (Ray). THE URL BELOW IS NO LONGER UPSTREAM, and the
 # invariant above is why it had to move with the pin: `pyproject.toml` now
 # installs `graphifyy[all]` from `git+https://github.com/ray-manaloto/graphify@
-# 1d0a9338…`, so leaving this at Graphify-Labs would have put the corpus back in
+# cdfb11c0…`, so leaving this at Graphify-Labs would have put the corpus back in
 # exactly the 2026-07-23 state described above — describing code we do not run —
 # while every surface still LOOKED pinned.
 #
-# WHY THE FORK: graphify 0.9.48 has no codex backend, and neither does upstream
-# `v8` (byte-identical to v0.9.48; control-armed — `compare/v0.9.47...v8` reports
-# ahead_by 14, so the endpoint discriminates). PR #2981 adds `openai-cli`, a
+# WHY THE FORK, as measured ON 2026-08-24: graphify 0.9.48 had no codex backend,
+# and neither did upstream `v8` (byte-identical to v0.9.48 at that moment;
+# control-armed — `compare/v0.9.47...v8` reported ahead_by 14, so the endpoint
+# discriminates). Both halves are frozen to that date on purpose: `v8` has since
+# moved to v0.9.49, so re-read it rather than quoting this. PR #2981 adds
+# `openai-cli`, a
 # sibling of `claude-cli` that shells to the locally authenticated `codex` CLI,
 # and it is OPEN and unreviewed. Ray's call was to take the whole branch rather
 # than cherry-pick, so this pins its head verbatim.
 #
 # THE REF IS A BRANCH WE CREATED, and that contradicts the "never a branch head"
-# rule above for one specific reason: `refs/heads/kb-pin/openai-cli-backend` in
+# rule above for one specific reason: `refs/heads/kb-pin/openai-cli-backend-v0.9.49`
+# (the ref recorded below — the branch is renamed per rebase base) in
 # our fork exists ONLY to hold this commit. Nothing pushes to it, so it cannot
 # drift the way `v8` does. The `commit` below is still the authority; the branch
 # is there so the object survives if TelB-io (whose fork the PR head lives on)
 # deletes their branch. Forks share object storage within a network, which is how
 # a SHA authored on TelB-io/graphify is reachable here at all.
 #
-# ⚠️ THE VERSION STRING DID NOT MOVE. The fork still reports `0.9.48` — same name,
-# same version, different code. So version alone cannot tell a forked install from
-# an upstream one, which is precisely why `currency.toml` `[tool.graphify]` needed
-# a fork-aware state rather than a bumped number.
+# ⚠️ THE VERSION STRING DOES NOT MOVE WITH THE FORK. It reported `0.9.48` when the
+# fork was cut and reports `0.9.49` now — but only because UPSTREAM released; the
+# fork's own seven commits changed nothing about it. Same name, same version as
+# the release it sits on, different code. So version alone cannot tell a forked
+# install from an upstream one, which is precisely why `currency.toml`
+# `[tool.graphify]` needed a fork-aware state rather than a bumped number.
+#
+# THE INSTRUMENT THAT CAN TELL, found 2026-08-25: the installed distribution's own
+# `direct_url.json` records the commit uv ACTUALLY installed —
+#   uv run python -c "from importlib.metadata import distribution; \
+#     print(distribution('graphifyy').read_text('direct_url.json'))"
+# That is the runtime speaking, where every file below is only a claim about it.
 #
 # WHAT RETURNS THIS TO UPSTREAM: #2981 merging and shipping to PyPI. Then revert
 # `pyproject.toml` to `graphifyy[all]==<that version>`, set url/ref/commit here
@@ -55,9 +67,19 @@
 # currency.toml. Upstream ships roughly daily (15 releases in 15 days measured
 # 2026-08-24), so re-check rather than assume.
 #
-# To bump the FORK: rebase `kb-pin/openai-cli-backend` onto the newer upstream
-# tag, push, then set `commit` here and the `@<sha>` in `pyproject.toml` together.
-# They are one pin in two files and must move in the same commit.
+# To bump the FORK: rebase the `kb-pin/openai-cli-backend-<base>` branch onto the
+# newer upstream tag, push, then set `commit` here and the `@<sha>` in
+# `pyproject.toml` together. They are one pin in two files and must move in the
+# same commit — and `currency.toml`'s `ref_binding` rows are what find the OTHER
+# surfaces carrying the same SHA, which a research lane under-counted 3-to-7 once.
+#
+# ⚠️ THERE IS NO REBASE TARGET RIGHT NOW — re-measured 2026-08-25. Upstream's
+# DEFAULT branch is `v8`, not `main` (`main` has been frozen at 91f4d120 since
+# 2026-05-14, so reading it reports a three-month-old tree as "latest"). `v8` HEAD
+# is 282976b2, which IS the `v0.9.49` tag; `compare/282976b2...cdfb11c0` on our
+# fork reports ahead_by 7, behind_by 0. #2981 remains OPEN and `dirty`, its head
+# 1d0a9338 untouched since 2026-08-24T10:09 — before this fork was cut, so there
+# is nothing new on its side either. Re-measure before assuming this still holds.
 url = https://github.com/ray-manaloto/graphify
 ref = kb-pin/openai-cli-backend-v0.9.49
 commit = cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8

@@ -1,0 +1,331 @@
+<title>The Sixth Argument</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --paper:      #f4f3f6;
+    --card:       #ffffff;
+    --sunk:       #eae7ee;
+    --ink:        #1b1620;
+    --ink-soft:   #544c5c;
+    --ink-faint:  #857c8e;
+    --rule:       #d6d0dd;
+    --rule-soft:  #e6e2ec;
+    --plum:       #6b3f74;
+    --plum-wash:  #efe4f2;
+    --olive:      #566627;
+    --olive-wash: #e6ecd4;
+    --rust:       #8c4a20;
+    --rust-wash:  #f6e3d6;
+    --plate:      #faf9fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #141118;
+      --card:       #1d1823;
+      --sunk:       #120f17;
+      --ink:        #ece7f0;
+      --ink-soft:   #b0a6ba;
+      --ink-faint:  #7d7388;
+      --rule:       #342c3d;
+      --rule-soft:  #251f2d;
+      --plum:       #c99ad4;
+      --plum-wash:  #2c1f33;
+      --olive:      #adc06c;
+      --olive-wash: #232a12;
+      --rust:       #dd9a6f;
+      --rust-wash:  #33200f;
+      --plate:      #faf9fb;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:      #141118;
+    --card:       #1d1823;
+    --sunk:       #120f17;
+    --ink:        #ece7f0;
+    --ink-soft:   #b0a6ba;
+    --ink-faint:  #7d7388;
+    --rule:       #342c3d;
+    --rule-soft:  #251f2d;
+    --plum:       #c99ad4;
+    --plum-wash:  #2c1f33;
+    --olive:      #adc06c;
+    --olive-wash: #232a12;
+    --rust:       #dd9a6f;
+    --rust-wash:  #33200f;
+    --plate:      #faf9fb;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 20px 90px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+
+  header.mast { padding: 60px 0 34px; }
+  .kicker {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--plum);
+    margin: 0 0 16px;
+  }
+  h1 {
+    font-family: "Instrument Serif", Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(42px, 8vw, 76px);
+    line-height: .98;
+    letter-spacing: -.01em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-size: clamp(17px, 2.3vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 58ch;
+    margin: 0;
+  }
+  .standfirst strong { color: var(--ink); font-weight: 600; }
+  .askline {
+    margin: 26px 0 0;
+    padding: 14px 18px;
+    background: var(--plum-wash);
+    border-left: 3px solid var(--plum);
+    font-size: 15.5px;
+    max-width: 62ch;
+  }
+
+  section { margin: 0 0 56px; }
+  h2 {
+    font-family: "Instrument Serif", Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(26px, 4vw, 38px);
+    line-height: 1.1;
+    letter-spacing: -.005em;
+    text-wrap: balance;
+    margin: 0 0 8px;
+  }
+  .sub { color: var(--ink-soft); font-size: 15px; margin: 0 0 24px; max-width: 62ch; }
+  p { max-width: 64ch; }
+
+  code, .mono { font-family: "IBM Plex Mono", monospace; font-size: .87em; }
+  code { background: var(--sunk); padding: .1em .36em; border-radius: 2px; }
+
+  figure { margin: 0 0 24px; background: var(--card); border: 1px solid var(--rule); }
+  .fig-body { padding: 26px 18px 8px; overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink); }
+  figcaption {
+    font-size: 14px; line-height: 1.5; color: var(--ink-soft);
+    padding: 14px 22px 18px; border-top: 1px solid var(--rule-soft);
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  .pans { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 20px; }
+  .pan { background: var(--card); border: 1px solid var(--rule); padding: 24px 26px; }
+  .pan.keep { border-top: 5px solid var(--olive); }
+  .pan.refactor { border-top: 5px solid var(--rust); }
+  .pan h3 { font-family: "IBM Plex Sans", sans-serif; font-size: 18px; font-weight: 600; margin: 0 0 2px; }
+  .pan .tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .07em;
+    text-transform: uppercase; margin: 0 0 16px;
+  }
+  .pan.keep .tag { color: var(--olive); }
+  .pan.refactor .tag { color: var(--rust); }
+  .pan dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; font-size: 14.5px; }
+  .pan dt { color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; padding-top: 3px; }
+  .pan dd { margin: 0; }
+  .big { font-family: "Instrument Serif", serif; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .pan.keep .big { color: var(--olive); }
+  .pan.refactor .big { color: var(--rust); }
+
+  .rulebox { background: var(--card); border: 1px solid var(--rule); border-left: 5px solid var(--plum); padding: 22px 26px; }
+  .rulebox h3 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
+  .rulebox p { font-size: 15px; margin: 0 0 10px; }
+  .rulebox p:last-child { margin-bottom: 0; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 560px; }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--ink-faint); border-bottom: 1px solid var(--rule); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.m { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+  td.n { font-variant-numeric: tabular-nums; }
+
+  pre {
+    background: var(--sunk); border: 1px solid var(--rule); padding: 16px 18px;
+    overflow-x: auto; font-family: "IBM Plex Mono", monospace; font-size: 13px; line-height: 1.55; margin: 0 0 18px;
+  }
+
+  .prov { border-top: 1px solid var(--rule); padding-top: 20px; font-size: 13.5px; color: var(--ink-soft); }
+  .prov h2 { font-size: 20px; margin-bottom: 10px; }
+  .prov ul { padding-left: 20px; margin: 0; line-height: 1.6; }
+
+  a { color: var(--plum); }
+  a:focus-visible { outline: 2px solid var(--plum); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="kicker">A decision that is yours, not mine</p>
+    <h1>The Sixth Argument</h1>
+    <p class="standfirst">A linter allows a function <strong>five</strong> arguments. The new feature made it <strong>six</strong>. Nothing is broken — the only question is which kind of cost you would rather pay.</p>
+    <p class="askline">I'm asking because this repo's own rule says so: <em>no ignore rule without explicit user approval.</em> The implementing lane added one and flagged it rather than quietly shipping it — which is the correct behaviour, and why it's in front of you.</p>
+  </header>
+
+  <section>
+    <h2>What the function actually is</h2>
+    <p class="sub">It is the currency engine's single judgment call: given everything known about a tool, may a version bump apply itself without a human? Each argument is one independent fact a gate reads.</p>
+
+    <figure>
+      <div class="fig-body">
+        <svg viewBox="0 0 840 300" role="img" aria-label="The decide function takes six independent facts — sync, upstream, moved, observations, views, and the newly added reviewed — and feeds a bar of six gates that returns a single verdict on whether a version bump may apply itself. The sixth fact, reviewed, is the one this change added.">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" fill="currentColor"/>
+            </marker>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" fill="#6b3f74"/>
+            </marker>
+          </defs>
+
+          <text x="0" y="20" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".55">SIX INDEPENDENT FACTS</text>
+
+          <!-- five existing facts -->
+          <g font-family="IBM Plex Mono, monospace" font-size="12.5" fill="currentColor">
+            <rect x="0" y="38"  width="168" height="28" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".55"/>
+            <text x="12" y="57" opacity=".9">sync</text>
+            <rect x="0" y="76"  width="168" height="28" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".55"/>
+            <text x="12" y="95" opacity=".9">upstream</text>
+            <rect x="0" y="114" width="168" height="28" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".55"/>
+            <text x="12" y="133" opacity=".9">moved</text>
+            <rect x="0" y="152" width="168" height="28" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".55"/>
+            <text x="12" y="171" opacity=".9">observations</text>
+            <rect x="0" y="190" width="168" height="28" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".55"/>
+            <text x="12" y="209" opacity=".9">views</text>
+          </g>
+
+          <!-- the sixth -->
+          <rect x="0" y="228" width="168" height="28" fill="none" stroke="#6b3f74" stroke-width="2.4"/>
+          <text x="12" y="247" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#6b3f74" font-weight="500">reviewed</text>
+          <text x="0" y="276" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="#6b3f74" font-weight="600">THE SIXTH — added by this change</text>
+
+          <!-- arrows into the bar -->
+          <g stroke="currentColor" stroke-width="1.4" opacity=".5">
+            <line x1="176" y1="52"  x2="286" y2="120" marker-end="url(#a1)"/>
+            <line x1="176" y1="90"  x2="286" y2="128" marker-end="url(#a1)"/>
+            <line x1="176" y1="128" x2="286" y2="136" marker-end="url(#a1)"/>
+            <line x1="176" y1="166" x2="286" y2="144" marker-end="url(#a1)"/>
+            <line x1="176" y1="204" x2="286" y2="152" marker-end="url(#a1)"/>
+          </g>
+          <line x1="176" y1="242" x2="286" y2="162" stroke="#6b3f74" stroke-width="2.2" marker-end="url(#a2)"/>
+
+          <!-- the gate bar -->
+          <rect x="296" y="88" width="212" height="96" fill="none" stroke="currentColor" stroke-width="2.4"/>
+          <text x="402" y="122" text-anchor="middle" font-family="Instrument Serif, serif" font-size="21" fill="currentColor">decide()</text>
+          <text x="402" y="145" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor" opacity=".7">six gates, all must be closed</text>
+          <text x="402" y="165" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".55">one caller: run.py</text>
+
+          <!-- verdict -->
+          <line x1="510" y1="136" x2="596" y2="136" stroke="currentColor" stroke-width="2.2" marker-end="url(#a1)"/>
+          <rect x="604" y="106" width="204" height="60" fill="none" stroke="currentColor" stroke-width="2.4"/>
+          <text x="706" y="132" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13.5" font-weight="600" fill="currentColor">may this bump</text>
+          <text x="706" y="151" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13.5" font-weight="600" fill="currentColor">apply itself?</text>
+        </svg>
+      </div>
+      <figcaption>Each argument is a <b>different kind of fact</b>, not a repeated one — which is what makes the linter's complaint structural rather than a code smell. <code>PLR0913</code> exists to catch functions that grew a parameter list nobody planned; this one has exactly the arguments its six gates read, and it has <b>one</b> caller.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>The two pans</h2>
+    <p class="sub">Both options end with a green lint. They differ in what else moves.</p>
+
+    <div class="pans">
+      <div class="pan keep">
+        <h3>Record the exception</h3>
+        <p class="tag">one line + a written reason</p>
+        <dl>
+          <dt>Lines changed</dt><dd><span class="big">10</span> &nbsp;<span style="color:var(--ink-faint)">1 rule, 9 of justification</span></dd>
+          <dt>Call sites touched</dt><dd><span class="big">0</span></dd>
+          <dt>Where it lives</dt><dd>the one root <code>pyproject.toml</code> — the only sanctioned place, reviewable beside the other six</dd>
+          <dt>Precedent</dt><dd><code>session_review_archive.py</code> carries the identical ignore for the identical reason, already accepted</dd>
+          <dt>What you give up</dt><dd>a seventh entry on the exceptions list, and this file stops being checked for argument creep <em>forever</em></dd>
+        </dl>
+      </div>
+
+      <div class="pan refactor">
+        <h3>Refactor to obey</h3>
+        <p class="tag">bundle six facts into one object</p>
+        <dl>
+          <dt>Lines changed</dt><dd><span class="big">~51</span> &nbsp;<span style="color:var(--ink-faint)">call sites, plus the signature</span></dd>
+          <dt>Call sites touched</dt><dd><span class="big">51</span> &nbsp;<span style="color:var(--ink-faint)">44 existing + 7 new</span></dd>
+          <dt>What actually improves</dt><dd>the argument count. The six facts still exist, still all get passed, still all get read</dd>
+          <dt>New risk</dt><dd>51 mechanical edits to the tests that guard the bump-authorising function — the highest-stakes suite in the engine</dd>
+          <dt>What you give up</dt><dd>nothing on the exceptions list; you pay in churn on tests that currently pass</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why the honest answer isn't obvious</h2>
+
+    <div class="rulebox">
+      <h3>The rule that makes this your call</h3>
+      <p><code>zero-skip-policy</code> rule 1: <em>never add an ignore rule without explicit user approval; each suppression must be justified with a documented reason.</em> Rule 5 adds: <em>a passing gate with suppressed warnings is not "green".</em></p>
+      <p>The lane satisfied the <em>documented reason</em> half and stopped at the <em>approval</em> half. That is the rule working. But notice the tension the rule itself sets up — approving this makes the gate green in a way rule 5 explicitly says is not the same as clean.</p>
+    </div>
+
+    <p style="margin-top:22px;">The case <em>against</em> approving, stated fairly: a per-file ignore is permanent and file-wide. It does not say <em>"<code>decide()</code> may have six"</em> — it says <em>"nothing in <code>decide.py</code> is ever checked for this again."</em> If a future function in that file grows to nine arguments, nothing complains.</p>
+
+    <p>The case <em>for</em>: the refactor does not remove information, it renames it. Six facts go in either way. And the churn lands on the one test suite you least want mechanically rewritten to satisfy a threshold — the suite guarding whether a bump may apply itself unattended.</p>
+
+    <p><strong>There is a third option neither pan shows</strong>, and it is worth knowing about before you choose: ruff's <code>max-args</code> is configurable, and this repo has never set it — the 5 is simply ruff's default. Raising it to 6 project-wide would need no per-file ignore at all, but it relaxes the check <em>everywhere</em>, which is a wider blast radius than a single named file.</p>
+  </section>
+
+  <section>
+    <h2>The exception list as it stands</h2>
+    <p class="sub">What you would be adding to. Six entries today, excluding the tests block.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>File</th><th>Ignored</th><th>Why, in one line</th></tr></thead>
+        <tbody>
+          <tr><td class="m">hook_guard.py</td><td class="m">BLE001</td><td>a guard must fail open on its own errors</td></tr>
+          <tr><td class="m">graph_size.py</td><td class="m">SLF001</td><td>reads a private attribute deliberately</td></tr>
+          <tr><td class="m">evals.py</td><td class="m">BLE001</td><td>best-effort report block</td></tr>
+          <tr><td class="m">_merge_docs.py</td><td class="m">BLE001, N806</td><td>best-effort; <code>G</code> is the standard graph name</td></tr>
+          <tr><td class="m">cli.py</td><td class="m">C901, PLR0911, PLR0912</td><td>a flat command dispatch is branchy by nature</td></tr>
+          <tr><td class="m">session_review_archive.py</td><td class="m">PLR0913</td><td>six keyword params mirroring six CLI flags 1:1</td></tr>
+          <tr style="background:var(--plum-wash)"><td class="m"><b>currency/decide.py</b></td><td class="m"><b>PLR0913</b></td><td><b>the decision in front of you</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:18px;">The precedent row is the strongest argument for approval and the weakest against: <code>archive()</code>'s ignore was granted because its six parameters mirror six CLI flags one-for-one. <code>decide()</code>'s six mirror six <em>gates</em> one-for-one. Same shape, read side instead of write side.</p>
+  </section>
+
+  <section class="prov">
+    <h2>Measured, not recalled</h2>
+    <ul>
+      <li><code>decide()</code>'s six keyword-only parameters — read this session at <code>python/src/kb_setup/currency/decide.py:429-437</code>.</li>
+      <li><b>44</b> <code>decide(</code> call sites in <code>tests/test_currency_decide.py</code>, <b>7</b> in the new <code>tests/test_currency_watch_reviewed.py</code> — counted this session.</li>
+      <li>No <code>max-args</code> override exists in <code>pyproject.toml</code>, so the limit is ruff's default of 5 — checked this session; the file's ruff sections are <code>[tool.ruff]</code>, <code>lint</code>, <code>per-file-ignores</code>, <code>pydocstyle</code>, <code>mccabe</code>, none of which set it.</li>
+      <li>The existing exception list and the <code>session_review_archive.py</code> precedent — <code>pyproject.toml:153-189</code>.</li>
+      <li>The commit under discussion is <code>dd90e64f</code>. Its gates were run by the implementing lane and reported green; a <b>cold review of that diff was still running when this page was written</b>, so nothing here should be read as that review having passed.</li>
+    </ul>
+  </section>
+
+</div>

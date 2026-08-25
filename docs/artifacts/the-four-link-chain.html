@@ -1,0 +1,260 @@
+<title>The Four-Link Chain</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --ground:#eef2f6; --surface:#ffffff; --sunk:#e2e8f0;
+  --ink:#0d141d; --slate:#54657a; --hair:#c3ceda;
+  --sync:#0f6e63; --drift:#a8590a; --gap:#9b1239; --accent:#1d5a72;
+  --plate:#f6f9fc;
+}
+:root:not([data-theme="light"]){ @media (prefers-color-scheme: dark){
+  --ground:#0d141d; --surface:#161f2b; --sunk:#1e2a38;
+  --ink:#e8eef5; --slate:#93a4b8; --hair:#31404f;
+  --sync:#4fd1c0; --drift:#f0b357; --gap:#f6738f; --accent:#7cc4e0;
+}}
+:root[data-theme="dark"]{
+  --ground:#0d141d; --surface:#161f2b; --sunk:#1e2a38;
+  --ink:#e8eef5; --slate:#93a4b8; --hair:#31404f;
+  --sync:#4fd1c0; --drift:#f0b357; --gap:#f6738f; --accent:#7cc4e0;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Newsreader",Georgia,serif; font-size:18px; line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:74ch; margin:0 auto; padding:64px 24px 96px; display:flex; flex-direction:column; gap:38px}
+h1,h2,h3{font-family:"Bricolage Grotesque","Helvetica Neue",sans-serif; text-wrap:balance; margin:0; line-height:1.12}
+h1{font-size:clamp(2.3rem,6vw,3.4rem); font-weight:700; letter-spacing:-.02em}
+h2{font-size:1.62rem; font-weight:700; letter-spacing:-.01em; margin-top:14px}
+h3{font-size:1.12rem; font-weight:600}
+p{margin:0}
+.eyebrow{font-family:"JetBrains Mono",monospace; font-size:.72rem; letter-spacing:.16em; text-transform:uppercase; color:var(--slate)}
+.lede{font-size:1.28rem; color:var(--slate); font-style:italic}
+code,.mono{font-family:"JetBrains Mono",monospace; font-size:.84em}
+code{background:var(--sunk); padding:.12em .38em; border-radius:3px}
+figure{margin:0; display:flex; flex-direction:column; gap:12px}
+figure svg{width:100%; height:auto; display:block}
+figcaption{font-size:.92rem; color:var(--slate)}
+.scroll{overflow-x:auto; background:var(--surface); border:1px solid var(--hair); border-radius:8px; padding:18px}
+table{border-collapse:collapse; width:100%; font-family:"Bricolage Grotesque",sans-serif; font-size:.9rem; font-variant-numeric:tabular-nums}
+th{text-align:left; font-weight:600; font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:var(--slate); padding:0 14px 9px 0; border-bottom:1px solid var(--hair); white-space:nowrap}
+td{padding:9px 14px 9px 0; border-bottom:1px solid var(--hair); vertical-align:top}
+tr:last-child td{border-bottom:none}
+.chip{display:inline-block; font-family:"JetBrains Mono",monospace; font-size:.68rem; letter-spacing:.06em; text-transform:uppercase; padding:.18em .5em; border-radius:3px; border:1px solid currentColor}
+.c-sync{color:var(--sync)} .c-drift{color:var(--drift)} .c-gap{color:var(--gap)}
+.card{background:var(--surface); border:1px solid var(--hair); border-radius:8px; padding:22px 24px; display:flex; flex-direction:column; gap:10px}
+.card.lead{border-left:3px solid var(--accent)}
+.mermaid{background:var(--plate); border:1px solid var(--hair); border-radius:8px; padding:20px; overflow-x:auto}
+.rule{height:1px; background:var(--hair); border:0}
+.foot{font-size:.86rem; color:var(--slate)}
+ul{margin:0; padding-left:1.15em} li{margin-bottom:6px}
+</style>
+
+<div class="wrap">
+
+<header style="display:flex;flex-direction:column;gap:14px">
+  <p class="eyebrow">Knowledge-base · dependency sweep · 2026-08-25</p>
+  <h1>The Four-Link Chain</h1>
+  <p class="lede">Every dependency this repo uses has to agree with itself in four places. Ninety-four times. Here is where it doesn't.</p>
+</header>
+
+<div class="card" style="border-left:3px solid var(--drift)">
+  <p class="eyebrow" style="color:var(--drift)">Correction &middot; added 2026-08-25, after publication</p>
+  <h3>Three claims on this page were refuted by later measurement</h3>
+  <p>They are corrected here rather than silently overwritten, because the original was already read and acted on.</p>
+  <ul>
+    <li><strong>&ldquo;3 drifts&rdquo; was the wrong frame.</strong> <code>pkl</code>, <code>typos</code> and <code>codex</code> are drifted <em>manifest-side only</em> &mdash; <code>mise.toml</code> already pinned the newer version of all three. The real upstream drift was five other tools: <code>hk</code>, <code>rumdl</code>, <code>agnix</code>, <code>fnox</code>, <code>mise</code>.</li>
+    <li><strong>The gap count held, but one fix was wrong.</strong> All eight missing manifests were added (76 &rarr; 84 sources). <code>ffmpeg</code>&rsquo;s was then found to pin the <em>tag object</em> rather than the commit &mdash; <code>n9.0.1</code> is annotated, and <code>git ls-remote --tags</code> returns the tag object for those. Corrected within the hour; the other five tag-pinned sources are lightweight and were already right.</li>
+    <li><strong>&ldquo;The build&rsquo;s recorded cause no longer reproduces&rdquo; understated the situation.</strong> Both <code>.currency-stamp.json</code> and <code>.compose-manifest.json</code> are <em>absent</em>, with <code>.build-failure.json</code> present &mdash; so the graph has no provenance record at all. Every graph-derived figure is not stale but <strong>unanswerable</strong> until a rebuild.</li>
+  </ul>
+  <p style="font-size:.94rem;color:var(--slate)">One exclusion also flipped: <code>codex</code> moves from <code>skip</code> to <code>include</code>, confirmed by the code&rsquo;s own comment at <code>graph.py:203-205</code> saying it was excluded &ldquo;out of scope&rdquo; rather than by defect.</p>
+</div>
+
+<div class="card lead">
+  <h3>The one-sentence version</h3>
+  <p>A pinned tool is only <em>really</em> in the knowledge graph when four separate things say the same version. We measured all four for every first-level dependency: <strong>9 never start the chain</strong>, <strong>3 break at the second link</strong>, and <strong>6 are cut before the last one</strong>.</p>
+</div>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+<h2>What has to line up</h2>
+<p>Think of it like a library that keeps a copy of every book it recommends. The <em>pin</em> is the edition you told people to read. The <em>manifest</em> is the card in the catalogue. The <em>clone</em> is the physical copy on the shelf. The <em>graph</em> is the index at the back that lets you actually look something up.</p>
+<p>If the catalogue card names last year's edition, you'll fetch the wrong book and never know. If there's no card at all, the book isn't in the library — you just remember owning it. And if the copy is on the shelf but was never indexed, searching finds nothing.</p>
+
+<figure>
+<svg viewBox="0 0 880 500" role="img" aria-label="One four-link chain from pin to manifest to clone to graph, drawn four times: once healthy, then once for each of three break points — nine dependencies with no manifest, three whose manifest names an older version than the pin, and six whose manifest exists but is excluded from the build.">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <polygon points="0,1 10,5 0,9" fill="currentColor"/>
+    </marker>
+    <marker id="ah-gap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <polygon points="0,1 10,5 0,9" fill="#9b1239"/>
+    </marker>
+  </defs>
+
+  <g font-family="Bricolage Grotesque, sans-serif" fill="currentColor">
+
+  <!-- ROW 1 : healthy -->
+  <text x="30" y="40" font-size="11" letter-spacing="1.6" fill="#54657a">IN SYNC — E.G. GRAPHIFY, RUMDL, GITLEAKS</text>
+  <g>
+    <rect x="30" y="52" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="112" y="74" font-size="13" font-weight="600" text-anchor="middle">pin</text>
+    <text x="112" y="91" font-size="10.5" text-anchor="middle" fill="#54657a">mise.toml · pyproject</text>
+
+    <rect x="235" y="52" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="317" y="74" font-size="13" font-weight="600" text-anchor="middle">manifest</text>
+    <text x="317" y="91" font-size="10.5" text-anchor="middle" fill="#54657a">ref + commit</text>
+
+    <rect x="440" y="52" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="522" y="74" font-size="13" font-weight="600" text-anchor="middle">clone</text>
+    <text x="522" y="91" font-size="10.5" text-anchor="middle" fill="#54657a">gitignored checkout</text>
+
+    <rect x="645" y="52" width="165" height="50" rx="5" fill="none" stroke="#0f6e63" stroke-width="2"/>
+    <text x="727" y="74" font-size="13" font-weight="600" text-anchor="middle" fill="#0f6e63">graph</text>
+    <text x="727" y="91" font-size="10.5" text-anchor="middle" fill="#0f6e63">AST nodes</text>
+
+    <line x1="195" y1="77" x2="230" y2="77" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+    <line x1="400" y1="77" x2="435" y2="77" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+    <line x1="605" y1="77" x2="640" y2="77" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+    <text x="212" y="70" font-size="9" text-anchor="middle" fill="#54657a">names</text>
+    <text x="417" y="70" font-size="9" text-anchor="middle" fill="#54657a">fetches</text>
+    <text x="622" y="70" font-size="9" text-anchor="middle" fill="#54657a">extracts</text>
+  </g>
+
+  <!-- ROW 2 : no manifest -->
+  <text x="30" y="158" font-size="11" letter-spacing="1.6" fill="#9b1239">BREAK 1 — 9 PINS HAVE NO CATALOGUE CARD</text>
+  <g>
+    <rect x="30" y="170" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="112" y="192" font-size="13" font-weight="600" text-anchor="middle">pin</text>
+    <text x="112" y="209" font-size="10.5" text-anchor="middle" fill="#54657a">gh · biome · ctx7 …</text>
+
+    <rect x="235" y="170" width="165" height="50" rx="5" fill="none" stroke="#9b1239" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <text x="317" y="199" font-size="12.5" font-weight="600" text-anchor="middle" fill="#9b1239">no manifest</text>
+
+    <g opacity="0.26">
+      <rect x="440" y="170" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="522" y="199" font-size="13" text-anchor="middle">clone</text>
+      <rect x="645" y="170" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="727" y="199" font-size="13" text-anchor="middle">graph</text>
+      <line x1="400" y1="195" x2="435" y2="195" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+      <line x1="605" y1="195" x2="640" y2="195" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+    </g>
+    <line x1="195" y1="195" x2="230" y2="195" stroke="#9b1239" stroke-width="1.6" marker-end="url(#ah-gap)"/>
+    <text x="212" y="188" font-size="9" text-anchor="middle" fill="#9b1239">names</text>
+    <text x="522" y="238" font-size="10" text-anchor="middle" fill="#54657a">the chain never starts — nothing downstream exists</text>
+  </g>
+
+  <!-- ROW 3 : version disagreement -->
+  <text x="30" y="276" font-size="11" letter-spacing="1.6" fill="#a8590a">BREAK 2 — 3 CARDS NAME AN OLDER EDITION</text>
+  <g>
+    <rect x="30" y="288" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="112" y="310" font-size="13" font-weight="600" text-anchor="middle">pin</text>
+    <text x="112" y="327" font-size="10.5" text-anchor="middle" fill="#a8590a" font-family="JetBrains Mono, monospace">typos 1.49.0</text>
+
+    <rect x="235" y="288" width="165" height="50" rx="5" fill="none" stroke="#a8590a" stroke-width="2"/>
+    <text x="317" y="310" font-size="13" font-weight="600" text-anchor="middle">manifest</text>
+    <text x="317" y="327" font-size="10.5" text-anchor="middle" fill="#a8590a" font-family="JetBrains Mono, monospace">ref = v1.48.0</text>
+
+    <rect x="440" y="288" width="165" height="50" rx="5" fill="none" stroke="#a8590a" stroke-width="1.4"/>
+    <text x="522" y="310" font-size="13" font-weight="600" text-anchor="middle">clone</text>
+    <text x="522" y="327" font-size="10.5" text-anchor="middle" fill="#a8590a">the OLD source</text>
+
+    <rect x="645" y="288" width="165" height="50" rx="5" fill="none" stroke="#a8590a" stroke-width="1.4"/>
+    <text x="727" y="310" font-size="13" font-weight="600" text-anchor="middle">graph</text>
+    <text x="727" y="327" font-size="10.5" text-anchor="middle" fill="#a8590a">answers, but wrong</text>
+
+    <line x1="195" y1="313" x2="230" y2="313" stroke="#a8590a" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#ah)" color="#a8590a"/>
+    <line x1="400" y1="313" x2="435" y2="313" stroke="#a8590a" stroke-width="1.4" marker-end="url(#ah)" color="#a8590a"/>
+    <line x1="605" y1="313" x2="640" y2="313" stroke="#a8590a" stroke-width="1.4" marker-end="url(#ah)" color="#a8590a"/>
+    <text x="212" y="306" font-size="9" text-anchor="middle" fill="#a8590a">disagrees</text>
+    <text x="522" y="356" font-size="10" text-anchor="middle" fill="#54657a">every link still works — it just describes code we do not run</text>
+  </g>
+
+  <!-- ROW 4 : excluded -->
+  <text x="30" y="394" font-size="11" letter-spacing="1.6" fill="#9b1239">BREAK 3 — 6 SOURCES ARE ON THE SHELF, NEVER INDEXED</text>
+  <g>
+    <rect x="30" y="406" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="112" y="435" font-size="13" font-weight="600" text-anchor="middle">pin</text>
+    <rect x="235" y="406" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="317" y="428" font-size="13" font-weight="600" text-anchor="middle">manifest</text>
+    <text x="317" y="445" font-size="10.5" text-anchor="middle" fill="#9b1239" font-family="JetBrains Mono, monospace">build = skip</text>
+    <rect x="440" y="406" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="522" y="435" font-size="13" font-weight="600" text-anchor="middle">clone</text>
+    <g opacity="0.26">
+      <rect x="645" y="406" width="165" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="727" y="435" font-size="13" text-anchor="middle">graph</text>
+    </g>
+    <line x1="195" y1="431" x2="230" y2="431" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+    <line x1="400" y1="431" x2="435" y2="431" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+    <line x1="605" y1="431" x2="640" y2="431" stroke="#9b1239" stroke-width="1.6" stroke-dasharray="4 4" marker-end="url(#ah-gap)"/>
+    <line x1="616" y1="422" x2="630" y2="440" stroke="#9b1239" stroke-width="2"/>
+    <line x1="630" y1="422" x2="616" y2="440" stroke="#9b1239" stroke-width="2"/>
+    <text x="622" y="416" font-size="9" text-anchor="middle" fill="#9b1239">excluded</text>
+  </g>
+  </g>
+</svg>
+<figcaption><strong>One chain, three break points.</strong> The top row is what a healthy dependency looks like. Each row below it holds the same four boxes and changes exactly one link, so what is broken is the part that differs from the row above.</figcaption>
+</figure>
+</section>
+
+<hr class="rule">
+
+<section style="display:flex;flex-direction:column;gap:18px">
+<h2>What we actually counted</h2>
+<p>Every figure here was measured this session by reading <code>mise.toml</code>, <code>pyproject.toml</code> and all 76 <code>sources/*.manifest</code> files directly. No network calls: a version disagreement is only reported where two committed files contradict each other in plain text.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th>State</th><th>Count</th><th>What it means</th></tr></thead>
+<tbody>
+<tr><td><span class="chip c-sync">in sync</span></td><td>17</td><td>Manifest agrees with the pin. Includes <code>graphify</code> itself — pin, manifest, clone and installed package all read <code>0.9.49</code>&nbsp;/&nbsp;<code>cdfb11c0</code>.</td></tr>
+<tr><td><span class="chip c-drift">drift</span></td><td>3</td><td><code>pkl</code>, <code>typos</code>, <code>codex</code> — each exactly one patch behind. All three carry their own "pinned here: X" comment, so the contradiction is literal.</td></tr>
+<tr><td><span class="chip c-gap">no manifest</span></td><td>9</td><td>Declared and installed, absent from the corpus entirely.</td></tr>
+<tr><td><span class="chip c-gap">excluded</span></td><td>6</td><td>5 <code>skip</code> + 1 <code>defer</code>. Cloned and pinned, but the AST step never runs on them.</td></tr>
+<tr><td><span class="chip c-sync">unpinnable</span></td><td>4</td><td><code>msgspec</code>, <code>pytest</code>, <code>pytest-xdist</code>, <code>structlog</code> track a branch head with no version comment — <em>not checked</em>, which is not a pass.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card">
+<h3>The nine with no card at all</h3>
+<p class="mono" style="font-size:.86rem;line-height:1.9">python · conda:ffmpeg · biome · gh · antigravity-cli · npm:ctx7 · npm:firecrawl-cli · trafilatura · mcp2cli</p>
+<p style="font-size:.94rem;color:var(--slate)">Seven come from <code>mise.toml</code>, two from <code>pyproject.toml</code>. <code>python</code> is arguably not a repo-shaped corpus candidate; the other eight are.</p>
+</div>
+</section>
+
+<hr class="rule">
+
+<section style="display:flex;flex-direction:column;gap:18px">
+<h2>Why the order matters</h2>
+<p>These stages are not independent. Advancing a pin without advancing its manifest just moves the break from one link to the next, and rebuilding the graph before either is finished indexes the wrong source.</p>
+
+<pre class="mermaid">
+flowchart LR
+  A["1 · bump pins<br/>owning tool only"] --> B["2 · advance manifests<br/>kb-update per source"]
+  B --> C["3 · fill the 9 gaps<br/>kb-manifest-add"]
+  C --> D["4 · AST sweep<br/>kb-build"]
+  D --> E["5 · verify<br/>kb-query answers"]
+  X["re-decide the 6<br/>skip / defer"] --> D
+  style D fill:#e2e8f0,stroke:#1d5a72,stroke-width:2px
+</pre>
+<p style="font-size:.94rem;color:var(--slate)">Stage 4 is the expensive one — it re-clones every pinned source and is the only stage that costs real wall clock. Stages 1–3 are cheap and reversible.</p>
+</section>
+
+<hr class="rule">
+
+<section style="display:flex;flex-direction:column;gap:14px">
+<h2>One thing that turned out not to be broken</h2>
+<p>A persisted record has been telling every session that <code>kb-build</code> will fail again, quoting the line <code class="mono">[graphify] Pruned 3 node(s) from 3 deleted or excluded source file(s).</code></p>
+<p>Armed directly this session: that exact line now filters to empty, while a genuine <code>WARNING:</code> line and a trailing-text variant both survive unfiltered. So the probe discriminates, and <strong>the recorded cause no longer reproduces</strong> — the fix landed after the record was written. The record regenerates a fresh prediction from an old failure without ever re-testing it.</p>
+<p class="foot">This is the second stale build-failure prediction found in two rounds. The first named a template file that no longer exists.</p>
+</section>
+
+<hr class="rule">
+
+<footer class="foot" style="display:flex;flex-direction:column;gap:8px">
+<p><strong>Provenance.</strong> All counts measured 2026-08-25 from committed files at <code>317c79ed348b</code> on <code>corpus-partial-merge-20260823</code>. The gap inventory was produced by a read-only lane and spot-checked at the session level: the nine no-manifest pins were re-probed by glob, and the three drifts re-read against two known-synced controls (<code>rumdl</code>, <code>gitleaks</code>).</p>
+<p>Figures on this page go stale the moment a pin moves. Re-derive with <code>mise run kb-currency-check</code>; do not quote these numbers forward.</p>
+</footer>
+
+</div>
