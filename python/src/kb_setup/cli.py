@@ -734,7 +734,11 @@ def _opt(rest: list[str], flag: str, default: str | None = None) -> str | None:
 
 
 def _currency(repo_root: Path, rest: list[str]) -> int:
-    """Dispatch `kb-setup currency {check|run|apply|daily|docs-reviewed|watch-reviewed|stamp}`."""
+    """Dispatch `kb-setup currency`.
+
+    Modes: check | run | apply | daily | docs-reviewed | watch-reviewed |
+    prune-reviewed | stamp.
+    """
     from kb_setup.currency import run as currency_run
 
     only = _opt(rest, "--tool", "") or ""
@@ -797,6 +801,11 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
         return currency_run.watch_reviewed(
             repo_root, only=only, ref=ref, version=version, note=note
         )
+    if mode == "prune-reviewed":
+        # A SEPARATE mode from watch-reviewed, deliberately (cold review, MAJ-1):
+        # pruning is destructive and recording is not, so they do not share an
+        # entry point or a flag — see `run.prune_reviewed`.
+        return currency_run.prune_reviewed(repo_root, only=only)
     if mode == "stamp":
         if not only:
             print(
@@ -812,7 +821,7 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
         )
     print(
         f"kb-setup currency: unknown mode {mode!r} "
-        "(check | run | apply | daily | docs-reviewed | watch-reviewed | stamp)",
+        "(check | run | apply | daily | docs-reviewed | watch-reviewed | prune-reviewed | stamp)",
         file=sys.stderr,
     )
     return 2

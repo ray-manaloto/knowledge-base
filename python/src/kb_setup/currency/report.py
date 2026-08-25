@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 # ViewStatus, so deferring this import would NameError the moment a record is
 # built without one — which is every fixture and every pre-#182 call site.
 from kb_setup.currency import views as views_mod
-from kb_setup.currency.issues import cleared_for
+from kb_setup.currency.issues import check_clearance
 from kb_setup.currency.views import ViewStatus
 
 if TYPE_CHECKING:
@@ -170,7 +170,7 @@ def _watch_table(
 
 
 def _reviewed_cell(
-    reviewed: dict[str, Reviewed], key: str, target: str, *, current_note: str = ""
+    reviewed: dict[str, Reviewed], key: str, target: str, *, current_note: str
 ) -> str:
     """This watch item's clearance state (#486) — a stale record must not read as clean.
 
@@ -188,6 +188,17 @@ def _reviewed_cell(
     evidence page. This repo's own rule is that DRIFT/SKIP/OK stay distinct
     because collapsing them is how its defects happen; "not checked" is the
     third state here for the identical reason.
+
+    Within the STALE outcome, the message branches on WHICH axis `check_clearance`
+    reports (cold review, MAJ-3): a redefined finding — the note no longer
+    hashes to what was recorded, `B1`'s whole subject — must never render
+    identically to an ordinary version mismatch. Before this, `'STALE @ 0.9.26 —
+    target is 0.9.26'` was reachable for BOTH "the version differs" and "the
+    note was rewritten but the version happens to still match", and the second
+    reads, in a committed page, as a bug in the tool rather than as the finding
+    having changed. `current_note` has no default for the same reason
+    `check_clearance`'s does not: both call sites already pass it, and a future
+    one that forgets should fail loudly, not silently re-create B1.
     """
     record = reviewed.get(key)
     if record is None:
@@ -195,8 +206,11 @@ def _reviewed_cell(
     when = f" ({record.at})" if record.at else ""
     if not target:
         return f"recorded @ {record.version}{when} — not checked this run (no target version)"
-    if cleared_for(reviewed, key, target, current_note=current_note):
+    check = check_clearance(reviewed, key, target, current_note=current_note)
+    if check.cleared:
         return f"cleared @ {record.version}{when}"
+    if not check.note_matches:
+        return f"STALE @ {record.version}{when} — the finding's note has changed since recording"
     return f"STALE @ {record.version}{when} — target is {target}"
 
 

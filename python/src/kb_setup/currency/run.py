@@ -429,6 +429,16 @@ def _missing_required(only: str, ref: str, version: str) -> list[str]:
     return [flag for flag, value in required if not value]
 
 
+def _local_items(spec: config.ToolSpec) -> list[config.WatchItem]:
+    """This tool's local watch items.
+
+    `kind != "issue"` is how `issues.observe` itself decides an item is local,
+    matched here so `watch_reviewed` and `prune_reviewed` can never disagree
+    with the gate about which items are in scope.
+    """
+    return [item for item in spec.watch if item.kind != "issue"]
+
+
 def watch_reviewed(
     repo_root: Path, *, only: str = "", ref: str = "", version: str = "", note: str = ""
 ) -> int:
@@ -457,10 +467,12 @@ def watch_reviewed(
     reached; this function still refuses on its own, because it must not trust a
     caller other than the CLI to have done that.
 
-    `record_reviewed` is given `valid_keys` — every CURRENT local item's key —
-    so a clearance for a watch item edited or removed since it was recorded does
-    not linger in the store forever (cold review, B1's pruning half; mirrors
-    `save_current`'s own pruning of stale observations).
+    NEVER prunes (cold review, MAJ-1) — see `prune_reviewed` below, a separate
+    function reached only by a separate `--tool`-only command. An earlier cut
+    folded pruning in here as a `--prune` flag on THIS command; that was still
+    wrong, because it made a destructive action reachable from the same call
+    that performs an ordinary, non-destructive one. Recording a clearance can
+    now never delete a different one, structurally, regardless of any flag.
 
     Returns 2 for any unusable request, below, and writes NOTHING in that case —
     never partially. There is no `docs_reviewed`-style partial-success `1`: that
@@ -483,11 +495,7 @@ def watch_reviewed(
         return 2
     spec = specs[0]
 
-    # `kind != "issue"` is how `issues.observe` itself decides a watch item is
-    # local (`state="local"`) — matched here rather than testing `kind ==
-    # "local"` so this command can never disagree with the gate it clears about
-    # which items are in scope.
-    local_items = [item for item in spec.watch if item.kind != "issue"]
+    local_items = _local_items(spec)
     match = next((item for item in local_items if item.ref == ref), None)
     if match is None:
         # Fail closed: a recorded clearance for a key nothing observes could
@@ -517,9 +525,8 @@ def watch_reviewed(
         finding_digest=issues.finding_digest(match.note),
         note=note,
     )
-    valid_keys = frozenset(item.key for item in local_items)
     try:
-        path = issues.record_reviewed(report_root, spec.name, record, valid_keys=valid_keys)
+        path = issues.record_reviewed(report_root, spec.name, record)
     except issues.ReviewedStoreUnreadableError as e:
         print(
             f"[currency] refusing to record — the existing store could not be read ({e}); "
@@ -532,6 +539,55 @@ def watch_reviewed(
         f"[currency] {spec.name}: {match.key} recorded reviewed @ {version} — "
         f"{path.relative_to(repo_root)}"
     )
+    return 0
+
+
+def prune_reviewed(repo_root: Path, *, only: str = "") -> int:
+    """Remove stored `watch-reviewed` clearances for local items no longer configured (#486).
+
+    A SEPARATE command from `watch_reviewed` (cold review, MAJ-1), reachable
+    only by explicitly naming `--tool`, never as a side effect of recording a
+    clearance. Pruning is destructive — it deletes a human's re-probe
+    assertion, which no run can reconstruct — while recording is not, and an
+    earlier cut that gave them one entry point let a config typo three lines
+    away silently delete an unrelated item's clearance, with `rc 0` and no
+    message. `config._watch_items` fails SOFT (an entry missing `ref` is
+    silently skipped, pre-existing and out of scope here), so "absent from
+    THIS `config.load()`" is not proof an item was genuinely removed; the
+    remedy here is not detecting that — it is making the action require a
+    human to specifically ask for it, at a time of their choosing, seeing
+    exactly what is about to go before it does.
+
+    Prints every key about to be removed BEFORE writing (never silent), and
+    prints "nothing to prune" and writes nothing when there is nothing to do.
+    Returns 2 for `--tool` missing or unknown, or when the store cannot be
+    read (`ReviewedStoreUnreadableError`, the M2 refusal); 0 otherwise.
+    """
+    if not only:
+        print("[currency] prune-reviewed requires --tool <name>", file=sys.stderr)
+        return 2
+    specs = _specs(repo_root, only)
+    if not specs:
+        configured = ", ".join(s.name for s in config.load(repo_root))
+        print(f"[currency] unknown tool {only!r}; configured: {configured}", file=sys.stderr)
+        return 2
+    spec = specs[0]
+
+    report_root = repo_root / report.REPORT_DIR
+    valid_keys = frozenset(item.key for item in _local_items(spec))
+    try:
+        _path, removed = issues.prune_reviewed(report_root, spec.name, valid_keys)
+    except issues.ReviewedStoreUnreadableError as e:
+        print(
+            f"[currency] refusing to prune — the existing store could not be read ({e}); "
+            "fix or remove it by hand first",
+            file=sys.stderr,
+        )
+        return 2
+    if not removed:
+        print(f"[currency] {spec.name}: nothing to prune")
+        return 0
+    print(f"[currency] {spec.name}: pruned {len(removed)} clearance(s): {', '.join(removed)}")
     return 0
 
 

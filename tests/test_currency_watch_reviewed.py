@@ -199,6 +199,14 @@ def test_a_v_prefixed_record_clears_the_bare_target_and_vice_versa() -> None:
 
 
 def test_finding_digest_is_deterministic_and_content_sensitive() -> None:
+    """`finding_digest`'s own contract, in isolation.
+
+    NOT the B1 regression arm (cold review, MIN-2) — this holds identically
+    even if `cleared_for`/`check_clearance` never consulted the digest at all.
+    `test_a_clearance_does_not_survive_the_notes_content_changing` is the arm;
+    this only pins the property that arm's fail-closed reasoning relies on
+    (`finding_digest("")` is a real hash, never `""`).
+    """
     assert issues.finding_digest("same") == issues.finding_digest("same")
     assert issues.finding_digest("a") != issues.finding_digest("b")
     assert issues.finding_digest("") != ""  # content_hash never returns an empty string
@@ -231,6 +239,17 @@ def test_load_reviewed_returns_empty_when_the_path_is_a_directory(tmp_path: Path
     `IsADirectoryError`.
     """
     (tmp_path / "graphify-watch-reviewed.json").mkdir()
+    assert issues.load_reviewed(tmp_path, "graphify") == {}
+
+
+def test_load_reviewed_returns_empty_on_non_utf8_bytes(tmp_path: Path) -> None:
+    """MAJ-2: `UnicodeDecodeError` is a `ValueError`, not an `OSError` or a `json.JSONDecodeError`.
+
+    The handler this round added originally caught only the latter two, so
+    this exact corruption shape escaped uncaught and crashed the read instead
+    of reading as un-reviewed.
+    """
+    (tmp_path / "graphify-watch-reviewed.json").write_bytes(b"\xff\xfe\x00binary garbage")
     assert issues.load_reviewed(tmp_path, "graphify") == {}
 
 
@@ -286,11 +305,11 @@ def test_record_reviewed_merges_rather_than_overwrites_other_keys(tmp_path: Path
     assert loaded["local:b"].version == "0.9.25"
 
 
-def test_record_reviewed_prunes_keys_absent_from_valid_keys(tmp_path: Path) -> None:
-    """B1's pruning half.
+def test_record_reviewed_never_prunes_other_keys(tmp_path: Path) -> None:
+    """MAJ-1: `record_reviewed` structurally cannot delete a different key.
 
-    `valid_keys` removes a clearance no longer configured, the same way
-    `save_current` already prunes stale observations.
+    No parameter re-enables it. Pruning is `issues.prune_reviewed`'s job alone,
+    below.
     """
     issues.record_reviewed(
         tmp_path,
@@ -305,25 +324,22 @@ def test_record_reviewed_prunes_keys_absent_from_valid_keys(tmp_path: Path) -> N
         Reviewed(
             key="local:b", version="0.9.25", at="d1", finding_digest=issues.finding_digest("b")
         ),
-        valid_keys={"local:a", "local:b"},
     )
     assert set(issues.load_reviewed(tmp_path, "graphify")) == {"local:a", "local:b"}
-    # local:b has since been removed from currency.toml; this write's valid_keys
-    # no longer names it, so it must be pruned even though this write is ABOUT
-    # local:c, not local:b.
+    # Recording local:c — a THIRD key, unrelated to a or b — must not touch
+    # either existing entry, regardless of what is or is not "still configured".
     issues.record_reviewed(
         tmp_path,
         "graphify",
         Reviewed(
             key="local:c", version="0.9.25", at="d2", finding_digest=issues.finding_digest("c")
         ),
-        valid_keys={"local:a", "local:c"},
     )
-    assert set(issues.load_reviewed(tmp_path, "graphify")) == {"local:a", "local:c"}
+    assert set(issues.load_reviewed(tmp_path, "graphify")) == {"local:a", "local:b", "local:c"}
 
 
-def test_record_reviewed_with_no_valid_keys_prunes_nothing(tmp_path: Path) -> None:
-    """Control arm: omitting `valid_keys` (the default) keeps every prior entry."""
+def test_prune_reviewed_removes_only_keys_absent_from_valid_keys(tmp_path: Path) -> None:
+    """`issues.prune_reviewed` — the ONLY place pruning happens."""
     issues.record_reviewed(
         tmp_path,
         "graphify",
@@ -338,7 +354,35 @@ def test_record_reviewed_with_no_valid_keys_prunes_nothing(tmp_path: Path) -> No
             key="local:b", version="0.9.25", at="d1", finding_digest=issues.finding_digest("b")
         ),
     )
-    assert set(issues.load_reviewed(tmp_path, "graphify")) == {"local:a", "local:b"}
+    path, removed = issues.prune_reviewed(tmp_path, "graphify", {"local:a"})
+    assert removed == ("local:b",)
+    assert path.exists()
+    assert set(issues.load_reviewed(tmp_path, "graphify")) == {"local:a"}
+
+
+def test_prune_reviewed_with_nothing_to_prune_writes_nothing(tmp_path: Path) -> None:
+    """A no-op prune must not touch the file at all — not even a byte-identical rewrite."""
+    issues.record_reviewed(
+        tmp_path,
+        "graphify",
+        Reviewed(
+            key="local:a", version="0.9.25", at="d1", finding_digest=issues.finding_digest("a")
+        ),
+    )
+    path = tmp_path / "graphify-watch-reviewed.json"
+    before = path.stat().st_mtime_ns
+    _returned_path, removed = issues.prune_reviewed(tmp_path, "graphify", {"local:a", "local:b"})
+    assert removed == ()
+    assert path.stat().st_mtime_ns == before
+
+
+def test_prune_reviewed_refuses_rather_than_destroying_a_corrupt_store(tmp_path: Path) -> None:
+    """M2's refusal applies to pruning too — an unreadable store must not be silently emptied."""
+    path = tmp_path / "graphify-watch-reviewed.json"
+    path.write_text("not json at all", encoding="utf-8")
+    with pytest.raises(issues.ReviewedStoreUnreadableError):
+        issues.prune_reviewed(tmp_path, "graphify", {"local:a"})
+    assert path.read_text(encoding="utf-8") == "not json at all"
 
 
 def test_record_reviewed_refuses_rather_than_destroying_a_corrupt_store(tmp_path: Path) -> None:
@@ -369,6 +413,25 @@ def test_record_reviewed_refuses_over_a_non_dict_json_payload(tmp_path: Path) ->
             ),
         )
     assert path.read_text(encoding="utf-8") == "[1, 2, 3]"
+
+
+def test_record_reviewed_refuses_on_non_utf8_bytes(tmp_path: Path) -> None:
+    """MAJ-2, on the write path.
+
+    The SAME corruption shape must raise `ReviewedStoreUnreadableError`, not
+    an uncaught `UnicodeDecodeError`.
+    """
+    path = tmp_path / "graphify-watch-reviewed.json"
+    path.write_bytes(b"\xff\xfe\x00binary garbage")
+    with pytest.raises(issues.ReviewedStoreUnreadableError):
+        issues.record_reviewed(
+            tmp_path,
+            "graphify",
+            Reviewed(
+                key="local:new", version="0.9.26", at="d", finding_digest=issues.finding_digest("x")
+            ),
+        )
+    assert path.read_bytes() == b"\xff\xfe\x00binary garbage"
 
 
 def test_record_reviewed_with_no_existing_file_is_unaffected(tmp_path: Path) -> None:
@@ -422,11 +485,12 @@ def test_cleared_for_fails_closed_when_the_note_no_longer_matches() -> None:
     }
     assert issues.cleared_for(reviewed, "k", "0.9.26", current_note="original")
     assert not issues.cleared_for(reviewed, "k", "0.9.26", current_note="redefined")
-    # Omitting `current_note` (the default "") must also fail closed rather than
-    # coincidentally matching a record whose `finding_digest` is itself blank —
-    # `finding_digest("")` is a real SHA-256 hex string, never "".
+    # A record whose `finding_digest` is itself blank (e.g. a pre-#486-shape
+    # entry, or one hand-edited to drop the field) must never match — passing
+    # an equally-blank `current_note=""` must NOT coincidentally clear it,
+    # because `finding_digest("")` is a real SHA-256 hex string, never "".
     blank_digest = {"k": Reviewed(key="k", version="0.9.26", at="d", finding_digest="")}
-    assert not issues.cleared_for(blank_digest, "k", "0.9.26")
+    assert not issues.cleared_for(blank_digest, "k", "0.9.26", current_note="")
 
 
 # --------------------------------------------------------- run.watch_reviewed ----
@@ -528,8 +592,16 @@ def test_watch_reviewed_refuses_when_the_store_is_corrupt(tmp_path: Path) -> Non
     assert _store_path(root).read_text(encoding="utf-8") == "not json"
 
 
-def test_watch_reviewed_prunes_a_clearance_whose_watch_item_was_removed(tmp_path: Path) -> None:
-    """B1's pruning half, end to end through the CLI-facing entry point."""
+def test_prune_reviewed_removes_a_clearance_whose_watch_item_was_genuinely_removed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """MAJ-1: pruning lives in its own command, reached only via explicit `--tool`.
+
+    `run.prune_reviewed`, never as a side effect of `watch_reviewed`. This
+    test pins that when a human deliberately runs it, and the item really is
+    gone, it still works — and it must print what it removed, not silently
+    succeed.
+    """
     root = _repo(
         tmp_path, locals_=(("schema-gap", _SCHEMA_GAP_NOTE), ("other-gap", _OTHER_GAP_NOTE))
     )
@@ -542,9 +614,79 @@ def test_watch_reviewed_prunes_a_clearance_whose_watch_item_was_removed(tmp_path
     }
     # currency.toml is edited to drop "other-gap" entirely.
     _repo(root, locals_=(("schema-gap", _SCHEMA_GAP_NOTE),))
-    # Re-recording schema-gap (still configured) must prune the orphaned entry.
-    assert run.watch_reviewed(root, only="graphify", ref="schema-gap", version="0.9.27") == 0
+    capsys.readouterr()  # clear anything buffered from the setup calls above
+    assert run.prune_reviewed(root, only="graphify") == 0
     assert set(issues.load_reviewed(report_root, "graphify")) == {"local:schema-gap"}
+    assert "local:other-gap" in capsys.readouterr().out
+
+
+def test_prune_reviewed_with_nothing_orphaned_says_so(tmp_path: Path) -> None:
+    """Control arm: every stored clearance still has a live watch item — nothing removed."""
+    root = _repo(tmp_path)
+    assert run.watch_reviewed(root, only="graphify", ref="schema-gap", version="0.9.26") == 0
+    assert run.prune_reviewed(root, only="graphify") == 0
+    report_root = root / report.REPORT_DIR
+    assert set(issues.load_reviewed(report_root, "graphify")) == {"local:schema-gap"}
+
+
+def test_prune_reviewed_refuses_a_dangling_tool(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    assert run.prune_reviewed(root, only="") == 2
+
+
+def test_prune_reviewed_refuses_an_unknown_tool(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    assert run.prune_reviewed(root, only="no-such-tool") == 2
+
+
+def test_watch_reviewed_never_prunes_a_now_invisible_item(tmp_path: Path) -> None:
+    """MAJ-1's exact reviewer scenario, end to end.
+
+    Two clearances recorded. `other-gap`'s watch-item entry then develops the
+    SAME config-typo shape already live in this repo's real `currency.toml`
+    today (MIN-3): `id =` where `_watch_items` requires `ref =`. `config.load`
+    silently returns no local item for it — not removed, merely unparsed.
+    Recording a NEW clearance for the surviving item via `watch_reviewed` —
+    which never prunes, structurally, not merely by an off-by-default flag —
+    must leave the now-invisible item's clearance untouched.
+    """
+    root = _repo(
+        tmp_path, locals_=(("schema-gap", _SCHEMA_GAP_NOTE), ("other-gap", _OTHER_GAP_NOTE))
+    )
+    assert run.watch_reviewed(root, only="graphify", ref="schema-gap", version="0.9.26") == 0
+    assert run.watch_reviewed(root, only="graphify", ref="other-gap", version="0.9.26") == 0
+    report_root = root / report.REPORT_DIR
+    assert set(issues.load_reviewed(report_root, "graphify")) == {
+        "local:schema-gap",
+        "local:other-gap",
+    }
+
+    (root / "currency.toml").write_text(
+        "[tool.graphify]\n"
+        'mise_key = "pipx:graphifyy"\n'
+        'binary = "graphify"\n'
+        'artifact = "graphify-out/graph.json"\n'
+        'stamp = "graphify-out/.currency-stamp.json"\n'
+        '\n[[tool.graphify.watch]]\nkind = "local"\nref = "schema-gap"\n'
+        f'note = "{_SCHEMA_GAP_NOTE}"\n'
+        # The typo: `id =` instead of `ref =`. `_watch_items` requires `ref` and
+        # `continue`s past an entry missing it — silently, with no count.
+        '\n[[tool.graphify.watch]]\nkind = "local"\nid = "other-gap"\n'
+        f'note = "{_OTHER_GAP_NOTE}"\n',
+        encoding="utf-8",
+    )
+    # Control: confirm the typo really does make the item invisible — the same
+    # measurement MIN-3 made against the real config.
+    spec = config.load(root)[0]
+    assert [item.ref for item in spec.watch if item.kind != "issue"] == ["schema-gap"]
+
+    assert run.watch_reviewed(root, only="graphify", ref="schema-gap", version="0.9.27") == 0
+    assert set(issues.load_reviewed(report_root, "graphify")) == {
+        "local:schema-gap",
+        "local:other-gap",
+    }
+    surviving = issues.load_reviewed(report_root, "graphify")["local:other-gap"]
+    assert surviving.version == "0.9.26"  # untouched, not merely "not yet deleted"
 
 
 # ------------------------------------------------ run._missing_required (m4) ----
@@ -651,6 +793,22 @@ def test_cli_currency_registers_ref_and_note_as_value_flags(tmp_path: Path) -> N
     assert loaded["local:schema-gap"].note == "re-probed, still broken"
 
 
+def test_cli_currency_dispatches_prune_reviewed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`prune-reviewed` is a SEPARATE mode from `watch-reviewed` (cold review, MAJ-1)."""
+    calls: dict[str, object] = {}
+
+    def _fake(repo_root: Path, *, only: str = "") -> int:
+        calls.update(repo_root=repo_root, only=only)
+        return 0
+
+    monkeypatch.setattr(run, "prune_reviewed", _fake)
+    rc = cli._currency(tmp_path, ["prune-reviewed", "--tool", "graphify"])
+    assert rc == 0
+    assert calls == {"repo_root": tmp_path, "only": "graphify"}
+
+
 # ------------------------------------------------------- report._watch_table ----
 
 
@@ -719,6 +877,30 @@ def test_reviewed_cell_not_checked_versus_stale_versus_cleared() -> None:
 
     cleared = report._reviewed_cell(reviewed, "k", "0.9.26", current_note="n")
     assert cleared.startswith("cleared @ 0.9.26")
+
+
+def test_reviewed_cell_distinguishes_a_redefined_finding_from_a_stale_version() -> None:
+    """MAJ-3: a note-mismatch must never render identically to a version-mismatch.
+
+    Before this fix both reached the same `STALE @ <version> — target is
+    <target>` text, so `'STALE @ 0.9.26 — target is 0.9.26'` — the note-changed
+    case, where the version happens to still match — read as a bug in the tool
+    rather than as the finding having been redefined, which is exactly the
+    ambiguity B1 exists to remove.
+    """
+    reviewed = {
+        "k": Reviewed(
+            key="k", version="0.9.26", at="d", finding_digest=issues.finding_digest("original")
+        )
+    }
+    note_changed = report._reviewed_cell(reviewed, "k", "0.9.26", current_note="redefined")
+    version_stale = report._reviewed_cell(reviewed, "k", "0.9.27", current_note="original")
+    assert "STALE" in note_changed
+    assert "STALE" in version_stale
+    assert note_changed != version_stale
+    assert "note has changed" in note_changed
+    assert "note has changed" not in version_stale
+    assert "target is" in version_stale
 
 
 def test_watch_table_with_reviewed_omitted_still_renders_every_item_unreviewed() -> None:

@@ -27,9 +27,18 @@ at the same version kept passing, on the strength of a re-probe of a finding
 that no longer existed. `finding_digest` closes that: a `Reviewed` record now
 also carries a content digest of the note it was recorded against, and
 `cleared_for` requires that to match the watch item's CURRENT note before it
-ever reaches the version comparison. `record_reviewed`'s `valid_keys` closes
-the sibling hygiene gap — a clearance for a key no longer configured at all is
-pruned at write time, the same way `save_current` already prunes `observations`.
+ever reaches the version comparison.
+
+A first cut at the sibling hygiene gap — pruning a clearance for a key no
+longer configured — folded it into `record_reviewed` as an automatic side
+effect, on the strength of `save_current`'s (superficially similar, actually
+unrelated) pruning of network-re-fetched observations. Cold review of
+`8a02b82d` (MAJ-1): `config._watch_items` fails soft, so "absent from a
+config parse" is not proof an item was genuinely removed, and the automatic
+prune deleted a sibling item's clearance — a human assertion nothing can
+re-derive — on nothing more than a config typo. `prune_reviewed` is now its
+own function, called only when a caller explicitly asks; `record_reviewed`
+never prunes.
 """
 
 from __future__ import annotations
@@ -281,13 +290,21 @@ def _read_reviewed_raw(report_dir: Path, tool: str) -> dict[str, object] | None:
     purpose: `load_reviewed` treats both as "nothing recorded" (fail-closed for
     the gate), but `record_reviewed` must tell them apart — a genuinely-first
     write is fine to create; a write over a file it could not parse is not.
+
+    Catches `(OSError, ValueError)`, not `(OSError, json.JSONDecodeError)` —
+    `json.JSONDecodeError` IS a `ValueError` subclass, so this already covered
+    it, but a store containing non-UTF-8 bytes raises `UnicodeDecodeError` from
+    `read_text`, which is ALSO a `ValueError` subclass and was NOT covered: it
+    escaped uncaught and crashed both `load_reviewed` and `record_reviewed`,
+    which is the exact corruption class this handler exists to turn into a
+    controlled fail-closed / refusal instead of a traceback (cold review, MAJ-2).
     """
     path = _reviewed_path(report_dir, tool)
     if not path.exists():
         return None
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
+    except (OSError, ValueError) as e:
         raise ReviewedStoreUnreadableError(f"{path}: {e}") from e
     if not isinstance(raw, dict):
         raise ReviewedStoreUnreadableError(f"{path}: not a JSON object")
@@ -332,13 +349,7 @@ def load_reviewed(report_dir: Path, tool: str) -> dict[str, Reviewed]:
     return _parse_reviewed_entries(raw) if raw is not None else {}
 
 
-def record_reviewed(
-    report_dir: Path,
-    tool: str,
-    record: Reviewed,
-    *,
-    valid_keys: Iterable[str] | None = None,
-) -> Path:
+def record_reviewed(report_dir: Path, tool: str, record: Reviewed) -> Path:
     """Persist one local watch item's re-probe claim, merged with what is already stored.
 
     Takes a whole `Reviewed` rather than its fields spread across the call
@@ -353,13 +364,20 @@ def record_reviewed(
     destructive on the write direction. A genuinely first-ever write (no file
     yet) is unaffected; only an EXISTING, unparsable file refuses.
 
-    `valid_keys`, when given, PRUNES the store to those keys before merging in
-    `record` — the same pruning `save_current` already does for observations
-    (`save_current`'s docstring: "Items no longer in the config are pruned").
-    Without it a clearance for a watch item that was later edited or removed
-    lingers in the store forever; the gate itself can never be fooled by that
-    orphan (it only ever looks up keys `observe_all` currently produces), but
-    an unbounded, un-prunable file is still worth closing (cold review, B1).
+    Deliberately does NOT prune (cold review, MAJ-1). An earlier cut folded a
+    `valid_keys` parameter in here and pruned every stored key absent from it
+    as a side effect of recording — automatically, silently, on every ordinary
+    call. `config._watch_items` fails SOFT (an entry missing `ref` is silently
+    skipped, pre-existing and out of scope here), so "absent from one
+    `config.load()`" is not proof a watch item was genuinely REMOVED; it may be
+    a parse that could not complete. That deleted a sibling item's clearance —
+    a human assertion nothing can re-derive, unlike `save_current`'s
+    network-re-fetched observations, which is why that precedent never applied
+    here — on nothing more than a config typo three lines away, with no
+    message. Recording a clearance and pruning stale ones are now two
+    functions with two different risk profiles: this one is never destructive;
+    `prune_reviewed` below is, and can only run when a caller deliberately
+    calls it.
 
     Never writes to `currency.toml` — the claim is engine state, keyed like every
     other per-tool store under the report root, not repo config a human hand-authors
@@ -371,9 +389,6 @@ def record_reviewed(
     path.parent.mkdir(parents=True, exist_ok=True)
     raw = _read_reviewed_raw(report_dir, tool)
     current = _parse_reviewed_entries(raw) if raw is not None else {}
-    if valid_keys is not None:
-        keep = frozenset(valid_keys)
-        current = {k: v for k, v in current.items() if k in keep}
     current[record.key] = record
     payload: dict[str, dict[str, object]] = {
         k: {kk: vv for kk, vv in asdict(v).items() if kk != "key"} for k, v in current.items()
@@ -382,38 +397,102 @@ def record_reviewed(
     return path
 
 
-def cleared_for(
-    reviewed: dict[str, Reviewed], key: str, target: str, *, current_note: str = ""
-) -> bool:
+def prune_reviewed(
+    report_dir: Path, tool: str, valid_keys: Iterable[str]
+) -> tuple[Path, tuple[str, ...]]:
+    """Remove stored clearances whose key is not in `valid_keys`; returns (path, removed).
+
+    The ONLY place pruning happens (cold review, MAJ-1) — never as a side effect
+    of `record_reviewed`. This function still trusts whatever `valid_keys` it is
+    given; it does not and cannot know whether an absence means "genuinely
+    removed" or "this run's config parse could not complete" — that judgment
+    belongs entirely to the caller, which is why `run.prune_reviewed` is its own
+    command, requiring an explicit `--tool` and never invoked as a side effect
+    of recording a clearance.
+
+    Raises `ReviewedStoreUnreadableError` on an existing-but-unparsable store,
+    for the same M2 reason `record_reviewed` does: refusing to write over data
+    it could not read, rather than treating "unreadable" as "empty" and
+    silently discarding every clearance the store held.
+
+    Returns `removed = ()` and writes NOTHING when there is nothing to prune —
+    a no-op call must not touch the file's mtime or rewrite it byte-identical.
+    """
+    path = _reviewed_path(report_dir, tool)
+    raw = _read_reviewed_raw(report_dir, tool)
+    current = _parse_reviewed_entries(raw) if raw is not None else {}
+    keep = frozenset(valid_keys)
+    removed = tuple(sorted(k for k in current if k not in keep))
+    if not removed:
+        return path, ()
+    kept = {k: v for k, v in current.items() if k in keep}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, dict[str, object]] = {
+        k: {kk: vv for kk, vv in asdict(v).items() if kk != "key"} for k, v in kept.items()
+    }
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path, removed
+
+
+@dataclass(frozen=True)
+class ClearanceCheck:
+    """The full two-axis verdict on one clearance check — not just pass/fail.
+
+    `cleared_for` collapses this to a single bool for `_gate_local`, which only
+    ever needs to know whether to block. `report._reviewed_cell` needs the
+    REASON: rendering a note-mismatch identically to a version-mismatch (both
+    as bare `STALE @ <version> — target is <target>`) hid exactly the
+    distinction B1 exists to draw — a redefined finding read as ordinary
+    version staleness (cold review, MAJ-3).
+    """
+
+    version_matches: bool
+    note_matches: bool
+
+    @property
+    def cleared(self) -> bool:
+        """Both axes agree — the bool `cleared_for` collapses this to."""
+        return self.version_matches and self.note_matches
+
+
+def check_clearance(
+    reviewed: dict[str, Reviewed], key: str, target: str, *, current_note: str
+) -> ClearanceCheck:
+    """The full two-axis verdict — see `ClearanceCheck` and `cleared_for`.
+
+    TWO axes, both required. `current_note` is keyword-ONLY with NO default
+    (cold review, MIN-1) — a defaulted `""` let a caller that forgot to pass it
+    silently reconstruct the exact pre-B1, note-blind behaviour for any item
+    with `finding_digest(current_note="")` on file, which is a real, reachable
+    stored shape (an item declared with no `note` at all). Both production call
+    sites (`decide._gate_local`, `report._watch_table`) already pass it; making
+    it required turns a future omission into an immediate `TypeError` instead
+    of a silent regression.
+
+    Fail-closed by construction on the version axis, and deliberately does not
+    lean on `same_release`'s documented fallback for an unparsable string (that
+    fallback's behaviour on an EMPTY or unparsable version was never read for
+    this change): both `record.version` and `target` must parse as a `Version`
+    before `same_release` is even consulted — `and` short-circuits, so an
+    unparsable side never reaches `same_release` at all. A record at "1.56.0"
+    must not clear a target of "1.56.1" — that comparison is the entire reason
+    this exists instead of the prose note it replaces.
+    """
+    record = reviewed.get(key)
+    if record is None or not record.version or not target:
+        return ClearanceCheck(version_matches=False, note_matches=False)
+    parses = Version.parse(record.version) is not None and Version.parse(target) is not None
+    return ClearanceCheck(
+        version_matches=parses and same_release(record.version, target),
+        note_matches=record.finding_digest == finding_digest(current_note),
+    )
+
+
+def cleared_for(reviewed: dict[str, Reviewed], key: str, target: str, *, current_note: str) -> bool:
     """Whether `key`'s recorded re-probe covers `target` AND still describes the same finding.
 
-    TWO axes, both required, and requiring `current_note` is not optional
-    decoration — it is the fix for B1 (cold review of `dd90e64f`): a `Reviewed`
-    used to bind only `(key, version)`, and `key` is `kind:ref`, which does not
-    include the finding's content. Rewriting a watch item's `note` (or deleting
-    it and letting a new finding reuse the same `ref`) left an old clearance at
-    the same version still passing — checkable against the RELEASE, still
-    unfalsifiable against the FINDING. Comparing `finding_digest(current_note)`
-    against the stored digest closes that: a changed note produces a different
-    digest, which can never match, so the item reads as un-reviewed again.
-
-    Fail-closed by construction on the version axis too, and deliberately does
-    not lean on `same_release`'s documented fallback for an unparsable string
-    (that fallback's behaviour on an EMPTY or unparsable version was never read
-    for this change): both `record.version` and `target` must parse as a
-    `Version` before `same_release` is even consulted, so a blank or garbled
-    version on either side reads as NOT cleared rather than falling through to
-    whatever string-equality `same_release` would otherwise fall back to. A
-    record at "1.56.0" must not clear a target of "1.56.1" — that comparison is
-    the entire reason this function exists instead of the prose note it replaces.
+    The bool the GATE consumes (`decide._gate_local`) — see `check_clearance`
+    for the two-axis detail the REPORT consumes, and for why `current_note` has
+    no default.
     """
-    if not target:
-        return False
-    record = reviewed.get(key)
-    if record is None or not record.version:
-        return False
-    if record.finding_digest != finding_digest(current_note):
-        return False
-    if Version.parse(record.version) is None or Version.parse(target) is None:
-        return False
-    return same_release(record.version, target)
+    return check_clearance(reviewed, key, target, current_note=current_note).cleared
