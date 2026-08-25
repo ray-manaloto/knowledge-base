@@ -1,9 +1,9 @@
-amends "package://github.com/jdx/hk/releases/download/v1.56.0/hk@1.56.0#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v1.56.1/hk@1.56.1#/Config.pkl"
 
 // Builtin linters MUST be assigned from Builtins (`= Builtins.name`), never a
 // bare `["name"] {}` block — a bare block is a fresh empty Step that hk silently
 // skips. See ray-manaloto/dotfiles feedback_hk_builtins_need_assignment.
-import "package://github.com/jdx/hk/releases/download/v1.56.0/hk@1.56.0#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.56.1/hk@1.56.1#/Builtins.pkl"
 
 // Refuse this config on an older hk binary rather than silently misreading it.
 min_hk_version = "1.49.0"

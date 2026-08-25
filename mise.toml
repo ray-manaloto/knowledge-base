@@ -43,7 +43,7 @@ min_version = { hard = "2026.8.10", soft = "2026.8.10" }
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.7"
 uv = "0.12.5"
-hk = "1.56.0"
+hk = "1.56.1"
 pkl = "0.32.1"
 typos = "1.49.0"
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
@@ -73,19 +73,29 @@ gitleaks = "8.30.1"
 # `mise run lint` while the pinned docs (`sub-agents.md:286`, `:303`) declare it
 # valid. Do not drop below 0.44.0 to "match dotfiles" — bump dotfiles instead.
 # 0.45.0 additionally accepts parameterized ids such as `claude-opus-5[effort=high]`.
-"github:agent-sh/agnix" = "0.49.0"
+"github:agent-sh/agnix" = "0.50.0"
 # fnox: the credential tool the shell's secrets come from (jdx/fnox, in mise's
 # registry as `github:jdx/fnox`). Pinned here rather than left to the user's
-# GLOBAL mise, where it installs into a directory literally named `latest` and
-# self-updates out of band — so nothing could notice a version moving under us
-# (#86). Ray's call, 2026-07-31: track it "like hk", i.e. as an ordinary pinned
-# tool with a `mise_key`, not with `[tool.mise]`'s self-managed shape.
+# GLOBAL mise, which at the time installed into a directory literally named
+# `latest` and self-updated out of band — so nothing could notice a version
+# moving under us (#86). Ray's call, 2026-07-31: track it "like hk", i.e. as an
+# ordinary pinned tool with a `mise_key`, not with `[tool.mise]`'s self-managed
+# shape.
 #
-# ⚠️ Pinning it means the shim resolves to THIS version inside this directory
-# while the global install stays on `latest` — a deliberate, accepted skew.
-# This repo pins what fnox it EXPECTS; it does not touch `~/.config/fnox`, so
-# `do-not.md` #11 is not engaged. Bump alongside the global one.
-fnox = "1.33.1"
+# ⚠️ THE `latest` PREMISE IS STALE — re-measured 2026-08-25 at the 1.33.1 ->
+# 1.34.0 bump. `~/.config/mise/config.toml`'s `[tools]` now carries an EXPLICIT
+# `fnox = { version = "1.34.0", … }`, and `mise exec --cd "$HOME" -- fnox
+# --version` prints 1.34.0. The global side is a pin, not a floating `latest`,
+# so the skew this block describes is not "repo pinned vs global drifting" but
+# "two pins that must be moved together". Control arm: the same probe reports
+# `hk = 1.56.1` there too, matching this file — so it reads real values rather
+# than defaulting to agreement.
+#
+# Practically: a bump here is a bump toward the global pin, and 1.34.0 CLOSES
+# the gap rather than widening it. This repo still does not touch
+# `~/.config/fnox`, so `do-not.md` #11 remains un-engaged. Check the global
+# `[tools]` entry when bumping; do not assume it floats.
+fnox = "1.34.0"
 # Doppler is the runtime secret-delivery boundary used by the devcontainer and
 # CI/CD workflows. Keep this exact pin aligned with `[tool.doppler]` and
 # `sources/doppler.manifest`; credentials/config remain user-owned and are not

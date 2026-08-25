@@ -1739,7 +1739,7 @@ manifest = "sources/ruff.manifest"
 # `expected` for the same reason. Pre-1.0 and moving fast, which is exactly why
 # it needs a row rather than trust — a 0.0.x bump can carry a breaking change
 # with no marker to trip gate 3.
-expected = "0.0.73"
+expected = "0.0.74"
 binary = "ty"
 github = "astral-sh/ty"
 pypi = "ty"

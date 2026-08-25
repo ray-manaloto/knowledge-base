@@ -4896,6 +4896,61 @@ checksum = "sha256:ca7daae4f218a11fab82cc2857f0ea518ec3f46acec60490485347a4c22c6
 version = "1.1.20"
 backend = "aqua:google-antigravity/antigravity-cli"
 
+[tools.antigravity-cli."platforms.linux-arm64"]
+checksum = "sha256:a2f5c205e9c1c89bfcf714f485a08c63b1a5d907f98226191e7b5a177e0368a9"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542824"
+
+[tools.antigravity-cli."platforms.linux-arm64-musl"]
+checksum = "sha256:a2f5c205e9c1c89bfcf714f485a08c63b1a5d907f98226191e7b5a177e0368a9"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542824"
+
+[tools.antigravity-cli."platforms.linux-x64"]
+checksum = "sha256:6ceeb0ac91df6dca60a4fa02856807ed2e2fc6d3d70bb734d1ad61a9e44ef4da"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_linux_x64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542826"
+
+[tools.antigravity-cli."platforms.linux-x64-baseline"]
+checksum = "sha256:6ceeb0ac91df6dca60a4fa02856807ed2e2fc6d3d70bb734d1ad61a9e44ef4da"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_linux_x64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542826"
+
+[tools.antigravity-cli."platforms.linux-x64-musl"]
+checksum = "sha256:6ceeb0ac91df6dca60a4fa02856807ed2e2fc6d3d70bb734d1ad61a9e44ef4da"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_linux_x64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542826"
+
+[tools.antigravity-cli."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:6ceeb0ac91df6dca60a4fa02856807ed2e2fc6d3d70bb734d1ad61a9e44ef4da"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_linux_x64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542826"
+
+[tools.antigravity-cli."platforms.macos-arm64"]
+checksum = "sha256:4f471594a692c6a1d53f63b22ae2ef3cbf7681194eaceecf635ce0085bcc5fd3"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_mac_arm64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542822"
+
+[tools.antigravity-cli."platforms.macos-x64"]
+checksum = "sha256:611975e1b08b8f844941ad0523abf2585790aefc84d8c31d79d710d3bcb39bcc"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_mac_x64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542827"
+
+[tools.antigravity-cli."platforms.macos-x64-baseline"]
+checksum = "sha256:611975e1b08b8f844941ad0523abf2585790aefc84d8c31d79d710d3bcb39bcc"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_mac_x64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542827"
+
+[tools.antigravity-cli."platforms.windows-x64"]
+checksum = "sha256:2f0a200367a980e0f342247a0d705251e418821904428f8fa995497f23ed45cd"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_windows_x64.zip"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542823"
+
+[tools.antigravity-cli."platforms.windows-x64-baseline"]
+checksum = "sha256:2f0a200367a980e0f342247a0d705251e418821904428f8fa995497f23ed45cd"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.20/agy_cli_windows_x64.zip"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/528542823"
+
 [[tools.biome]]
 version = "2.5.10"
 backend = "aqua:biomejs/biome"
@@ -6393,6 +6448,77 @@ url_api = "https://api.github.com/repos/DopplerHQ/cli/releases/assets/514702521"
 provenance = "github-attestations"
 
 [[tools.fnox]]
+version = "1.34.0"
+backend = "github:jdx/fnox"
+
+[tools.fnox."platforms.linux-arm64"]
+checksum = "sha256:6a435547e9161b8a268538a04b2cf7886184e945d6649ffbc0ff367bbfbc8dea"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712277"
+provenance = "github-attestations"
+
+[tools.fnox."platforms.linux-arm64-musl"]
+checksum = "sha256:9f3bdef3b618a11d123de4655191e319cb4a02691019609aeddcb862e05d27bd"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712271"
+provenance = "github-attestations"
+
+[tools.fnox."platforms.linux-x64"]
+checksum = "sha256:2344ad4d48956380e4b2dcf680dbbdd51ef6da447c805c832562b94a4bd8da6d"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712303"
+provenance = "github-attestations"
+
+[tools.fnox."platforms.linux-x64-baseline"]
+checksum = "sha256:2344ad4d48956380e4b2dcf680dbbdd51ef6da447c805c832562b94a4bd8da6d"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712303"
+provenance = "github-attestations"
+
+[tools.fnox."platforms.linux-x64-musl"]
+checksum = "sha256:3648e415a91044ecbbd626049c7d781f652095f49385cb8fbcb8eba5f39c9434"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712305"
+provenance = "github-attestations"
+
+[tools.fnox."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:3648e415a91044ecbbd626049c7d781f652095f49385cb8fbcb8eba5f39c9434"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712305"
+provenance = "github-attestations"
+
+[tools.fnox."platforms.macos-arm64"]
+checksum = "sha256:60cae86705108b7a2d2950b7182d58aa717f6996e4bb1e31fc1e8219a13a0cc5"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712276"
+provenance = "github-attestations"
+provenance_verified = true
+
+[tools.fnox."platforms.macos-x64"]
+checksum = "sha256:56c0bd7c8366f6ecf96f6c425cca81ba56fb64e16798bdbedf1a0675d287d868"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712274"
+provenance = "github-attestations"
+
+[tools.fnox."platforms.macos-x64-baseline"]
+checksum = "sha256:56c0bd7c8366f6ecf96f6c425cca81ba56fb64e16798bdbedf1a0675d287d868"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712274"
+provenance = "github-attestations"
+
+[tools.fnox."platforms.windows-x64"]
+checksum = "sha256:c6db4dbbeff36f07ab8e9ca99816d81d44404be1fc24891ae0f87928f58e7fcc"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712298"
+provenance = "github-attestations"
+
+[tools.fnox."platforms.windows-x64-baseline"]
+checksum = "sha256:c6db4dbbeff36f07ab8e9ca99816d81d44404be1fc24891ae0f87928f58e7fcc"
+url = "https://github.com/jdx/fnox/releases/download/v1.34.0/fnox-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/525712298"
+provenance = "github-attestations"
+
+[[tools.fnox]]
 version = "1.33.1"
 backend = "github:jdx/fnox"
 
@@ -6534,6 +6660,65 @@ url_api = "https://api.github.com/repos/cli/cli/releases/assets/522857996"
 provenance = "github-attestations"
 
 [[tools."github:agent-sh/agnix"]]
+version = "0.50.0"
+backend = "github:agent-sh/agnix"
+
+[tools."github:agent-sh/agnix"."platforms.linux-arm64"]
+checksum = "sha256:27e87fe7fd4579dd266bb143aea5bf4f958f142ac77e3ad3dc1bf80465425fc9"
+url = "https://github.com/agent-sh/agnix/releases/download/v0.50.0/agnix-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/agent-sh/agnix/releases/assets/528509552"
+provenance = "github-attestations"
+
+[tools."github:agent-sh/agnix"."platforms.linux-arm64-musl"]
+checksum = "sha256:27e87fe7fd4579dd266bb143aea5bf4f958f142ac77e3ad3dc1bf80465425fc9"
+url = "https://github.com/agent-sh/agnix/releases/download/v0.50.0/agnix-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/agent-sh/agnix/releases/assets/528509552"
+provenance = "github-attestations"
+
+[tools."github:agent-sh/agnix"."platforms.linux-x64"]
+checksum = "sha256:500c9ada6faf75db02bfc2773ce77e428f255577dd60c9e3767ebddfc3ccbf72"
+url = "https://github.com/agent-sh/agnix/releases/download/v0.50.0/agnix-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/agent-sh/agnix/releases/assets/528509530"
+provenance = "github-attestations"
+
+[tools."github:agent-sh/agnix"."platforms.linux-x64-baseline"]
+checksum = "sha256:500c9ada6faf75db02bfc2773ce77e428f255577dd60c9e3767ebddfc3ccbf72"
+url = "https://github.com/agent-sh/agnix/releases/download/v0.50.0/agnix-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/agent-sh/agnix/releases/assets/528509530"
+provenance = "github-attestations"
+
+[tools."github:agent-sh/agnix"."platforms.linux-x64-musl"]
+checksum = "sha256:6ad13ada58e32acf9ecf206bfa51ec2d3ebb2f8f4f0c39f4290e2c26f06fa2e4"
+url = "https://github.com/agent-sh/agnix/releases/download/v0.50.0/agnix-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/agent-sh/agnix/releases/assets/528509532"
+provenance = "github-attestations"
+
+[tools."github:agent-sh/agnix"."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:6ad13ada58e32acf9ecf206bfa51ec2d3ebb2f8f4f0c39f4290e2c26f06fa2e4"
+url = "https://github.com/agent-sh/agnix/releases/download/v0.50.0/agnix-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/agent-sh/agnix/releases/assets/528509532"
+provenance = "github-attestations"
+
+[tools."github:agent-sh/agnix"."platforms.macos-arm64"]
+checksum = "sha256:b556b2334562363997929d312aea764e583b530000fc147f8679653304f0d11f"
+url = "https://github.com/agent-sh/agnix/releases/download/v0.50.0/agnix-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/agent-sh/agnix/releases/assets/528509554"
+provenance = "github-attestations"
+provenance_verified = true
+
+[tools."github:agent-sh/agnix"."platforms.windows-x64"]
+checksum = "sha256:ac49095215b19782bf6fe62ea9f90077d2b525234b4f9a312cc7630a54935d67"
+url = "https://github.com/agent-sh/agnix/releases/download/v0.50.0/agnix-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/agent-sh/agnix/releases/assets/528509529"
+provenance = "github-attestations"
+
+[tools."github:agent-sh/agnix"."platforms.windows-x64-baseline"]
+checksum = "sha256:ac49095215b19782bf6fe62ea9f90077d2b525234b4f9a312cc7630a54935d67"
+url = "https://github.com/agent-sh/agnix/releases/download/v0.50.0/agnix-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/agent-sh/agnix/releases/assets/528509529"
+provenance = "github-attestations"
+
+[[tools."github:agent-sh/agnix"]]
 version = "0.49.0"
 backend = "github:agent-sh/agnix"
 
@@ -6652,53 +6837,53 @@ url = "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8
 url_api = "https://api.github.com/repos/gitleaks/gitleaks/releases/assets/378333178"
 
 [[tools.hk]]
-version = "1.56.0"
+version = "1.56.1"
 backend = "aqua:jdx/hk"
 
 [tools.hk."platforms.linux-arm64"]
-checksum = "sha256:6c5b84e2078b83194888d314e830c24398a856f1659f324c9a5c98fac5ec8db6"
-url = "https://github.com/jdx/hk/releases/download/v1.56.0/hk-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/jdx/hk/releases/assets/520698505"
+checksum = "sha256:cd671706a273dac35b012fd585a0fba1b0c0f340558dccfd4c9a4b976a794597"
+url = "https://github.com/jdx/hk/releases/download/v1.56.1/hk-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/jdx/hk/releases/assets/525632120"
 
 [tools.hk."platforms.linux-arm64-musl"]
-checksum = "sha256:e28eca21809220a7c0c8c894d901370e73b1ae9bf5bb1a898ff41744e0d937e6"
-url = "https://github.com/jdx/hk/releases/download/v1.56.0/hk-aarch64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/jdx/hk/releases/assets/520698506"
+checksum = "sha256:5feac3cfcdae33227197d0104832b91a5d293733320632c3c19f864866a6c8ce"
+url = "https://github.com/jdx/hk/releases/download/v1.56.1/hk-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/jdx/hk/releases/assets/525632119"
 
 [tools.hk."platforms.linux-x64"]
-checksum = "sha256:eea0beedea7a49a74cd9190e4cc7c27ed209fb77b1b0eec711123cec02303a95"
-url = "https://github.com/jdx/hk/releases/download/v1.56.0/hk-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/jdx/hk/releases/assets/520698520"
+checksum = "sha256:67157431e36bb523213d8361a9f59b6eb718f80ae8534827849552b3c6c92a04"
+url = "https://github.com/jdx/hk/releases/download/v1.56.1/hk-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/jdx/hk/releases/assets/525632131"
 
 [tools.hk."platforms.linux-x64-baseline"]
-checksum = "sha256:eea0beedea7a49a74cd9190e4cc7c27ed209fb77b1b0eec711123cec02303a95"
-url = "https://github.com/jdx/hk/releases/download/v1.56.0/hk-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/jdx/hk/releases/assets/520698520"
+checksum = "sha256:67157431e36bb523213d8361a9f59b6eb718f80ae8534827849552b3c6c92a04"
+url = "https://github.com/jdx/hk/releases/download/v1.56.1/hk-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/jdx/hk/releases/assets/525632131"
 
 [tools.hk."platforms.linux-x64-musl"]
-checksum = "sha256:0efc6dbafd09a67a7e2de7c364101a51c4490f62fc76e84cd8bc8da0db78f9b6"
-url = "https://github.com/jdx/hk/releases/download/v1.56.0/hk-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/jdx/hk/releases/assets/520698521"
+checksum = "sha256:e7435c1aec98f60d98712da3231541987ac67c017c001f767c0f37bd517cfe43"
+url = "https://github.com/jdx/hk/releases/download/v1.56.1/hk-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/jdx/hk/releases/assets/525632133"
 
 [tools.hk."platforms.linux-x64-musl-baseline"]
-checksum = "sha256:0efc6dbafd09a67a7e2de7c364101a51c4490f62fc76e84cd8bc8da0db78f9b6"
-url = "https://github.com/jdx/hk/releases/download/v1.56.0/hk-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/jdx/hk/releases/assets/520698521"
+checksum = "sha256:e7435c1aec98f60d98712da3231541987ac67c017c001f767c0f37bd517cfe43"
+url = "https://github.com/jdx/hk/releases/download/v1.56.1/hk-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/jdx/hk/releases/assets/525632133"
 
 [tools.hk."platforms.macos-arm64"]
-checksum = "sha256:600207a25ac055ead8b20bd59ae779821e0dee9fc03c041ddb4432b60ad21b68"
-url = "https://github.com/jdx/hk/releases/download/v1.56.0/hk-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/jdx/hk/releases/assets/520698508"
+checksum = "sha256:f8400a1427e66f1b968e58568115a2138b5d0fe88e0561b97d3822648b7e35ea"
+url = "https://github.com/jdx/hk/releases/download/v1.56.1/hk-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/jdx/hk/releases/assets/525632123"
 
 [tools.hk."platforms.windows-x64"]
-checksum = "sha256:1d0fa7242d5af85586527eab2a7fc5799c54388e1394e34ef5af26db9bc64ede"
-url = "https://github.com/jdx/hk/releases/download/v1.56.0/hk-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/jdx/hk/releases/assets/520698507"
+checksum = "sha256:4ccf353e484997dd4975361b6433f3b2661f5db614f2b382cddcac7eaa74a604"
+url = "https://github.com/jdx/hk/releases/download/v1.56.1/hk-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/jdx/hk/releases/assets/525632118"
 
 [tools.hk."platforms.windows-x64-baseline"]
-checksum = "sha256:1d0fa7242d5af85586527eab2a7fc5799c54388e1394e34ef5af26db9bc64ede"
-url = "https://github.com/jdx/hk/releases/download/v1.56.0/hk-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/jdx/hk/releases/assets/520698507"
+checksum = "sha256:4ccf353e484997dd4975361b6433f3b2661f5db614f2b382cddcac7eaa74a604"
+url = "https://github.com/jdx/hk/releases/download/v1.56.1/hk-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/jdx/hk/releases/assets/525632118"
 
 [[tools."npm:ctx7"]]
 version = "0.5.8"
