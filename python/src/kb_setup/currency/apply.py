@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING
 
 from kb_setup import manifest as mf
 from kb_setup.currency import skill
+from kb_setup.currency import upstream as up
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -194,8 +195,19 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
         )
 
     mise_path = repo_root / "mise.toml"
+    # Normalised PER TARGET, not at resolve time (#499). `verdict.latest` carries
+    # whatever the upstream source spelled it — for a GitHub-sourced tool with no
+    # declared `tag_prefix` that is the raw TAG, `v` and all. A mise pin takes the
+    # bare version; the manifest `ref` below takes the tag. Writing one string to
+    # both put `hk = "v1.56.1"` in `mise.toml`, which resolves to nothing at all.
+    #
+    # Normalising here rather than in `github_versions` is deliberate: `latest` is
+    # also what the gates parse, what the report renders, and what `resolve_tag`
+    # searches for, so moving the strip upstream would change four consumers to fix
+    # one. The write is the only place the two spellings actually diverge.
+    pin_version = up.bare_version(verdict.latest, spec.tag_prefix)
     new_text, old = set_pin_version(
-        mise_path.read_text(encoding="utf-8"), spec.mise_key, verdict.latest
+        mise_path.read_text(encoding="utf-8"), spec.mise_key, pin_version
     )
     if old != verdict.current:
         # The file moved under us between the verdict and the apply. Refuse rather
@@ -251,7 +263,12 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
     return ApplyResult(
         tool=spec.name,
         from_version=verdict.current,
-        to_version=verdict.latest,
+        # The BARE version, matching what was actually written to the pin and
+        # comparable against `from_version`, which is read from `mise.toml` and is
+        # therefore always bare. `verdict.latest` here would render the run line as
+        # `hk 1.56.0 → v1.56.1`, whose two halves are in different spellings — and
+        # the tag it looked like it was reporting is on `manifest_ref` instead.
+        to_version=pin_version,
         changed=tuple(dict.fromkeys(changed)),
         manifest_ref=manifest_ref,
         manifest_commit=manifest_commit,

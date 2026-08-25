@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING
 
 from kb_setup import build_outcome
 from kb_setup.currency import _proc
+from kb_setup.currency import upstream as up
 
 if TYPE_CHECKING:
     from kb_setup.currency.config import RefBinding, ToolSpec
@@ -1368,7 +1369,12 @@ def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     # `rust-v0.147.0` -> `0.147.0`. Strip the project's declared prefix BEFORE
     # the `v`, or a `rust-v` tag compares literally against an installed
     # `0.147.0` and reports drift on a manifest pinned exactly right (#245).
-    bare = ref.removeprefix(spec.tag_prefix).lstrip("v") if spec.tag_prefix else ref.lstrip("v")
+    #
+    # The rule itself moved to `upstream.bare_version` with #499, which needed the
+    # same tag->version reduction on the WRITE side. Two spellings of one rule in
+    # two files is how #245 half-landed in the first place; this call site keeps
+    # the reason and lends the rule.
+    bare = up.bare_version(ref, spec.tag_prefix)
     if bare != pinned:
         # "mise installs" is TRUE only on the mise-managed path. Since 2026-08-08
         # this is also reached for `expected`-based tools (mise itself,

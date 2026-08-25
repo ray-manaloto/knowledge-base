@@ -595,3 +595,36 @@ def test_probe_does_not_fetch_notes_for_a_decoration_only_mismatch(monkeypatch) 
     status = upstream.probe(pypi="", github="anthropics/claude-code", current="2.1.220")
     assert status.latest == "v2.1.220"
     assert not status.notes
+
+
+# ------------------------------------------------------------ bare_version ----
+
+
+def test_bare_version_reduces_a_tag_to_the_version_it_names() -> None:
+    """The half of #499 that is a pure string rule, armed in both directions.
+
+    The `v` in `status.latest == "v2.1.220"` two tests above is not incidental —
+    it is the exact value `apply` used to write into a `mise.toml` pin, where it
+    resolves to nothing.
+    """
+    assert upstream.bare_version("v1.56.1") == "1.56.1"
+    assert upstream.bare_version("rust-v0.149.1", "rust-v") == "0.149.1"
+    # Already bare on either path: the reduction is idempotent, so a tool that
+    # never carried a tag spelling is not mangled by being run through it.
+    assert upstream.bare_version("1.56.1") == "1.56.1"
+    assert upstream.bare_version("0.149.1", "rust-v") == "0.149.1"
+
+
+def test_bare_version_strips_the_declared_prefix_by_name() -> None:
+    """A `v`-strip alone cannot reach a `rust-v` prefix (#245).
+
+    `lstrip("v")` removes NOTHING from `rust-v0.149.1` — it does not start with
+    `v` — so without the declared prefix the tag survives into a comparison
+    against an installed `0.149.1` and reports drift on a manifest pinned exactly
+    right. The second assertion is the control arm: the same input with nothing
+    declared must KEEP its prefix, because this function reduces only what it was
+    told about and never guesses. Without it, a `bare_version` that stripped
+    everything up to the first digit would satisfy the first line.
+    """
+    assert upstream.bare_version("rust-v0.149.1", "rust-v") == "0.149.1"
+    assert upstream.bare_version("rust-v0.149.1") == "rust-v0.149.1"
