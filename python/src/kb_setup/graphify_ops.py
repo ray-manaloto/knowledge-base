@@ -406,13 +406,25 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     community after its highest-degree member). Instant, no API, no Gemini.
 
     Why deterministic is the default (Ray, 2026-07-22, control-arm verified): the
-    only LLM path that is NOT Gemini is graphify's `claude-cli` backend, and that
-    backend is BROKEN for labeling (issue #2076) — the CLI returns prose-wrapped
-    JSON ("Done — cluster names above …") that graphify cannot parse, so every
-    batch fails and the run is slow + noisy for no gain. `--claude-cli` still opts
-    into it (falls back to deterministic on the inevitable failure), kept only so a
-    future graphify fix can be re-probed through the task. clean_env() strips
-    GEMINI/GOOGLE either way, so Gemini can never be auto-selected.
+    only LLM path that is NOT Gemini is graphify's `claude-cli` backend. Issue
+    #2076 reported it BROKEN for labeling — the CLI returns prose-wrapped JSON
+    ("Done — cluster names above …") that graphify cannot parse, so every batch
+    fails and the run is slow + noisy for no gain.
+
+    **Scope, corrected 2026-08-23.** A native `graphify extract --mode deep
+    --backend claude-cli` run (see `graphify_native_extract.py`) confirmed the
+    EXTRACTION path works cleanly at the pinned 0.9.48 — 19/19 chunks, no
+    prose-wrapping, structured JSON throughout. That is a DIFFERENT code path
+    from labeling (`cluster-only`'s LLM-naming call), which this session did NOT
+    re-test. #2076's report is therefore still the last evidence for LABELING
+    specifically — treat it as unconfirmed either way, not as refuted. Do not
+    read the extraction result as evidence labeling now works too.
+
+    `--claude-cli` still opts into the labeling path (falls back to deterministic
+    on the inevitable failure, if #2076 still applies there), kept only so a
+    future re-probe can go through the task rather than a hand-run `graphify
+    label --claude-cli`. clean_env() strips GEMINI/GOOGLE either way, so Gemini
+    can never be auto-selected.
 
     A successful label RE-DERIVES the prose graph, for the same reason `kb-merge`
     does. `graphify label` is not a sidecar-only write: verified in the installed

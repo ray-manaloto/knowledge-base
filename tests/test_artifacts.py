@@ -2,9 +2,11 @@
 """kb-artifacts helpers: node counting + the large-graph svg skip."""
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
+import pytest
 from kb_setup import artifacts, prose
 
 
@@ -16,6 +18,10 @@ def test_node_count_reads_graph(tmp_path) -> None:
 
 def test_node_count_missing_is_zero(tmp_path) -> None:
     assert artifacts._node_count(tmp_path / "nope.json") == 0
+
+
+def test_known_views_matches_the_registry_names_in_order() -> None:
+    assert artifacts.known_views() == tuple(name for name, _, _ in artifacts._ARTIFACTS)
 
 
 def test_svg_in_default_registry_but_gated_by_limit() -> None:
@@ -241,3 +247,73 @@ def test_generate_does_not_refresh_the_stamp_on_failure(tmp_path: Path, monkeypa
     assert artifacts.generate(tmp_path, only=["graphml"]) == 1
 
     assert calls == []
+
+
+# --- `graph_root`: the scoped-caller reuse case (kb-graphify-native-extract) --
+
+
+def test_graph_root_scopes_graph_cwd_and_stamp_while_repo_root_still_resolves_the_exe(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The landmine `graph_root` exists to route around.
+
+    `graphify_exe`/`ensure_runtime_deps` have no fallback — a scoped caller
+    whose graph lives OUTSIDE the real project root (no `.venv/` of its own)
+    must still resolve the binary against the real root. Reverted to using
+    `repo_root` for the graph path/cwd/stamp instead of `graph_root`, this
+    must fail: there is no `graph.json` under `repo_root` in this fixture.
+    """
+    real_root = tmp_path / "real-repo"
+    scoped_root = tmp_path / "scoped-out"
+    _graph_with_hyperedge(scoped_root)
+
+    exe_calls: list[Path] = []
+    cwd_calls: list[Path | None] = []
+
+    def fake_graphify_exe(root: Path) -> str:
+        exe_calls.append(root)
+        return "/usr/bin/true"
+
+    def fake_run(
+        cmd: list[str], *, cwd: Path | None = None, **_kwargs: object
+    ) -> subprocess.CompletedProcess[bytes]:
+        cwd_calls.append(cwd)
+        return subprocess.CompletedProcess(list(cmd), 0)
+
+    monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
+    monkeypatch.setattr(artifacts, "graphify_exe", fake_graphify_exe)
+    monkeypatch.setattr(artifacts.subprocess, "run", fake_run)
+    monkeypatch.setattr(artifacts.prose, "derive_for", lambda _r: None)
+
+    rc = artifacts.generate(real_root, only=["graphml"], graph_root=scoped_root)
+
+    assert rc == 0
+    assert exe_calls == [real_root], "graphify_exe must resolve against the REAL project root"
+    assert cwd_calls == [scoped_root], "each generator's cwd must be the scoped graph_root"
+
+
+def test_graph_root_defaults_to_repo_root_unchanged(tmp_path: Path, monkeypatch) -> None:
+    """The aggregate `kb-artifacts` call site passes no `graph_root` at all.
+
+    Reverted (graph_root no longer defaulting to repo_root), this must fail —
+    the bare `generate(tmp_path, ...)` call every other test in this file
+    already makes would stop finding its own `graph.json`.
+    """
+    _graph_with_hyperedge(tmp_path)
+    monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
+    monkeypatch.setattr(artifacts, "graphify_exe", lambda _r: "/usr/bin/true")
+    monkeypatch.setattr(
+        artifacts.subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(list(cmd), 0)
+    )
+    monkeypatch.setattr(artifacts.prose, "derive_for", lambda _r: None)
+
+    assert artifacts.generate(tmp_path, only=["graphml"]) == 0
+
+
+def test_missing_graph_json_under_graph_root_is_refused(tmp_path: Path) -> None:
+    """A `graph_root` with no `graph.json` must refuse, even if `repo_root` has one."""
+    _graph_with_hyperedge(tmp_path)  # repo_root DOES have a graph — must not matter
+    empty_scoped_root = tmp_path / "empty-scoped"
+
+    with pytest.raises(SystemExit, match=re.escape(str(empty_scoped_root))):
+        artifacts.generate(tmp_path, only=["graphml"], graph_root=empty_scoped_root)

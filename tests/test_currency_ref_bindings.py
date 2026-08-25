@@ -295,10 +295,27 @@ def _unhealthy_bindings(repo_root, spec) -> set[tuple[str, str, str]]:
         "ref": manifest_ref(repo_root, spec),
         "commit": _manifest_field(repo_root, spec, "commit"),
     }
+    # A FORKED tool has two legitimate revisions, and this helper must resolve
+    # them the same way `sync._check_ref_bindings` does. It re-derives the
+    # comparison rather than calling the engine (it needs the per-binding KEYS,
+    # which the engine's Finding flattens into prose), so the fork rule has to be
+    # mirrored here — and that mirroring is exactly why this went red the moment
+    # graphify was forked on 2026-08-24, while the engine itself was already
+    # right. `tracks = "fork_base"` bindings record a review performed against a
+    # specific upstream release; they hold at the base, and are still checked
+    # against it. See `RefBinding.tracks`.
+    base = (
+        {"ref": spec.fork.base_ref, "commit": spec.fork.base_commit}
+        if spec.fork is not None
+        else expected
+    )
     unhealthy = set()
     for b in spec.ref_bindings:
         key = (b.path, b.field, b.pattern)
-        want = expected.get(b.field, "")
+        if b.tracks == "frozen":
+            want = b.expect
+        else:
+            want = (base if b.tracks == "fork_base" else expected).get(b.field, "")
         path = repo_root / b.path
         if not want or not path.exists():
             unhealthy.add(key)

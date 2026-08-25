@@ -28,14 +28,21 @@ fine — `gh pr view` is how you resolve whether a bare `#42` is an issue or a P
 
 # Cross-vendor orchestration (Fable-5 architect + executor lanes)
 
-- When the session model is Fable, without being reminded: non-trivial implementation runs the fable-orchestrator architect-as-orchestrator flow — invoke the fable-orchestrator:orchestration skill before delegating and follow it as authoritative for routing, verification, review tiers, and advisor consults.
+- Without being reminded, on ANY session model: non-trivial implementation runs the fable-orchestrator architect-as-orchestrator flow — invoke the fable-orchestrator:orchestration skill before delegating and follow it as authoritative for routing, verification, review tiers, and advisor consults.
 - fable-orchestrator: implementation lane = codex
 - fable-orchestrator: codex effort = xhigh
 
-The first line is the **trigger**, Fable-gated by design (sessions on other models skip the
-flow). Until 2026-07-24 only the mode line existed, which the plugin's setup wizard calls
-"inert without the trigger". Default `/model` is **Opus 5**; switch to **Fable 5** to arm
-this flow. `grok` CLI is not installed → `codex` is the only viable fixed mode.
+The first line is the **trigger**, and it is **deliberately UN-gated** (Ray, 2026-08-24).
+The plugin ships it Fable-gated — its changelog: *"sessions on other models skip the flow
+instead of running an architect pattern their model wasn't chosen for"* — and its setup
+wizard writes that form. Default `/model` here is **Opus 5**, so the gated line was false in
+every session and the flow **never once armed**; the handoffs' "treat it as armed regardless"
+was a workaround for a line nobody had read against the session model. Two consequences to
+know: `/fable-orchestrator:setup` recognises an unconditional trigger as a shape to
+*upgrade away from* and will offer to re-gate it — **decline**; and invoking
+`/fable-orchestrator:orchestration` by hand remains valid and is what the plugin documents
+for anyone without an always-on line. `grok` CLI is not installed → `codex` is the only
+viable fixed mode.
 
 Adopted plugins (enabled in `.claude/settings.json`): `fable-orchestrator@fable-orchestrator`
 (Claude/Fable-5 architect + `codex` implementer lane + cross-family reviewers + supervisor + terminal

@@ -1,0 +1,512 @@
+<title>The Dry Run That Wasn't</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --paper:      #f6f7f9;
+    --card:       #ffffff;
+    --ink:        #151d26;
+    --ink-soft:   #4a5a6b;
+    --ink-faint:  #7d8b99;
+    --rule:       #dde2e8;
+    --rule-firm:  #c3ccd6;
+    --accent:     #35577d;
+    --critical:   #a3322a;
+    --critical-bg:#f6e9e7;
+    --resolved:   #2b6b60;
+    --resolved-bg:#e6f0ee;
+    --warn:       #866717;
+    --warn-bg:    #f5eedb;
+    --plate:      #ffffff;
+    --shadow:     0 1px 2px rgba(21,29,38,.06), 0 6px 18px rgba(21,29,38,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #10161d;
+      --card:       #172029;
+      --ink:        #e6ecf2;
+      --ink-soft:   #a9b7c4;
+      --ink-faint:  #7c8b99;
+      --rule:       #26313d;
+      --rule-firm:  #384654;
+      --accent:     #7ea6d0;
+      --critical:   #e08b7f;
+      --critical-bg:#2e1d1a;
+      --resolved:   #77c0b2;
+      --resolved-bg:#122926;
+      --warn:       #d8b662;
+      --warn-bg:    #2a2312;
+      --plate:      #eef1f4;
+      --shadow:     0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:      #10161d;
+    --card:       #172029;
+    --ink:        #e6ecf2;
+    --ink-soft:   #a9b7c4;
+    --ink-faint:  #7c8b99;
+    --rule:       #26313d;
+    --rule-firm:  #384654;
+    --accent:     #7ea6d0;
+    --critical:   #e08b7f;
+    --critical-bg:#2e1d1a;
+    --resolved:   #77c0b2;
+    --resolved-bg:#122926;
+    --warn:       #d8b662;
+    --warn-bg:    #2a2312;
+    --plate:      #eef1f4;
+    --shadow:     0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 clamp(1rem, 4vw, 3rem) 6rem;
+  }
+
+  .wrap { max-width: 62rem; margin: 0 auto; }
+
+  /* ---------- masthead ---------- */
+  header.top {
+    display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem;
+    align-items: flex-end; justify-content: space-between;
+    padding: 3.5rem 0 1.25rem;
+    border-bottom: 2px solid var(--ink);
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .72rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 0 0 .5rem;
+  }
+  h1 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-weight: 600; font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.08; margin: 0; text-wrap: balance; letter-spacing: -.015em;
+  }
+  .standfirst {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-size: 1.1rem; font-style: italic; color: var(--ink-soft);
+    margin: 1rem 0 0; max-width: 34em;
+  }
+  .provenance {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .74rem; line-height: 1.9; color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .provenance b { color: var(--ink-soft); font-weight: 500; }
+
+  /* ---------- verdict strip ---------- */
+  .tally {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+    margin: 2.5rem 0 3rem;
+  }
+  .tally div { background: var(--card); padding: 1rem 1.15rem; }
+  .tally .n {
+    font-family: "IBM Plex Mono", monospace; font-size: 2rem; font-weight: 500;
+    line-height: 1; font-variant-numeric: tabular-nums; display: block;
+  }
+  .tally .k {
+    font-size: .7rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint); margin-top: .45rem; display: block;
+  }
+  .n.crit { color: var(--critical); }
+  .n.warn { color: var(--warn); }
+  .n.ok   { color: var(--resolved); }
+
+  h2 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-size: 1.5rem; font-weight: 600; margin: 3.5rem 0 .4rem;
+    text-wrap: balance;
+  }
+  h2 + .sub {
+    color: var(--ink-soft); margin: 0 0 1.75rem; max-width: 40em;
+  }
+
+  /* ---------- defect cards ---------- */
+  .defect {
+    background: var(--card); border: 1px solid var(--rule);
+    border-left: 4px solid var(--critical);
+    box-shadow: var(--shadow);
+    margin: 0 0 2rem; padding: 1.6rem clamp(1.1rem, 3vw, 2rem) 1.8rem;
+  }
+  .defect > header { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: baseline; }
+  .tag {
+    font-family: "IBM Plex Mono", monospace; font-size: .68rem;
+    letter-spacing: .1em; text-transform: uppercase; font-weight: 500;
+    padding: .2rem .55rem; border: 1px solid currentColor;
+  }
+  .tag.crit { color: var(--critical); background: var(--critical-bg); }
+  .tag.armed { color: var(--resolved); background: var(--resolved-bg); }
+  .defect h3 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-size: 1.22rem; font-weight: 600; margin: .7rem 0 .5rem; width: 100%;
+    text-wrap: balance;
+  }
+  .cite {
+    font-family: "IBM Plex Mono", monospace; font-size: .78rem;
+    color: var(--accent); word-break: break-all;
+  }
+  .defect p { margin: .8rem 0; }
+
+  figure { margin: 1.6rem 0 .5rem; }
+  .plate {
+    background: var(--plate); border: 1px solid var(--rule-firm);
+    padding: 1.1rem; overflow-x: auto;
+  }
+  .plate svg { display: block; max-width: 100%; height: auto; color: #151d26; }
+  figcaption {
+    font-size: .82rem; color: var(--ink-faint); margin-top: .6rem;
+    max-width: 46em;
+  }
+
+  .arm {
+    margin-top: 1.4rem; border-top: 1px solid var(--rule); padding-top: 1rem;
+  }
+  .arm h4 {
+    font-family: "IBM Plex Mono", monospace; font-size: .7rem;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint);
+    margin: 0 0 .6rem; font-weight: 500;
+  }
+  pre {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .78rem; line-height: 1.75; margin: 0;
+    background: var(--paper); border: 1px solid var(--rule);
+    padding: .85rem 1rem; overflow-x: auto;
+  }
+  pre .out { color: var(--critical); }
+  pre .ctl { color: var(--resolved); }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .87em; background: var(--paper);
+    border: 1px solid var(--rule); padding: .05em .35em;
+  }
+
+  /* ---------- tables ---------- */
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .89rem; }
+  th, td {
+    text-align: left; padding: .62rem .8rem;
+    border-bottom: 1px solid var(--rule); vertical-align: top;
+  }
+  th {
+    font-size: .68rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600;
+    border-bottom: 1px solid var(--rule-firm);
+  }
+  td.v { font-family: "IBM Plex Mono", monospace; font-size: .76rem; white-space: nowrap; }
+  .ref { color: var(--resolved); font-weight: 500; }
+  .con { color: var(--critical); font-weight: 500; }
+
+  .note {
+    border-left: 3px solid var(--accent); background: var(--card);
+    padding: 1rem 1.25rem; margin: 2rem 0; box-shadow: var(--shadow);
+  }
+  .note p:first-child { margin-top: 0; }
+  .note p:last-child { margin-bottom: 0; }
+
+  footer.foot {
+    margin-top: 4rem; padding-top: 1.25rem; border-top: 1px solid var(--rule);
+    font-size: .8rem; color: var(--ink-faint);
+  }
+  a { color: var(--accent); }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <p class="eyebrow">kb-review · round 1 · cold cross-family</p>
+    <h1>The Dry Run That Wasn't</h1>
+    <p class="standfirst">Three blocking defects in eighteen unshipped commits — each one confirmed by building the case that produces it, not by reading the code and agreeing with it.</p>
+  </div>
+  <p class="provenance">
+    <b>HEAD</b>&nbsp;&nbsp;fa4ed551ac7e<br>
+    <b>base</b>&nbsp;&nbsp;408593510b06 (origin/main)<br>
+    <b>diff</b>&nbsp;&nbsp;186 files · +5,943 / −18,705<br>
+    <b>lanes</b>&nbsp;&nbsp;antigravity (Gemini), codex<br>
+    <b>date</b>&nbsp;&nbsp;2026-08-24
+  </p>
+</header>
+
+<div class="tally">
+  <div><span class="n crit">3</span><span class="k">Blocking</span></div>
+  <div><span class="n warn">2</span><span class="k">Major</span></div>
+  <div><span class="n">4</span><span class="k">Minor</span></div>
+  <div><span class="n ok">6</span><span class="k">Refuted</span></div>
+  <div><span class="n">9</span><span class="k">Arms run</span></div>
+</div>
+
+<h2>The three that stop the ship</h2>
+<p class="sub">All three live in <code>graphify_native_extract.py</code> — the newest, largest, and least-exercised code on the branch. Each is shown as the mechanism that produces it, then the probe that made it happen.</p>
+
+<!-- ============ DEFECT 1 ============ -->
+<section class="defect">
+  <header>
+    <span class="tag crit">Blocking</span>
+    <span class="tag armed">Armed</span>
+    <h3>A mistyped preview silently becomes a real extraction</h3>
+    <p class="cite">graphify_native_extract.py <code>_parse</code> · :262–311 (the <code>--out</code> branch at :278)</p>
+  </header>
+
+  <p>The argument parser reads <code>--out</code> and takes <em>whatever token follows</em> as its value. It never asks whether that token is itself a flag. So <code>--out --dry-run</code> does not fail, and does not warn: it quietly assigns the string <code>--dry-run</code> as the output directory, steps the cursor past both tokens, and leaves <code>dry_run</code> at its default of <code>False</code>.</p>
+
+  <p>The user asked for a preview. What runs is the real thing — a token-spending, disk-writing extraction, into a directory named after the flag they were trying to use.</p>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 700 232" role="img" aria-label="The parser consumes the --dry-run flag as the value of --out, leaving dry_run false, so a real extraction runs instead of a preview.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,1 9,5 0,9" fill="currentColor"/>
+          </marker>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,1 9,5 0,9" fill="#a3322a"/>
+          </marker>
+        </defs>
+
+        <text x="0" y="14" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".55">WHAT WAS TYPED</text>
+
+        <rect x="0" y="26" width="104" height="30" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="52" y="46" font-family="IBM Plex Mono, monospace" font-size="12.5" text-anchor="middle" fill="currentColor">--out</text>
+        <rect x="116" y="26" width="120" height="30" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="176" y="46" font-family="IBM Plex Mono, monospace" font-size="12.5" text-anchor="middle" fill="currentColor">--dry-run</text>
+
+        <text x="252" y="46" font-size="12" fill="currentColor" opacity=".6">two separate flags</text>
+
+        <!-- brace showing consumption -->
+        <path d="M4 66 L4 76 L232 76 L232 66" fill="none" stroke="#a3322a" stroke-width="1.4"/>
+        <path d="M118 76 L118 88" fill="none" stroke="#a3322a" stroke-width="1.4" marker-end="url(#arr)"/>
+        <text x="128" y="99" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#a3322a">read as ONE flag + its value  (i += 2)</text>
+
+        <line x1="0" y1="116" x2="700" y2="116" stroke="currentColor" stroke-width=".6" opacity=".25"/>
+
+        <text x="0" y="140" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".55">WHAT THE PARSER PRODUCED</text>
+
+        <rect x="0" y="152" width="250" height="60" fill="none" stroke="#a3322a" stroke-width="1.6"/>
+        <text x="14" y="174" font-family="IBM Plex Mono, monospace" font-size="12" fill="#a3322a">out      = repo/--dry-run</text>
+        <text x="14" y="196" font-family="IBM Plex Mono, monospace" font-size="12" fill="#a3322a">dry_run  = False</text>
+
+        <line x1="258" y1="182" x2="352" y2="182" stroke="#a3322a" stroke-width="1.6" marker-end="url(#arr)"/>
+        <text x="262" y="174" font-size="11" fill="#a3322a">so</text>
+
+        <rect x="360" y="152" width="200" height="60" fill="#a3322a"/>
+        <text x="460" y="178" font-size="13" font-weight="600" text-anchor="middle" fill="#ffffff">graphify runs</text>
+        <text x="460" y="196" font-size="13" font-weight="600" text-anchor="middle" fill="#ffffff">for real</text>
+
+        <text x="576" y="178" font-size="11.5" fill="currentColor" opacity=".7">tokens spent,</text>
+        <text x="576" y="194" font-size="11.5" fill="currentColor" opacity=".7">disk written</text>
+      </svg>
+    </div>
+    <figcaption>The defect is the missing question. Every option branch checks <code>i + 1 &lt; len(argv)</code> — that a next token <em>exists</em> — and none checks what that token <em>is</em>.</figcaption>
+  </figure>
+
+  <div class="arm">
+    <h4>The arm — run against the real parser, with a control</h4>
+<pre><span class="out">['--out', '--dry-run']     -&gt; dry_run=False  out='/repo/--dry-run'</span>
+<span class="out">['--model', '--dry-run']   -&gt; dry_run=False  model='--dry-run'</span>
+<span class="ctl">['--dry-run']              -&gt; dry_run=True   (control: probe discriminates)</span></pre>
+  </div>
+</section>
+
+<!-- ============ DEFECT 2 ============ -->
+<section class="defect">
+  <header>
+    <span class="tag crit">Blocking</span>
+    <span class="tag armed">Armed</span>
+    <h3>The output guard checks one door and leaves the other open</h3>
+    <p class="cite">graphify_native_extract.py <code>_refuse_out</code> · :369–402 · graphify_env.py · graphify/paths.py:26</p>
+  </header>
+
+  <p><code>_refuse_out</code> exists to stop the extraction writing somewhere it must not. It validates <code>opts.out</code> — the value of the <code>--out</code> flag. But <code>--out</code> is not the only way to move graphify's output root.</p>
+
+  <p>Graphify reads <code>GRAPHIFY_OUT</code> from the environment at import time, by design, for worktree and shared-output setups. <code>clean_env()</code> strips every non-Claude backend trigger — and passes <code>GRAPHIFY_OUT</code> straight through. So an inherited environment variable relocates the output root without ever meeting the guard.</p>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 700 250" role="img" aria-label="Two routes set graphify's output root: the --out flag passes through the _refuse_out guard, while the GRAPHIFY_OUT environment variable bypasses it entirely via clean_env and paths.py.">
+        <defs>
+          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,1 9,5 0,9" fill="currentColor"/>
+          </marker>
+          <marker id="a2r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,1 9,5 0,9" fill="#a3322a"/>
+          </marker>
+        </defs>
+
+        <!-- guarded route -->
+        <text x="0" y="14" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity=".55">ROUTE 1 — CHECKED</text>
+        <rect x="0" y="26" width="150" height="38" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="75" y="50" font-family="IBM Plex Mono, monospace" font-size="12" text-anchor="middle" fill="currentColor">--out &lt;path&gt;</text>
+        <line x1="152" y1="45" x2="216" y2="45" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+        <rect x="220" y="26" width="160" height="38" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="300" y="44" font-family="IBM Plex Mono, monospace" font-size="12" text-anchor="middle" fill="currentColor">_refuse_out</text>
+        <text x="300" y="58" font-size="10" text-anchor="middle" fill="currentColor" opacity=".65">validates</text>
+        <line x1="382" y1="45" x2="470" y2="45" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+
+        <!-- target -->
+        <rect x="474" y="88" width="180" height="66" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="564" y="115" font-size="12.5" font-weight="600" text-anchor="middle" fill="currentColor">graphify</text>
+        <text x="564" y="134" font-size="12.5" font-weight="600" text-anchor="middle" fill="currentColor">output root</text>
+        <path d="M470 45 L564 45 L564 86" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+
+        <line x1="0" y1="176" x2="700" y2="176" stroke="currentColor" stroke-width=".6" opacity=".25"/>
+
+        <!-- bypass route -->
+        <text x="0" y="200" font-family="IBM Plex Mono, monospace" font-size="11" fill="#a3322a">ROUTE 2 — UNCHECKED</text>
+        <rect x="0" y="208" width="176" height="34" fill="none" stroke="#a3322a" stroke-width="1.6"/>
+        <text x="88" y="230" font-family="IBM Plex Mono, monospace" font-size="11.5" text-anchor="middle" fill="#a3322a">GRAPHIFY_OUT=…</text>
+        <line x1="178" y1="225" x2="228" y2="225" stroke="#a3322a" stroke-width="1.6" marker-end="url(#a2r)"/>
+        <rect x="232" y="208" width="130" height="34" fill="none" stroke="#a3322a" stroke-width="1.6"/>
+        <text x="297" y="224" font-family="IBM Plex Mono, monospace" font-size="11.5" text-anchor="middle" fill="#a3322a">clean_env()</text>
+        <text x="297" y="236" font-size="9.5" text-anchor="middle" fill="#a3322a">passes through</text>
+        <line x1="364" y1="225" x2="410" y2="225" stroke="#a3322a" stroke-width="1.6" marker-end="url(#a2r)"/>
+        <rect x="414" y="208" width="130" height="34" fill="none" stroke="#a3322a" stroke-width="1.6"/>
+        <text x="479" y="229" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" fill="#a3322a">paths.py:26</text>
+        <path d="M546 225 L620 225 L620 156" fill="none" stroke="#a3322a" stroke-width="1.6" marker-end="url(#a2r)"/>
+        <text x="556" y="204" font-size="11" fill="#a3322a">no guard on this path</text>
+      </svg>
+    </div>
+    <figcaption>Both routes end at the same output root. Only one of them passes a check — and it is the one a caller has to opt into typing.</figcaption>
+  </figure>
+
+  <div class="arm">
+    <h4>The arm — end to end, both halves</h4>
+<pre><span class="out">clean_env passes it through   -&gt; GRAPHIFY_OUT = /tmp/pwned</span>
+<span class="ctl">graphify default             -&gt; paths.GRAPHIFY_OUT = graphify-out   (control)</span>
+<span class="out">graphify with the env var    -&gt; paths.GRAPHIFY_OUT = /tmp/pwned</span></pre>
+  </div>
+</section>
+
+<!-- ============ DEFECT 3 ============ -->
+<section class="defect">
+  <header>
+    <span class="tag crit">Blocking</span>
+    <span class="tag armed">Armed</span>
+    <h3>The only code that actually runs graphify is untested</h3>
+    <p class="cite">graphify_native_extract.py <code>_run_cluster</code> :471–479 · <code>_run_real</code> :520–533 · tests/test_graphify_native_extract.py</p>
+  </header>
+
+  <p>Forty-two tests cover this module, and they are green. Every one of them exercises the <code>--dry-run</code> short-circuit — the branch that prints what <em>would</em> happen and returns. <code>_run_real</code> and <code>_run_cluster</code>, the two functions that spawn the subprocess, spend the tokens and write the disk, are reached by none of them.</p>
+
+  <p>This is not inferred from reading the tests. It was measured by deleting the functions' bodies.</p>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 700 220" role="img" aria-label="The test suite covers only the dry-run branch; replacing the bodies of _run_real and _run_cluster with return 0 leaves all 42 tests passing.">
+        <defs>
+          <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,1 9,5 0,9" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <rect x="0" y="80" width="120" height="40" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="60" y="105" font-family="IBM Plex Mono, monospace" font-size="12" text-anchor="middle" fill="currentColor">main()</text>
+        <line x1="122" y1="100" x2="176" y2="100" stroke="currentColor" stroke-width="1.4" marker-end="url(#a3)"/>
+
+        <polygon points="180,100 224,74 268,100 224,126" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="224" y="104" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" fill="currentColor">dry_run?</text>
+
+        <!-- covered branch -->
+        <path d="M224 72 L224 40 L330 40" fill="none" stroke="#2b6b60" stroke-width="1.8" marker-end="url(#a3)"/>
+        <text x="234" y="34" font-size="11" fill="#2b6b60">true</text>
+        <rect x="334" y="20" width="180" height="40" fill="none" stroke="#2b6b60" stroke-width="1.8"/>
+        <text x="424" y="45" font-family="IBM Plex Mono, monospace" font-size="12" text-anchor="middle" fill="#2b6b60">preview + return</text>
+        <text x="528" y="45" font-size="11.5" fill="#2b6b60">← all 42 tests live here</text>
+
+        <!-- uncovered branch -->
+        <path d="M224 128 L224 166 L330 166" fill="none" stroke="#a3322a" stroke-width="1.8" marker-end="url(#a3)"/>
+        <text x="232" y="150" font-size="11" fill="#a3322a">false</text>
+        <rect x="334" y="146" width="180" height="40" fill="none" stroke="#a3322a" stroke-width="1.8" stroke-dasharray="5 3"/>
+        <text x="424" y="164" font-family="IBM Plex Mono, monospace" font-size="11.5" text-anchor="middle" fill="#a3322a">_run_real</text>
+        <text x="424" y="180" font-family="IBM Plex Mono, monospace" font-size="11.5" text-anchor="middle" fill="#a3322a">_run_cluster</text>
+        <text x="528" y="164" font-size="11.5" fill="#a3322a">← zero tests</text>
+        <text x="528" y="180" font-size="11.5" fill="#a3322a">spawns the subprocess</text>
+      </svg>
+    </div>
+    <figcaption>Dashed border marks the untested branch. It is the branch with every consequence in it — the subprocess, the token spend, the writes.</figcaption>
+  </figure>
+
+  <div class="arm">
+    <h4>The arm — a mutation that should have been caught</h4>
+<pre><span class="ctl">control  : 42 passed                          (suite green before mutation)</span>
+mutation : _run_real     -&gt; return 0
+           _run_cluster  -&gt; return 0
+<span class="out">result   : 42 passed                          (the mutant SURVIVED)</span></pre>
+  </div>
+</section>
+
+<h2>What the lanes claimed, and what survived</h2>
+<p class="sub">Cold lenses trade precision for recall, so false positives are expected and each costs one refutation. Six of the fifteen claims did not survive contact with the code.</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>Claim</th><th>Lane</th><th>Verdict</th><th>What settled it</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>pyproject pins <code>0.9.49</code> but the fork reports <code>0.9.48</code>, so uv cannot resolve</td>
+      <td class="v">antigravity</td><td class="v ref">REFUTED</td>
+      <td><code>uv lock --check</code> → rc=0, 164 packages. The lane missed <code>[tool.uv.sources]</code> redirecting to the git fork.</td>
+    </tr>
+    <tr>
+      <td>Test ignores empty identity fields, so a mutually-exclusive-field bug survives</td>
+      <td class="v">antigravity</td><td class="v ref">REFUTED</td>
+      <td>Built a lock carrying <em>both</em> shapes; the git branch returns early, so the forms are disjoint by control flow. One construction site.</td>
+    </tr>
+    <tr>
+      <td><code>.gitleaks.toml</code> exclusion swallows reports and derived artifacts</td>
+      <td class="v">antigravity</td><td class="v ref">REFUTED</td>
+      <td><code>DEFAULT_OUT</code> is that exact subtree, written only by this subprocess. Narrowed correctly; third instance of a documented precedent.</td>
+    </tr>
+    <tr>
+      <td>Redundant <code>None</code> check in <code>_check_forked_manifest</code></td>
+      <td class="v">antigravity</td><td class="v ref">REFUTED</td>
+      <td>Removed it — the type checker goes red. Required narrowing, not redundancy. (Citation was also 870 lines off.)</td>
+    </tr>
+    <tr>
+      <td><code>tracks = "fork_base"</code> on an unforked tool degrades silently</td>
+      <td class="v">antigravity</td><td class="v con">CONFIRMED</td>
+      <td><code>frozen</code> gets a required-companion check; <code>fork_base</code> does not. Probed both — one validated, one not.</td>
+    </tr>
+    <tr>
+      <td>Hook-guard loses its repo-root <code>cwd</code>, scanning the agent's directory instead</td>
+      <td class="v">antigravity</td><td class="v con">CONFIRMED<br>(major)</td>
+      <td>Three arms: fires at repo root, silent from a subdirectory, silent from <code>/tmp</code>. The hard DENY layer survives; the advisory layer goes quiet.</td>
+    </tr>
+    <tr>
+      <td>Stderr inherited but never retained, against <code>AGENTS.md:8–9</code></td>
+      <td class="v">codex</td><td class="v con">CONFIRMED<br>(major)</td>
+      <td>A human watching sees it; nothing retains it programmatically — and this round's own <code>kb-build</code> fix turned on parsing that stderr.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <p><strong>One finding I generated and then killed rather than report.</strong> A line in <code>artifacts.py</code> reads <code>except OSError, json.JSONDecodeError:</code> — no parentheses, a Python-2 syntax error. Byte-level probes agreed: length 41, zero parentheses. But the file imports and the AST parses.</p>
+  <p>Two probes disagreeing means one is broken, and it was mine. This is <strong>PEP 758</strong>, new in Python 3.14: unparenthesized <code>except</code> tuples are valid. The interpreter here is 3.14.7, <code>requires-python</code> is <code>&gt;=3.14</code>, and there are <strong>69</strong> such clauses across <code>kb_setup</code> — house style, not a defect.</p>
+</div>
+
+<h2>The lane that had to be re-run</h2>
+<p class="sub">Batch A — the 1,155 lines of brand-new extraction code — came back from the first lane as a four-bullet paragraph with zero citations, closing with <em>“the code is robust and functions as described.”</em></p>
+
+<p>It had been told nothing about what the change was for. “As described” is the happy-path confirmation a cold lane exists to break, so the report was rejected rather than counted. Re-dispatched to codex — cross-family, since all three commits touching that file are Claude-authored — it returned six findings, every one cited, including all three blockers above.</p>
+
+<p>The two reports covered the same 1,155 lines. The difference was entirely in whether citations were demanded.</p>
+
+<footer class="foot">
+  <p>Round 1 of a two-round bound. Reports persisted verbatim at <code>.agent/kb/review/reports/review-fa4ed551…-cold.md</code>. No receipt is written while blocking findings stand — <code>kb-review-receipt</code> refuses <code>--blocking &gt; 0</code> before writing anything, so an unfixed branch leaves the same empty disk as an unreviewed one, and the lane reports are what tell the two apart.</p>
+  <p>Every figure on this page was measured in this session. Nothing here is inherited from a prior round.</p>
+  <p><strong>Corrected after publication, 2026-08-24.</strong> The module was subsequently parked, and the parking commit inserted ~25 lines of docstring at the top of the same file — which shifted every line citation on this page. The numbers were correct when published and were invalidated by the very commit that acted on them; the round-2 cold review of that commit is what caught it. Citations now name the <em>symbol</em> first and the line second, so the next edit cannot silently falsify them. Disposition: the three defects are filed as #479, #480 and #481 and are <em>not fixed</em> — they are unreachable, which is a different claim, and the module's own docstring states its exact scope.</p>
+</footer>
+
+</div>

@@ -11,6 +11,15 @@ import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+#: `build` states that exclude a source from `kb-build`, each for its own reason
+#: (see `Manifest.build`). Defined here rather than beside `_ENUMS` because
+#: `Manifest.is_built` reads it — a module-level name used from a class body must
+#: already exist when the checker walks it, and `ty` says so out loud.
+#:
+#: Membership is the whole predicate: adding a fourth exclusion state means adding
+#: it here and nowhere else, which is the property `is_built` exists to buy.
+_EXCLUDED_BUILDS = frozenset({"skip", "defer"})
+
 
 @dataclass(frozen=True)
 class Manifest:
@@ -48,14 +57,61 @@ class Manifest:
     #: `skip` is deliberately expensive to use: `skip_reason` is REQUIRED and the
     #: build prints one line per skipped source. A silent exclusion is a way to
     #: make a red build green by dropping the source that was telling the truth.
+    #:
+    #: `defer` is the THIRD value, and it exists because `skip` was carrying two
+    #: unrelated meanings (Ray, 2026-08-24). Every one of the five sources excluded
+    #: before it existed was excluded by a DEFECT — #409's reviewed-warning
+    #: inventories, #417's zero-node `Cargo.toml`. But a source can also be
+    #: perfectly healthy and merely not worth its extraction cost yet, which is a
+    #: BUDGET decision and not a blocker. Recording that as `skip` makes a cost
+    #: choice read as a broken source forever: the backlog cannot tell which
+    #: entries are waiting on a fix and which are waiting on a decision, so the
+    #: healthy ones get re-diagnosed by every session that meets them.
+    #:
+    #: The two differ in what CLEARS them. A `skip` clears when someone fixes the
+    #: defect; a `defer` clears when the economics change — a cheaper backend, a
+    #: bigger budget, a ruling that the content is worth it. Neither is a
+    #: soft-delete: both keep the pin committed and fingerprinted, and both are
+    #: announced by name on every build.
     build: str = "include"
     #: Why this source is `build = skip`. Required and non-empty when it is.
     skip_reason: str = ""
+    #: Why this source is `build = defer`. Required and non-empty when it is.
+    #: A separate field from `skip_reason` on purpose: one field would let a
+    #: state change silently inherit the other state's justification, and the
+    #: whole point of the split is that the two reasons are not interchangeable.
+    defer_reason: str = ""
 
     @property
     def clone_dir(self) -> Path:
         """Gitignored directory the source is cloned into (sibling of the manifest)."""
         return self.path.parent / self.name
+
+    @property
+    def is_built(self) -> bool:
+        """Whether `kb-build` extracts this source at all.
+
+        Ask THIS, never `build == "skip"`. When `defer` was added, the two live
+        call sites in `kb_setup.graph` both spelled the test as `!= "skip"`, which
+        silently returns True for `defer` — a new exclusion state that excludes
+        nothing. Both were fixed, but the durable fix is that consumers stop
+        re-deriving the predicate: a fourth state should not require finding every
+        comparison again. (`a-fix-at-one-layer-leaves-the-next`.)
+        """
+        return self.build not in _EXCLUDED_BUILDS
+
+    @property
+    def exclusion_reason(self) -> str:
+        """The stated reason this source is excluded, or `""` when it is built.
+
+        Reads whichever field the current `build` state requires, so a caller
+        never has to know which of the two reason fields is populated.
+        """
+        if self.build == "skip":
+            return self.skip_reason
+        if self.build == "defer":
+            return self.defer_reason
+        return ""
 
 
 def _parse(text: str) -> dict[str, str]:
@@ -81,7 +137,7 @@ def _parse(text: str) -> dict[str, str]:
 _ENUMS: dict[str, frozenset[str]] = {
     "kind": frozenset({"code", "docs"}),
     "scope": frozenset({"corpus", "study"}),
-    "build": frozenset({"include", "skip"}),
+    "build": frozenset({"include", "skip", "defer"}),
 }
 
 
@@ -100,11 +156,36 @@ def load(path: Path) -> Manifest:
             )
     build = f.get("build", "include")
     skip_reason = f.get("skip_reason", "")
+    defer_reason = f.get("defer_reason", "")
     if build == "skip" and not skip_reason:
         raise ValueError(
             f"{path}: build = skip requires a non-empty `skip_reason` — a source dropped "
             "from the build without a stated reason is indistinguishable from one nobody "
             "noticed was missing"
+        )
+    if build == "defer" and not defer_reason:
+        raise ValueError(
+            f"{path}: build = defer requires a non-empty `defer_reason` — a source deferred "
+            "on cost must say what would bring it back, or it is indistinguishable from one "
+            "that is broken"
+        )
+    # The reason fields are state-specific, so a reason attached to a state that
+    # is not current is not a harmless leftover: it is a justification for an
+    # exclusion nobody is applying, and it survives a state change to silently
+    # justify the WRONG state later. `skip`/`defer` differ precisely in what
+    # clears them, so borrowing one's reason for the other is the failure this
+    # split exists to prevent.
+    if build != "skip" and skip_reason:
+        raise ValueError(
+            f"{path}: `skip_reason` is set but build = {build!r} — a stale reason from a "
+            "state this manifest is no longer in will read as the justification for the "
+            "state it IS in. Move it to the matching field or delete it"
+        )
+    if build != "defer" and defer_reason:
+        raise ValueError(
+            f"{path}: `defer_reason` is set but build = {build!r} — a stale reason from a "
+            "state this manifest is no longer in will read as the justification for the "
+            "state it IS in. Move it to the matching field or delete it"
         )
     return Manifest(
         name=path.stem,
@@ -116,6 +197,7 @@ def load(path: Path) -> Manifest:
         scope=f.get("scope", "corpus"),
         build=build,
         skip_reason=skip_reason,
+        defer_reason=defer_reason,
     )
 
 

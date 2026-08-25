@@ -22,11 +22,44 @@
 #     PyPI — so tracking newest-tag would ingest code we cannot run.
 # The correct ref is `v<version>` for the version uv resolves.
 #
-# To bump: change the mise pin, then set ref/commit here to the matching tag
-#   git ls-remote --tags --refs https://github.com/Graphify-Labs/graphify | grep v<version>
-# and re-run `mise run kb-build`.
-url = https://github.com/Graphify-Labs/graphify
-ref = v0.9.48
-commit = b2cd36267456c166788c95be6e68574064a92a42
+# ⚠️ FORKED 2026-08-24 (Ray). THE URL BELOW IS NO LONGER UPSTREAM, and the
+# invariant above is why it had to move with the pin: `pyproject.toml` now
+# installs `graphifyy[all]` from `git+https://github.com/ray-manaloto/graphify@
+# 1d0a9338…`, so leaving this at Graphify-Labs would have put the corpus back in
+# exactly the 2026-07-23 state described above — describing code we do not run —
+# while every surface still LOOKED pinned.
+#
+# WHY THE FORK: graphify 0.9.48 has no codex backend, and neither does upstream
+# `v8` (byte-identical to v0.9.48; control-armed — `compare/v0.9.47...v8` reports
+# ahead_by 14, so the endpoint discriminates). PR #2981 adds `openai-cli`, a
+# sibling of `claude-cli` that shells to the locally authenticated `codex` CLI,
+# and it is OPEN and unreviewed. Ray's call was to take the whole branch rather
+# than cherry-pick, so this pins its head verbatim.
+#
+# THE REF IS A BRANCH WE CREATED, and that contradicts the "never a branch head"
+# rule above for one specific reason: `refs/heads/kb-pin/openai-cli-backend` in
+# our fork exists ONLY to hold this commit. Nothing pushes to it, so it cannot
+# drift the way `v8` does. The `commit` below is still the authority; the branch
+# is there so the object survives if TelB-io (whose fork the PR head lives on)
+# deletes their branch. Forks share object storage within a network, which is how
+# a SHA authored on TelB-io/graphify is reachable here at all.
+#
+# ⚠️ THE VERSION STRING DID NOT MOVE. The fork still reports `0.9.48` — same name,
+# same version, different code. So version alone cannot tell a forked install from
+# an upstream one, which is precisely why `currency.toml` `[tool.graphify]` needed
+# a fork-aware state rather than a bumped number.
+#
+# WHAT RETURNS THIS TO UPSTREAM: #2981 merging and shipping to PyPI. Then revert
+# `pyproject.toml` to `graphifyy[all]==<that version>`, set url/ref/commit here
+# back to `Graphify-Labs` at the matching tag, and drop the fork block in
+# currency.toml. Upstream ships roughly daily (15 releases in 15 days measured
+# 2026-08-24), so re-check rather than assume.
+#
+# To bump the FORK: rebase `kb-pin/openai-cli-backend` onto the newer upstream
+# tag, push, then set `commit` here and the `@<sha>` in `pyproject.toml` together.
+# They are one pin in two files and must move in the same commit.
+url = https://github.com/ray-manaloto/graphify
+ref = kb-pin/openai-cli-backend-v0.9.49
+commit = cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8
 kind = code
 added = 2026-07-21

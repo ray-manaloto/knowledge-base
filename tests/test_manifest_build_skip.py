@@ -103,7 +103,9 @@ def test_gitnexus_is_skipped_but_still_pinned() -> None:
     assert "#409" in m.skip_reason
 
 
-def _manifest(name: str, *, build: str = "include", reason: str = "") -> mf.Manifest:
+def _manifest(
+    name: str, *, build: str = "include", reason: str = "", defer_reason: str = ""
+) -> mf.Manifest:
     return mf.Manifest(
         name=name,
         path=Path("sources") / f"{name}.manifest",
@@ -112,6 +114,7 @@ def _manifest(name: str, *, build: str = "include", reason: str = "") -> mf.Mani
         commit="a" * 40,
         build=build,
         skip_reason=reason,
+        defer_reason=defer_reason,
     )
 
 
@@ -175,3 +178,133 @@ def test_build_actually_calls_the_drop_before_cloning(
     with pytest.raises(RuntimeError) as excinfo:
         graph.build(tmp_path)
     assert excinfo.value is sentinel, "build() reached the clone without dropping first"
+
+
+# --------------------------------------------------------------------------
+# `build = defer` (Ray, 2026-08-24) — the cost-deferral state.
+#
+# `skip` had been carrying two unrelated meanings. All five sources excluded
+# before `defer` existed were excluded by a DEFECT (#409, #417); a source that
+# is merely not worth its extraction cost yet is a BUDGET decision, and filing
+# it as `skip` makes it read as broken forever. The pair below is the point:
+# the two states must be indistinguishable in EFFECT (both excluded, both loud,
+# both still pinned) and distinguishable in MEANING.
+# --------------------------------------------------------------------------
+
+
+def test_build_defer_carries_its_reason(tmp_path: Path) -> None:
+    m = mf.load(_write(tmp_path, "build = defer\ndefer_reason = 1,551 org files, deferred\n"))
+    assert m.build == "defer"
+    assert m.defer_reason == "1,551 org files, deferred"
+
+
+def test_build_defer_without_a_reason_is_refused(tmp_path: Path) -> None:
+    """A deferral must say what would bring it back, or it is just an absence."""
+    with pytest.raises(ValueError, match="requires a non-empty `defer_reason`"):
+        mf.load(_write(tmp_path, "build = defer\n"))
+
+
+def test_build_defer_with_an_empty_reason_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="requires a non-empty `defer_reason`"):
+        mf.load(_write(tmp_path, "build = defer\ndefer_reason =\n"))
+
+
+def test_defer_does_not_satisfy_skip_reason_and_vice_versa(tmp_path: Path) -> None:
+    """The fields are not interchangeable — that separation IS the feature.
+
+    Filing a cost deferral under `skip_reason` would put it back in the queue
+    that waits on a fix, which is the conflation this state was added to end.
+    """
+    with pytest.raises(ValueError, match="requires a non-empty `defer_reason`"):
+        mf.load(_write(tmp_path, "build = defer\nskip_reason = not a deferral reason\n"))
+    with pytest.raises(ValueError, match="requires a non-empty `skip_reason`"):
+        mf.load(_write(tmp_path, "build = skip\ndefer_reason = not a skip reason\n"))
+
+
+@pytest.mark.parametrize(
+    ("body", "stale"),
+    [
+        ("skip_reason = left over from a previous state\n", "skip_reason"),
+        ("defer_reason = left over from a previous state\n", "defer_reason"),
+    ],
+)
+def test_a_reason_for_a_state_the_manifest_is_not_in_is_refused(
+    tmp_path: Path, body: str, stale: str
+) -> None:
+    """A leftover reason is worse than none: it reads as the CURRENT state's reason.
+
+    The realistic edit that produces it is restoring a source — flipping `build`
+    back to `include` and forgetting to delete the line underneath it.
+    """
+    with pytest.raises(ValueError, match=f"`{stale}` is set but build ="):
+        mf.load(_write(tmp_path, body))
+
+
+def test_defaults_carry_neither_reason(tmp_path: Path) -> None:
+    m = mf.load(_write(tmp_path, ""))
+    assert (m.build, m.skip_reason, m.defer_reason) == ("include", "", "")
+    assert m.is_built is True
+    assert m.exclusion_reason == ""
+
+
+@pytest.mark.parametrize(
+    ("build", "field", "reason"),
+    [("skip", "skip_reason", "#417 zero nodes"), ("defer", "defer_reason", "too many docs")],
+)
+def test_exclusion_reason_reads_whichever_field_the_state_requires(
+    tmp_path: Path, build: str, field: str, reason: str
+) -> None:
+    """Callers must never have to know which of the two fields is populated."""
+    m = mf.load(_write(tmp_path, f"build = {build}\n{field} = {reason}\n"))
+    assert m.is_built is False
+    assert m.exclusion_reason == reason
+
+
+def test_a_deferred_source_is_dropped_before_the_clone() -> None:
+    """THE REGRESSION TEST FOR THE LAYER-2 BUG, and it is the reason this exists.
+
+    Adding `defer` to the parser alone left `graph._drop_skipped_builds` testing
+    `m.build != "skip"`, which is TRUE for `defer` — so the new exclusion state
+    excluded nothing and a deferred source would have been cloned and extracted
+    anyway. Revert `is_built` to a `!= "skip"` comparison and this case goes red;
+    nothing in the parser tests above would notice.
+    """
+    kept = graph._drop_skipped_builds(
+        [_manifest("keeper"), _manifest("deferred", build="defer", defer_reason="cost")]
+    )
+    assert [m.name for m in kept] == ["keeper"]
+
+
+def test_a_deferred_source_announces_its_state_not_just_its_reason(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The operator triaging the backlog needs to know WHICH queue the line is in.
+
+    `skip` waits on a fix; `defer` waits on a budget or a backend. Printing only
+    the reason would leave the two indistinguishable in the build log, which is
+    where the distinction is actually consumed.
+    """
+    graph._drop_skipped_builds(
+        [
+            _manifest("keeper"),
+            _manifest("broken", build="skip", reason="#417 zero nodes"),
+            _manifest("costly", build="defer", defer_reason="5,360 docs, deferred on spend"),
+        ]
+    )
+    out = capsys.readouterr().out
+    assert "keeper" not in out, "an included source must not be announced as excluded"
+    assert "build = skip" in out
+    assert "build = defer" in out
+    assert "#417 zero nodes" in out
+    assert "5,360 docs, deferred on spend" in out
+
+
+def test_a_build_with_every_source_excluded_is_refused_whichever_state() -> None:
+    """A mix of the two exclusions still leaves nothing to build."""
+    with pytest.raises(SystemExit, match="nothing to build"):
+        graph._drop_skipped_builds(
+            [
+                _manifest("a", build="skip", reason="#417"),
+                _manifest("b", build="defer", defer_reason="cost"),
+            ]
+        )

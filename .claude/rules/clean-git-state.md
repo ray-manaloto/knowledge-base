@@ -59,13 +59,15 @@ happened. Knowing the rule prevented nothing, which is this repo's recurring
 finding about warnings: the warning-only graph-first rule was complied with **0
 times out of 19**, while the DENY that replaced it took its violations **62 → 0**.
 
-**Why that path and not an ignore rule.** `graphify-out/graphify-semantic-corpus-chunks/`
-is deliberately absent from `.gitignore` and the comment there says why: it is
+**Why that path and not an ignore rule, at the time.** `graphify-out/graphify-semantic-corpus-chunks/`
+was deliberately absent from `.gitignore`, and the comment there said why: it was
 retained provider evidence for a run that cost real tokens, and whether to track
-it is the open question in #317. Ignoring it settles that question silently;
-committing it settles it just as silently the other way. Untracked-and-visible is
-the intended state, and a blanket add is the one command that destroys it without
-anyone deciding.
+it was the open question in #317 (settled 2026-08-23 in favour of tracking).
+Ignoring it would have settled that question silently; committing it settled it
+just as silently the other way. That whole tree — and the layer it evidenced —
+was removed 2026-08-24 (`docs/archive/README.md`), so the path no longer exists;
+the guard and its "name the paths explicitly" remedy are unchanged and still
+apply to whatever untracked evidence a future run produces.
 
 **`git add -u` is deliberately allowed.** It stages modifications to
 already-tracked files and cannot introduce an untracked path, which is the entire

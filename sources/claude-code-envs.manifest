@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Catalogue of Claude Code environment variables and their effects. Small (10 .md, 108 KB) and directly load-bearing here: currency.toml's [tool.claude-code] watch entries track env-var semantics (CLAUDE_CODE_PROJECT_DIR_NAME, CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS, ANTHROPIC_DEFAULT_HAIKU_MODEL) by hand today. Registered 2026-08-24.
+url = https://github.com/thevibeworks/claude-code-envs
+ref = main
+commit = bb22490e0d3548183111844b700ca9d28212aa46
+kind = docs

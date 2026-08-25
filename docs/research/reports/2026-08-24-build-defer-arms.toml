@@ -1,0 +1,92 @@
+# Mutation arms for `build = defer` (Ray, 2026-08-24).
+#
+# The state exists to split one overloaded value in two: every source excluded
+# before it was excluded by a DEFECT (#409, #417), while a source that is merely
+# not worth its extraction cost yet is a BUDGET decision. The two clear
+# differently — a `skip` clears when someone fixes something, a `defer` clears
+# when the economics change — so they must be distinguishable in MEANING while
+# staying identical in EFFECT.
+#
+# D1 is the arm that matters and the reason this file exists. Adding a state to
+# the parser is the visible half; the invisible half is that the only two live
+# consumers spelled the exclusion test as `build != "skip"`, which is TRUE for
+# `defer`. A new exclusion state that excludes nothing would have passed every
+# parser test written for it. That is `a-fix-at-one-layer-leaves-the-next`, and
+# no test of `mf.load` can see it.
+#
+# SCOPE, stated so a clean sweep is not over-read. What is NOT armed here:
+#   - whether `defer` is the right NAME, or whether two reason fields beat one
+#     with a discriminator. That is a design judgment and it is prose.
+#   - whether `claude-reads-hn` deserves to be deferred. An arm can prove the
+#     state is enforced; it cannot say the source was classified correctly.
+#   - the build's end-to-end behaviour with a deferred source, which is a real
+#     `kb-build` run, not a unit assertion.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: that the split was worth making, only that
+# the assertions about it can fail.
+
+suites = ["tests/test_manifest_build_skip.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/manifest.py"
+old = '''_EXCLUDED_BUILDS = frozenset({"skip", "defer"})'''
+new = '''_EXCLUDED_BUILDS = frozenset({"skip", "defer"})  # control'''
+
+# ── D1: the layer-2 bug — the exclusion predicate must admit `defer` ───────
+# The REALISTIC break, and the one that was actually present after the parser
+# change landed: the consumer still asks the old question. Reverting `is_built`
+# to the literal comparison reproduces it exactly, and a deferred source is then
+# cloned and extracted despite being excluded.
+[[arm]]
+id = "D1"
+test = "test_a_deferred_source_is_dropped_before_the_clone"
+file = "python/src/kb_setup/manifest.py"
+old = '''        return self.build not in _EXCLUDED_BUILDS'''
+new = '''        return self.build != "skip"'''
+
+# ── D2: a deferral with no stated reason must be refused ──────────────────
+# The realistic break is the validator never being added — the shape a
+# copy-of-the-skip-branch edit leaves when only one branch gets written.
+[[arm]]
+id = "D2"
+test = "test_build_defer_without_a_reason_is_refused"
+file = "python/src/kb_setup/manifest.py"
+old = '''    if build == "defer" and not defer_reason:'''
+new = '''    if False and build == "defer" and not defer_reason:'''
+
+# ── D3: the build log must name WHICH exclusion state ─────────────────────
+# Printing only the reason leaves `skip` and `defer` indistinguishable in the
+# one place the distinction is consumed. The realistic break is the older
+# wording surviving the change, since it still reads correctly for `skip`.
+[[arm]]
+id = "D3"
+test = "test_a_deferred_source_announces_its_state_not_just_its_reason"
+file = "python/src/kb_setup/graph.py"
+old = '''            print(f"  [excluded] {m.name}: build = {m.build} — {m.exclusion_reason}")'''
+new = '''            print(f"  [excluded] {m.name}: build = skip — {m.exclusion_reason}")'''
+
+# ── D4: a reason belonging to a state the manifest is NOT in is refused ───
+# The realistic edit is restoring a source: flipping `build` back to `include`
+# and leaving the justification line underneath it, where it then reads as the
+# reason for the state the manifest is now in.
+[[arm]]
+id = "D4"
+test = "test_a_reason_for_a_state_the_manifest_is_not_in_is_refused"
+file = "python/src/kb_setup/manifest.py"
+old = '''    if build != "skip" and skip_reason:'''
+new = '''    if False and skip_reason:'''
+
+# ── D5: `exclusion_reason` must read the field the CURRENT state requires ──
+# The realistic break is the property returning one field for both states —
+# the shape you get if the second branch is never written.
+[[arm]]
+id = "D5"
+test = "test_exclusion_reason_reads_whichever_field_the_state_requires"
+file = "python/src/kb_setup/manifest.py"
+old = '''        if self.build == "defer":
+            return self.defer_reason'''
+new = '''        if self.build == "defer":
+            return self.skip_reason'''

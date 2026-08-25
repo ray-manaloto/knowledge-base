@@ -5,7 +5,9 @@ The stamp answers "was a graph built, and by which version". It cannot answer
 "why is there no stamp", and those two causes are not the same finding:
 
 * **never run** — a fresh clone. A scheduling item. `mise run kb-build`.
-* **ran and failed** — a DEFECT. `mise run kb-build` will fail again.
+* **ran and failed** — a DEFECT, until re-verified. The record does not
+  re-test its own cause, so `describe()` no longer asserts the next attempt
+  fails too — a code fix can land without the record knowing it.
 
 `kb-currency-check` reported *"artifacts have never been stamped — rebuild
 pending"* for both, and several handoffs in a row carried the resulting defect
@@ -63,7 +65,7 @@ _SCHEMA_VERSION = 1
 #: says the build is broken or that re-running it will fail again. (Cold lane, P2.)
 INTERRUPTED = "interrupted"
 
-#: An ordinary build failure — a defect, and it will recur.
+#: An ordinary build failure — a defect. Not asserted to recur: see `describe`.
 FAILED = "failed"
 
 #: A failure summary is a rendered exception and can be a 900-character detect
@@ -216,6 +218,16 @@ def describe(repo_root: Path, *, stamp_built_at: str = "") -> Outcome | None:
     symmetric: wrongly ignoring a live failure reports OK for a broken build,
     which is #397 itself, while wrongly keeping a stale one reports a defect that
     a single successful build clears.
+
+    The FAILED message itself does not claim to know the future. It used to
+    read "re-running `mise run kb-build` will fail again" — a flat prediction
+    from a note this function never re-tests. A record naming a file that no
+    longer existed anywhere in the repo kept printing that exact sentence on
+    every session start for three days, because nothing about reading a stale
+    record on disk can know a fix landed since. The message now says the record
+    does not re-test its own cause, and leaves the future to an actual re-run —
+    still a DEFECT (a build genuinely failed, and this record still blocks until
+    superseded), just not a promise about what has not been tried again.
     """
     failure = read(repo_root)
     if failure is None:
@@ -237,7 +249,10 @@ def describe(repo_root: Path, *, stamp_built_at: str = "") -> Outcome | None:
     return Outcome(
         FAILED,
         f"a build RAN AND FAILED{stage} ({when}) — this is a DEFECT, not a pending "
-        f"rebuild; re-running `mise run kb-build` will fail again{detail}",
+        f"rebuild. This record does not re-test its own cause, so it is not a "
+        f"guarantee the next attempt fails too — a fix can land without this "
+        f"record knowing it. Only a fresh `mise run kb-build` can confirm whether "
+        f"it still does{detail}",
     )
 
 

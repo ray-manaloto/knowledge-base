@@ -290,9 +290,28 @@ def test_live_eligibility_census_is_exactly_the_two_mise_only_pins() -> None:
 
     What keeps this honest is that it stays an exact tuple. A tool that becomes
     eligible without anyone intending it still turns this red.
+
+    **It did exactly that on 2026-08-24, and this is what the update looks like.**
+    Pinning `npm:ctx7` and `npm:firecrawl-cli` — both exact, both mise-only, neither
+    python-package-owned nor manifest-bearing — took the census from two to four, and
+    this assertion is what caught it. That is the docstring above working as designed:
+    the growth is intended, so the tuple moves and stays exact rather than being
+    loosened to a count or a subset check.
+
+    Worth knowing WHY both qualify, since it is not obvious from `currency.toml`:
+    eligibility turns on `_selection`'s refusals, not on whether upstream can be
+    checked. `ctx7` deliberately carries no `github` key — its repo publishes the
+    plugin and the CLI under different version series, so an upstream comparison
+    there would be wrong rather than merely absent — and that omission does not
+    disqualify it here.
     """
     repo_root = Path(__file__).parents[1]
-    assert tool_sync.eligible_tools(repo_root) == ("antigravity-cli", "ffmpeg")
+    assert tool_sync.eligible_tools(repo_root) == (
+        "antigravity-cli",
+        "ctx7",
+        "ffmpeg",
+        "firecrawl-cli",
+    )
 
 
 def test_unexpected_exception_is_redacted_after_rollback(tmp_path, monkeypatch, capsys) -> None:

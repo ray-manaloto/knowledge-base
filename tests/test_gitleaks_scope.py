@@ -66,6 +66,10 @@ _MUST_SKIP = (
     # `gitleaks dir` walks directories so it landed in scope the moment it
     # existed (86 findings, ~500 MB scanned). Gitignored and pinned as such.
     ".agent/telemetry/ff431a36-b0bf-4af8-9f00-12cac7a6abe2.request.json",
+    # `kb-graphify-native-extract`'s own output tree: same content-hash noise
+    # shape as `.self-graph/`, confirmed on the real 2026-08-23 run.
+    ".agent/kb/native-extract/graphify-out/cache/stat-index.json",
+    ".agent/kb/native-extract/graphify-out/graph.json",
 )
 
 

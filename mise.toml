@@ -148,8 +148,10 @@ gh = "2.98.0"
 # `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
-codex = "0.149.0"
+codex = "0.149.1"
 antigravity-cli = "1.1.19"
+"npm:ctx7" = { version = "0.5.8", minimum_release_age = "0s" }
+"npm:firecrawl-cli" = "1.23.1"
 
 [deps.uv]
 auto = true
@@ -696,40 +698,18 @@ run = "uv run kb-setup graphify-contract"
 description = "Build or verify the pinned Graphify-only deterministic AST candidate"
 run = "uv run kb-setup graphify-baseline"
 
-[tasks.kb-graphify-semantic-slice]
-description = "Preflight, run, or verify the pinned real-Claude Graphify semantic slice"
-run = "uv run kb-setup graphify-semantic-slice"
-# A wall-clock hang guard, not a budget: this is one provider call under
-# SLICE_PROFILE (Haiku, `max_output_tokens=4096`, `effort=""`) — a much smaller,
-# faster profile than the corpus's CORPUS_PROFILE (Opus, 8192, effort high)
-# that `_INFERENCE_TIMEOUT_SECONDS`'s 659.5s lower bound describes; that figure
-# sizes the CORPUS task below, not this one. The one committed slice run took
-# 54.6s elapsed and cost $0.0557 (`graphify-out/graphify-semantic-slice/
-# adapter-metadata.json`: duration_ms 54203, total_cost_usd 0.0557). 30m is
-# headroom sized for outlier variance (retries, a slow network) above THAT
-# measured shape, not a reuse of the corpus's much larger one.
-timeout = "30m"
-
-[tasks.kb-graphify-semantic-corpus]
-description = "Plan, run, verify, or record complete pinned Graphify semantic coverage"
-run = "uv run kb-setup graphify-semantic-corpus"
-# A wall-clock hang guard, NOT the spend cap — `_MAX_TOTAL_COST_USD` already
-# bounds the money. A restart is NOT free at this layer either:
-# `_verified_stages` re-publishes already-staged chunks so their evidence is
-# not duplicated, but Graphify re-buys every chunk in the corpus at full price
-# on every restart (no incremental-cache read on this entry point — see the
-# `graphify_no_incremental_cache` comment in `graphify_semantic_corpus.py`).
-# 26 chunks (post-dedupe, #414; was 58 pre-dedupe) at the measured ~11
-# min/chunk projects to ~4.8h; 16h is roughly 3.3x that (was ~1.5x pre-dedupe),
-# so a genuinely wedged run is caught without the guard firing on ordinary
-# variance. One task dispatches `plan`/`run`/`verify` by argument, so this
-# same 16h leash also bounds the provider-free `plan` and `verify` actions —
-# mise has no per-argument timeout.
-timeout = "16h"
-
-[tasks.kb-graphify-semantic-corpus-merge]
-description = "Assemble staged Graphify semantic-corpus chunks into one committed doc chunk"
-run = "uv run kb-setup graphify-semantic-corpus-merge"
+# [tasks.kb-graphify-native-extract] was REMOVED 2026-08-24 — the module it ran
+# (`kb_setup.graphify_native_extract`) is PARKED, not deleted. The cold review of
+# fa4ed551ac7e confirmed three blocking defects reachable only through this task
+# and its CLI subcommand: `--out --dry-run` silently runs a REAL extraction (#479),
+# an inherited GRAPHIFY_OUT bypasses the --out guard entirely (#480), and the two
+# functions that spawn the subprocess have zero test coverage — stubbing both to
+# `return 0` leaves all 42 tests green (#481). Removing the task and the `cli.py`
+# dispatch together is what makes those paths unreachable; the module and its
+# tests stay in the tree as groundwork. Restore both together, and only once
+# #479/#480/#481 are closed. It is a STOPGAP for the SDK path, never the
+# destination (`docs/archive/README.md`), so reviving it is a decision to take,
+# not a repair to perform.
 
 [tasks.kb-skillopt-contract]
 description = "Verify the exact SkillOpt VCS provenance, reviewed API/CLI, lock, and isolated mock dry-run"

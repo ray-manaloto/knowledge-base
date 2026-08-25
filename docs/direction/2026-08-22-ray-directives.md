@@ -203,3 +203,37 @@ Measured at the moment of the directive, for item 2 (re-derive before acting):
 - `mise.toml:143` pins `antigravity-cli = "1.1.17"`, yet the binary at `~/.local/share/mise/installs/antigravity-cli/1.1.17/agy` prints **`1.1.19`** — the install dir name and the binary disagree (a self-update or a stale-PATH-class skew; `the-stale-path-skew-is-live`). `currency.toml:1777` carries `[tool.antigravity-cli]` (mise_key, `binary = "agy"`, `github = "google-antigravity/antigravity-cli"`), so `mise run kb-currency-check` is the instrument.
 - The plugin cache holds `antigravity-for-claude-code/antigravity/0.23.0` and `0.24.0`; this session's Gemini reviews ran through `agy-delegate` from `0.24.0` with `--tier pro --sandbox --mode plan`, prompt + diff on stdin (the kb-review skill names `antigravity:review` as the cold lane for codex-authored diffs; the `--adversarial` flag was NOT used). `.claude/settings.json:81` enables `antigravity@antigravity-for-claude-code`, `:99-102` names the marketplace `yuting0624/antigravity-for-claude-code`.
 - `sources/` has `antigravity-plugin-cc-chris` and `antigravity-plugin-cc-marcos` manifests, NOT yuting0624's plugin — it is neither a corpus source nor a currency row today.
+
+### ADDENDUM (c) — 2026-08-23, wiring the native extraction — VERBATIM
+
+Asked how to reconcile the native-extraction run against the existing bespoke
+corpus layer, Ray answered with a ruling rather than a preference. VERBATIM:
+
+> just do native graphify extract/reflection/generate output. stop doing internal hashing
+
+A native `graphify extract --mode deep --backend claude-cli` run over
+`sources/graphify` (`mise run kb-graphify-native-extract`) confirmed
+EXTRACTION works cleanly at the pinned 0.9.48 — 19/19 chunks, no
+prose-wrapping — which is the fact this ruling is measured against: the
+bespoke `graphify_semantic_corpus*`/`graphify_semantic_slice`/
+`graphify_semantic_adapter` layer's per-file-slice hashing/chunking exists
+because an earlier version of graphify's `claude-cli` backend reportedly
+could not do this natively (#2076); that premise no longer holds for
+extraction. That layer is **not deleted** — it has its own receipts, spend
+caps and retained provider evidence (#317), and the corpus-integrity gate is
+currently RED on chunk 0009, so removing it now would destroy the evidence of
+why. Retiring it is a separate, later decision, tracked as open.
+
+**Wiring this ruling into the corpus is deliberately NOT done in this round.**
+The native run produced a queryable graph (13,442 nodes / 26,791 edges / 692
+communities) that cannot be merged into the aggregate `graphify-out/graph.json`
+at the current ~772 MB scale (`graphify merge-graphs`'s 50 MB-per-input cap,
+confirmed against the installed 0.9.48 source) — so where its output should
+live (tracked in git vs. left local, and at what size) and how it should be
+queried remain open questions. The user asked what graphify's own best
+practice is for this before deciding, and that research was still running
+when this addendum was written. The documentation changes landed this round
+are the ones that hold regardless of how that question resolves: the
+refuted-claim corrections above and this ruling recorded verbatim. Nothing
+under `sources/graphify-native-extract/` (or any `.gitignore` change enabling
+it) is committed here.

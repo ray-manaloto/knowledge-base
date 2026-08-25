@@ -118,6 +118,30 @@ incident: unbounded wait + pipe-masked exit code.
    (and its process group), then diagnose from the log tail. Re-running
    under a timeout is cheaper than waiting on a corpse.
 
+4a. **0% CPU WITH a deep child chain is a BLOCKING CHAIN, and it may be a
+   RECURSION — read `ps -o pid,ppid` before diagnosing.** Rule 4's signature is
+   "no children"; the opposite case reads identically at the top and is a
+   different bug. On 2026-08-24 `npm:renovate@44.37.1` made every `mise run`
+   here hang. It was recorded as *"mise exits rc=0 and installs nothing — a
+   silent-failure defect in mise's npm backend"*, and every observable in that
+   sentence was real. One PPID column refuted it: the install was **its own
+   descendant**. `node-gyp` on PATH is a **mise shim**, and a shim auto-installs
+   missing tools, so `dtrace-provider`'s `node-gyp` postinstall re-entered the
+   very install it was part of — one level deeper every ~16 minutes, every level
+   blocked on its child, the whole tree at 0.0% CPU. It held mise's install lock,
+   which is what starved this repo's SessionEnd hooks into `Hook cancelled`.
+
+   The fix was 12.63 s and touched no pin: kill the process **group**
+   (`kill -TERM -<pgid>`), then reinstall with the shim dir stripped from PATH.
+   The class is larger than renovate — **any** npm-backend tool whose native
+   postinstall calls a binary mise also shims recurses this way while it is
+   missing. And note what the wrong diagnosis cost: it was not the hang, it was
+   a handoff instructing the next session to export `MISE_DISABLE_TOOLS` forever
+   and to treat the fix as someone else's, which put the real one-command remedy
+   outside the space that session was searching. **A workaround that works is not
+   a diagnosis** — `MISE_DISABLE_TOOLS` even control-armed the finding (2.6 s vs
+   >120 s), which is exactly what made it persuasive enough to be written down.
+
 5. **hk specifics.** hk parallelises via per-file read/write locks *within* a
    run. Two log lines look alarming and are not the same thing:
    - `failed to get write locks …` is **DEBUG-level and non-fatal** — a retry

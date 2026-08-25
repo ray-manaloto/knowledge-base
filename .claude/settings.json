@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -C \"${CLAUDE_PROJECT_DIR:-.}\" -- graphify hook-guard search",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}/.venv/bin/graphify\" hook-guard search",
             "timeout": 15
           }
         ]
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -C \"${CLAUDE_PROJECT_DIR:-.}\" -- graphify hook-guard read",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}/.venv/bin/graphify\" hook-guard read",
             "timeout": 15
           }
         ]
@@ -88,7 +88,12 @@
     "plugin-eval@claude-code-workflows": true,
     "codex@openai-codex": true,
     "mcp2cli@claude-community": true,
-    "eli5@claude-community": true
+    "eli5@claude-community": true,
+    "firecrawl@firecrawl": true,
+    "firecrawl@claude-plugins-official": false,
+    "exa@exa": true,
+    "context7@context7-marketplace": true,
+    "last30days@last30days-skill": true
   },
   "extraKnownMarketplaces": {
     "fable-orchestrator": {
@@ -120,7 +125,32 @@
         "source": "github",
         "repo": "wshobson/agents"
       }
+    },
+    "firecrawl": {
+      "source": {
+        "source": "github",
+        "repo": "firecrawl/firecrawl-claude-plugin"
+      }
+    },
+    "exa": {
+      "source": {
+        "source": "github",
+        "repo": "exa-labs/exa-mcp-server"
+      }
+    },
+    "context7-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "upstash/context7"
+      }
+    },
+    "last30days-skill": {
+      "source": {
+        "source": "github",
+        "repo": "mvanhorn/last30days-skill"
+      }
     }
   },
-  "teammateMode": "auto"
+  "teammateMode": "auto",
+  "outputStyle": "ELI5 Visual"
 }

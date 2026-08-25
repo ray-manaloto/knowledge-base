@@ -1,0 +1,822 @@
+<title>Sixteen Commits, No Passport</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Source+Sans+3:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ground: #F4F5F9;
+    --surface: #FFFFFF;
+    --surface-2: #EAEDF4;
+    --ink: #161C2E;
+    --ink-2: #3D465F;
+    --muted: #757F99;
+    --rule: #D3D9E5;
+    --stop: #B33C29;
+    --stop-soft: #F6E6E2;
+    --go: #1B6F62;
+    --go-soft: #DFEFEB;
+    --hold: #96690F;
+    --hold-soft: #F5EBD7;
+    --accent: #3A4FA0;
+    --shadow: 0 1px 2px rgba(22,28,46,.06), 0 8px 24px rgba(22,28,46,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0E1119;
+      --surface: #171C28;
+      --surface-2: #1F2637;
+      --ink: #E4E8F2;
+      --ink-2: #B4BCCF;
+      --muted: #808AA3;
+      --rule: #2C3446;
+      --stop: #E88A76;
+      --stop-soft: #2E1D19;
+      --go: #6FC7B4;
+      --go-soft: #142A26;
+      --hold: #D8AC55;
+      --hold-soft: #2B2314;
+      --accent: #93A5E8;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0E1119;
+    --surface: #171C28;
+    --surface-2: #1F2637;
+    --ink: #E4E8F2;
+    --ink-2: #B4BCCF;
+    --muted: #808AA3;
+    --rule: #2C3446;
+    --stop: #E88A76;
+    --stop-soft: #2E1D19;
+    --go: #6FC7B4;
+    --go-soft: #142A26;
+    --hold: #D8AC55;
+    --hold-soft: #2B2314;
+    --accent: #93A5E8;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  h1, h2, h3 {
+    font-family: Fraunces, Georgia, "Times New Roman", serif;
+    text-wrap: balance;
+    margin: 0;
+    letter-spacing: -0.012em;
+  }
+  h1 { font-size: clamp(2.1rem, 5.4vw, 3.1rem); font-weight: 600; line-height: 1.08; }
+  h2 { font-size: clamp(1.35rem, 3vw, 1.72rem); font-weight: 600; line-height: 1.18; }
+  h3 { font-size: 1.06rem; font-weight: 600; line-height: 1.3; }
+  p { margin: 0 0 1em; max-width: 66ch; color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 600; }
+  code, .mono { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; font-size: .86em; }
+  code { background: var(--surface-2); padding: .12em .38em; border-radius: 3px; color: var(--ink); }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", monospace;
+    font-size: .70rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  /* ---- manifest header ---- */
+  header.manifest {
+    border-top: 3px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 26px 0 22px;
+    margin: 44px 0 40px;
+  }
+  header.manifest h1 { margin: 10px 0 16px; }
+  .lede { font-size: 1.12rem; color: var(--ink-2); max-width: 60ch; margin: 0; }
+
+  .stamps { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+  .stamp {
+    display: inline-flex; align-items: baseline; gap: 8px;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 7px 12px;
+    background: var(--surface);
+    font-family: "JetBrains Mono", monospace;
+    font-size: .78rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .stamp b { font-weight: 600; font-size: .95rem; }
+  .stamp .k { color: var(--muted); text-transform: uppercase; letter-spacing: .09em; font-size: .68rem; }
+  .stamp.stop { background: var(--stop-soft); border-color: var(--stop); color: var(--stop); }
+  .stamp.go   { background: var(--go-soft);   border-color: var(--go);   color: var(--go); }
+  .stamp.hold { background: var(--hold-soft); border-color: var(--hold); color: var(--hold); }
+  .stamp.stop .k, .stamp.go .k, .stamp.hold .k { color: inherit; opacity: .8; }
+
+  section { margin: 0 0 56px; }
+  section > .eyebrow { display: block; margin-bottom: 6px; }
+  section > h2 + p { margin-top: 12px; }
+
+  figure {
+    margin: 26px 0;
+    padding: 22px 20px 16px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+  }
+  figure svg { display: block; width: 100%; max-width: 100%; height: auto; min-width: 460px; }
+  figcaption {
+    margin-top: 14px; padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    font-size: .86rem; color: var(--muted); max-width: 68ch;
+  }
+  figcaption b { color: var(--ink-2); }
+
+  /* mermaid needs a plate that stays light in both themes */
+  .plate { background: #FBFBFD; border-radius: 4px; padding: 12px 8px; }
+  pre.mermaid { background: transparent; margin: 0; text-align: center; }
+
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); box-shadow: var(--shadow); }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-family: "JetBrains Mono", monospace; font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.mono { font-family: "JetBrains Mono", monospace; font-size: .8rem; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; font-family: "JetBrains Mono", monospace; font-size: .66rem; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; white-space: nowrap; }
+  .pill.stop { background: var(--stop-soft); color: var(--stop); }
+  .pill.hold { background: var(--hold-soft); color: var(--hold); }
+  .pill.go   { background: var(--go-soft);   color: var(--go); }
+  .pill.new  { background: var(--surface-2); color: var(--ink-2); }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    padding: 2px 0 2px 18px;
+    margin: 24px 0;
+  }
+  .note.stop { border-left-color: var(--stop); }
+  .note p:last-child { margin-bottom: 0; }
+
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 22px 0; display: grid; gap: 14px; }
+  ol.steps li {
+    counter-increment: s;
+    display: grid; grid-template-columns: 30px 1fr; gap: 14px;
+    color: var(--ink-2);
+  }
+  ol.steps li::before {
+    content: counter(s);
+    font-family: "JetBrains Mono", monospace; font-size: .78rem; font-weight: 600;
+    color: var(--muted);
+    border: 1px solid var(--rule); border-radius: 50%;
+    width: 26px; height: 26px; display: grid; place-items: center;
+    margin-top: 2px;
+  }
+  ol.steps li b { color: var(--ink); }
+
+  footer { border-top: 1px solid var(--rule); padding-top: 22px; color: var(--muted); font-size: .84rem; }
+  footer p { color: var(--muted); }
+  @media (prefers-reduced-motion: no-preference) { a { transition: opacity .15s ease; } }
+</style>
+
+<div class="wrap">
+
+<header class="manifest">
+  <span class="eyebrow">Session resume · 24 August 2026</span>
+  <h1>Sixteen Commits,<br>No Passport</h1>
+  <p class="lede">The branch <code>corpus-partial-merge-20260823</code> holds a full round of finished work and cannot leave the machine. One missing file is why — plus five tool-version drifts and a debt chain four handoffs deep.</p>
+  <div class="stamps">
+    <span class="stamp"><span class="k">branch</span><b>corpus-partial-merge-20260823</b></span>
+    <span class="stamp"><span class="k">ahead of main</span><b>16</b></span>
+    <span class="stamp go"><span class="k">tree</span><b>clean</b></span>
+    <span class="stamp stop"><span class="k">review receipt</span><b>0 found</b></span>
+    <span class="stamp stop"><span class="k">open PR</span><b>none</b></span>
+    <span class="stamp hold"><span class="k">currency drift</span><b>5</b></span>
+  </div>
+</header>
+
+<section>
+  <span class="eyebrow">The blocker</span>
+  <h2>The gate wants a receipt that nobody wrote</h2>
+  <p>Shipping here is a line of turnstiles. Every commit walks it in order, and each turnstile checks one thing. The one that stops this branch is the third: <code>kb-ship</code> refuses to push unless a review receipt exists <em>for the exact commit at the tip</em>.</p>
+  <p>There are receipts on disk — seventy-four of them. <strong>None is an ancestor of the current tip</strong>, so as far as the gate is concerned there are none at all.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 250" role="img" aria-label="A five-stage ship pipeline: sixteen commits pass the clean-tree check, then stop at kb-ship because the review receipt slot for the tip commit is empty. The stages after it — pull request and kb-land — are never reached.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+        <marker id="ar-stop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#B33C29"/>
+        </marker>
+      </defs>
+
+      <g font-family="'JetBrains Mono', monospace" font-size="12" fill="currentColor">
+
+        <!-- stage 1: commits -->
+        <rect x="8" y="72" width="128" height="62" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="72" y="97" text-anchor="middle" font-size="19" font-weight="600">16</text>
+        <text x="72" y="118" text-anchor="middle" font-size="10.5" opacity=".72">commits</text>
+
+        <line x1="140" y1="103" x2="182" y2="103" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+
+        <!-- stage 2: clean tree -->
+        <rect x="186" y="72" width="128" height="62" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="250" y="98" text-anchor="middle" font-size="11.5">clean tree</text>
+        <text x="250" y="117" text-anchor="middle" font-size="15" font-weight="600" fill="#1B6F62">PASS</text>
+
+        <line x1="318" y1="103" x2="360" y2="103" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+
+        <!-- receipt slot, empty, feeding down into kb-ship -->
+        <rect x="364" y="8" width="150" height="48" rx="4" fill="none" stroke="#B33C29" stroke-width="1.6" stroke-dasharray="5 4"/>
+        <text x="439" y="28" text-anchor="middle" font-size="10.5" fill="#B33C29">receipt-&lt;tip sha&gt;.json</text>
+        <text x="439" y="45" text-anchor="middle" font-size="11.5" font-weight="600" fill="#B33C29">MISSING</text>
+        <line x1="439" y1="60" x2="439" y2="68" stroke="#B33C29" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#ar-stop)"/>
+        <text x="524" y="40" font-size="10" fill="#B33C29" opacity=".95">written by</text>
+        <text x="524" y="53" font-size="10" fill="#B33C29" opacity=".95">kb-review</text>
+
+        <!-- stage 3: kb-ship, the stop -->
+        <rect x="364" y="72" width="150" height="62" rx="4" fill="#F6E6E2" stroke="#B33C29" stroke-width="2"/>
+        <text x="439" y="98" text-anchor="middle" font-size="11.5" fill="#B33C29" font-weight="600">kb-ship</text>
+        <text x="439" y="117" text-anchor="middle" font-size="15" font-weight="600" fill="#B33C29">REFUSES</text>
+
+        <!-- blocked arrow -->
+        <line x1="518" y1="103" x2="556" y2="103" stroke="#B33C29" stroke-width="1.4" stroke-dasharray="4 4"/>
+        <line x1="562" y1="88" x2="578" y2="118" stroke="#B33C29" stroke-width="2.4"/>
+        <line x1="578" y1="88" x2="562" y2="118" stroke="#B33C29" stroke-width="2.4"/>
+
+        <!-- unreached stages -->
+        <rect x="596" y="72" width="120" height="62" rx="4" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".34"/>
+        <text x="656" y="98" text-anchor="middle" font-size="11.5" opacity=".34">pull request</text>
+        <text x="656" y="117" text-anchor="middle" font-size="10.5" opacity=".34">not reached</text>
+
+        <line x1="720" y1="103" x2="750" y2="103" stroke="currentColor" stroke-width="1.2" opacity=".34" marker-end="url(#ar)"/>
+
+        <rect x="754" y="72" width="118" height="62" rx="4" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".34"/>
+        <text x="813" y="98" text-anchor="middle" font-size="11.5" opacity=".34">kb-land</text>
+        <text x="813" y="117" text-anchor="middle" font-size="10.5" opacity=".34">not reached</text>
+
+        <!-- the 23 receipts that do not count -->
+        <rect x="364" y="170" width="150" height="56" rx="4" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".45"/>
+        <text x="439" y="192" text-anchor="middle" font-size="11" opacity=".6">74 older receipts</text>
+        <text x="439" y="210" text-anchor="middle" font-size="10.5" opacity=".6">0 ancestors of tip</text>
+        <line x1="439" y1="166" x2="439" y2="140" stroke="currentColor" stroke-width="1.2" opacity=".45" stroke-dasharray="3 3"/>
+        <text x="524" y="196" font-size="10" opacity=".55">wrong commit,</text>
+        <text x="524" y="209" font-size="10" opacity=".55">so invisible here</text>
+      </g>
+    </svg>
+    <figcaption><b>The gate is keyed to the commit, not to the branch.</b> A receipt proves that <em>these exact bytes</em> were cold-reviewed, so an older one never carries forward. Measured this session: <code>git rev-list --count main..HEAD</code> → 16; every receipt filename tested with <code>git merge-base --is-ancestor</code> → zero hits.</figcaption>
+  </figure>
+
+  <div class="note stop">
+    <p><strong>Unblocking is one command chain, not a fix:</strong> run <code>kb-review</code> → <code>mise run kb-review-receipt</code> → <code>mise run kb-ship</code>. Nothing is broken; the round simply never closed.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Owed, and live right now</span>
+  <h2>Why the pinned clone keeps drifting</h2>
+  <p>The session-start check reports that <code>sources/graphify/</code> sits at <code>b2cd3626</code> while its manifest pins <code>cdfb11c0</code>. That is not someone forgetting to reset a directory — it is a structural consequence of how a frozen manifest resolves its clone path.</p>
+  <p>A manifest can be frozen to a <em>commit</em>, but its <em>directory</em> is computed from the source's <strong>name alone</strong>. So two different pins of the same source resolve to the same folder on disk, and the checkout happens <em>in place</em>.</p>
+
+  <figure>
+    <div class="plate">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#FBFBFD','primaryColor':'#FFFFFF','primaryTextColor':'#161C2E','primaryBorderColor':'#757F99','lineColor':'#3D465F','fontSize':'13px','fontFamily':'JetBrains Mono, monospace'}}}%%
+flowchart TD
+  A["_authorized_source_manifest()"] -->|"freezes<br/>commit = cdfb11c0"| B["frozen manifest"]
+  A -.->|"does NOT freeze<br/>clone_dir"| B
+  B --> C["clone_dir property<br/>manifest.py:85-88"]
+  C -->|"path.parent / <b>name</b><br/>commit not in the path"| D[("sources/graphify/<br/>one shared folder")]
+  E["any other pin<br/>of the same source"] --> C
+  D --> F["_ensure_clone<br/>graph.py:643-657"]
+  F -->|"git checkout --detach m.commit<br/><b>in place</b>"| D
+  D --> G["clone now at b2cd3626<br/>manifest still says cdfb11c0"]
+  G --> H["currency check reports DRIFT"]
+
+  style D fill:#F5EBD7,stroke:#96690F,stroke-width:2px
+  style G fill:#F6E6E2,stroke:#B33C29,stroke-width:2px
+  style H fill:#F6E6E2,stroke:#B33C29,stroke-width:2px
+</pre>
+    </div>
+    <figcaption><b>The missing freeze is the whole bug.</b> Both citations were read in this session: <code>manifest.py:85-88</code> returns <code>self.path.parent / self.name</code> — no commit anywhere in the path — and <code>graph.py:643-657</code> runs <code>git checkout --quiet --detach m.commit</code> against that shared directory. Ray ruled this bundled into the dependency-sync task rather than fixed on its own.</figcaption>
+  </figure>
+
+  <div class="note">
+    <p><strong>Manual reset until then:</strong> <code>git -C sources/graphify checkout -q cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8</code></p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Re-derived this session</span>
+  <h2>Five drifts, not three</h2>
+  <p>The handoff warned that its own drift list was stale and told the next session to re-derive rather than trust it. Re-derived: <strong>five</strong>, plus one item that could not be checked at all. Two are new since the handoff was written — the <code>codex</code> manifest drift was created by this very round's own version bump.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Tool</th><th>Kind</th><th>What disagrees</th><th>State</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">graphify</td><td class="mono">build-stamp</td>
+          <td>A build <b>ran and failed</b>. Re-running <code>kb-build</code> fails again — a syntax error in a vendored template file stops extraction.</td>
+          <td><span class="pill stop">defect</span></td>
+        </tr>
+        <tr>
+          <td class="mono">graphify</td><td class="mono">clone</td>
+          <td>Clone at <code>b2cd3626</code>, manifest pins <code>cdfb11c0</code> — the bug diagrammed above.</td>
+          <td><span class="pill stop">live</span></td>
+        </tr>
+        <tr>
+          <td class="mono">codex</td><td class="mono">manifest</td>
+          <td>Manifest pins <code>rust-v0.149.0</code>; mise installs <code>0.149.1</code>. The corpus describes code we do not run.</td>
+          <td><span class="pill new">new this round</span></td>
+        </tr>
+        <tr>
+          <td class="mono">mise</td><td class="mono">version</td>
+          <td>On PATH: <code>2026.8.12</code>. Reviewed: <code>2026.8.10</code>. It self-updated.</td>
+          <td><span class="pill hold">unreviewed</span></td>
+        </tr>
+        <tr>
+          <td class="mono">mise</td><td class="mono">manifest</td>
+          <td>Manifest pins <code>v2026.8.10</code> against a running <code>2026.8.12</code>.</td>
+          <td><span class="pill hold">unreviewed</span></td>
+        </tr>
+        <tr>
+          <td class="mono">skillopt</td><td class="mono">upstream</td>
+          <td>Pin is a git SHA, recorded upstream is <code>v0.2.0</code> — not comparable, so whether it is behind is <b>unknown</b>.</td>
+          <td><span class="pill new">not checked</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p><code>kb-currency-check</code> exits <b>0</b> even while reporting all of this — by design, since an out-of-date tool is a signal and not a failure. <strong>The exit code is not the answer here; the report is.</strong> That is exactly the trap the handoff's caveat pointed at.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Structural debt</span>
+  <h2>The chain that keeps getting carried</h2>
+  <p>Each handoff reconciles the one before it, marking every open item <em>carried</em>, <em>done</em>, or <em>dropped</em>. That works while items are named. Two of them stopped being named — they were carried <em>wholesale</em>, as a reference to a whole earlier section, and the contents have not been read out since.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 240" role="img" aria-label="Four handoffs a through d, each carrying the previous one forward. Two blocks are carried wholesale rather than item by item: one section is now four handoffs deep and another three, and neither has been enumerated.">
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="'JetBrains Mono', monospace" fill="currentColor">
+
+        <!-- the four handoffs -->
+        <g font-size="11.5">
+          <rect x="14" y="96" width="150" height="52" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="89" y="119" text-anchor="middle">session -a</text>
+          <text x="89" y="136" text-anchor="middle" font-size="10" opacity=".65">§6 catch-all</text>
+
+          <rect x="238" y="96" width="150" height="52" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="313" y="119" text-anchor="middle">session -b</text>
+          <text x="313" y="136" text-anchor="middle" font-size="10" opacity=".65">§6 block</text>
+
+          <rect x="462" y="96" width="150" height="52" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="537" y="119" text-anchor="middle">session -c</text>
+          <text x="537" y="136" text-anchor="middle" font-size="10" opacity=".65">§11 reconciles -b</text>
+
+          <rect x="686" y="96" width="180" height="52" rx="4" fill="#F5EBD7" stroke="#96690F" stroke-width="2"/>
+          <text x="776" y="119" text-anchor="middle" fill="#96690F" font-weight="600">session -d</text>
+          <text x="776" y="136" text-anchor="middle" font-size="10" fill="#96690F">you are here</text>
+        </g>
+
+        <!-- carry arrows -->
+        <g font-size="9.5" opacity=".8">
+          <line x1="168" y1="122" x2="232" y2="122" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar2)"/>
+          <text x="200" y="113" text-anchor="middle">carried</text>
+          <line x1="392" y1="122" x2="456" y2="122" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar2)"/>
+          <text x="424" y="113" text-anchor="middle">carried</text>
+          <line x1="616" y1="122" x2="680" y2="122" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar2)"/>
+          <text x="648" y="113" text-anchor="middle">carried</text>
+        </g>
+
+        <!-- the wholesale spans -->
+        <g stroke="#B33C29" stroke-width="2" fill="none">
+          <path d="M 89 92 L 89 44 L 776 44 L 776 90" stroke-dasharray="6 4"/>
+          <path d="M 313 152 L 313 196 L 776 196 L 776 154" stroke-dasharray="6 4"/>
+        </g>
+        <g font-family="'JetBrains Mono', monospace" font-size="10.5" fill="#B33C29">
+          <text x="432" y="34" text-anchor="middle" font-weight="600">carried WHOLESALE — 4 handoffs deep, never enumerated</text>
+          <text x="544" y="216" text-anchor="middle" font-weight="600">carried WHOLESALE — 3 handoffs deep, never enumerated</text>
+        </g>
+      </g>
+    </svg>
+    <figcaption><b>A wholesale carry is a pointer, not a list.</b> Each solid arrow moves named items forward one hop and can be audited. The two dashed spans move an entire unnamed section, so nothing checks whether its contents are still true or already done. The current handoff itself says to enumerate both this round rather than carry them a fifth time.</figcaption>
+  </figure>
+
+  <p>The mechanical check agrees, at a smaller scale: <code>mise run kb-handoff-check</code> reports <strong>41 citations OK, 3 ambiguous, 0 broken</strong> — the three ambiguous ones being two gotchas the previous handoff owed that this one never names, plus a gate claim whose block cites two different commits without saying which one the gates ran at.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Side finding</span>
+  <h2>The output style was being overridden locally</h2>
+  <p>Claude Code layers its settings, and the most local layer wins. The project asked for <code>ELI5 Visual</code>; a stale line in the machine-local file — the file the <code>/output-style</code> command writes to — was pinning <code>Concise</code> on top of it.</p>
+
+  <figure>
+    <svg viewBox="0 0 620 208" role="img" aria-label="Three settings layers stacked by precedence. The machine-local file pinned the Concise style and won over the project file's ELI5 Visual. Removing that one key lets the project setting take effect.">
+      <defs>
+        <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="'JetBrains Mono', monospace" font-size="11.5" fill="currentColor">
+        <text x="14" y="20" font-size="9.5" letter-spacing="1.4" opacity=".6">BEFORE</text>
+        <text x="330" y="20" font-size="9.5" letter-spacing="1.4" opacity=".6">AFTER</text>
+
+        <!-- before stack -->
+        <rect x="14" y="34" width="268" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".45"/>
+        <text x="26" y="52" opacity=".55">~/.claude/settings.json</text>
+        <text x="270" y="52" text-anchor="end" font-size="10" opacity=".55">— not set —</text>
+        <text x="26" y="68" font-size="9.5" opacity=".45">user</text>
+
+        <rect x="14" y="82" width="268" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".45"/>
+        <text x="26" y="100" opacity=".55">.claude/settings.json</text>
+        <text x="270" y="100" text-anchor="end" font-size="10" opacity=".55">"ELI5 Visual"</text>
+        <text x="26" y="116" font-size="9.5" opacity=".45">project · overridden</text>
+
+        <rect x="14" y="130" width="268" height="46" rx="3" fill="#F6E6E2" stroke="#B33C29" stroke-width="2"/>
+        <text x="26" y="150" fill="#B33C29">.claude/settings.local.json</text>
+        <text x="270" y="150" text-anchor="end" font-size="10" fill="#B33C29" font-weight="600">"Concise" ← WINS</text>
+        <text x="26" y="166" font-size="9.5" fill="#B33C29">machine-local · gitignored</text>
+
+        <!-- arrow -->
+        <line x1="292" y1="105" x2="318" y2="105" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar3)"/>
+
+        <!-- after stack -->
+        <rect x="336" y="34" width="268" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".45"/>
+        <text x="348" y="52" opacity=".55">~/.claude/settings.json</text>
+        <text x="592" y="52" text-anchor="end" font-size="10" opacity=".55">— not set —</text>
+        <text x="348" y="68" font-size="9.5" opacity=".45">user</text>
+
+        <rect x="336" y="82" width="268" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="2"/>
+        <text x="348" y="100" fill="#1B6F62">.claude/settings.json</text>
+        <text x="592" y="100" text-anchor="end" font-size="10" fill="#1B6F62" font-weight="600">"ELI5 Visual" ← WINS</text>
+        <text x="348" y="116" font-size="9.5" fill="#1B6F62">project · now in effect</text>
+
+        <rect x="336" y="130" width="268" height="46" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4" opacity=".55"/>
+        <text x="348" y="150" opacity=".6">.claude/settings.local.json</text>
+        <text x="592" y="150" text-anchor="end" font-size="10" opacity=".6">key removed</text>
+        <text x="348" y="166" font-size="9.5" opacity=".5">other keys untouched</text>
+      </g>
+    </svg>
+    <figcaption><b>Deleting one key was the whole fix.</b> The style took effect immediately — the session's own style banner flipped from <code>Concise</code> to <code>ELI5 Visual</code> within the same turn, which is the control arm proving the change landed rather than just being written. Note the local file is gitignored, so the fix is machine-local and any future <code>/output-style</code> pick will re-pin it.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <span class="eyebrow">The next task, re-scoped</span>
+  <h2>The update chain is broken in the middle</h2>
+  <p>The requirement is not "go update the tools." It is <strong>a command line that performs the whole update with zero agent work</strong>, built the way everything here is built: a skill calls a mise task, the task calls a python function. The only thing left for an agent is reading release notes to judge what affects this project.</p>
+  <p>Most of that chain already exists. One column of it does not — and it is the column that actually changes the pin.</p>
+
+  <figure>
+    <svg viewBox="0 0 940 312" role="img" aria-label="A grid of six update steps against three layers: skill, mise task, and python module. Every step has all three layers except the apply step, which has only the python module — no mise task and no skill mention — so the chain breaks there and a human must run the module by hand.">
+      <defs>
+        <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="'JetBrains Mono', monospace" fill="currentColor">
+
+        <!-- flow arrow across the top -->
+        <line x1="112" y1="20" x2="928" y2="20" stroke="currentColor" stroke-width="1" opacity=".3" marker-end="url(#ar4)"/>
+        <text x="112" y="13" font-size="8.5" letter-spacing="1.3" opacity=".5">ONE INVOCATION, LEFT TO RIGHT</text>
+
+        <!-- column headers -->
+        <g font-size="9.5" text-anchor="middle" opacity=".72">
+          <text x="178" y="42">detect drift</text>
+          <text x="316" y="42">read notes</text>
+          <text x="454" y="42">decide</text>
+          <text x="592" y="42">APPLY</text>
+          <text x="730" y="42">install + re-extract</text>
+          <text x="868" y="42">rebuild graph</text>
+        </g>
+        <text x="316" y="54" font-size="8" text-anchor="middle" fill="#96690F" font-weight="600">agent step</text>
+        <text x="592" y="54" font-size="8" text-anchor="middle" fill="#B33C29" font-weight="600">edits the pin</text>
+
+        <!-- row labels -->
+        <g font-size="9" text-anchor="end" opacity=".62">
+          <text x="100" y="92">SKILL</text>
+          <text x="100" y="154">MISE TASK</text>
+          <text x="100" y="216">PYTHON</text>
+        </g>
+
+        <!-- ===== SKILL row ===== -->
+        <g font-size="9">
+          <rect x="112" y="68" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="178" y="93" text-anchor="middle" fill="#1B6F62">tool-currency</text>
+
+          <rect x="250" y="68" width="132" height="42" rx="3" fill="#F5EBD7" stroke="#96690F" stroke-width="1.3"/>
+          <text x="316" y="88" text-anchor="middle" fill="#96690F">tool-currency</text>
+          <text x="316" y="101" text-anchor="middle" fill="#96690F" font-size="8">step 5 interview</text>
+
+          <rect x="388" y="68" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="454" y="93" text-anchor="middle" fill="#1B6F62">tool-currency</text>
+
+          <rect x="526" y="68" width="132" height="42" rx="3" fill="#F6E6E2" stroke="#B33C29" stroke-width="2"/>
+          <text x="592" y="87" text-anchor="middle" fill="#B33C29" font-weight="600">named at :86</text>
+          <text x="592" y="100" text-anchor="middle" fill="#B33C29" font-size="8">but it is a NO-OP</text>
+
+          <rect x="664" y="68" width="132" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity=".28"/>
+          <text x="730" y="93" text-anchor="middle" opacity=".38">—</text>
+
+          <rect x="802" y="68" width="132" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity=".28"/>
+          <text x="868" y="93" text-anchor="middle" opacity=".38">—</text>
+        </g>
+
+        <!-- ===== TASK row ===== -->
+        <g font-size="9">
+          <rect x="112" y="130" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="178" y="155" text-anchor="middle" fill="#1B6F62">kb-currency-check</text>
+
+          <rect x="250" y="130" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="316" y="155" text-anchor="middle" fill="#1B6F62">kb-currency</text>
+
+          <rect x="388" y="130" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="454" y="155" text-anchor="middle" fill="#1B6F62">kb-currency</text>
+
+          <rect x="526" y="130" width="132" height="42" rx="3" fill="#F6E6E2" stroke="#B33C29" stroke-width="2" stroke-dasharray="5 4"/>
+          <text x="592" y="149" text-anchor="middle" fill="#B33C29" font-weight="600">NO TASK</text>
+          <text x="592" y="163" text-anchor="middle" fill="#B33C29" font-size="8">arg is swallowed</text>
+
+          <rect x="664" y="130" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="730" y="150" text-anchor="middle" fill="#1B6F62" font-size="8.5">kb-tool-sync</text>
+          <text x="730" y="163" text-anchor="middle" fill="#1B6F62" font-size="8.5">kb-update</text>
+
+          <rect x="802" y="130" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="868" y="155" text-anchor="middle" fill="#1B6F62">kb-build</text>
+        </g>
+
+        <!-- ===== MODULE row ===== -->
+        <g font-size="9">
+          <rect x="112" y="192" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="178" y="217" text-anchor="middle" fill="#1B6F62">currency.sync</text>
+
+          <rect x="250" y="192" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="316" y="217" text-anchor="middle" fill="#1B6F62">currency.upstream</text>
+
+          <rect x="388" y="192" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="454" y="217" text-anchor="middle" fill="#1B6F62">currency.decide</text>
+
+          <rect x="526" y="192" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="2"/>
+          <text x="592" y="212" text-anchor="middle" fill="#1B6F62" font-weight="600">currency.apply</text>
+          <text x="592" y="225" text-anchor="middle" fill="#1B6F62" font-size="8">EXISTS, unreachable</text>
+
+          <rect x="664" y="192" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="730" y="217" text-anchor="middle" fill="#1B6F62">graph / tool_sync</text>
+
+          <rect x="802" y="192" width="132" height="42" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="868" y="217" text-anchor="middle" fill="#1B6F62">graph.build</text>
+        </g>
+
+        <!-- the break, called out -->
+        <g stroke="#B33C29" stroke-width="1.6" fill="none">
+          <path d="M 592 234 L 592 258 L 470 258 L 470 274" stroke-dasharray="5 4" marker-end="url(#ar4)"/>
+        </g>
+        <text x="462" y="290" text-anchor="end" font-size="9.5" fill="#B33C29" font-weight="600">a human types</text>
+        <text x="470" y="290" font-size="9.5" fill="#B33C29">uv run kb-setup currency apply --tool X</text>
+        <text x="470" y="303" font-size="8.5" fill="#B33C29" opacity=".85">— and only when all six gates pass; anything ambiguous is refused</text>
+      </g>
+    </svg>
+    <figcaption><b>The break is one column wide — and it is worse than a missing task.</b> The function is written and works; the two layers above it do not reach it, which is precisely the <em>skill → task → module</em> rule this repo enforces everywhere else. Two further stops sit past it: <code>apply</code> deliberately does not rebuild the graph, and its own docstring calls it <em>session-only — called only from the tool-currency skill, which a human is driving</em>.</figcaption>
+  </figure>
+
+  <div class="note stop">
+    <p><b>CORRECTION, added after this page was first published.</b> The first version of this figure said the skill <em>never names</em> <code>apply</code>. That was wrong, and the truth is worse — see below. Nothing else on the page changed.</p>
+  </div>
+
+  <h3 style="margin-top:36px">The documented apply command silently does nothing</h3>
+  <p>The <code>tool-currency</code> skill <em>does</em> name apply. Step 4 of its own procedure, in a runnable bash fence at <code>SKILL.md:86</code>:</p>
+  <div class="note stop">
+    <p><code>mise run kb-currency -- --tool &lt;name&gt; apply</code></p>
+  </div>
+  <p>That command runs the report and <strong>discards the word <code>apply</code></strong>. It exits 0, writes another page under <code>docs/currency/</code>, and edits no pin — indistinguishable from success to anyone following the documented steps.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 232" role="img" aria-label="The argv the documented command produces is parsed so that the mode is taken from the first positional word. Because the task already bakes in the word run, and the tool flag's value is skipped, the trailing word apply lands second in the positional list and is never read.">
+      <g font-family="'JetBrains Mono', monospace" fill="currentColor">
+        <text x="14" y="20" font-size="9" letter-spacing="1.3" opacity=".55">WHAT THE SKILL TELLS YOU TO TYPE</text>
+        <text x="14" y="42" font-size="12">mise run kb-currency -- --tool graphify apply</text>
+
+        <line x1="14" y1="56" x2="14" y2="72" stroke="currentColor" stroke-width="1.2" opacity=".5"/>
+        <text x="26" y="69" font-size="9" opacity=".6">mise appends the extra args to the task's own run line</text>
+
+        <text x="14" y="94" font-size="9" letter-spacing="1.3" opacity=".55">THE ARGV PYTHON ACTUALLY SEES</text>
+
+        <!-- argv tokens -->
+        <g font-size="11.5">
+          <rect x="14" y="106" width="72" height="34" rx="3" fill="#EAEDF4" stroke="#757F99" stroke-width="1.2"/>
+          <text x="50" y="128" text-anchor="middle">run</text>
+
+          <rect x="94" y="106" width="86" height="34" rx="3" fill="none" stroke="#757F99" stroke-width="1.2" stroke-dasharray="4 3" opacity=".7"/>
+          <text x="137" y="128" text-anchor="middle" opacity=".7">--tool</text>
+
+          <rect x="188" y="106" width="104" height="34" rx="3" fill="none" stroke="#757F99" stroke-width="1.2" stroke-dasharray="4 3" opacity=".7"/>
+          <text x="240" y="128" text-anchor="middle" opacity=".7">graphify</text>
+
+          <rect x="300" y="106" width="86" height="34" rx="3" fill="#F6E6E2" stroke="#B33C29" stroke-width="1.6"/>
+          <text x="343" y="128" text-anchor="middle" fill="#B33C29">apply</text>
+        </g>
+
+        <!-- annotations under tokens -->
+        <g font-size="8.5">
+          <text x="50" y="156" text-anchor="middle" opacity=".6">baked into</text>
+          <text x="50" y="167" text-anchor="middle" opacity=".6">the task</text>
+          <text x="188" y="156" text-anchor="middle" opacity=".6">flag + its value: both skipped</text>
+          <text x="188" y="167" text-anchor="middle" opacity=".6">cli.py:742-752</text>
+          <text x="343" y="156" text-anchor="middle" fill="#B33C29">your word</text>
+        </g>
+
+        <!-- the collapse -->
+        <line x1="440" y1="123" x2="486" y2="123" stroke="currentColor" stroke-width="1.4" opacity=".55"/>
+        <polygon points="486,118 496,123 486,128" fill="currentColor" opacity=".55"/>
+        <text x="463" y="113" font-size="8.5" text-anchor="middle" opacity=".6">collapses to</text>
+
+        <rect x="506" y="98" width="196" height="50" rx="3" fill="#EAEDF4" stroke="#757F99" stroke-width="1.2"/>
+        <text x="604" y="118" text-anchor="middle" font-size="10.5">positional = ["run", "apply"]</text>
+        <text x="604" y="136" text-anchor="middle" font-size="10.5" fill="#B33C29" font-weight="600">mode = positional[0]</text>
+
+        <line x1="712" y1="123" x2="748" y2="123" stroke="#B33C29" stroke-width="1.4"/>
+        <polygon points="748,118 758,123 748,128" fill="#B33C29"/>
+
+        <rect x="766" y="98" width="102" height="50" rx="3" fill="#F6E6E2" stroke="#B33C29" stroke-width="2"/>
+        <text x="817" y="119" text-anchor="middle" font-size="12" fill="#B33C29" font-weight="600">"run"</text>
+        <text x="817" y="137" text-anchor="middle" font-size="8.5" fill="#B33C29">not "apply"</text>
+
+        <!-- the working form -->
+        <line x1="14" y1="184" x2="866" y2="184" stroke="currentColor" stroke-width="1" opacity=".22"/>
+        <text x="14" y="204" font-size="9" letter-spacing="1.3" fill="#1B6F62">THE ONLY ARGV THAT REACHES apply()</text>
+        <text x="14" y="224" font-size="12" fill="#1B6F62">uv run kb-setup currency apply --tool graphify</text>
+        <text x="470" y="224" font-size="9" opacity=".6">— no mise task produces this</text>
+      </g>
+    </svg>
+    <figcaption><b>The mode is read from the first positional word, and the task already spent it.</b> Confirmed by reading <code>cli.py:735-765</code> directly, not from a lane's summary: the value-flag skip at <code>:742-752</code> drops <code>--tool</code> and its value, leaving <code>["run", "apply"]</code>, and <code>:754</code> takes element zero. Armed both directions on the real parsing logic — <code>['run','--tool','graphify','apply']</code> → <code>run</code>; <code>['--tool','graphify','apply']</code> → <code>apply</code>. Nothing catches this: the hk <code>skill_lint</code> step checks skill fences against the task-redirect table, and this command <em>is</em> the sanctioned task.</figcaption>
+  </figure>
+
+  <div class="note stop">
+    <p><strong>So the work is not "run the updates" — it is closing that column and the seams after it,</strong> so one invocation carries a tool from drift-detected to graph-rebuilt. The agent's only remaining job is the amber cell: read the release notes and judge what affects this project. And a fix here must include the arm that would have caught this one: a documented command that exits 0 while doing nothing is the failure mode to test for.</p>
+  </div>
+
+  <h3 style="margin-top:40px">And even reached, apply serves 8 of 15 tools</h3>
+  <p>Wiring a task to <code>apply</code> would still not automate the two tools that are drifting right now. <code>apply</code> knows exactly one pin format — a <code>[tools]</code> entry in <code>mise.toml</code> — and seven of the fifteen configured tools are pinned somewhere else.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 214" role="img" aria-label="Of fifteen configured tools, apply can move the pin for eight. Seven are refused because they declare no mise key: their pins live in pyproject.toml or in an expected field in currency.toml. Two of the refused seven, graphify and mise, are the tools with live drift today.">
+      <g font-family="'JetBrains Mono', monospace" fill="currentColor">
+        <text x="14" y="18" font-size="9" letter-spacing="1.3" opacity=".55">15 CONFIGURED TOOLS, BY WHETHER apply() CAN MOVE THE PIN</text>
+
+        <!-- served -->
+        <rect x="14" y="32" width="404" height="76" rx="4" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.6"/>
+        <text x="28" y="52" font-size="10.5" fill="#1B6F62" font-weight="600">8 · pin lives in mise.toml [tools]</text>
+        <text x="28" y="72" font-size="10" fill="#1B6F62">agnix · antigravity-cli · codex · doppler</text>
+        <text x="28" y="88" font-size="10" fill="#1B6F62">ffmpeg · fnox · hk · uv</text>
+        <text x="28" y="102" font-size="8.5" fill="#1B6F62" opacity=".85">apply edits the pin, then re-pins the manifest to the resolved tag</text>
+
+        <!-- refused -->
+        <rect x="434" y="32" width="432" height="76" rx="4" fill="#F6E6E2" stroke="#B33C29" stroke-width="1.6"/>
+        <text x="448" y="52" font-size="10.5" fill="#B33C29" font-weight="600">7 · no mise_key — refused, by design</text>
+        <text x="448" y="72" font-size="10" fill="#B33C29">claude-code · datamodel-code-generator · ruff · ty</text>
+        <text x="448" y="88" font-size="10" fill="#B33C29" font-weight="600">skillopt · graphify · mise</text>
+        <text x="448" y="102" font-size="8.5" fill="#B33C29" opacity=".85">pinned in pyproject.toml, or by `expected` in currency.toml</text>
+
+        <!-- where the drift is -->
+        <line x1="620" y1="112" x2="620" y2="136" stroke="#B33C29" stroke-width="1.6" stroke-dasharray="4 3"/>
+        <polygon points="615,136 620,146 625,136" fill="#B33C29"/>
+        <rect x="434" y="148" width="432" height="46" rx="4" fill="none" stroke="#B33C29" stroke-width="1.6"/>
+        <text x="650" y="168" text-anchor="middle" font-size="10.5" fill="#B33C29" font-weight="600">graphify and mise are 4 of today's 5 live drifts</text>
+        <text x="650" y="184" text-anchor="middle" font-size="9" fill="#B33C29">the automation cannot touch either of them</text>
+
+        <!-- the reason -->
+        <rect x="14" y="148" width="404" height="46" rx="4" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".4"/>
+        <text x="28" y="166" font-size="9" opacity=".7">The refusal is deliberate and documented</text>
+        <text x="28" y="182" font-size="9" opacity=".7">(apply.py:176-194, attributed to a cold lane) — not a bug</text>
+      </g>
+    </svg>
+    <figcaption><b>Measured live this session</b> by loading the real config and applying <code>apply()</code>'s own two refusal predicates to all fifteen specs: 8 served, 7 refused for a missing <code>mise_key</code>, 0 refused as source-only. The refusal carries a written rationale — applying "would have to edit a file whose format this function does not know, and a half-applied bump is exactly what the resolve-everything-first ordering exists to prevent." So the automation is not a wiring job: it has to teach <code>apply</code> the other two pin formats, or route those tools to something that already knows them.</figcaption>
+  </figure>
+
+  <p>Three more findings from the same inventory shape the build, each cited in the lane report at <code>.agent/kb/reports/agents/2026-08-24-pipeline-inventory/</code>:</p>
+  <ul>
+    <li><b><code>apply</code> ignores <code>ref_binding</code>.</b> <code>currency.toml</code> binds three files to graphify's manifest ref; <code>sync</code> <em>detects</em> their drift and <code>apply</code> never <em>moves</em> them, so they stay hand-edited.</li>
+    <li><b><code>apply</code> discards the verdict a human just approved</b> and re-runs the full network probe. An upstream blip between the interview and the apply turns an authorized bump into an ambiguity.</li>
+    <li><b>Manifests have two writers with different semantics.</b> <code>write_commit</code> (used by <code>kb-update</code>) moves <code>commit</code> to upstream HEAD and leaves <code>ref</code> alone; <code>write_pin</code> (used by <code>apply</code>) moves both to a resolved tag. Nothing reconciles them, so a <code>kb-update</code> can leave <code>commit</code> off the tag its own <code>ref</code> names.</li>
+  </ul>
+
+  <h3 style="margin-top:40px">The other two, unchanged</h3>
+  <ol class="steps">
+    <li><b>Rebuild the call-boundary telemetry.</b> Explicitly asked for and not started: argv, timestamps, tokens, model and effort for every graphify call. The deleted adapter is a template, not a drop-in — it instrumented the Claude CLI, not graphify — and <code>kb_setup.events</code> survives as the stream to hang it on.</li>
+    <li><b>Re-run the grilling from scratch</b> on the documentation-currency mandate.</li>
+  </ol>
+</section>
+
+<section>
+  <span class="eyebrow">Re-running graphify</span>
+  <h2>The graph can't answer, and rebuilding won't fix it</h2>
+  <p>Querying this repo's own code from the graph fails constantly, and the instinct is to rebuild. Measured, the problem is not staleness — it is <strong>dilution</strong> and <strong>coverage</strong>, and a rebuild changes neither.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 300" role="img" aria-label="This repo's own code is 7,054 of 492,654 graph nodes, about 1.4 percent, while the codex source alone is 95,031 nodes. Of our own slice, tests outnumber source code two to one, and there are zero nodes for mise.toml, any SKILL.md, currency.toml, any markdown file, CLAUDE.md or hk.pkl.">
+      <g font-family="'JetBrains Mono', monospace" fill="currentColor">
+        <text x="14" y="18" font-size="9" letter-spacing="1.3" opacity=".55">492,654 NODES ACROSS 58 REPOS — WHO OWNS THEM</text>
+
+        <!-- proportional bar -->
+        <rect x="14" y="30" width="852" height="30" fill="#EAEDF4" stroke="#757F99" stroke-width="1"/>
+        <rect x="14" y="30" width="164" height="30" fill="#D3D9E5" stroke="#757F99" stroke-width="1"/>
+        <text x="96" y="50" text-anchor="middle" font-size="10">codex · 95,031</text>
+        <rect x="178" y="30" width="103" height="30" fill="#EAEDF4" stroke="#757F99" stroke-width="1"/>
+        <text x="229" y="50" text-anchor="middle" font-size="10">ruff · 59,782</text>
+        <rect x="281" y="30" width="573" height="30" fill="#EAEDF4" stroke="#757F99" stroke-width="1"/>
+        <text x="560" y="50" text-anchor="middle" font-size="10" opacity=".75">55 more ingested sources</text>
+        <rect x="854" y="30" width="12" height="30" fill="#B33C29" stroke="#B33C29" stroke-width="1"/>
+
+        <line x1="860" y1="64" x2="860" y2="84" stroke="#B33C29" stroke-width="1.4"/>
+        <text x="866" y="80" text-anchor="end" font-size="11" fill="#B33C29" font-weight="600">this repo · 7,054 · 1.43%</text>
+        <text x="866" y="96" text-anchor="end" font-size="9" fill="#B33C29" opacity=".85">codex alone is 13.5× our entire repo</text>
+
+        <!-- what our slice holds -->
+        <line x1="14" y1="116" x2="866" y2="116" stroke="currentColor" stroke-width="1" opacity=".22"/>
+        <text x="14" y="136" font-size="9" letter-spacing="1.3" opacity=".55">AND WITHIN OUR 7,054 — WHAT IS INDEXED</text>
+
+        <g font-size="10">
+          <rect x="14" y="148" width="200" height="44" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="114" y="167" text-anchor="middle" fill="#1B6F62" font-weight="600">4,313 · tests/</text>
+          <text x="114" y="183" text-anchor="middle" fill="#1B6F62" font-size="9">indexed</text>
+
+          <rect x="222" y="148" width="200" height="44" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.3"/>
+          <text x="322" y="167" text-anchor="middle" fill="#1B6F62" font-weight="600">2,386 · python/</text>
+          <text x="322" y="183" text-anchor="middle" fill="#1B6F62" font-size="9">indexed — tests outnumber it 2:1</text>
+
+          <rect x="430" y="148" width="130" height="44" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="1.1"/>
+          <text x="495" y="167" text-anchor="middle" fill="#1B6F62">55 · schemas</text>
+          <text x="495" y="183" text-anchor="middle" fill="#1B6F62" font-size="9">21 · .claude</text>
+        </g>
+
+        <!-- the zeros -->
+        <rect x="568" y="148" width="298" height="44" rx="3" fill="#F6E6E2" stroke="#B33C29" stroke-width="2"/>
+        <text x="717" y="167" text-anchor="middle" font-size="11" fill="#B33C29" font-weight="600">0 nodes · every artifact Ray asked for</text>
+        <text x="717" y="183" text-anchor="middle" font-size="9" fill="#B33C29">mise.toml · SKILL.md · currency.toml · *.md · hk.pkl</text>
+
+        <!-- conclusion -->
+        <line x1="14" y1="216" x2="866" y2="216" stroke="currentColor" stroke-width="1" opacity=".22"/>
+        <g font-size="10.5">
+          <rect x="14" y="232" width="270" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".45"/>
+          <text x="149" y="252" text-anchor="middle" opacity=".75">rebuild the graph</text>
+          <text x="149" y="270" text-anchor="middle" font-size="9" opacity=".6">→ more python, same 1.4%</text>
+
+          <rect x="300" y="232" width="270" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".45"/>
+          <text x="435" y="252" text-anchor="middle" opacity=".75">query a scoped graph</text>
+          <text x="435" y="270" text-anchor="middle" font-size="9" opacity=".6">→ fixes dilution, not coverage</text>
+
+          <rect x="586" y="232" width="280" height="52" rx="3" fill="#DFEFEB" stroke="#1B6F62" stroke-width="2"/>
+          <text x="726" y="252" text-anchor="middle" fill="#1B6F62" font-weight="600">emit the missing edges</text>
+          <text x="726" y="270" text-anchor="middle" font-size="9" fill="#1B6F62">→ fixes both, and IS the diagram build</text>
+        </g>
+      </g>
+    </svg>
+    <figcaption><b>Measured directly from <code>graph.json</code> this session</b> by counting nodes per <code>repo</code> key — 58 repos, our own slice 7,054 nodes at 1.43%, and zero hits for every non-python artifact probed. The first probe I ran returned a uniform "unknown" for all 492,654 nodes; that was a wrong key, not a finding, and it is corrected here. <b>The third box is the point:</b> the emitter that would draw the four pipelines produces exactly the nodes the graph is missing, so "query our repo better" and "generate the workflow diagram" are one piece of work, not two.</figcaption>
+  </figure>
+
+  <div class="note stop">
+    <p><b>And the blocker in front of a rebuild is stale.</b> <code>kb-currency-check</code> reports every session that a build <em>ran and failed</em> on <code>.agent/skills/blocking-io-guard/templates/anchor.template.py</code>, and predicts "re-running will fail again". <strong>That file no longer exists</strong> — control-armed: the same probe finds a 22 KB file under <code>.agent/</code> fine, and finds no <code>blocking-io-guard</code> tree and no <code>anchor.template.py</code> anywhere in the repo. The prediction is read from a persisted record at <code>graphify-out/.build-failure.json</code> dated 2026-08-23 and is never re-tested against the cause. A rebuild may simply succeed.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Asked in the margin</span>
+  <h2>Why the orchestration flow never fires</h2>
+  <p>It is gated by its own first clause. The trigger in <code>.claude/CLAUDE.md</code> line 31 begins:</p>
+  <div class="note stop">
+    <p><code>When the session model is Fable, without being reminded: non-trivial implementation runs the fable-orchestrator architect-as-orchestrator flow…</code></p>
+  </div>
+  <p>This session's model is <strong>Opus 5</strong>, and Opus is the repo's documented default. The condition is false, so the standing instruction does nothing — every session here has been in that state since the line was written.</p>
+  <p>That gate is not a mistake in our config; it is the plugin's intended design. Its own changelog says the canonical trigger <em>"now begins 'When the session model is Fable' — sessions on other models skip the flow instead of running an architect pattern their model wasn't chosen for"</em>, and its setup wizard writes that gated form. An <strong>unconditional</strong> trigger is a shape the wizard recognises and offers to <em>upgrade away from</em>.</p>
+  <p>So there are two honest ways to arm it, and they are not equivalent: switch the session to <strong>Fable 5</strong> and run the pattern as designed, or <strong>remove the gate</strong> from line 31 so it fires on Opus too — accepting that the architect is then a model the plugin did not pick for the role. Invoking <code>/fable-orchestrator:orchestration</code> by hand, as this session did, works either way and is what the plugin documents for anyone without the always-on line.</p>
+</section>
+
+<footer>
+  <p><b>Every figure on this page is measured, not recalled.</b> Commit counts from <code>git rev-list</code>; receipt coverage from <code>git merge-base --is-ancestor</code> over every receipt file; drift from <code>mise run kb-currency-check</code>; citation health from <code>mise run kb-handoff-check</code>; the two code citations read directly at <code>manifest.py:85-88</code> and <code>graph.py:643-657</code>. All on 24 August 2026, against tip <code>2b1cdc3a04e7</code>.</p>
+  <p>Source: <code>docs/artifacts/sixteen-commits-no-passport.html</code>, tracked in the repo. When the state it describes changes, this page changes in the same commit.</p>
+  <p><b>Revised four times after first publication, 24 Aug.</b> Revision 4 added the graph-coverage figure and the stale-blocker finding. Revision 3 added the <em>8 of 15</em> coverage figure and three further inventory findings. Revision 1 replaced the three-item prose task list with the <em>update chain</em> figure and gave the orchestration gate its own section — both raised in comments on this page. <b>Revision 2 carries a correction:</b> revision 1 claimed the <code>tool-currency</code> skill never names <code>apply</code>. It does, at <code>SKILL.md:86</code> — and that documented command is a silent no-op, which is a worse finding than the one it replaced. The wrong claim came from a repo-wide grep of mine; the correction came from an inventory lane reading the argv parser, and I confirmed it against <code>cli.py:735-765</code> before publishing it. Sections before <em>The next task</em> are unchanged from first publication.</p>
+</footer>
+
+</div>

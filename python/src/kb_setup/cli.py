@@ -85,11 +85,6 @@ def _print_usage() -> int:
         "goal-outcome <pair> --result R [--turns N] [--note ...] | "
         "cc | cc-doctor | eval [--live] [--slow] | "
         "graphify-contract | graphify-baseline build|controls|verify [PATH] | "
-        "graphify-semantic-slice preflight|run|verify [PATH] | "
-        "graphify-semantic-corpus plan|run|verify [PATH] | "
-        "graphify-semantic-corpus record [--plan-dir PATH] [--accept] "
-        "[--accept-decision-change NAME[,NAME]] | "
-        "graphify-semantic-corpus-merge <name> [PLAN_DIR] [--partial] | "
         "skillopt-contract | "
         "tool-sync <currency-tool-name> | "
         "skillopt-reviewed --packet P --target T --backend mock|handoff | "
@@ -159,9 +154,6 @@ def _run(argv: list[str] | None = None) -> int:
     if cmd in {
         "graphify-contract",
         "graphify-baseline",
-        "graphify-semantic-slice",
-        "graphify-semantic-corpus",
-        "graphify-semantic-corpus-merge",
         "skillopt-contract",
     }:
         return _dispatch_contract(repo_root, cmd, rest)
@@ -244,22 +236,15 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
             # `runtime_identity`; `verify` never runs Graphify.
             graphify_env.assert_pinned_graphify(repo_root)
         return graphify_baseline.baseline_main(repo_root, rest)
-    if cmd == "graphify-semantic-slice":
-        from kb_setup import graphify_semantic_slice
-
-        return graphify_semantic_slice.semantic_main(repo_root, rest)
-    if cmd == "graphify-semantic-corpus":
-        if rest[:1] == ["record"]:
-            from kb_setup import graphify_semantic_corpus_record
-
-            return graphify_semantic_corpus_record.record_main(repo_root, rest[1:])
-        from kb_setup import graphify_semantic_corpus
-
-        return graphify_semantic_corpus.corpus_main(repo_root, rest)
-    if cmd == "graphify-semantic-corpus-merge":
-        from kb_setup import graphify_semantic_corpus_merge
-
-        return graphify_semantic_corpus_merge.merge_main(repo_root, rest)
+    # `graphify-native-extract` was dispatched here until 2026-08-24 and is now
+    # PARKED: the module and its tests stay in the tree, but no CLI subcommand and
+    # no mise task reaches them, so `_parse`'s flag-swallowing (#479), the
+    # `GRAPHIFY_OUT` bypass of `_refuse_out` (#480), and the wholly untested
+    # `_run_real`/`_run_cluster` (#481) cannot be reached by a caller. All three
+    # were confirmed by the cold review of fa4ed551ac7e. Restore this branch and
+    # `[tasks.kb-graphify-native-extract]` together, and only once those three are
+    # closed — the module is a STOPGAP for the SDK path, not the destination
+    # (`docs/archive/README.md`), so reviving it is a decision, not a repair.
     from kb_setup import skillopt_contract
 
     return skillopt_contract.contract_main(repo_root)

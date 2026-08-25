@@ -136,7 +136,18 @@ SHA_ABBREV = 12
 #: died reports rc=0 forever. Wrapped rather than run bare because `hk test`
 #: exits 0 when it runs NOTHING (measured on 1.56.0), so `kb_setup.hk_test`
 #: asserts a floor on the count before it reads hk's rc.
-GATE_TASKS = ("lint", "test", "brain-audit", "eval", "graph-size", "hk-test")
+GATE_TASKS = (
+    "lint",
+    "test",
+    "brain-audit",
+    "eval",
+    "graph-size",
+    "hk-test",
+)
+#: `kb-corpus-integrity` WAS here, gating the semantic-corpus layer's staged
+#: evidence tree. It left with that layer's removal (2026-08-24) — see
+#: `docs/archive/README.md`. Its own deletion took its evidence tree with it,
+#: so nothing was left to scan.
 
 #: Gates that may run CONCURRENTLY with each other. Everything not named here
 #: runs EXCLUSIVE — alone, with nothing else in flight — and that default is the

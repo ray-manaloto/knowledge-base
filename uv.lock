@@ -649,8 +649,8 @@ wheels = [
 
 [[package]]
 name = "graphifyy"
-version = "0.9.48"
-source = { registry = "https://pypi.org/simple" }
+version = "0.9.49"
+source = { git = "https://github.com/ray-manaloto/graphify?rev=cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8#cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8" }
 dependencies = [
     { name = "networkx" },
     { name = "numpy" },
@@ -681,10 +681,6 @@ dependencies = [
     { name = "tree-sitter-typescript" },
     { name = "tree-sitter-verilog" },
     { name = "tree-sitter-zig" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/95/01/08fe1b0a840daf350599694c4927af7369af23daf0b22fdc00f4ef56ae7d/graphifyy-0.9.48.tar.gz", hash = "sha256:14eaac83804866940ccb34491ca69ab62b2b51e346f88356c5211a3d8cd5e41e", size = 1965537, upload-time = "2026-08-20T16:40:08.528Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/99/86/df9bdd8eb4eaa694b829690f0bdfe49d966cc242d8037f3a96b3cb1b1548/graphifyy-0.9.48-py3-none-any.whl", hash = "sha256:4f745d72d6c5165ef7132bf8b2819ef59707aa70cd99efd3a4fbc8c4ba43b4b9", size = 1332328, upload-time = "2026-08-20T16:40:06.68Z" },
 ]
 
 [package.optional-dependencies]
@@ -1025,7 +1021,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=1.0.0" },
-    { name = "graphifyy", extras = ["all"], specifier = "==0.9.48" },
+    { name = "graphifyy", extras = ["all"], git = "https://github.com/ray-manaloto/graphify?rev=cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8" },
     { name = "msgspec", specifier = "==0.21.1" },
     { name = "skillopt", git = "https://github.com/microsoft/SkillOpt?rev=93bdf3d770b99128daf35278218e5a666fe392f3" },
     { name = "structlog", specifier = ">=26.1" },

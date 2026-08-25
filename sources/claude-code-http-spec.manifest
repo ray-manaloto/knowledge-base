@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Reverse-engineered HTTP/wire spec for Claude Code — request shapes, headers, streaming. 23 .md + 285 .txt at registration; .txt is NOT in graphify's _PROSE_EXTS (detect.py:185), so only the markdown is deep-extractable. Registered 2026-08-24 with the claude source swap.
+url = https://github.com/thevibeworks/claude-code-http-spec
+ref = main
+commit = dc2cd549e654a60c99fa9ac1780ea856ce081e03
+kind = docs

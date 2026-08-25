@@ -266,6 +266,42 @@ class GraphifyEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     observed_scope: str | None = None
 
 
+#: Graphify's OWN routine progress narration for a merge that drops nodes/edges
+#: belonging to a source file it no longer sees (deleted upstream, or newly
+#: excluded) — not a warning, and not something a caller reviews. The graph
+#: falling back into sync with a deletion is not corpus loss, so unlike every
+#: APPROVED_*/Expected* class above this needs no token and no inventory entry:
+#: there is nothing here for a reviewer to have gotten wrong.
+#:
+#: Matched ANCHORED against the exact two f-strings Graphify's `build.py` prints
+#: for this (the node line carries a from-N-files count; the edge line does
+#: not). Graphify reuses the SAME "[graphify] " prefix a few statements away in
+#: the same function for genuine `WARNING:` lines (a prune source that matched
+#: nothing, a dropped hyperedge) — so recognising the prefix alone, or "Pruned"
+#: alone, would launder those through as if reviewed. Anchoring on the full
+#: line (`\A…\Z`) means a benign line carrying extra trailing text is NOT
+#: silently approved either.
+_ROUTINE_PRUNE_PROGRESS = re.compile(
+    r"\A\[graphify\] Pruned \d+ (?:node|edge)\(s\) from(?: \d+)? deleted or "
+    r"excluded source file\(s\)\.\Z"
+)
+
+
+def _unaccounted_stderr(stderr: str, residual_stderr: str | None) -> str:
+    """Stderr no caller reviewed, minus lines Graphify narrates as routine.
+
+    `residual_stderr` already drops everything a CALLER approved BY NAME (see
+    its own docstring on `GraphifyEvidence`); this drops the smaller, separate
+    class that needs no approval at all because Graphify prints it on every
+    ordinary merge whether or not anything is actually wrong. Filtered
+    line-by-line and matched anchored — recognising one benign line is never
+    license to wave the rest of the same stderr through unread.
+    """
+    raw = stderr if residual_stderr is None else residual_stderr
+    kept = [line for line in raw.splitlines() if not _ROUTINE_PRUNE_PROGRESS.match(line.strip())]
+    return "\n".join(kept)
+
+
 def _basic_reasons(evidence: GraphifyEvidence) -> list[str]:
     reasons: list[str] = []
     if not evidence.observed:
@@ -276,8 +312,9 @@ def _basic_reasons(evidence: GraphifyEvidence) -> list[str]:
     # caller could not account for by name; when it was never computed, the whole
     # of stderr is unaccounted for. A classification token records WHY something
     # was approved — it has never been sufficient on its own, and is deliberately
-    # not consulted here, so a token can no longer approve text nobody read.
-    unaccounted = evidence.stderr if evidence.residual_stderr is None else evidence.residual_stderr
+    # not consulted here, so a token can no longer approve text nobody read. A
+    # second, narrower class needs no token at all: see `_unaccounted_stderr`.
+    unaccounted = _unaccounted_stderr(evidence.stderr, evidence.residual_stderr)
     if unaccounted.strip():
         reasons.append("stderr")
     if "truncated" in f"{evidence.stdout}\n{evidence.stderr}".casefold():
@@ -424,11 +461,12 @@ def require_complete(receipt: GraphifyReceipt) -> GraphifyReceipt:
         if receipt.ignored_paths:
             evidence.append(f"ignored={list(receipt.ignored_paths)!r}")
         if "stderr" in receipt.reasons:
-            # The line(s) nobody accounted for, bounded. `stderr` on its own sent
-            # a reader to re-run the build to find out WHICH warning blocked.
-            unaccounted = (
-                receipt.stderr if receipt.residual_stderr is None else receipt.residual_stderr
-            )
+            # The line(s) nobody accounted for, bounded, with Graphify's own
+            # routine progress narration already filtered out — a reader should
+            # not have to skim past "Pruned 3 node(s)..." to find the line that
+            # actually blocked. `stderr` on its own sent a reader to re-run the
+            # build to find out WHICH warning blocked.
+            unaccounted = _unaccounted_stderr(receipt.stderr, receipt.residual_stderr)
             evidence.append(f"unaccounted_stderr={unaccounted.strip()[:400]!r}")
         suffix = f"; {'; '.join(evidence)}" if evidence else ""
         raise IncompleteGraphifyOperationError(

@@ -78,13 +78,10 @@ Concretely:
 - **Prose (docs/URLs/blogs)**: `mise run kb-add -- <url>` fetches to `./raw`; semantic
   extraction is the **Claude host agent** (a Workflow fan-out of `general-purpose`
   subagents that read each raw file → `{nodes,edges}` → one combined chunk in
-  `sources/extractions/`), then `mise run kb-merge -- <chunk>`. This is the only LLM
-  path and it is Claude — graphify's `claude-cli` backend is broken (#2076,
-  prose-wrapped JSON), Ollama/other backends are stripped.
-- **Video**: `mise run kb-add -- <yt-url>` then `mise run kb-transcribe -- raw/<yt>.m4a`
-  (local faster-whisper — no key, no LLM), then host-agent extract the transcript.
-- **Label** after every merge: `mise run kb-label` — deterministic hub labels (no LLM,
-  Gemini-free). Do not expect LLM-named communities (claude-cli #2076).
+  `sources/extractions/`), then `mise run kb-merge -- <chunk>`. Ollama/other
+  non-Claude backends are stripped.
+- **Video**: `mise run kb-add -- <yt-url>` then `mise run kb-transcribe -- raw/<yt>.m4a` (local faster-whisper — no key, no LLM), then host-agent extract the transcript.
+- **Label** after every merge: `mise run kb-label` — deterministic hub labels (no LLM, Gemini-free); LLM-named communities via claude-cli remain untested (#2076).
 
 ## Quick start
 
@@ -166,7 +163,7 @@ mise run kb-currency          # the full loop; writes docs/currency/
 | `sources/*.manifest` | github-repo pins (url+SHA); the clone `sources/<name>/` is gitignored, re-fetched on build. |
 | `sources/media/` | Vendored non-refetchable sources (video transcripts, docs, PDFs) — committed. |
 | `sources/extractions/*.json` | Committed host-agent doc/media extraction chunks (not free to regenerate). |
-| `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (**772 MB measured 2026-08-23**, the fourth re-measure — this figure goes stale; far past git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). `graph-prose.json` is derived from THAT (by every task that writes `graph.json` — `kb-build`/`kb-merge`/`kb-label` — or `kb-prose` alone): the same graph minus every `_origin=ast` node, which is what `kb-query --prose` reads. Committed: **`memory/`** (authored work-memory) **and `graphify-semantic-corpus-chunks/`** (retained provider evidence — #317 settled 2026-08-23 in favour of tracking, because a fresh clone and the hosted app see only tracked files; keep it OFF `.gitignore`). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
+| `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (**772 MB measured 2026-08-23**, the fourth re-measure — this figure goes stale; far past git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). `graph-prose.json` is derived from THAT (by every task that writes `graph.json` — `kb-build`/`kb-merge`/`kb-label` — or `kb-prose` alone): the same graph minus every `_origin=ast` node, which is what `kb-query --prose` reads. Committed: **`memory/`** (authored work-memory) — the ONE committed subdirectory since the semantic-corpus layer's own tracked evidence tree (`graphify-semantic-corpus-chunks/`, #317) was removed with the rest of that layer, 2026-08-24 (`docs/archive/README.md`). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
 | `python/` | `kb_setup` (build/update/artifacts/manifest/chunks/env — thin helpers, zero-bash-logic) + `kb_setup.currency`, the tool-currency engine dotfiles also depends on. |
 | `currency.toml` | Per-tool currency config (`[tool.<name>]`): pin, extras, source manifest, build stamp, tracked issues. |
 | `docs/currency/` | Committed run log: `README.md` (one row per run) + `runs/<date>-<tool>.md` (detail, only when a run found something). |
