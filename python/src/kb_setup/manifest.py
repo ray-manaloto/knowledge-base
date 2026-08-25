@@ -210,13 +210,15 @@ def latest_commit(m: Manifest) -> str:
     """Upstream HEAD of the manifest's ref (a `git ls-remote`, no clone).
 
     Shares `_resolve_ref` with `resolve_tag` (#500), so the two can never again
-    disagree on what a ref names. `m.ref` may itself be either a branch or a
-    tag — this repo pins both under one field — so the call omits `--tags`
-    (baking it in would return EMPTY for every branch source, silently) and
-    `_resolve_ref` checks `refs/heads/` then `refs/tags/` against that one
-    UNRESTRICTED result. Checking both namespaces costs no extra round trip:
-    `--tags` only narrows what git includes in the reply, never how many of the
-    already-returned lines this function is allowed to look at.
+    disagree on what a ref names. `m.ref` may itself be a branch, a tag, an
+    already-qualified refname, or `HEAD` — this repo pins the first two under
+    one field, and `_resolve_ref` accepts all four — so the call omits
+    `--tags` (baking it in would return EMPTY for every branch source,
+    silently). See `_resolve_ref`'s own docstring for exactly which candidate
+    refnames get checked and in what order; that rule is stated there once,
+    not restated here, so it cannot drift out of sync with the code again
+    (#500 respec round 2, finding 2 — a prior revision of THIS docstring
+    restated it and went stale when `_resolve_ref`'s was corrected).
     """
     sha = _resolve_ref(m.url, m.ref, tags=False)
     if sha is None:
@@ -265,18 +267,37 @@ def _resolve_ref(url: str, ref: str, *, tags: bool) -> str | None:
     compared afterwards). `latest_commit` uses this shape, because a
     manifest's `ref` may name either kind of pin.
 
-    PRECEDENCE (#500 respec round 1, finding 2 — the code below is correct,
-    an earlier revision of this docstring was not): every namespace's PEELED
-    form is checked before ANY namespace's plain form, not "whichever
-    namespace `ref` lives in, in order". This matters only when a branch and
-    an annotated tag share a name — armed against a real collision fixture:
+    PRECEDENCE (#500 respec round 2, finding 1 — the CODE below has not
+    changed since round 1; a claim in THIS paragraph was overgeneralised from
+    one fixture and is corrected here): every namespace's PEELED form is
+    checked before ANY namespace's plain form; within each of those two
+    passes, `refs/heads/` is checked before `refs/tags/` (the `namespaces`
+    tuple order), and the namespace-qualified forms before the raw `ref`.
+    This only matters when a branch and a tag share a name, and it splits by
+    tag KIND:
 
-        git rev-parse <name>          -> the TAG object
-        git rev-parse <name>^{commit} -> the TAG's peeled commit (this function)
+    For an ANNOTATED collision the peel pass decides, before either plain
+    form is ever reached, and that agrees with `git rev-parse`:
 
-    which is exactly what `git rev-parse` itself resolves an ambiguous bare
-    name to (with its own `refname '<name>' is ambiguous` warning) — the OLD
-    `out.split()[0]` returned the branch instead, disagreeing with git.
+        git rev-parse <name>          -> the TAG object   (git warns: ambiguous)
+        git rev-parse <name>^{commit} -> the TAG's peeled commit  <- this function
+
+    For a LIGHTWEIGHT collision there is no peel entry, so the plain pass
+    decides — and it checks `refs/heads/` first, returning the BRANCH, while
+    `git rev-parse` prefers `refs/tags/` there (`gitrevisions`(7)'s
+    disambiguation order) and resolves to the TAG instead. Armed on a second,
+    separate fixture:
+
+        refs/heads/dup -> b5c142aa…            refs/tags/dup -> 4c3af257…  (lightweight)
+        git rev-parse dup          -> 4c3af257…   (the TAG; git warns: ambiguous)
+        _resolve_ref(url,"dup",tags=False) -> b5c142aa…   (the BRANCH — disagrees)
+
+    So this function agrees with `git rev-parse` for an annotated collision
+    and DISAGREES for a lightweight one — never "exactly what git rev-parse
+    resolves" unconditionally, which is what round 1 of this paragraph said.
+    Returning the branch for a branch-shaped pin is a defensible choice on its
+    own, and no manifest in this repo can reach either collision shape, so
+    this is documenting a resolved ambiguity, not a live bug.
 
     `ref` itself is ALSO tried unprefixed, alongside the namespace-qualified
     forms, because `git ls-remote` reports some refs with no `refs/…/` prefix
