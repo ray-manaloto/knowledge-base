@@ -149,7 +149,7 @@ gh = "2.98.0"
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
 codex = "0.149.1"
-antigravity-cli = "1.1.19"
+antigravity-cli = "1.1.20"
 "npm:ctx7" = { version = "0.5.8", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.1"
 
