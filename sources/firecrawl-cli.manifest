@@ -1,0 +1,5 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+url = https://github.com/firecrawl/cli
+ref = v1.23.1
+commit = 026c820bebd7040720079a05d4d428c193e23a7b
+kind = code

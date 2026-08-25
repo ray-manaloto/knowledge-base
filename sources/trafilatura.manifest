@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# adbar/trafilatura's default branch is master, not main -- kb-update must pass --ref explicitly, never assume main.
+url = https://github.com/adbar/trafilatura
+ref = v2.2.0
+commit = c1bc9531a2a978326112ca9987e1382745116136
+kind = code

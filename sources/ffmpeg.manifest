@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# FFmpeg's default branch is master, not main -- kb-update must pass --ref explicitly, never assume main.
+url = https://github.com/FFmpeg/FFmpeg
+ref = n9.0.1
+commit = 501bb49457b9dfb25d6a208832e0a6e6cd53108d
+kind = code

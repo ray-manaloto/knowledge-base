@@ -1,0 +1,5 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+url = https://github.com/google-antigravity/antigravity-cli
+ref = 1.1.20
+commit = ade702a5439c2bc67de2f9cfcb83c5370768f0c6
+kind = code

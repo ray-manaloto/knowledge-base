@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# gh's default branch is trunk, not main -- kb-update must pass --ref explicitly, never assume main.
+url = https://github.com/cli/cli
+ref = v2.98.0
+commit = a255baf71d13fe5947a4eb7ad521ffd412d64cee
+kind = code
