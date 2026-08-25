@@ -78,10 +78,26 @@ paths = [
   #   `.firecrawl/` staged, no config       -> rc 1   (gitleaks would flag it)
   #   `.firecrawl/` staged, WITH this file  -> rc 0   (this entry blinds it)
   #
-  # So `git add -f .firecrawl/<anything>` commits past the gate. The residual is
-  # accepted because it is the CLASS this list already has — `^raw/`,
-  # `^sources/` and `^\.agent/telemetry/` reach exactly as far, and all of it
-  # needs a deliberate `-f`. Tracked, because nobody had ever decided it.
+  # So `git add -f .firecrawl/<anything>` commits past the gate. That residual is
+  # accepted because it is the CLASS this list already has — but state the class
+  # ACCURATELY, because the previous two attempts at this comment did not:
+  #
+  #   `^raw/`, `^\.agent/telemetry/`, `^\.firecrawl/`  gitignored, so reaching
+  #       them needs a deliberate `git add -f`.
+  #   `^sources/`                                       NOT gitignored. Only
+  #       `sources/*/` (the re-fetchable clones) is. **158 files are tracked
+  #       under `sources/`** — every `*.manifest`, `sources/extractions/*.json`
+  #       and all of `sources/media/**` — so a PLAIN `git add sources/media/x.md`
+  #       stages an allowlisted path with NO force flag at all.
+  #
+  # Armed, control first: a non-allowlisted staged file -> rc 1 with and without
+  # this config (so the config does not blind everything); `sources/media/x.md`
+  # staged with a plain `git add` -> rc 1 without this config, **rc 0 with it**.
+  # See also the note at the top of this list: `^sources/` is deliberately BROAD
+  # and is described there as a residual. It is the largest exemption here.
+  #
+  # Tracked in #510, because nobody had ever decided any of this — the list grew
+  # one entry at a time, each with a good local reason.
   #
   # Do not restore the old wording. It read as a safety argument for widening
   # the list, and it was false.
