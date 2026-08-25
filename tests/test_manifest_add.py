@@ -221,6 +221,39 @@ def test_latest_commit_control_arm_a_branch_ref_is_unchanged(tmp_path) -> None:
     assert manifest.latest_commit(m) == sha
 
 
+def test_latest_commit_resolves_head(tmp_path) -> None:
+    """#500 respec round 1, finding 1: `HEAD` reports with NO namespace prefix.
+
+    `namespaces = ("refs/heads/", "refs/tags/")` alone can never match it — git
+    reports the line as the bare refname `HEAD`, so a namespace-qualified-only
+    check builds `refs/heads/HEAD`/`refs/tags/HEAD`, neither of which is ever
+    returned, and `latest_commit` raised "ref 'HEAD' not found" even though
+    `HEAD` plainly resolves. `NewSource.ref` defaults callers can override, and
+    reaches `latest_commit` via `add()`, so this is reachable from
+    `kb-manifest-add <url> --ref HEAD`, not just a hypothetical.
+    """
+    root = _repo(tmp_path)
+    sha = _clone_at(root, "v0.9.25", annotated=True)
+    m = _local_manifest(str(root / "sources" / "graphify"), "HEAD")
+
+    assert manifest.latest_commit(m) == sha
+
+
+def test_latest_commit_resolves_an_already_qualified_refname(tmp_path) -> None:
+    """#500 respec round 1, finding 1: a caller may already pass `refs/heads/<x>`.
+
+    Namespace-prefixing an already-qualified `ref` looks for
+    `refs/heads/refs/heads/<branch>`, which can never exist — the fix tries the
+    RAW `ref` too, so a fully qualified name is not double-prefixed.
+    """
+    root = _repo(tmp_path)
+    sha = _clone_at(root, "v0.9.25", annotated=True)
+    branch = _git(root, "symbolic-ref", "--short", "HEAD")
+    m = _local_manifest(str(root / "sources" / "graphify"), f"refs/heads/{branch}")
+
+    assert manifest.latest_commit(m) == sha
+
+
 def test_resolve_tag_and_latest_commit_agree_on_an_annotated_ref(tmp_path) -> None:
     """THE INVARIANT #500 exists to establish: one identity, one shared path.
 

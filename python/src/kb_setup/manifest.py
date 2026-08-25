@@ -251,27 +251,47 @@ def _resolve_ref(url: str, ref: str, *, tags: bool) -> str | None:
     """One `git ls-remote` for `ref` (+ its dereference), resolved to a commit sha.
 
     Returns the PEELED commit when `ref` names an annotated tag, the ref's own
-    sha for a lightweight tag or a branch, or `None` — a MISS — when `ref`
-    matches nothing at `url`. Shared by `resolve_tag` and `latest_commit` (#500)
-    so the two can never again disagree on what a ref names.
+    sha for a lightweight tag, a branch, or `HEAD`, or `None` — a MISS — when
+    `ref` matches nothing at `url`. Shared by `resolve_tag` and `latest_commit`
+    (#500) so the two can never again disagree on what a ref names.
 
-    `tags=True` passes `--tags` — restricting the remote search to
-    `refs/tags/*`, which also disambiguates a GUESSED tag name from a
-    same-named branch — and only ever needs to check that one namespace, since
-    git already filtered to it. `resolve_tag`'s candidate loop always uses this
-    shape. `tags=False` omits the flag: the search is UNRESTRICTED, so the
-    match is checked against `refs/heads/` and `refs/tags/`, in that order —
-    whichever namespace `ref` actually lives in is the one that comes back, at
-    no extra network cost (`--tags` only narrows what git returns, not how many
-    of the returned lines get compared afterwards). `latest_commit` uses this
-    shape, because a manifest's `ref` may name either kind of pin.
+    `tags=True` passes `--tags`, restricting the remote search to
+    `refs/tags/*` — which also disambiguates a GUESSED tag name from a
+    same-named branch — so only that one namespace needs checking.
+    `resolve_tag`'s candidate loop always uses this shape. `tags=False` omits
+    the flag: the search is UNRESTRICTED, so the match is checked against
+    `refs/heads/` and `refs/tags/` both, at no extra network cost (`--tags`
+    only narrows what git returns, not how many of the returned lines get
+    compared afterwards). `latest_commit` uses this shape, because a
+    manifest's `ref` may name either kind of pin.
+
+    PRECEDENCE (#500 respec round 1, finding 2 — the code below is correct,
+    an earlier revision of this docstring was not): every namespace's PEELED
+    form is checked before ANY namespace's plain form, not "whichever
+    namespace `ref` lives in, in order". This matters only when a branch and
+    an annotated tag share a name — armed against a real collision fixture:
+
+        git rev-parse <name>          -> the TAG object
+        git rev-parse <name>^{commit} -> the TAG's peeled commit (this function)
+
+    which is exactly what `git rev-parse` itself resolves an ambiguous bare
+    name to (with its own `refname '<name>' is ambiguous` warning) — the OLD
+    `out.split()[0]` returned the branch instead, disagreeing with git.
+
+    `ref` itself is ALSO tried unprefixed, alongside the namespace-qualified
+    forms, because `git ls-remote` reports some refs with no `refs/…/` prefix
+    at all — `HEAD` chief among them — and a caller may already pass a fully
+    qualified name (`refs/heads/main`). Namespace-prefixing an already
+    qualified `ref` would look for `refs/heads/refs/heads/main`, which can
+    never exist; checking the raw `ref` too costs nothing, because git never
+    reports an ordinary short tag/branch name with no namespace at all, so the
+    raw form only ever matches `HEAD` or an already-qualified input.
 
     `git ls-remote` patterns are TAIL matches on `/` boundaries, not exact
     names — a repo holding `sub/v1.0.0` and no `v1.0.0` answers a `v1.0.0`
     pattern too (`refs/tags/sub/v1.0.0`). So a non-empty result is not itself a
-    match: every candidate refname is checked for EXACT equality against the
-    namespace this call asked for, and a non-empty output with no exact match
-    is still a MISS.
+    match: every candidate refname below is checked for EXACT equality, and a
+    non-empty output with no exact match is still a MISS.
     """
     namespaces = ("refs/tags/",) if tags else ("refs/heads/", "refs/tags/")
     argv = ["git", "ls-remote", *(["--tags"] if tags else []), url, ref, f"{ref}^{{}}"]
@@ -286,14 +306,18 @@ def _resolve_ref(url: str, ref: str, *, tags: bool) -> str | None:
     for line in out.splitlines():
         sha, _, refname = line.partition("\t")
         by_refname[refname] = sha
-    # Peeled entries first, across every candidate namespace, THEN plain ones —
-    # an annotated tag's dereference always outranks its own tag-object line.
-    for namespace in namespaces:
-        sha = by_refname.get(f"{namespace}{ref}^{{}}")
+    # Every refname this call could legitimately match: namespace-qualified
+    # (the ordinary case) plus the raw `ref` itself (HEAD, or an
+    # already-qualified input — see the docstring).
+    candidates = (*(f"{namespace}{ref}" for namespace in namespaces), ref)
+    # Peeled entries first, across every candidate, THEN plain ones — an
+    # annotated tag's dereference always outranks its own tag-object line.
+    for candidate in candidates:
+        sha = by_refname.get(f"{candidate}^{{}}")
         if sha is not None:
             return sha
-    for namespace in namespaces:
-        sha = by_refname.get(f"{namespace}{ref}")
+    for candidate in candidates:
+        sha = by_refname.get(candidate)
         if sha is not None:
             return sha
     return None
