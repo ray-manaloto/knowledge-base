@@ -1,0 +1,113 @@
+# Mutation arms for un-parking `graphify_native_extract` — #479, #480, #481.
+#
+# The module's own docstring gates the un-park: "Restoring the subcommand and
+# the task is one gesture, and it requires those three closed first." These arms
+# are the evidence for "closed".
+#
+# All three came from ONE cold cross-family review of `fa4ed551ac7e`, and they
+# are three different failure classes, which is why each needs its own arm:
+#
+#   #479 a parser that mistakes a flag for a value — the DANGEROUS one, because
+#        `--out --dry-run` consumed the `--dry-run` and ran a real,
+#        token-spending extraction into a directory named `--dry-run`. The user
+#        asked for a preview and got a bill.
+#   #480 a guard the environment walks around. `_refuse_out` reads `opts.out`
+#        and knows nothing about `GRAPHIFY_OUT`, which `clean_env()` passed
+#        straight through to the subprocess.
+#   #481 no coverage at all on the only two functions that spawn a subprocess.
+#        The review's own probe: stub both bodies to `return 0`, all 42 tests
+#        stay green. B4/B5 below ARE that probe, kept as the arm.
+#
+# B6 is the control on the #479 fix rather than on the defect: a refusal that is
+# too broad passes every other arm here while making the parser unusable. It is
+# in because this repo's measured defect direction on its own guards is FALSE
+# POSITIVES, not evasion.
+#
+# SCOPE, stated so a clean sweep is not over-read. What is NOT armed here:
+#   - that the module SHOULD be un-parked. The docstring's ranking says the SDK
+#     path supersedes it, and `graphify.llm.extract_corpus_parallel` is already
+#     pinned in `graphify_sdk._SEMANTIC_SYMBOLS` with `backend` as a native
+#     parameter — pinned but never called. That is a design decision, not a test.
+#   - the real extraction. No arm here starts a graphify process or makes a
+#     provider call; B4/B5 replace `subprocess.run` itself.
+#   - whether `--` is the right flag prefix to key on. B6 shows the current rule
+#     is enforced, not that it is the correct rule.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: that the module is safe to invoke. It means
+# the three named defects can now fail a test that could not fail before.
+
+suites = ["tests/test_graphify_native_extract.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    return token.startswith("--")'''
+new = '''    return token.startswith("--")  # control'''
+
+# ── B1: #479 — the value-taking flags must refuse a flag ───────────────────
+# The realistic break, and the exact shape the code had: take the next token,
+# ask nothing about it.
+[[arm]]
+id = "B1"
+test = "test_out_refuses_a_flag_as_its_value"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''            out = repo_root / _flag_value(argv, i, a)'''
+new = '''            out = repo_root / argv[i + 1]'''
+
+# ── B2: #480 — the env pop that protects the direct-import caller ──────────
+# `_run_real` can be called by an importer and meets no argv guard, so the pop
+# is the ONLY thing between an ambient GRAPHIFY_OUT and a relocated write.
+[[arm]]
+id = "B2"
+test = "test_resolve_env_drops_an_ambient_graphify_out"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    env.pop(_GRAPHIFY_OUT_ENV, None)'''
+new = '''    pass'''
+
+# ── B3: #480 — the loud half, for the argv caller ──────────────────────────
+# Silently overriding a variable someone deliberately exported is its own
+# defect: "ignored" and "relocated everything" look identical from outside.
+[[arm]]
+id = "B3"
+test = "test_main_refuses_when_graphify_out_is_set"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    ambient_out = os.environ.get(_GRAPHIFY_OUT_ENV, "").strip()'''
+new = '''    ambient_out = ""'''
+
+# ── B4: #481 — the extract spawn, stubbed exactly as the review probed it ──
+[[arm]]
+id = "B4"
+test = "test_run_real_spawns_the_resolved_argv_and_returns_its_code"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    # No capture_output: stdio is inherited so a human watching sees graphify's
+    # own progress output live, exactly like `merge_chunk`'s subprocess call.
+    # No timeout: the caller bounds this (long-running-command-hangs.md).
+    result = subprocess.run([*argv], cwd=repo_root, env=env, check=False)
+    return result.returncode'''
+new = '''    return 0'''
+
+# ── B5: #481 — the cluster spawn, the identical hole ──────────────────────
+# Anchored on `resolve_cluster_env`, which is unique to this function: the two
+# spawn lines are byte-identical, and an arm matching both would be refused.
+[[arm]]
+id = "B5"
+test = "test_run_cluster_spawns_the_cluster_argv_and_returns_its_code"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    env = resolve_cluster_env(opts)
+    print(f"[graphify-native-extract] $ {' '.join(argv)}")
+    result = subprocess.run([*argv], cwd=repo_root, env=env, check=False)
+    return result.returncode'''
+new = '''    return 0'''
+
+# ── B6: the #479 fix must not be TOO broad ────────────────────────────────
+# Keying on a single `-` would refuse a legitimate value and pass every arm
+# above. Every measured defect in this repo's own guards has been a false
+# positive, never an evasion, so the over-broad direction is the one to arm.
+[[arm]]
+id = "B6"
+test = "test_a_single_dash_value_is_still_accepted"
+file = "python/src/kb_setup/graphify_native_extract.py"
+old = '''    return token.startswith("--")'''
+new = '''    return token.startswith("-")'''

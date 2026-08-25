@@ -18,23 +18,41 @@ The test suite does exactly that, deliberately. So this is a park against
 *accidental invocation*, not a sandbox; a caller who imports this module is making
 a decision, and the defects below are what they are deciding to accept.
 
-The cold cross-family review of `fa4ed551ac7e` confirmed three blocking defects,
-each armed rather than argued:
+The cold cross-family review of `fa4ed551ac7e` confirmed three blocking defects.
+**All three are CLOSED as of 2026-08-25**, each armed rather than argued —
+`docs/research/reports/2026-08-25-native-extract-unpark-arms.toml`, 6/6 died,
+1/1 control held:
 
-* **#479** — `_parse` takes the token after `--out` as its value without asking
-  whether that token is a flag, so `--out --dry-run` sets `dry_run=False` and runs
-  a REAL, token-spending extraction into a directory named `--dry-run`.
-* **#480** — `_refuse_out` validates the `--out` flag, but `graphify/paths.py`
-  reads `GRAPHIFY_OUT` from the environment and `clean_env()` passes it through, so
-  the output root can be relocated without ever meeting the guard.
+* **#479** — `_parse` took the token after `--out` as its value without asking
+  whether that token is a flag, so `--out --dry-run` set `dry_run=False` and ran
+  a REAL, token-spending extraction into a directory named `--dry-run`. Closed by
+  `_flag_value`, which refuses a flag or an absent value — and applied to all
+  FIVE value-taking flags, not only the one the review cited.
+* **#480** — `_refuse_out` validated the `--out` flag, but `graphify/paths.py`
+  reads `GRAPHIFY_OUT` from the environment (`paths.py:26`) and `clean_env()`
+  passed it through, so the output root could be relocated without ever meeting
+  the guard. Closed in TWO places for two different callers: `resolve_env` pops
+  it (the direct-import caller meets no argv guard at all) and `_refuse_out`
+  refuses it (silently overriding a deliberate export is its own defect).
 * **#481** — `_run_real` and `_run_cluster`, the only functions that spawn the
-  subprocess, have no coverage: replacing both bodies with `return 0` leaves all
-  42 tests green.
+  subprocess, had no coverage: replacing both bodies with `return 0` left all
+  42 tests green. Closed by tests that replace `subprocess.run` itself and assert
+  the argv, the cwd, the env and the propagated exit code — the same technique
+  the `--artifacts` tests already used one layer up, so the "NO provider call,
+  ever" promise below is untouched. That probe is now arms B4/B5.
 
-**Restoring the subcommand and the task is one gesture, and it requires those three
-closed first.** Reviving this module at all is a decision rather than a repair: the
-ranking below says the SDK path supersedes it, so the question to ask before
-un-parking is whether the SDK route has arrived, not whether these bugs are fixed.
+**The park itself is a SEPARATE decision, and it has not been taken here.** The
+three defects were the stated precondition, not the reason: reviving this module
+at all is a decision rather than a repair, and the ranking below says the SDK path
+supersedes it. The question to ask before un-parking is whether the SDK route has
+arrived.
+
+**It has, for this verb.** `graphify.llm.extract_corpus_parallel` is pinned in
+`kb_setup.graphify_sdk._SEMANTIC_SYMBOLS` with a reviewed signature carrying
+`backend: str` and `model: str | None` as native parameters — **pinned but never
+called**: no caller exists in `python/src/` or `tests/`. So the coupled-constants
+problem this module has (below) does not exist on that path at all, because
+neither backend nor model travels by environment variable there.
 
 ## Why this exists
 
@@ -168,11 +186,19 @@ never the full resolved dict handed to `subprocess.run`.
 
 ## Verification scope
 
-This module makes NO provider call, ever, including in its own tests. For
-`extract`/`--cluster` the only path this session's verification exercises is
-`--dry-run`, which prints the resolved plan and exits before `graphify_exe` is
-invoked at all. A human runs the real extraction separately (multi-hour,
-serial-by-default, no timeout is set here — the caller bounds it).
+This module makes NO provider call, ever, including in its own tests. A human
+runs the real extraction separately (multi-hour, serial-by-default, no timeout is
+set here — the caller bounds it).
+
+**That promise is about PROVIDER calls, and it was over-read as being about the
+function bodies** — which is how #481 happened. This section used to say
+`--dry-run` was the only path exercised for `extract`/`--cluster`, and the
+justification it gave for the `--artifacts` exception applied to them verbatim:
+*a reverted arg order would still print a correct-looking preview*. `_run_real`
+and `_run_cluster` are now exercised for real with `subprocess.run` itself
+replaced by a spy, so the argv, cwd, env and exit code are asserted and no process
+ever starts. Dry-run coverage alone could not see a body replaced by `return 0`,
+and for 42 tests it did not.
 
 `--artifacts` is the one real (non-dry-run) path this suite DOES exercise,
 because the thing worth proving — that `_run_artifacts` hands `repo_root` and
@@ -186,6 +212,7 @@ runs; it is a one-line wiring check, not a real extraction.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -218,9 +245,20 @@ _MODEL_ENV = "GRAPHIFY_CLAUDE_CLI_MODEL"
 _PARALLEL_ENV = "GRAPHIFY_CLAUDE_CLI_PARALLEL"
 
 #: graphify/paths.py: `GRAPHIFY_OUT = os.environ.get("GRAPHIFY_OUT", "graphify-out")`.
-#: Not read from the environment here — this module never sets that override,
-#: so the literal default is the only value that can apply to a run it starts.
+#: graphify's default output-directory name.
+#:
+#: ⚠️ THIS COMMENT USED TO SAY the literal default is "the only value that can
+#: apply to a run it starts", because this module never SETS the override. That
+#: was #480: not setting a variable does not stop a subprocess INHERITING one,
+#: and `clean_env()` passed `GRAPHIFY_OUT` straight through. The reasoning was
+#: true and the conclusion was false — the sibling shape of every "unreachable
+#: by construction" claim this repo has had to retract. `resolve_env` now pops
+#: it, which is what makes the literal below actually the only value that applies.
 _GRAPHIFY_OUT_NAME = "graphify-out"
+
+#: The environment override `resolve_env` removes, named once so the pop and the
+#: refusal message can never disagree about which variable is at issue (#480).
+_GRAPHIFY_OUT_ENV = "GRAPHIFY_OUT"
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,10 +291,54 @@ def _consume_view_names(argv: list[str], start: int) -> tuple[tuple[str, ...], i
     """
     views: list[str] = []
     i = start
-    while i < len(argv) and not argv[i].startswith("--"):
+    while i < len(argv) and not _looks_like_flag(argv[i]):
         views.append(argv[i])
         i += 1
     return tuple(views), i
+
+
+def _looks_like_flag(token: str) -> bool:
+    """Whether `token` reads as a flag rather than as a value.
+
+    ONE predicate with two callers, deliberately. `_consume_view_names` already
+    had to answer this question to know where a view list ends; `_flag_value`
+    below has to answer the same question to know a value was omitted. Two
+    spellings of one rule in one file is how the identical defect survives in
+    the half nobody edited — this repo has now paid for that twice (#245, #499).
+
+    `--` rather than `-`: every flag this parser recognises is `--`-prefixed, so
+    this catches both a recognised flag and an unrecognised `--typo`, while
+    leaving an odd-but-deliberate single-dash value (a path, a model name)
+    usable.
+    """
+    return token.startswith("--")
+
+
+def _flag_value(argv: list[str], i: int, flag: str) -> str:
+    """The value token after `flag` at index `i`, refusing a flag or an end (#479).
+
+    The defect this closes was live and expensive in exactly one direction:
+    `--out --dry-run` took `--dry-run` as the OUT PATH and consumed it, so
+    `dry_run` stayed `False` and a REAL, token-spending extraction ran into a
+    directory named `--dry-run`. The user's typo asked for a preview and got a
+    bill. Refusing is the only safe reading — there is no plausible run in which
+    someone means a directory named after a flag.
+
+    The end-of-argv case was not dangerous but was misdescribed: a trailing
+    `--out` fell through the whole chain to the `else`, reporting
+    `unrecognised argument: '--out'` about a flag this parser recognises
+    perfectly well, which sends the reader to check their spelling instead of
+    their missing value.
+    """
+    if i + 1 >= len(argv):
+        raise _UsageError(f"{flag} requires a value")
+    value = argv[i + 1]
+    if _looks_like_flag(value):
+        raise _UsageError(
+            f"{flag} requires a value, but the next argument is the flag {value!r} — "
+            f"if you meant both, put the value first"
+        )
+    return value
 
 
 #: Flags that take no value and just flip a `bool` field on `Options` — kept as
@@ -285,20 +367,20 @@ def _parse(repo_root: Path, argv: list[str]) -> Options:
         if a in _BOOL_FLAGS:
             bool_fields[_BOOL_FLAGS[a]] = True
             i += 1
-        elif a == "--out" and i + 1 < len(argv):
-            out = repo_root / argv[i + 1]
+        elif a == "--out":
+            out = repo_root / _flag_value(argv, i, a)
             i += 2
-        elif a == "--token-budget" and i + 1 < len(argv):
-            token_budget = _parse_positive_int("--token-budget", argv[i + 1])
+        elif a == "--token-budget":
+            token_budget = _parse_positive_int(a, _flag_value(argv, i, a))
             i += 2
-        elif a == "--max-concurrency" and i + 1 < len(argv):
-            max_concurrency = _parse_positive_int("--max-concurrency", argv[i + 1])
+        elif a == "--max-concurrency":
+            max_concurrency = _parse_positive_int(a, _flag_value(argv, i, a))
             i += 2
-        elif a == "--model" and i + 1 < len(argv):
-            model = argv[i + 1]
+        elif a == "--model":
+            model = _flag_value(argv, i, a)
             i += 2
-        elif a == "--target" and i + 1 < len(argv):
-            target = repo_root / argv[i + 1]
+        elif a == "--target":
+            target = repo_root / _flag_value(argv, i, a)
             i += 2
         elif a == "--artifacts":
             artifacts_requested = True
@@ -370,10 +452,25 @@ def resolve_env(opts: Options) -> dict[str, str]:
     """The full environment the real subprocess runs under.
 
     `clean_env()` (every non-Claude backend trigger and mise's secret blob
-    stripped) plus this module's overlay. Never printed in full — see
-    `env_overlay`.
+    stripped) plus this module's overlay, with `GRAPHIFY_OUT` REMOVED (#480).
+    Never printed in full — see `env_overlay`.
+
+    `GRAPHIFY_OUT` is graphify's own output-root override
+    (`graphify/paths.py:26`, `os.environ.get("GRAPHIFY_OUT", "graphify-out")`).
+    `clean_env()` strips backend triggers and passes it through, so an ambient
+    value relocated every write this module makes WITHOUT ever meeting
+    `_refuse_out` — which reads `opts.out` and knows nothing about the
+    environment. The guard was real and the lever went around it.
+
+    Removed here rather than only refused in `native_extract_main`, because the
+    two protect different callers and the module docstring is explicit that both
+    exist: `_refuse_out` covers the argv path and gives a human a message they
+    can act on, while this covers a caller who imports the module and invokes
+    `_run_real` directly, meeting no argv guard at all. Neither alone closes it.
     """
-    return clean_env(env_overlay(opts))
+    env = clean_env(env_overlay(opts))
+    env.pop(_GRAPHIFY_OUT_ENV, None)
+    return env
 
 
 def _refuse_out(repo_root: Path, opts: Options) -> str | None:
@@ -390,7 +487,23 @@ def _refuse_out(repo_root: Path, opts: Options) -> str | None:
        gitignored, re-cloneable checkout is the same class of defect #420
        fixed for a stray marker file: the next `mise run kb-build` re-clones
        over it with no warning that anything was lost.
+
+    And one shape that is not about `--out` at all (#480): an ambient
+    `GRAPHIFY_OUT`. `resolve_env` now removes it, so a run started here is safe
+    either way — but silently ignoring a variable someone deliberately exported
+    is its own defect, and the two answers ("your setting was overridden" vs
+    "your setting relocated everything") are indistinguishable from the outside.
+    Refusing says which one happened. Checked FIRST, because it is the one that
+    invalidates the reasoning behind the other two rather than joining them.
     """
+    ambient_out = os.environ.get(_GRAPHIFY_OUT_ENV, "").strip()
+    if ambient_out:
+        return (
+            f"[graphify-native-extract] refusing to run with {_GRAPHIFY_OUT_ENV}="
+            f"{ambient_out!r} in the environment — it relocates graphify's output root "
+            f"({_GRAPHIFY_OUT_NAME}/) past every --out check this guard makes (#480). "
+            f"Unset it and use --out, which is the one lever this task validates."
+        )
     out = opts.out.resolve()
     root = repo_root.resolve()
     if out == root:

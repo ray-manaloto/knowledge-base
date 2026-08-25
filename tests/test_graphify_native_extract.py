@@ -525,3 +525,168 @@ def test_main_refuses_an_unknown_artifact_view_with_bad_request(tmp_path: Path) 
     _make_extracted_out(tmp_path)
     rc = gne.native_extract_main(tmp_path, ["--artifacts", "wiky", "--dry-run"])
     assert rc == Rc.BAD_REQUEST
+
+
+# --- #479: a value-taking flag must refuse a flag as its value ----------------
+
+
+def test_out_refuses_a_flag_as_its_value(tmp_path: Path) -> None:
+    """`--out --dry-run` must NOT run a real extraction into a dir named `--dry-run`.
+
+    The live shape of #479: `--dry-run` was taken as the OUT PATH and consumed,
+    so `dry_run` stayed False and a real, token-spending run followed. The user
+    asked for a preview and got a bill.
+    """
+    rc = gne.native_extract_main(tmp_path, ["--out", "--dry-run"])
+    assert rc == Rc.BAD_REQUEST
+
+
+def test_every_value_flag_refuses_a_flag_as_its_value(tmp_path: Path) -> None:
+    """Not just `--out` — the same `argv[i + 1]` shape was on all five.
+
+    Fixing only the flag the review cited would leave four identical defects
+    behind, which is this repo's `a-fix-at-one-layer-leaves-the-next`.
+    """
+    for flag in ("--out", "--token-budget", "--max-concurrency", "--model", "--target"):
+        rc = gne.native_extract_main(tmp_path, [flag, "--dry-run"])
+        assert rc == Rc.BAD_REQUEST, f"{flag} accepted a flag as its value"
+
+
+def test_a_trailing_value_flag_names_the_missing_value(tmp_path: Path) -> None:
+    """A flag at the end of argv reported `unrecognised argument: '--out'`.
+
+    It IS recognised; what is missing is its value. A message that misdescribes
+    its own failure sends the reader to check their spelling.
+    """
+    rc = gne.native_extract_main(tmp_path, ["--out"])
+    assert rc == Rc.BAD_REQUEST
+
+
+def test_a_single_dash_value_is_still_accepted(tmp_path: Path) -> None:
+    """The control arm: the refusal must not swallow legitimate values.
+
+    A guard that refuses everything passes every test above while making the
+    parser useless. Only `--`-prefixed tokens read as flags here.
+    """
+    opts = gne._parse(tmp_path, ["--model", "-weird-but-mine", "--dry-run"])
+    assert opts.model == "-weird-but-mine"
+    assert opts.dry_run is True
+
+
+# --- #480: GRAPHIFY_OUT must not relocate the output root --------------------
+
+#: A relocation target that is not `/tmp` — ruff S108 flags a hard-coded temp
+#: path, and the value here only has to be a non-empty string the code never
+#: reads, so the literal was the incidental half of the fixture.
+_ELSEWHERE = "somewhere-else"
+
+
+def test_resolve_env_drops_an_ambient_graphify_out(monkeypatch) -> None:
+    """`clean_env()` passed it through, so it went around `_refuse_out` entirely.
+
+    This is the arm for the DIRECT-IMPORT caller — `_run_real` meets no argv
+    guard — which is why the env pop exists as well as the refusal below.
+    """
+    monkeypatch.setenv("GRAPHIFY_OUT", _ELSEWHERE)
+    env = gne.resolve_env(gne.Options(target=Path("/t"), out=Path("/o")))
+    assert "GRAPHIFY_OUT" not in env
+
+
+def test_main_refuses_when_graphify_out_is_set(tmp_path: Path, monkeypatch) -> None:
+    """And says so, rather than silently overriding a deliberate export.
+
+    "Your setting was ignored" and "your setting relocated everything" are
+    indistinguishable from outside; the refusal is what tells them apart.
+    """
+    _make_target(tmp_path)
+    monkeypatch.setenv("GRAPHIFY_OUT", _ELSEWHERE)
+    rc = gne.native_extract_main(tmp_path, ["--dry-run"])
+    assert rc == Rc.BAD_REQUEST
+
+
+# --- #481: the two functions that actually spawn the subprocess --------------
+
+
+class _FakeCompleted:
+    def __init__(self, returncode: int) -> None:
+        self.returncode = returncode
+
+
+def _spy_subprocess(monkeypatch, returncode: int = 0) -> list[dict]:
+    """Replace `subprocess.run` and record every call. No process ever starts.
+
+    The same technique the `--artifacts` tests already use on
+    `artifacts.generate`, applied one layer down. It keeps this module's "NO
+    provider call, ever" promise intact while still executing the real function
+    body — which is the whole of #481: `_run_real` and `_run_cluster` were the
+    only functions that spawn a subprocess and stubbing both to `return 0` left
+    all 42 tests green.
+    """
+    calls: list[dict] = []
+
+    def _run(argv: list[str], **kwargs: object) -> _FakeCompleted:
+        calls.append({"argv": list(argv), **kwargs})
+        return _FakeCompleted(returncode)
+
+    monkeypatch.setattr(gne.subprocess, "run", _run)
+    monkeypatch.setattr(gne, "assert_pinned_graphify", lambda _root: None)
+    return calls
+
+
+def test_run_real_spawns_the_resolved_argv_and_returns_its_code(tmp_path, monkeypatch) -> None:
+    """Reverted to `return 0`, this fails on the first assertion — nothing is called."""
+    calls = _spy_subprocess(monkeypatch, returncode=3)
+    opts = gne.Options(target=tmp_path / "t", out=tmp_path / "o")
+
+    rc = gne._run_real(tmp_path, "/bin/graphify", opts)
+
+    assert rc == 3, "the subprocess's exit code must propagate, never a literal"
+    assert len(calls) == 1
+    assert calls[0]["argv"] == gne.resolve_argv("/bin/graphify", opts)
+    assert calls[0]["cwd"] == tmp_path
+    assert calls[0]["check"] is False
+
+
+def test_run_real_passes_an_env_with_no_graphify_out(tmp_path, monkeypatch) -> None:
+    """The end-to-end arm for #480, through the function that actually spawns.
+
+    `resolve_env`'s own unit test proves the pop; this proves the spawn USES it.
+    A fix at one layer leaves the next.
+    """
+    monkeypatch.setenv("GRAPHIFY_OUT", _ELSEWHERE)
+    calls = _spy_subprocess(monkeypatch)
+    gne._run_real(tmp_path, "/bin/graphify", gne.Options(target=tmp_path, out=tmp_path / "o"))
+    assert "GRAPHIFY_OUT" not in calls[0]["env"]
+
+
+def test_run_cluster_spawns_the_cluster_argv_and_returns_its_code(tmp_path, monkeypatch) -> None:
+    """The cluster half, which had the identical hole.
+
+    Asserted against `resolve_cluster_argv`, NOT `resolve_argv`: a body that
+    spawned the extract argv here would run a token-spending extraction where
+    the caller asked for deterministic re-clustering, and a test keyed on the
+    wrong helper could never see it.
+    """
+    calls = _spy_subprocess(monkeypatch, returncode=7)
+    opts = gne.Options(target=tmp_path / "t", out=tmp_path / "o", cluster=True)
+
+    rc = gne._run_cluster(tmp_path, "/bin/graphify", opts)
+
+    assert rc == 7
+    assert calls[0]["argv"] == gne.resolve_cluster_argv("/bin/graphify", opts)
+    assert "--backend" not in calls[0]["argv"], "cluster-only must never carry a backend"
+
+
+def test_run_real_checks_the_pin_before_spawning(tmp_path, monkeypatch) -> None:
+    """A stale binary rewriting output under an unverified version is the hazard.
+
+    Order matters: the check must happen BEFORE the spawn, so record both into
+    one list and assert the sequence rather than merely that both occurred.
+    """
+    order: list[str] = []
+    monkeypatch.setattr(gne, "assert_pinned_graphify", lambda _r: order.append("pin"))
+    monkeypatch.setattr(
+        gne.subprocess, "run", lambda *_a, **_k: (order.append("spawn"), _FakeCompleted(0))[1]
+    )
+    gne._run_real(tmp_path, "/bin/graphify", gne.Options(target=tmp_path, out=tmp_path / "o"))
+    assert order == ["pin", "spawn"]
