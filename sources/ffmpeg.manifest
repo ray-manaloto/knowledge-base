@@ -1,6 +1,10 @@
 # Source manifest — reproducible-by-reference (Invariant 3).
 # FFmpeg's default branch is master, not main -- kb-update must pass --ref explicitly, never assume main.
+# n9.0.1 is an ANNOTATED tag: `git ls-remote --tags` returns the TAG OBJECT (501bb494), not the commit.
+# Resolved with `gh api repos/FFmpeg/FFmpeg/commits/n9.0.1 --jq .sha`. Same trap as #395, which left a tag
+# object in sources/mise.manifest's commit field for 17 days. Armed 2026-08-25: of the six tag-pinned
+# sources added in this batch only FFmpeg ships annotated tags, so the probe discriminates.
 url = https://github.com/FFmpeg/FFmpeg
 ref = n9.0.1
-commit = 501bb49457b9dfb25d6a208832e0a6e6cd53108d
+commit = bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
 kind = code
