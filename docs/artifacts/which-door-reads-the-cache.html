@@ -1,0 +1,289 @@
+<title>Which Door Reads the Cache</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    --ground:#eef1f4; --panel:#ffffff; --edge:#c9d2da;
+    --ink:#1b232c; --ink-soft:#4e5c69; --ink-faint:#75828e;
+    --signal:#0e7c86; --signal-soft:#d6ecee;
+    --hazard:#8a5a10; --hazard-soft:#f3e7cf;
+    --panel-2:#e4e9ee;
+    --measure:34rem;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#131a24; --panel:#1a232f; --edge:#2f3d4c;
+      --ink:#e3eaf1; --ink-soft:#a8b6c4; --ink-faint:#7c8b9a;
+      --signal:#4fc3ce; --signal-soft:#12333a;
+      --hazard:#d6a445; --hazard-soft:#33280f;
+      --panel-2:#212c3a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#131a24; --panel:#1a232f; --edge:#2f3d4c;
+    --ink:#e3eaf1; --ink-soft:#a8b6c4; --ink-faint:#7c8b9a;
+    --signal:#4fc3ce; --signal-soft:#12333a;
+    --hazard:#d6a445; --hazard-soft:#33280f;
+    --panel-2:#212c3a;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Source Serif 4",Georgia,serif; font-size:17px; line-height:1.6;
+    margin:0; padding:0 1.25rem 6rem;
+  }
+  .wrap{max-width:var(--measure); margin:0 auto; display:flex; flex-direction:column; gap:1.35rem}
+  .bleed{max-width:66rem; margin-inline:auto; width:100%}
+  h1,h2,h3{font-family:"Bricolage Grotesque",system-ui,sans-serif; text-wrap:balance; margin:0; line-height:1.15}
+  h1{font-size:clamp(2rem,5.5vw,3rem); font-weight:700; letter-spacing:-.02em}
+  h2{font-size:1.45rem; font-weight:700; margin-top:1.6rem; letter-spacing:-.01em}
+  h3{font-size:1.05rem; font-weight:600}
+  p{margin:0}
+  .eyebrow{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.72rem;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--signal); margin:0;
+  }
+  .lede{font-size:1.16rem; color:var(--ink-soft)}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.86em}
+  code{background:var(--panel-2); padding:.1em .34em; border-radius:3px}
+  header{padding:4rem 0 .5rem}
+  hr{border:0; border-top:1px solid var(--edge); margin:.4rem 0}
+  figure{margin:0; display:flex; flex-direction:column; gap:.7rem}
+  figure svg{width:100%; height:auto; display:block; color:var(--ink)}
+  figcaption{
+    font-size:.86rem; color:var(--ink-faint); max-width:var(--measure);
+    margin-inline:auto; text-align:center; text-wrap:balance;
+  }
+  .scroll{overflow-x:auto}
+  .panel{
+    background:var(--panel); border:1px solid var(--edge); border-radius:2px;
+    padding:1.1rem 1.2rem; display:flex; flex-direction:column; gap:.6rem;
+  }
+  .panel.signal{border-left:3px solid var(--signal)}
+  .panel.hazard{border-left:3px solid var(--hazard)}
+  table{border-collapse:collapse; width:100%; font-size:.9rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--edge); vertical-align:top}
+  th{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.7rem;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); font-weight:400;
+  }
+  td.num{font-variant-numeric:tabular-nums; font-family:"IBM Plex Mono",ui-monospace,monospace}
+  .yes{color:var(--signal); font-weight:600}
+  .no{color:var(--hazard); font-weight:600}
+  ul{margin:0; padding-left:1.1rem; display:flex; flex-direction:column; gap:.4rem}
+  .cite{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.78rem; color:var(--ink-faint)}
+  .stamp{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.72rem;
+    color:var(--ink-faint); letter-spacing:.04em;
+  }
+</style>
+
+<header class="wrap">
+  <p class="eyebrow">Measured 2026-08-25 · graphify fork v0.9.48</p>
+  <h1>Which door reads the cache</h1>
+  <p class="lede">There are two ways into <code>openai-cli</code> extraction. One of them
+  is the route the house ranking calls <em>best</em>. The other is the only one that
+  doesn&rsquo;t re-buy the whole corpus when a run dies halfway.</p>
+</header>
+
+<div class="wrap"><hr></div>
+
+<div class="wrap">
+  <p>Semantic extraction spends real money at a provider. A long run over this corpus
+  is measured in hours, and it <em>will</em> be interrupted &mdash; a laptop sleeps, a
+  session ends, a chunk wedges. What decides whether that costs you an inconvenience
+  or the entire bill again is one question:</p>
+
+  <div class="panel signal">
+    <h3>Does the route you took check what it already paid for, before it pays again?</h3>
+    <p style="color:var(--ink-soft)">Both routes <strong>write</strong> to the same cache.
+    Only one of them <strong>reads</strong> it.</p>
+  </div>
+</div>
+
+<div class="bleed" style="margin:2.5rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 900 470" role="img" aria-label="Two routes into openai-cli extraction. The SDK route calls extract_corpus_parallel directly: it writes to the semantic cache but never reads it, so a restart re-buys every chunk. The CLI route goes through graphify's cli.py, which reads the cache first and skips already-extracted files before calling the same function.">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+      </marker>
+      <marker id="ar-sig" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#0e7c86"/>
+      </marker>
+      <marker id="ar-haz" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#8a5a10"/>
+      </marker>
+    </defs>
+
+    <line x1="450" y1="28" x2="450" y2="442" stroke="currentColor" stroke-width="1" stroke-dasharray="3 6" opacity=".25"/>
+
+    <text x="215" y="26" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="currentColor" letter-spacing="1.5">ROUTE A &mdash; THE SDK</text>
+    <text x="685" y="26" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="currentColor" letter-spacing="1.5">ROUTE B &mdash; THE CLI VERB</text>
+
+    <!-- ROUTE A -->
+    <rect x="115" y="48" width="200" height="42" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="215" y="74" text-anchor="middle" font-size="13" fill="currentColor">our code (kb_setup)</text>
+
+    <line x1="215" y1="90" x2="215" y2="126" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+    <text x="226" y="112" font-size="11" fill="currentColor" opacity=".75">import, call</text>
+
+    <rect x="95" y="128" width="240" height="52" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="215" y="150" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="currentColor">extract_corpus_parallel</text>
+    <text x="215" y="168" text-anchor="middle" font-size="11" fill="currentColor" opacity=".7">backend="openai-cli"</text>
+
+    <line x1="215" y1="180" x2="215" y2="222" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+    <text x="226" y="206" font-size="11" fill="currentColor" opacity=".75">spends</text>
+
+    <rect x="135" y="224" width="160" height="40" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="215" y="249" text-anchor="middle" font-size="13" fill="currentColor">codex CLI &rarr; $</text>
+
+    <!-- A: write only -->
+    <path d="M 295 244 L 360 244 L 360 356" fill="none" stroke="#0e7c86" stroke-width="1.5" marker-end="url(#ar-sig)"/>
+    <text x="368" y="302" font-size="11" fill="#0e7c86" font-weight="600">writes</text>
+
+    <!-- A: the missing read -->
+    <path d="M 90 356 L 68 356 L 68 154 L 93 154" fill="none" stroke="#8a5a10" stroke-width="1.5" stroke-dasharray="5 5" opacity=".55"/>
+    <line x1="52" y1="240" x2="84" y2="272" stroke="#8a5a10" stroke-width="2.5"/>
+    <line x1="84" y1="240" x2="52" y2="272" stroke="#8a5a10" stroke-width="2.5"/>
+    <text x="26" y="300" font-size="11" fill="#8a5a10" font-weight="600">no reader</text>
+    <text x="26" y="315" font-size="10.5" fill="#8a5a10" opacity=".85">exists</text>
+
+    <!-- ROUTE B -->
+    <rect x="585" y="48" width="200" height="42" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="685" y="74" text-anchor="middle" font-size="13" fill="currentColor">our code (kb_setup)</text>
+
+    <line x1="685" y1="90" x2="685" y2="126" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+    <text x="696" y="112" font-size="11" fill="currentColor" opacity=".75">subprocess</text>
+
+    <rect x="565" y="128" width="240" height="52" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="685" y="150" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="currentColor">graphify extract</text>
+    <text x="685" y="168" text-anchor="middle" font-size="11" fill="currentColor" opacity=".7">cli.py plans the run</text>
+
+    <!-- B: the read that exists -->
+    <path d="M 560 356 L 838 356 L 838 154 L 807 154" fill="none" stroke="#0e7c86" stroke-width="1.5" marker-end="url(#ar-sig)"/>
+    <text x="828" y="238" text-anchor="end" font-size="11" fill="#0e7c86" font-weight="600">reads first</text>
+    <text x="828" y="254" text-anchor="end" font-size="11" fill="#0e7c86">skips paid chunks</text>
+
+    <line x1="685" y1="180" x2="685" y2="222" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+    <text x="696" y="200" font-size="11" fill="currentColor" opacity=".75">calls the</text>
+    <text x="696" y="214" font-size="11" fill="currentColor" opacity=".75">same function</text>
+
+    <rect x="565" y="224" width="240" height="40" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="685" y="249" text-anchor="middle" font-size="13" fill="currentColor">only the unpaid chunks &rarr; $</text>
+
+    <path d="M 565 244 L 520 244 L 520 356" fill="none" stroke="#0e7c86" stroke-width="1.5" marker-end="url(#ar-sig)"/>
+    <text x="440" y="302" font-size="11" fill="#0e7c86" font-weight="600">writes</text>
+
+    <!-- shared cache -->
+    <rect x="300" y="340" width="260" height="52" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+    <text x="430" y="362" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">the semantic cache</text>
+    <text x="430" y="380" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor" opacity=".7">cache/semantic-deep/</text>
+
+    <text x="450" y="428" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">Same cache. Same extraction function. Same provider.</text>
+    <text x="450" y="446" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">The reader lives in <tspan font-family="IBM Plex Mono, monospace" font-size="11">cli.py</tspan> &mdash; so only Route B has one.</text>
+  </svg>
+  </div>
+  <figcaption>Both routes reach the identical extraction function and write identical cache
+  entries. The cache <em>reader</em> sits upstream, inside graphify&rsquo;s CLI layer &mdash;
+  so calling the library directly skips it, and a restart pays for every chunk again.</figcaption>
+</figure>
+</div>
+
+<div class="wrap">
+  <h2>How this was measured</h2>
+  <p>Not inferred from a changelog. The probe counts one symbol in two files, with the
+  second file as the control arm &mdash; if the search were broken it would return zero
+  in both:</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>symbol</th><th>llm.py (the SDK)</th><th>cli.py (control)</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">check_semantic_cache</td><td class="num no">0 hits</td><td class="num yes">4 hits</td></tr>
+      <tr><td class="mono">save_semantic_cache</td><td class="num yes">present</td><td class="num">&mdash;</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="cite">Read side absent throughout <code>llm.py</code>; write side at
+  <code>llm.py:2843</code>. Control hits at <code>cli.py:3753</code>, <code>:3788</code>,
+  <code>:4452</code>, <code>:4484</code>. The probe discriminates.</p>
+
+  <div class="panel hazard">
+    <h3>Why this is uncomfortable</h3>
+    <p style="color:var(--ink-soft)">The house ranking for this repo puts the public SDK
+    <strong>first</strong> and shelling out to the CLI <strong>second</strong>. That ranking
+    is about coupling &mdash; the SDK route cannot drift against private internals, and its
+    <code>backend</code> and <code>model</code> are real function parameters rather than
+    environment variables that can silently come apart. All of that is still true. It is
+    simply not free: on this verb, rank&nbsp;1 costs you cache resumption and rank&nbsp;2
+    keeps it.</p>
+  </div>
+</div>
+
+<div class="wrap">
+  <h2>What is already built</h2>
+  <p>Most of the <code>openai-cli</code> plumbing exists and is guarded. The gap is
+  narrower than &ldquo;integrate openai-cli&rdquo; sounds.</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>piece</th><th>state</th><th>evidence</th></tr></thead>
+    <tbody>
+      <tr><td>The backend itself</td><td class="yes">present</td>
+        <td class="cite">10 backends installed; <code>openai-cli</code> among them. Probed this session.</td></tr>
+      <tr><td>Routes to your subscription</td><td class="yes">yes</td>
+        <td class="cite">Shells the authenticated <code>codex</code> binary; pricing recorded as 0/0 because subscription use isn&rsquo;t metered spend.</td></tr>
+      <tr><td>Backend-derived env keys</td><td class="yes">done</td>
+        <td class="cite">Resolves to <code>GRAPHIFY_OPENAI_CLI_MODEL</code> / <code>_PARALLEL</code>, never the Claude pair.</td></tr>
+      <tr><td>Refuses a missing backend</td><td class="yes">fails closed</td>
+        <td class="cite">Won&rsquo;t start rather than silently falling back to the metered API.</td></tr>
+      <tr><td>Default model</td><td class="yes">graphify&rsquo;s own</td>
+        <td class="cite"><code>gpt-5.6-sol</code>, not a Claude identifier smuggled across.</td></tr>
+      <tr><td>An entry point</td><td class="no">none</td>
+        <td class="cite">Subcommand and mise task both removed; reachable only by direct Python import.</td></tr>
+      <tr><td>Parallelism</td><td class="no">serialized</td>
+        <td class="cite">Clamped to one worker unless <code>GRAPHIFY_OPENAI_CLI_PARALLEL=1</code> exactly.</td></tr>
+      <tr><td>Images</td><td class="no">text only</td>
+        <td class="cite">Vision off &mdash; but 0 of 27 committed chunks came from an image, so nothing is lost here.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="wrap">
+  <h2>So the real question isn&rsquo;t &ldquo;how&rdquo;</h2>
+  <p>It&rsquo;s <strong>which door to open</strong>, and the answer decides what gets built:</p>
+
+  <div class="panel">
+    <h3>Open the CLI door</h3>
+    <p style="color:var(--ink-soft)">Restore the entry point that was removed, now that its
+    three blocking defects are closed. Keeps cache resumption. Accepts rank&nbsp;2 and the
+    environment-variable coupling that comes with shelling out.</p>
+  </div>
+
+  <div class="panel">
+    <h3>Open the SDK door</h3>
+    <p style="color:var(--ink-soft)">Call the pinned function directly with
+    <code>backend="openai-cli"</code>. Honours rank&nbsp;1, no env coupling possible &mdash;
+    and every interrupted run starts from zero until someone builds the cache read that
+    graphify keeps in its CLI layer.</p>
+  </div>
+
+  <div class="panel signal">
+    <h3>Open the SDK door, and build the missing reader</h3>
+    <p style="color:var(--ink-soft)">Rank&nbsp;1 plus resumption: wrap the pinned call with
+    our own cache check, using the same public function graphify&rsquo;s CLI calls. More work
+    than either alternative, and it&rsquo;s our code to maintain &mdash; but it is the only
+    option where neither property is given up.</p>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:2.5rem">
+  <hr>
+  <p class="stamp">Every figure on this page was measured in the session that wrote it,
+  against the pinned fork at v0.9.48 &mdash; not carried from a prior handoff. Backend list
+  and env-key resolution probed live; cache read/write counts control-armed against
+  <span class="mono">cli.py</span>. Nothing here has been reviewed by a second lens yet.</p>
+</div>
