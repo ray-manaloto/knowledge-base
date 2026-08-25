@@ -49,7 +49,7 @@ ran a real token-spending extraction into a directory named `--dry-run`), #480
 #481 (no coverage on the only two functions that spawn a subprocess). All three
 were the stated precondition for un-parking `graphify_native_extract`.
 
-Evidence: 31 mutation arms across 5 specs, all died; 5 controls held. Gates 6/6.
+Evidence: 27 mutation arms across 5 specs, all died; 5 controls held. Gates 6/6.
 
 
 ## Outcome
