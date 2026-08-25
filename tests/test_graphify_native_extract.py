@@ -793,3 +793,62 @@ def test_backend_parses_from_argv(tmp_path: Path) -> None:
     opts = gne._parse(tmp_path, ["--backend", "openai-cli", "--dry-run"])
     assert opts.backend == "openai-cli"
     assert opts.dry_run is True
+
+
+# --- round-1 cold review findings (14756ebb8212) ------------------------------
+
+
+def test_the_dry_run_note_names_the_backends_own_parallel_var(tmp_path, capsys) -> None:
+    """The MAJOR: the NOTE hardcoded claude-cli's variable regardless of --backend.
+
+    Same coupled-constants defect as `env_overlay`, surviving one function over —
+    and worse here, because the env overlay is merely wrong while this is wrong
+    OUT LOUD, in the output a reader consults to check what a run will do.
+    """
+    _make_target(tmp_path)
+    gne.native_extract_main(tmp_path, ["--backend", "openai-cli", "--dry-run"])
+    out = capsys.readouterr().out
+    assert "GRAPHIFY_OPENAI_CLI_PARALLEL" in out
+    assert "GRAPHIFY_CLAUDE_CLI_PARALLEL" not in out
+
+
+def test_the_dry_run_does_not_carry_claude_evidence_to_another_backend(tmp_path, capsys) -> None:
+    """A true fact past its condition is how this repo ships confident wrong claims.
+
+    The 19-chunk run and `--no-session-persistence` are claude-cli's. Printing
+    them under `--backend openai-cli` asserts evidence nobody gathered.
+    """
+    _make_target(tmp_path)
+    gne.native_extract_main(tmp_path, ["--backend", "openai-cli", "--dry-run"])
+    out = capsys.readouterr().out
+    assert "19-chunk" not in out
+    assert "no-session-persistence" not in out
+    assert "NO evidence either way" in out
+
+
+def test_the_dry_run_still_carries_that_evidence_for_claude_cli(tmp_path, capsys) -> None:
+    """The control arm: scoping the evidence must not delete it where it applies."""
+    _make_target(tmp_path)
+    gne.native_extract_main(tmp_path, ["--dry-run"])
+    out = capsys.readouterr().out
+    assert "19-chunk" in out
+    assert "GRAPHIFY_CLAUDE_CLI_PARALLEL" in out
+
+
+def test_an_empty_but_exported_graphify_out_is_still_refused(tmp_path, monkeypatch) -> None:
+    """PRESENCE, not truthiness — and the empty value is the worst one.
+
+    graphify reads `os.environ.get("GRAPHIFY_OUT", "graphify-out")`, so an empty
+    string is USED as the directory name rather than falling back to the default.
+    `.strip()` read that as "not set".
+    """
+    _make_target(tmp_path)
+    monkeypatch.setenv("GRAPHIFY_OUT", "")
+    assert gne.native_extract_main(tmp_path, ["--dry-run"]) == Rc.BAD_REQUEST
+
+
+def test_an_unset_graphify_out_is_not_refused(tmp_path, monkeypatch) -> None:
+    """The control arm: presence-checking must not refuse the ordinary case."""
+    _make_target(tmp_path)
+    monkeypatch.delenv("GRAPHIFY_OUT", raising=False)
+    assert gne.native_extract_main(tmp_path, ["--dry-run"]) == 0

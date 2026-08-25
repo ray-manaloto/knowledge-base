@@ -193,8 +193,8 @@ def bare_version(value: str, prefix: str = "") -> str:
 
     The `v` survives that far because `Version.parse` keeps `raw` VERBATIM (`:159`)
     and cleans only its comparison key (`:151`), while `github_versions` returns
-    `max(stable).raw` (`:544`) after stripping the declared `tag_prefix` and
-    nothing else (`:538`). So a tool whose tags carry a bare `v` and which declares
+    `max(stable).raw` (`:581`) after stripping the declared `tag_prefix` and
+    nothing else (`:574`). So a tool whose tags carry a bare `v` and which declares
     no `tag_prefix` — hk, agnix, fnox — carries the `v` all the way into the pin. A
     tool that DOES declare one (`codex` = `rust-v`, `firecrawl-cli` = `v`) never
     could, which is why this went unseen: the only two configured tools were the

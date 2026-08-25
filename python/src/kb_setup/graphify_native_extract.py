@@ -579,8 +579,14 @@ def _refuse_out(repo_root: Path, opts: Options) -> str | None:
     Refusing says which one happened. Checked FIRST, because it is the one that
     invalidates the reasoning behind the other two rather than joining them.
     """
-    ambient_out = os.environ.get(_GRAPHIFY_OUT_ENV, "").strip()
-    if ambient_out:
+    # PRESENCE, not truthiness (cold lane, 14756ebb8212). `.strip()` treated an
+    # empty-but-exported `GRAPHIFY_OUT=""` as absent — and that is the one value
+    # worth refusing hardest: graphify reads it as `os.environ.get(..., "graphify-out")`
+    # (`paths.py:26`), so an empty string is USED, giving an empty output-directory
+    # NAME rather than falling back to the default. Exporting it is a deliberate
+    # act; this guard exists to say so rather than to judge the value.
+    ambient_out = os.environ.get(_GRAPHIFY_OUT_ENV)
+    if ambient_out is not None:
         return (
             f"[graphify-native-extract] refusing to run with {_GRAPHIFY_OUT_ENV}="
             f"{ambient_out!r} in the environment — it relocates graphify's output root "
@@ -712,15 +718,40 @@ def _print_dry_run(exe: str, opts: Options) -> None:
     for key, value in sorted(overlay.items()):
         print(f"    {key}={value}")
     if not opts.allow_parallel_claude_cli:
+        # Backend-aware, and it was not until the cold lane on 14756ebb8212 caught
+        # it. This NOTE hardcoded `GRAPHIFY_CLAUDE_CLI_PARALLEL`, the words
+        # "claude-cli runs serially", the claude-cli clamp's line numbers, AND the
+        # claude-cli evidence — printed verbatim under `--backend openai-cli`.
+        #
+        # It is the SAME coupled-constants defect this commit fixed in
+        # `env_overlay` one function above, surviving in the printer: a fix at one
+        # layer leaves the next. Worse here than there, because the env overlay is
+        # merely wrong while this is wrong OUT LOUD, in the one output a reader
+        # consults to check what a run will do.
+        _, parallel_env = backend_env_keys(opts.backend)
         print(
-            "  NOTE: GRAPHIFY_CLAUDE_CLI_PARALLEL is NOT set — claude-cli runs serially "
-            "(graphify's own default). graphify's clamp comment (llm.py:2569/:3301) cites "
-            "session-state conflict, but every claude-cli invocation passes "
-            "--no-session-persistence, and a real 19-chunk run at concurrency 4 with the "
-            "clamp lifted completed cleanly (see the module docstring). Pass "
-            "--allow-parallel-claude-cli to lift it — an informed opt-in, not a workaround "
-            "for a live risk."
+            f"  NOTE: {parallel_env} is NOT set — {opts.backend} runs serially "
+            "(graphify's own default)."
         )
+        # The evidence is claude-cli's and stays scoped to it. A 19-chunk run and
+        # `--no-session-persistence` say nothing about another backend's clamp, and
+        # carrying a true fact past its condition is how this repo has shipped
+        # confident wrong claims before (`verify-before-advancing.md`).
+        if opts.backend == DEFAULT_BACKEND:
+            print(
+                "  graphify's clamp comment (llm.py:2569/:3301) cites session-state "
+                "conflict, but every claude-cli invocation passes "
+                "--no-session-persistence, and a real 19-chunk run at concurrency 4 "
+                "with the clamp lifted completed cleanly (see the module docstring). "
+                "Pass --allow-parallel-claude-cli to lift it — an informed opt-in, "
+                "not a workaround for a live risk."
+            )
+        else:
+            print(
+                f"  NO evidence either way for {opts.backend}: the run that cleared "
+                "the clamp was claude-cli's, and it does not transfer. Lifting it "
+                "here with --allow-parallel-claude-cli is untested, not informed."
+            )
 
 
 def _run_real(repo_root: Path, exe: str, opts: Options) -> int:

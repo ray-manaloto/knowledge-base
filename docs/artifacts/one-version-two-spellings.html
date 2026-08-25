@@ -273,8 +273,7 @@
   <h1>One version, two spellings</h1>
   <p class="standfirst">
     A tool bump has to write the same release into two files. The two files
-    disagree about how to spell it — and for six weeks the engine spelled it
-    one way for both.
+    disagree about how to spell it — and the engine spelled it one way for both.
   </p>
 </header>
 
@@ -401,13 +400,13 @@
     <div class="mermaid">
 flowchart TD
     A["GitHub release tag<br/><b>v1.56.1</b>"] --> B{"does the tool declare<br/>a tag_prefix?"}
-    B -- "yes: codex 'rust-v'<br/>firecrawl-cli 'v'" --> C["tag.removeprefix(tag_prefix)<br/>upstream.py:538"]
+    B -- "yes: codex 'rust-v'<br/>firecrawl-cli 'v'" --> C["tag.removeprefix(tag_prefix)<br/>upstream.py:574"]
     B -- "no: hk, agnix, fnox" --> D["nothing is stripped"]
     C --> E["Version.parse<br/>upstream.py:151-159"]
     D --> E
     E --> F["comparison key is cleaned<br/><i>cleaned = raw.lstrip('v')</i>"]
     E --> G["<b>raw is kept VERBATIM</b><br/><i>cls(raw=raw, parts=parts)</i>"]
-    G --> H["github_versions returns<br/><b>max(stable).raw</b><br/>upstream.py:544"]
+    G --> H["github_versions returns<br/><b>max(stable).raw</b><br/>upstream.py:581"]
     H --> I["verdict.latest"]
     I --> J["prefix declared →<br/><b>1.56.1</b> — safe"]
     I --> K["no prefix declared →<br/><b>v1.56.1</b> — reaches the pin"]
@@ -434,7 +433,7 @@ flowchart TD
     The engine has a config key for exactly this: <code>tag_prefix</code>. Two
     tools declare one. Those two are the only two that <em>cannot</em> exhibit
     the defect — because declaring a prefix is what causes the strip at
-    <code>upstream.py:538</code>.
+    <code>upstream.py:574</code>.
   </p>
 
   <div class="scroll">
@@ -549,11 +548,11 @@ flowchart TD
     <li>
       <code>github_versions</code> returns <code>max(stable).raw</code> after
       stripping the declared prefix and nothing else —
-      <code>upstream.py:538</code>, <code>upstream.py:544</code>.
+      <code>upstream.py:574</code>, <code>upstream.py:581</code>.
     </li>
     <li>
       Exactly two tools declare a <code>tag_prefix</code> —
-      <code>currency.toml:1827</code> (codex), <code>currency.toml:2055</code>
+      <code>currency.toml:1844</code> (codex), <code>currency.toml:2072</code>
       (firecrawl-cli).
     </li>
     <li>
