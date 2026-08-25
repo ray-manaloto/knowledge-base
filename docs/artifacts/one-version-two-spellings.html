@@ -1,0 +1,602 @@
+<title>One Version, Two Spellings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<style>
+  :root {
+    --ground:   #F1F4F3;
+    --surface:  #FFFFFF;
+    --sunken:   #E4EAE8;
+    --ink:      #16211F;
+    --muted:    #5E6E6C;
+    --rule:     #CBD6D3;
+
+    /* The two spellings. Amber = the bare VERSION. Teal = the git TAG.
+       Held constant in every figure so one character can be traced by colour. */
+    --bare:     #A85D06;
+    --bare-bg:  #FBEEDD;
+    --tag:      #0C6360;
+    --tag-bg:   #DDEEEC;
+    --alarm:    #A32222;
+
+    /* Mermaid draws in its own palette, so its plate stays light in BOTH
+       themes rather than following the tokens above. */
+    --plate:    #FFFFFF;
+    --plate-rule: #CBD6D3;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #0F1716;
+      --surface: #17211F;
+      --sunken:  #1E2A28;
+      --ink:     #E7EEEC;
+      --muted:   #94A4A1;
+      --rule:    #30403D;
+      --bare:    #E5A64B;
+      --bare-bg: #372815;
+      --tag:     #55C3B9;
+      --tag-bg:  #10322F;
+      --alarm:   #E8736B;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:  #0F1716;
+    --surface: #17211F;
+    --sunken:  #1E2A28;
+    --ink:     #E7EEEC;
+    --muted:   #94A4A1;
+    --rule:    #30403D;
+    --bare:    #E5A64B;
+    --bare-bg: #372815;
+    --tag:     #55C3B9;
+    --tag-bg:  #10322F;
+    --alarm:   #E8736B;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 1.25rem 6rem;
+  }
+
+  .wrap { max-width: 43rem; margin: 0 auto; }
+  .wide { max-width: 58rem; margin-left: auto; margin-right: auto; }
+
+  header.masthead {
+    max-width: 43rem;
+    margin: 0 auto;
+    padding: 4.5rem 0 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-family: Spectral, Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(2.1rem, 6vw, 3.1rem);
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    font-family: Spectral, Georgia, serif;
+    font-size: 1.19rem;
+    line-height: 1.55;
+    color: var(--muted);
+    margin: 0;
+    text-wrap: pretty;
+  }
+
+  h2 {
+    font-family: Spectral, Georgia, serif;
+    font-weight: 600;
+    font-size: 1.6rem;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 3.4rem 0 0;
+  }
+
+  h3 {
+    font-family: "Source Sans 3", sans-serif;
+    font-weight: 600;
+    font-size: 1.02rem;
+    letter-spacing: 0.01em;
+    margin: 2.2rem 0 0;
+  }
+
+  p { margin: 1rem 0 0; text-wrap: pretty; }
+
+  code, .m {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.87em;
+  }
+
+  p code, li code, td code, figcaption code {
+    background: var(--sunken);
+    padding: 0.08em 0.34em;
+    border-radius: 3px;
+  }
+
+  /* The two spellings, as inline chips. */
+  .bare, .tag {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.87em;
+    font-weight: 700;
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
+  }
+  .bare { color: var(--bare); background: var(--bare-bg); }
+  .tag  { color: var(--tag);  background: var(--tag-bg); }
+
+  figure {
+    margin: 2.4rem auto 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.75rem 1.5rem 1.25rem;
+  }
+
+  figure svg { display: block; width: 100%; height: auto; }
+
+  figcaption {
+    margin-top: 1.25rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  /* Mermaid renders with its own colours — pin a light plate that stays light
+     in dark mode, or it draws dark-on-dark. */
+  .mermaid {
+    background: var(--plate);
+    border: 1px solid var(--plate-rule);
+    border-radius: 3px;
+    padding: 1.1rem 0.75rem;
+    overflow-x: auto;
+  }
+
+  .scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.94rem;
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.4rem;
+  }
+
+  th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 0.9rem 0.55rem 0;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.6rem 0.9rem 0.6rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  tr.hit td:first-child { box-shadow: inset 3px 0 0 var(--alarm); padding-left: 0.75rem; }
+  tr.safe td:first-child { box-shadow: inset 3px 0 0 var(--tag); padding-left: 0.75rem; }
+
+  .verdict {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .verdict.bad  { color: var(--alarm); }
+  .verdict.good { color: var(--tag); }
+
+  .pull {
+    margin: 2.6rem 0 0;
+    padding: 1.15rem 0 1.15rem 1.3rem;
+    border-left: 3px solid var(--bare);
+    font-family: Spectral, Georgia, serif;
+    font-size: 1.16rem;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .cite {
+    display: block;
+    margin-top: 0.55rem;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.74rem;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+  }
+
+  ul { margin: 1rem 0 0; padding-left: 1.15rem; }
+  li { margin-top: 0.5rem; text-wrap: pretty; }
+
+  pre {
+    background: var(--sunken);
+    border-radius: 4px;
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    margin: 1.1rem 0 0;
+  }
+
+  footer {
+    max-width: 43rem;
+    margin: 4.5rem auto 0;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.86rem;
+    color: var(--muted);
+  }
+
+  a { color: var(--tag); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--bare); outline-offset: 2px; border-radius: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<header class="masthead">
+  <span class="eyebrow">knowledge-base · issue #499 · 2026-08-25</span>
+  <h1>One version, two spellings</h1>
+  <p class="standfirst">
+    A tool bump has to write the same release into two files. The two files
+    disagree about how to spell it — and for six weeks the engine spelled it
+    one way for both.
+  </p>
+</header>
+
+<div class="wrap">
+
+  <p>
+    When <code>currency apply</code> bumps a tool, it edits two committable
+    files. Both are about hk 1.56.1. Neither wants the same characters.
+  </p>
+
+  <p>
+    <code>mise.toml</code> holds a <strong>pin</strong>, and a pin takes a bare
+    version: <span class="bare">1.56.1</span>.
+    <code>sources/hk.manifest</code> holds a <strong>ref</strong>, and a ref
+    takes the git tag: <span class="tag">v1.56.1</span>. One character apart,
+    and only one of them is right in each place.
+  </p>
+
+  <p>
+    The engine carried a single resolved string and wrote it to both. The
+    manifest got what it wanted. The pin did not.
+  </p>
+
+</div>
+
+<div class="wide">
+  <figure>
+    <svg viewBox="0 0 720 300" role="img" aria-label="One resolved string flowing to two write targets. Before the fix both targets receive the git tag v1.56.1, and the mise pin fails to resolve; after the fix the pin is reduced to the bare version 1.56.1 while the manifest keeps the tag.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 1 L 9 5 L 0 9 z" fill="currentColor"/>
+        </marker>
+        <marker id="ar-bare" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 1 L 9 5 L 0 9 z" fill="#A85D06"/>
+        </marker>
+      </defs>
+
+      <!-- column headings -->
+      <text x="12" y="20" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" letter-spacing="1.2" fill="currentColor" opacity="0.55">BEFORE</text>
+      <text x="380" y="20" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" letter-spacing="1.2" fill="currentColor" opacity="0.55">AFTER</text>
+      <line x1="356" y1="8" x2="356" y2="292" stroke="currentColor" stroke-opacity="0.18" stroke-dasharray="3 4"/>
+
+      <!-- ============ BEFORE ============ -->
+      <rect x="12" y="36" width="150" height="40" rx="3" fill="none" stroke="currentColor" stroke-opacity="0.45"/>
+      <text x="87" y="53" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity="0.7">github_versions()</text>
+      <text x="87" y="68" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#0C6360">v1.56.1</text>
+
+      <!-- fan out -->
+      <path d="M 87 76 L 87 104 L 52 104 L 52 128" fill="none" stroke="currentColor" stroke-opacity="0.5" marker-end="url(#ar)"/>
+      <path d="M 87 76 L 87 104 L 236 104 L 236 128" fill="none" stroke="currentColor" stroke-opacity="0.5" marker-end="url(#ar)"/>
+      <text x="162" y="99" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.6">one string, written twice</text>
+
+      <!-- pin, wrong -->
+      <rect x="12" y="130" width="118" height="62" rx="3" fill="#FBEEDD" stroke="#A85D06" stroke-opacity="0.5"/>
+      <text x="71" y="148" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#A85D06">mise.toml</text>
+      <text x="71" y="167" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" font-weight="700" fill="#A32222">hk = "v1.56.1"</text>
+      <text x="71" y="183" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9.5" fill="#A32222">wants a version</text>
+
+      <!-- manifest, right -->
+      <rect x="178" y="130" width="118" height="62" rx="3" fill="#DDEEEC" stroke="#0C6360" stroke-opacity="0.5"/>
+      <text x="237" y="148" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#0C6360">hk.manifest</text>
+      <text x="237" y="167" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" font-weight="700" fill="#0C6360">ref = v1.56.1</text>
+      <text x="237" y="183" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9.5" fill="#0C6360" opacity="0.8">wants a tag</text>
+
+      <!-- outcome -->
+      <path d="M 71 194 L 71 216" fill="none" stroke="#A32222" stroke-opacity="0.7" marker-end="url(#ar)" color="#A32222"/>
+      <text x="12" y="238" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#A32222">mise ls hk → v1.56.1 (missing)</text>
+      <text x="12" y="256" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.7">nothing resolves — `mise run lint`</text>
+      <text x="12" y="271" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.7">cannot find hk for anyone who pulls</text>
+
+      <!-- ============ AFTER ============ -->
+      <rect x="380" y="36" width="150" height="40" rx="3" fill="none" stroke="currentColor" stroke-opacity="0.45"/>
+      <text x="455" y="53" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity="0.7">github_versions()</text>
+      <text x="455" y="68" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#0C6360">v1.56.1</text>
+
+      <!-- the one added hop -->
+      <path d="M 455 76 L 455 92" fill="none" stroke="#A85D06" marker-end="url(#ar-bare)" color="#A85D06"/>
+      <rect x="368" y="94" width="128" height="26" rx="3" fill="#FBEEDD" stroke="#A85D06"/>
+      <text x="432" y="111" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" font-weight="700" fill="#A85D06">bare_version()</text>
+
+      <path d="M 432 120 L 432 136 L 420 136 L 420 158" fill="none" stroke="#A85D06" marker-end="url(#ar-bare)" color="#A85D06"/>
+      <path d="M 512 76 L 512 158" fill="none" stroke="#0C6360" stroke-opacity="0.75" marker-end="url(#ar)" color="#0C6360"/>
+      <text x="586" y="112" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9.5" fill="#0C6360">tag passes through</text>
+
+      <!-- pin, right -->
+      <rect x="368" y="160" width="118" height="52" rx="3" fill="#FBEEDD" stroke="#A85D06" stroke-opacity="0.5"/>
+      <text x="427" y="178" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#A85D06">mise.toml</text>
+      <text x="427" y="197" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" font-weight="700" fill="#A85D06">hk = "1.56.1"</text>
+
+      <!-- manifest, right -->
+      <rect x="534" y="160" width="118" height="52" rx="3" fill="#DDEEEC" stroke="#0C6360" stroke-opacity="0.5"/>
+      <text x="593" y="178" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#0C6360">hk.manifest</text>
+      <text x="593" y="197" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" font-weight="700" fill="#0C6360">ref = v1.56.1</text>
+
+      <text x="380" y="240" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#0C6360">the two targets now DISAGREE</text>
+      <text x="380" y="258" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.7">which is the property the regression</text>
+      <text x="380" y="273" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.7">test asserts — not "both got 1.56.1"</text>
+    </svg>
+    <figcaption>
+      The fix is one hop, on one of the two arms. Everything upstream is
+      unchanged, which is deliberate: <code>verdict.latest</code> is also what
+      the gates parse, what the run report renders, and what
+      <code>resolve_tag</code> searches for — normalising at the source would
+      change four consumers to fix one.
+    </figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <h2>Where the <span class="tag">v</span> survives</h2>
+
+  <p>
+    The interesting question is not why the pin was wrong. It is why a
+    <code>v</code> was still attached to the string by the time anything wrote
+    it. Three functions decide that, and each one is doing exactly what it was
+    written to do.
+  </p>
+
+</div>
+
+<div class="wide">
+  <figure>
+    <div class="mermaid">
+flowchart TD
+    A["GitHub release tag<br/><b>v1.56.1</b>"] --> B{"does the tool declare<br/>a tag_prefix?"}
+    B -- "yes: codex 'rust-v'<br/>firecrawl-cli 'v'" --> C["tag.removeprefix(tag_prefix)<br/>upstream.py:538"]
+    B -- "no: hk, agnix, fnox" --> D["nothing is stripped"]
+    C --> E["Version.parse<br/>upstream.py:151-159"]
+    D --> E
+    E --> F["comparison key is cleaned<br/><i>cleaned = raw.lstrip('v')</i>"]
+    E --> G["<b>raw is kept VERBATIM</b><br/><i>cls(raw=raw, parts=parts)</i>"]
+    G --> H["github_versions returns<br/><b>max(stable).raw</b><br/>upstream.py:544"]
+    H --> I["verdict.latest"]
+    I --> J["prefix declared →<br/><b>1.56.1</b> — safe"]
+    I --> K["no prefix declared →<br/><b>v1.56.1</b> — reaches the pin"]
+
+    style G fill:#FBEEDD,stroke:#A85D06,stroke-width:2px
+    style K fill:#F7DCDA,stroke:#A32222,stroke-width:2px
+    style J fill:#DDEEEC,stroke:#0C6360
+    </div>
+    <figcaption>
+      <code>Version.parse</code> cleans the <em>comparison key</em> and keeps
+      <code>raw</code> untouched — correct, because sorting versions and
+      printing them are different jobs. But <code>github_versions</code> returns
+      <code>max(stable).raw</code>, so the decoration rides out of the function
+      on the value everything downstream treats as "the latest version".
+    </figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <h2>Why nobody saw it</h2>
+
+  <p>
+    The engine has a config key for exactly this: <code>tag_prefix</code>. Two
+    tools declare one. Those two are the only two that <em>cannot</em> exhibit
+    the defect — because declaring a prefix is what causes the strip at
+    <code>upstream.py:538</code>.
+  </p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Tool</th>
+          <th>Upstream tag</th>
+          <th><code>tag_prefix</code></th>
+          <th>Pin it would write</th>
+          <th>Verdict</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="safe">
+          <td><code>codex</code></td>
+          <td><span class="tag">rust-v0.149.1</span></td>
+          <td><code>"rust-v"</code></td>
+          <td><span class="bare">0.149.1</span></td>
+          <td class="verdict good">SAFE</td>
+        </tr>
+        <tr class="safe">
+          <td><code>firecrawl-cli</code></td>
+          <td><span class="tag">v1.23.1</span></td>
+          <td><code>"v"</code></td>
+          <td><span class="bare">1.23.1</span></td>
+          <td class="verdict good">SAFE</td>
+        </tr>
+        <tr class="hit">
+          <td><code>hk</code></td>
+          <td><span class="tag">v1.56.1</span></td>
+          <td>none</td>
+          <td><span class="tag">v1.56.1</span></td>
+          <td class="verdict bad">HIT — live</td>
+        </tr>
+        <tr class="hit">
+          <td><code>agnix</code></td>
+          <td><span class="tag">v0.50.0</span></td>
+          <td>none</td>
+          <td><span class="tag">v0.50.0</span></td>
+          <td class="verdict bad">WOULD HIT</td>
+        </tr>
+        <tr class="hit">
+          <td><code>fnox</code></td>
+          <td><span class="tag">v1.34.0</span></td>
+          <td>none</td>
+          <td><span class="tag">v1.34.0</span></td>
+          <td class="verdict bad">WOULD HIT</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Only hk actually reached <code>apply</code>. agnix and fnox were minor
+    bumps, and the engine refuses to auto-apply anything above patch level — so
+    they were bumped by hand and never went through the broken path.
+  </p>
+
+  <div class="pull">
+    The gate that blocks minor bumps is currently what limits this defect's
+    blast radius. Patch bumps are exactly the ones <code>apply</code> is allowed
+    to make unattended.
+    <span class="cite">— issue #499, as filed</span>
+  </div>
+
+  <h2>The arm that survived</h2>
+
+  <p>
+    Four mutation arms were written against the fix. Three died on the first
+    run. One survived — and it was the interesting one, because it was
+    measuring a claim I had written into the code's own docstring.
+  </p>
+
+  <p>
+    The reduction is one expression. I had claimed the order of its two halves
+    mattered:
+  </p>
+
+  <pre>value.removeprefix(prefix).lstrip("v")</pre>
+
+  <p>
+    The arm swapped them and expected a test to go red. Nothing failed. The
+    reason is plain once looked at: <code>lstrip("v")</code> cannot eat a
+    character of a prefix that does not begin with a <code>v</code>, so on every
+    real input the two orders return the same string. The swap was an
+    <strong>inert mutant</strong> — it changed the source without changing any
+    behaviour a test could see.
+  </p>
+
+  <p>
+    The code was right. The sentence was not. The docstring now says the order
+    is <em>not</em> load-bearing and says why, and the arm was replaced with one
+    that breaks the property that <em>is</em>: that the prefix is stripped
+    <strong>by name</strong> rather than guessed at. That arm dies.
+  </p>
+
+  <div class="pull">
+    A surviving arm reads as coverage. This one measured nothing at all — and it
+    would have shipped a confident, wrong sentence attached to correct code.
+    <span class="cite">— recorded in the arms spec rather than deleted</span>
+  </div>
+
+  <h2>What was measured, and where</h2>
+
+  <ul>
+    <li>
+      <code>Version.parse</code> keeps <code>raw</code> verbatim and cleans only
+      its comparison key — <code>upstream.py:151</code>,
+      <code>upstream.py:159</code>.
+    </li>
+    <li>
+      <code>github_versions</code> returns <code>max(stable).raw</code> after
+      stripping the declared prefix and nothing else —
+      <code>upstream.py:538</code>, <code>upstream.py:544</code>.
+    </li>
+    <li>
+      Exactly two tools declare a <code>tag_prefix</code> —
+      <code>currency.toml:1827</code> (codex), <code>currency.toml:2055</code>
+      (firecrawl-cli).
+    </li>
+    <li>
+      Every tag spelling in the table above was <strong>re-derived live this
+      session</strong> against <code>gh api repos/&lt;repo&gt;/releases</code>,
+      not taken from the ticket. codex's newest release is a prerelease
+      (<code>rust-v0.150.0-alpha.9</code>), which <code>github_versions</code>
+      excludes, so the table shows its newest <em>stable</em> tag. The probe was
+      control-armed: a guessed org returned <span class="verdict bad">404</span>
+      while <code>jdx/hk</code> returned real tags, so an absent result would
+      have been distinguishable from an unasked question.
+    </li>
+    <li>
+      The manifest was written correctly by the <em>fallback</em>, not by
+      design: <code>_tag_candidates</code> tries <code>v&lt;version&gt;</code>
+      after the prefixed candidate — <code>manifest.py:248</code>.
+    </li>
+    <li>
+      <code>mise ls hk</code> reporting the pin <span class="verdict bad">(missing)</span>
+      was measured live on the ticket, not in this session. It is not asserted by
+      any test here — no unit test in this repo can reach mise's resolver.
+    </li>
+    <li>
+      Arms: <strong>4/4 died, 1/1 control held</strong>, after A3 was replaced.
+      Gates on the working tree: lint · test · brain-audit · eval · graph-size ·
+      hk-test, <strong>6/6</strong>.
+    </li>
+  </ul>
+
+  <h3>What this does not claim</h3>
+
+  <p>
+    That #499 is the only place a resolved string is written to a target that
+    spells it differently. The arms can only show that <em>this</em> one can
+    fail. Whether normalising at write time beats normalising in
+    <code>github_versions</code> is a design call, argued in the commit and not
+    settled by any test.
+  </p>
+
+</div>
+
+<footer class="wrap">
+  Source: <code>docs/artifacts/one-version-two-spellings.html</code>, tracked in
+  <code>ray-manaloto/knowledge-base</code>. Fix: <code>3e2f8ff0</code>. Arms:
+  <code>docs/research/reports/2026-08-25-499-pin-spelling-arms.toml</code>.
+</footer>
