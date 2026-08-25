@@ -1,0 +1,598 @@
+<title>Two SHAs, One Tag</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<style>
+  :root {
+    --ground:      #f6f7f9;
+    --panel:       #ffffff;
+    --panel-sunk:  #eceff3;
+    --ink:         #151a22;
+    --ink-soft:    #4d5665;
+    --ink-faint:   #7b8493;
+    --rule:        #d8dee6;
+    --rule-strong: #b6bfcb;
+    --accent:      #1f5f6b;   /* structural: eyebrows, rules, links */
+    --tagobj:      #0e7c86;   /* the tag object */
+    --peeled:      #9a5a06;   /* the commit it peels to */
+    --refuted:     #a32219;   /* the claim that did not survive */
+    --plate:       #ffffff;   /* stays light in BOTH themes (diagram plate) */
+    --plate-ink:   #151a22;
+    --measure:     68ch;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #10141b;
+      --panel:       #171c25;
+      --panel-sunk:  #1e242f;
+      --ink:         #e6eaf0;
+      --ink-soft:    #a3adbb;
+      --ink-faint:   #78828f;
+      --rule:        #2a323d;
+      --rule-strong: #3c4653;
+      --accent:      #5fb3c0;
+      --tagobj:      #4ec3cd;
+      --peeled:      #e0a44a;
+      --refuted:     #ef8078;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #10141b;
+    --panel:       #171c25;
+    --panel-sunk:  #1e242f;
+    --ink:         #e6eaf0;
+    --ink-soft:    #a3adbb;
+    --ink-faint:   #78828f;
+    --rule:        #2a323d;
+    --rule-strong: #3c4653;
+    --accent:      #5fb3c0;
+    --tagobj:      #4ec3cd;
+    --peeled:      #e0a44a;
+    --refuted:     #ef8078;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Public Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 120px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: var(--measure); margin: 0 auto; }
+  .wide { max-width: 100ch; margin: 0 auto; }
+
+  h1, h2, h3 {
+    font-family: "Bricolage Grotesque", "Public Sans", sans-serif;
+    text-wrap: balance;
+    line-height: 1.12;
+    margin: 0;
+  }
+  h1 { font-size: clamp(2.3rem, 6vw, 3.5rem); font-weight: 700; letter-spacing: -0.022em; }
+  h2 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.014em; }
+  h3 { font-size: 1.08rem; font-weight: 700; letter-spacing: -0.006em; }
+
+  p, li { color: var(--ink-soft); }
+  p { margin: 0 0 1.05em; }
+  strong { color: var(--ink); font-weight: 600; }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  code, .sha, .cmd {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+    font-size: 0.86em;
+    font-variant-ligatures: none;
+  }
+  p code, li code, td code {
+    background: var(--panel-sunk);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+  }
+
+  header.masthead {
+    border-bottom: 1px solid var(--rule);
+    padding: 88px 0 40px;
+    margin-bottom: 52px;
+  }
+  header.masthead .eyebrow { display: block; margin-bottom: 20px; }
+  .standfirst {
+    font-size: 1.16rem;
+    color: var(--ink-soft);
+    margin-top: 22px;
+    max-width: 56ch;
+  }
+
+  section { margin-bottom: 60px; }
+  section > h2 { margin-bottom: 8px; }
+  .sec-lede { color: var(--ink-faint); font-size: 0.94rem; margin: 0 0 22px; }
+
+  /* --- the verdict strip --- */
+  .verdicts { display: grid; gap: 14px; margin: 0 0 8px; }
+  .verdict {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px;
+    align-items: start;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--mark, var(--rule-strong));
+    border-radius: 2px;
+    padding: 16px 18px;
+  }
+  .verdict .tag {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--mark, var(--ink-faint));
+    padding-top: 4px;
+    white-space: nowrap;
+  }
+  .verdict p { margin: 0; font-size: 0.96rem; }
+  .verdict p + p { margin-top: 8px; }
+  .v-refuted { --mark: var(--refuted); }
+  .v-live    { --mark: var(--peeled); }
+  .v-ok      { --mark: var(--tagobj); }
+
+  /* --- figures --- */
+  figure { margin: 34px 0; }
+  .plate {
+    background: var(--plate);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 26px 22px 18px;
+    overflow-x: auto;
+  }
+  .plate svg { display: block; width: 100%; max-width: 100%; height: auto; color: var(--plate-ink); }
+  figcaption {
+    font-size: 0.86rem;
+    color: var(--ink-faint);
+    margin-top: 12px;
+    max-width: 62ch;
+  }
+
+  /* --- terminal --- */
+  .term {
+    background: var(--panel-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78rem;
+    line-height: 1.75;
+    white-space: pre;
+    color: var(--ink-soft);
+    margin: 22px 0;
+  }
+  .term b { color: var(--ink); font-weight: 700; }
+  .term .c1 { color: var(--tagobj); font-weight: 700; }
+  .term .c2 { color: var(--peeled); font-weight: 700; }
+  .term .dim { color: var(--ink-faint); }
+
+  /* --- table --- */
+  .tablewrap { overflow-x: auto; margin: 24px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td {
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 400;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  td { color: var(--ink-soft); }
+  td.mono, th.mono { font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
+  td.sha { font-size: 0.72rem; letter-spacing: -0.01em; white-space: nowrap; }
+  .ok  { color: var(--tagobj); font-weight: 600; }
+  .bad { color: var(--refuted); font-weight: 600; }
+
+  /* --- choice cards --- */
+  .choice { display: grid; gap: 18px; margin: 26px 0; }
+  @media (min-width: 720px) { .choice { grid-template-columns: 1fr 1fr; } }
+  .opt {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--mark);
+    border-radius: 2px;
+    padding: 20px;
+  }
+  .opt h3 { margin-bottom: 4px; }
+  .opt .who { font-family: "JetBrains Mono", monospace; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mark); display: block; margin-bottom: 12px; }
+  .opt ul { margin: 0; padding-left: 1.1em; }
+  .opt li { font-size: 0.92rem; margin-bottom: 7px; }
+  .o-tag { --mark: var(--tagobj); }
+  .o-peel { --mark: var(--peeled); }
+
+  .cite {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+  }
+
+  .provenance {
+    border-top: 1px solid var(--rule);
+    padding-top: 26px;
+    margin-top: 70px;
+    font-size: 0.86rem;
+    color: var(--ink-faint);
+  }
+  .correction {
+    background: var(--panel-sunk);
+    border: 1px solid var(--rule-strong);
+    border-left: 3px solid var(--refuted);
+    border-radius: 2px;
+    padding: 16px 18px;
+    margin-top: 20px;
+  }
+  .correction .eyebrow { display: block; color: var(--refuted); margin-bottom: 8px; }
+  .correction p { margin: 0; font-size: 0.94rem; }
+
+  .provenance h2 { font-size: 1rem; margin-bottom: 12px; color: var(--ink-soft); }
+  .provenance ul { padding-left: 1.1em; margin: 0; }
+  .provenance li { font-size: 0.86rem; color: var(--ink-faint); margin-bottom: 6px; }
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <span class="eyebrow">Finding · 2026-08-25 · issue #500</span>
+    <h1>Two SHAs, One Tag</h1>
+    <p class="standfirst">
+      An annotated git tag names two objects, and this repo already knows that in two
+      places. The ticket that says otherwise sends the fix in the wrong direction — while
+      the defect that is actually live sits in five manifests, silently, and has for weeks.
+    </p>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section>
+  <h2>Three claims, checked</h2>
+  <p class="sec-lede">All three probed against the live remotes and the installed source this session.</p>
+
+  <div class="verdicts">
+    <div class="verdict v-refuted">
+      <span class="tag">Refuted</span>
+      <div>
+        <p><strong>“<code>--refs</code> strips the peeled line.”</strong> It does not — not here.
+        <code>git ls-remote --tags --refs &lt;url&gt; v0.50.0</code> and the same command
+        <em>without</em> <code>--refs</code> return byte-identical output. The peeled entry is
+        named <code>v0.50.0^{}</code>, so the <em>ref pattern</em> never matched it in the first place.</p>
+        <p>A fix that only removes <code>--refs</code> changes nothing, and would pass its own test.</p>
+      </div>
+    </div>
+
+    <div class="verdict v-refuted">
+      <span class="tag">Refuted</span>
+      <div>
+        <p><strong>“The tag-object SHA corrupts the reproducibility contract.”</strong>
+        <code>kb-build</code> peels before it verifies, deliberately, and says so:
+        <em>“The pin may be either a commit object or an annotated-tag object. Both legitimately
+        peel to one commit/tree.”</em> <span class="cite">graph.py:640-642</span>. The currency
+        check accepts both for the same reason <span class="cite">sync.py:1633-1645, #246</span>.</p>
+      </div>
+    </div>
+
+    <div class="verdict v-live">
+      <span class="tag">Live</span>
+      <div>
+        <p><strong>The defect runs the other way, and it is older and wider than the ticket.</strong>
+        <code>latest_commit()</code> returns the <em>tag object</em>, but <strong>five</strong>
+        manifests record the <em>peeled commit</em> — so <code>latest == m.commit</code>
+        <span class="cite">graph.py:3276</span> is permanently false on five sources that have
+        not moved. Three of the five predate last round entirely.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="correction">
+    <span class="eyebrow">Corrected after publication</span>
+    <p>
+      The first version of this page said the phantom-advance defect affected
+      <strong>two</strong> sources and that <strong>last round created it</strong>. A full
+      audit of all 84 manifests, run after publishing, refutes both halves: it affects
+      <strong>five</strong>, and <code>codex</code>, <code>ffmpeg</code> and <code>mise</code>
+      were already peeled before that round began. The round added two to an existing
+      population; it did not start it. The audit table below is the evidence.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>The corpus is already split, 5 to 4</h2>
+  <p class="sec-lede">
+    Every one of the 84 manifests, audited against its live remote this session. 25 are
+    tag-pinned; 9 of those sit on annotated tags — and they do not agree with each other.
+  </p>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Annotated source</th>
+          <th class="mono">ref</th>
+          <th class="mono">recorded</th>
+          <th class="mono">tag object</th>
+          <th class="mono">peeled</th>
+          <th>records</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>agnix</code></td><td class="mono">v0.50.0</td><td class="mono sha">faaeed49b5d018aaadecc2b2d21dcf049ed817c0</td><td class="mono sha">7e168bc4a84c357807b519db2eb103351e545fdb</td><td class="mono sha">faaeed49b5d018aaadecc2b2d21dcf049ed817c0</td><td class="bad">peeled</td></tr>
+        <tr><td><code>codex</code></td><td class="mono">rust-v0.149.0</td><td class="mono sha">758ef40f50c1a458425c7cfbf1eb12cbc07af0b0</td><td class="mono sha">a4e15bf371341b067c8278d3b70b1a8c7b3d793e</td><td class="mono sha">758ef40f50c1a458425c7cfbf1eb12cbc07af0b0</td><td class="bad">peeled</td></tr>
+        <tr><td><code>ffmpeg</code></td><td class="mono">n9.0.1</td><td class="mono sha">bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa</td><td class="mono sha">501bb49457b9dfb25d6a208832e0a6e6cd53108d</td><td class="mono sha">bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa</td><td class="bad">peeled</td></tr>
+        <tr><td><code>mise</code></td><td class="mono">v2026.8.10</td><td class="mono sha">c2a0cb9da890c54852245406c1597df9c3a7e63b</td><td class="mono sha">11522eab3f837e308a64726505ca31eb99d0da21</td><td class="mono sha">c2a0cb9da890c54852245406c1597df9c3a7e63b</td><td class="bad">peeled</td></tr>
+        <tr><td><code>rumdl</code></td><td class="mono">v0.2.60</td><td class="mono sha">50dbfef7cf08f1d28633b684c0884490a63094e3</td><td class="mono sha">510d056a792b944952f9bba3696178273586e6a1</td><td class="mono sha">50dbfef7cf08f1d28633b684c0884490a63094e3</td><td class="bad">peeled</td></tr>
+        <tr><td><code>colibri</code></td><td class="mono">v1.5.0</td><td class="mono sha">5e4b5c6a2179b5b7559657a6db100bed0cd45209</td><td class="mono sha">5e4b5c6a2179b5b7559657a6db100bed0cd45209</td><td class="mono sha">8f512fc8c2f48ffa18cd624cd4a5bcaae4a4abfc</td><td class="ok">tag object</td></tr>
+        <tr><td><code>doppler</code></td><td class="mono">3.76.5</td><td class="mono sha">12ca88c1227bf21ab45199b0ff6e07541c0956d9</td><td class="mono sha">12ca88c1227bf21ab45199b0ff6e07541c0956d9</td><td class="mono sha">a8671b86a839187fcbfdbd449fc5787dc62ab42f</td><td class="ok">tag object</td></tr>
+        <tr><td><code>pkl</code></td><td class="mono">0.32.0</td><td class="mono sha">67a681c60dda191365eeaabc40f9342132aaa0e7</td><td class="mono sha">67a681c60dda191365eeaabc40f9342132aaa0e7</td><td class="mono sha">e51fb2f91774265666f94980ec630db794a4db2d</td><td class="ok">tag object</td></tr>
+        <tr><td><code>typos</code></td><td class="mono">v1.48.0</td><td class="mono sha">dbe52f72499cd4ab666928e4d14ecfa9ddbb6852</td><td class="mono sha">dbe52f72499cd4ab666928e4d14ecfa9ddbb6852</td><td class="mono sha">bee27e3a4fd1ea2111cf90ab89cd076c870fce14</td><td class="ok">tag object</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    The remaining 16 tag-pinned sources are on <strong>lightweight</strong> tags, where the
+    two identities collapse into one and no convention can be wrong. That is why this went
+    unnoticed: <strong>16 of 25 tag-pinned sources cannot exhibit the difference at all.</strong>
+    Colour in the <code>records</code> column marks agreement with <code>latest_commit()</code>,
+    not correctness — the four “tag object” rows are the ones <code>kb-update</code> is
+    currently happy with.
+  </p>
+</section>
+
+<section>
+  <h2>What an annotated tag actually is</h2>
+  <p class="sec-lede">The mechanism the whole disagreement rests on.</p>
+  <p>
+    A <strong>lightweight</strong> tag is a name pointing straight at a commit — one name,
+    one SHA, no ambiguity. An <strong>annotated</strong> tag inserts a real object in
+    between: a tag object carrying the tagger, the date and the message, which in turn
+    points at the commit. Two objects, two SHAs, one release.
+  </p>
+</section>
+</div>
+
+<div class="wide">
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 880 300" role="img" aria-label="An annotated tag ref points at a tag object which peels to a commit and its tree; a lightweight tag ref points straight at the commit.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+        <marker id="ar-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#0e7c86"/>
+        </marker>
+        <marker id="ar-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#9a5a06"/>
+        </marker>
+      </defs>
+
+      <!-- ANNOTATED -->
+      <text x="20" y="26" font-family="JetBrains Mono, monospace" font-size="11" letter-spacing="1.6" fill="#7b8493">ANNOTATED — agnix, rumdl</text>
+
+      <rect x="20" y="44" width="176" height="52" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="108" y="68" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">refs/tags/</text>
+      <text x="108" y="85" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">v0.50.0</text>
+
+      <line x1="200" y1="70" x2="284" y2="70" stroke="#0e7c86" stroke-width="1.6" marker-end="url(#ar-t)"/>
+      <text x="242" y="60" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#0e7c86">names</text>
+
+      <rect x="288" y="40" width="204" height="60" rx="2" fill="none" stroke="#0e7c86" stroke-width="1.8"/>
+      <text x="390" y="62" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#0e7c86">tag object</text>
+      <text x="390" y="82" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="13" font-weight="700" fill="#0e7c86">7e168bc4</text>
+
+      <line x1="496" y1="70" x2="580" y2="70" stroke="#9a5a06" stroke-width="1.6" marker-end="url(#ar-p)"/>
+      <text x="538" y="60" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#9a5a06">peels to</text>
+
+      <rect x="584" y="40" width="204" height="60" rx="2" fill="none" stroke="#9a5a06" stroke-width="1.8"/>
+      <text x="686" y="62" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#9a5a06">commit</text>
+      <text x="686" y="82" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="13" font-weight="700" fill="#9a5a06">faaeed49</text>
+
+      <line x1="792" y1="70" x2="852" y2="70" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+      <text x="822" y="60" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#7b8493">tree</text>
+
+      <!-- divider -->
+      <line x1="20" y1="140" x2="860" y2="140" stroke="currentColor" stroke-width="0.7" stroke-dasharray="3 4" opacity="0.35"/>
+
+      <!-- LIGHTWEIGHT -->
+      <text x="20" y="176" font-family="JetBrains Mono, monospace" font-size="11" letter-spacing="1.6" fill="#7b8493">LIGHTWEIGHT — hk (the control arm)</text>
+
+      <rect x="20" y="194" width="176" height="52" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="108" y="218" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">refs/tags/</text>
+      <text x="108" y="235" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">v1.56.1</text>
+
+      <line x1="200" y1="220" x2="580" y2="220" stroke="currentColor" stroke-width="1.6" marker-end="url(#ar)"/>
+      <text x="390" y="210" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#7b8493">names the commit directly — no second object</text>
+
+      <rect x="584" y="190" width="204" height="60" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      <text x="686" y="212" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor">commit</text>
+      <text x="686" y="232" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="13" font-weight="700" fill="currentColor">fdbb35c1</text>
+
+      <text x="20" y="286" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#7b8493">One release · two true answers to “what SHA is v0.50.0?” · both name the same tree</text>
+    </svg>
+  </div>
+  <figcaption>
+    The tag object and the commit are both correct answers, which is why a checkout of
+    either produces identical bytes. <code>hk</code> is the control arm: a lightweight tag
+    has only one SHA, so any probe that “works” on <code>hk</code> alone has not been tested.
+  </figcaption>
+</figure>
+</div>
+
+<div class="wrap">
+<section>
+  <h2>The probe, both arms</h2>
+  <p class="sec-lede">Run against the live remotes this session. The middle pair is the one that matters.</p>
+
+  <div class="term"><span class="dim">$</span> git ls-remote --tags <b>--refs</b> https://github.com/agent-sh/agnix v0.50.0
+  <span class="c1">7e168bc4a84c357807b519db2eb103351e545fdb</span>	refs/tags/v0.50.0
+
+<span class="dim">$</span> git ls-remote --tags           https://github.com/agent-sh/agnix v0.50.0
+  <span class="c1">7e168bc4a84c357807b519db2eb103351e545fdb</span>	refs/tags/v0.50.0   <span class="dim">← identical. --refs changed nothing.</span>
+
+<span class="dim">$</span> git ls-remote --tags           https://github.com/agent-sh/agnix <b>'v0.50.0*'</b>
+  <span class="c1">7e168bc4a84c357807b519db2eb103351e545fdb</span>	refs/tags/v0.50.0
+  <span class="c2">faaeed49b5d018aaadecc2b2d21dcf049ed817c0</span>	refs/tags/v0.50.0^{}  <span class="dim">← there it is: the PATTERN was the bound.</span></div>
+
+  <p>
+    So the mechanism is not the flag. <code>_tag_candidates()</code> builds exact ref names
+    <span class="cite">manifest.py:235-243</span>, and an exact name can never match
+    <code>v0.50.0^{}</code>. That is a spelling bound, not a stripped line — and the
+    docstring at <span class="cite">manifest.py:253</span> asserts the opposite.
+  </p>
+</section>
+
+<section>
+  <h2>Who reads the pin, and what each one does with it</h2>
+  <p class="sec-lede">Every consumer of a manifest’s <code>commit</code> field in <code>kb_setup</code>. Only one compares it raw.</p>
+</section>
+</div>
+
+<div class="wide">
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 880 330" role="img" aria-label="The manifest commit field feeds four consumers; three peel the SHA before using it and tolerate either identity, while kb-update compares it raw against a tag object and therefore breaks when the manifest holds a peeled commit.">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+        <marker id="a2r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#a32219"/>
+        </marker>
+      </defs>
+
+      <rect x="20" y="126" width="196" height="76" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      <text x="118" y="154" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#7b8493">sources/*.manifest</text>
+      <text x="118" y="176" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="13" font-weight="700" fill="currentColor">commit = …</text>
+
+      <!-- three peeling consumers -->
+      <line x1="220" y1="150" x2="392" y2="52"  stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+      <line x1="220" y1="160" x2="392" y2="122" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+      <line x1="220" y1="172" x2="392" y2="192" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+      <!-- the raw comparer -->
+      <line x1="220" y1="184" x2="392" y2="272" stroke="#a32219" stroke-width="2" marker-end="url(#a2r)"/>
+
+      <rect x="396" y="26" width="300" height="52" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="412" y="48" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">_ensure_clone — cat-file / checkout</text>
+      <text x="412" y="66" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#7b8493">peels via ^{commit} · graph.py:626,641</text>
+
+      <rect x="396" y="96" width="300" height="52" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="412" y="118" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">_verify_source_provenance</text>
+      <text x="412" y="136" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#7b8493">peels via ^{commit} · graph.py:989</text>
+
+      <rect x="396" y="166" width="300" height="52" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="412" y="188" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">currency _check_manifest</text>
+      <text x="412" y="206" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#7b8493">accepts BOTH by design · sync.py:1645</text>
+
+      <rect x="396" y="246" width="300" height="56" rx="2" fill="none" stroke="#a32219" stroke-width="2"/>
+      <text x="412" y="268" font-family="JetBrains Mono, monospace" font-size="11.5" font-weight="700" fill="#a32219">kb-update: latest == m.commit</text>
+      <text x="412" y="286" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#a32219">raw string compare · graph.py:3276</text>
+
+      <line x1="700" y1="274" x2="784" y2="274" stroke="#a32219" stroke-width="1.6" marker-end="url(#a2r)"/>
+      <text x="792" y="266" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#a32219">false</text>
+      <text x="792" y="282" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#a32219">forever</text>
+
+      <text x="20" y="322" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#7b8493">Three of four peel before they judge. The fourth is the whole blast radius.</text>
+    </svg>
+  </div>
+  <figcaption>
+    <code>latest_commit()</code> returns whatever <code>git ls-remote &lt;url&gt; &lt;ref&gt;</code>
+    reports — the tag object — so the raw compare only holds while the manifest stores the
+    same identity. Store the peeled commit instead and the compare is permanently false.
+  </figcaption>
+</figure>
+</div>
+
+<div class="wrap">
+<section>
+  <h2>What a phantom advance looks like</h2>
+  <p>
+    It is not loud. <code>mise run kb-update -- agnix</code> prints
+    <code>faaeed49 -&gt; 7e168bc4</code> as though upstream had moved, writes the tag object
+    over the recorded commit, re-clones and re-runs a full AST extraction — for a source
+    that never moved. The manifest silently flips convention, and nothing reports that it
+    did. Repeat on <code>codex</code>, <code>ffmpeg</code>, <code>mise</code> and
+    <code>rumdl</code>.
+  </p>
+  <p>
+    Two things follow. The wasted rebuild is the cheap half. The expensive half is that
+    <strong><code>kb-update</code> can never answer “has this source moved?” for those five</strong> —
+    it says yes every time, so the one question it exists to answer is dead for the sources
+    where a version bump matters most.
+  </p>
+</section>
+
+<section>
+  <h2>So the real question is a convention, not a bug</h2>
+  <p class="sec-lede">Both are internally consistent. Only one is consistent with what the repo already does.</p>
+
+  <div class="choice">
+    <div class="opt o-tag">
+      <span class="who">Record the tag object</span>
+      <h3>What the writers emit</h3>
+      <ul>
+        <li>Matches <code>latest_commit()</code> and <code>resolve_tag()</code> as written, so the compare holds with no code change.</li>
+        <li>Matches the note at <span class="cite">sync.py:1636-1639</span> — <em>“what <code>kb-manifest-add</code> therefore records.”</em></li>
+        <li>But: makes a field named <code>commit</code> hold a non-commit, and only on tag sources — branch sources keep storing real commits.</li>
+        <li>Costs: migrate 5 manifests <em>backwards</em>, away from the identity a human would verify by hand.</li>
+      </ul>
+    </div>
+    <div class="opt o-peel">
+      <span class="who">Record the peeled commit</span>
+      <h3>What the majority already holds</h3>
+      <ul>
+        <li>5 of 9 annotated manifests are already peeled, three of them long before this round — this is the incumbent, not the proposal.</li>
+        <li><code>commit</code> then means one thing on every source, tag-pinned or branch-pinned.</li>
+        <li>Requires <code>latest_commit()</code> <em>and</em> <code>resolve_tag()</code> to peel — sharing one helper, or they drift again.</li>
+        <li>Costs: two functions, 4 manifests migrated, and a real annotated-tag fixture.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p>
+    One change is unconditional and independent of the choice:
+    <strong><code>latest_commit()</code> and <code>resolve_tag()</code> must return the same
+    identity, from one code path.</strong> They agree only by accident today — both happen to
+    read <code>ls-remote</code>’s unpeeled line — and nothing in the suite asserts it. Every
+    existing <code>resolve_tag</code> test fakes the remote
+    <span class="cite">tests/test_manifest_add.py:64</span>, so <strong>no test has ever seen a
+    real annotated tag</strong>, and 16 of the 25 tag-pinned sources could not have exposed it
+    in production either.
+  </p>
+</section>
+
+<div class="provenance">
+  <h2>Provenance</h2>
+  <ul>
+    <li>Every SHA above was read from a live <code>git ls-remote</code> this session — not inherited from the ticket, the plan, or the handoff.</li>
+    <li>Control arm: <code>hk</code> (lightweight tags) alongside <code>agnix</code> and <code>rumdl</code> (annotated). A probe that discriminates returns one SHA for <code>hk</code> and two for the others; it did.</li>
+    <li>The audit table carries <strong>full 40-character SHAs</strong> on purpose, and this page is the reason: a commit-hook spell-checker read an abbreviated SHA in this very table as a misspelling and silently rewrote it. This repo had recorded that exact failure once before, along with its remedy — a full-length hex string is skipped by the checker’s heuristic, an abbreviation is not. An abbreviation is also not independently verifiable, which is the better reason.</li>
+    <li>The 9-row audit table is the full population, not a sample: all 84 manifests were parsed, 25 are tag-pinned, and every one of those 25 was resolved against its live remote. Nothing was skipped and nothing was unreachable.</li>
+    <li>Source citations are line numbers in the working tree at <code>990c6a87</code>. The plan cites <code>currency/manifest.py:268</code>; the file is <code>python/src/kb_setup/manifest.py</code> (not under <code>currency/</code>), and <code>:268</code> is the candidate list — the <code>ls-remote</code> call is at <code>:272</code>.</li>
+    <li>Not measured here: whether a <code>git fetch origin &lt;tag-object-sha&gt;</code> succeeds against every host we pin. <code>graph.py:634</code> does exactly that on a cold clone, and it is the one path this page does not cover.</li>
+  </ul>
+</div>
+
+</div>

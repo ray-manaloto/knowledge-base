@@ -20,7 +20,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/jdx/fnox
-ref = v1.33.1
-commit = 195c259ee70931fc8bd828f34b6842c7f57fefcb
+ref = v1.34.0
+commit = c5dd4d2f1c4646c6117d59db1b91e77aefc01b75
 kind = code
 added = 2026-08-02

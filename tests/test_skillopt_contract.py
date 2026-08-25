@@ -191,7 +191,7 @@ def test_mise_owner_or_plugin_reenable_is_rejected(
     _fake_clean_clone(monkeypatch)
     mise = repo / "mise.toml"
     mise.write_text(
-        mise.read_text().replace("[tools]", '[tools]\nskillopt = "0.2.0"'),
+        mise.read_text().replace("\n[tools]\n", '\n[tools]\nskillopt = "0.2.0"\n', 1),
         encoding="utf-8",
     )
     settings = repo / ".claude" / "settings.json"
@@ -210,7 +210,9 @@ def test_mise_owner_hidden_in_backend_value_is_rejected(
     _fake_clean_clone(monkeypatch)
     mise = repo / "mise.toml"
     mise.write_text(
-        mise.read_text().replace("[tools]", '[tools]\nsleep_optimizer = "pipx:skillopt@0.2.0"'),
+        mise.read_text().replace(
+            "\n[tools]\n", '\n[tools]\nsleep_optimizer = "pipx:skillopt@0.2.0"\n', 1
+        ),
         encoding="utf-8",
     )
     errors = skillopt_contract.repository_contract_errors(repo)

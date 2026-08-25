@@ -207,17 +207,23 @@ def load_all(sources_dir: Path) -> list[Manifest]:
 
 
 def latest_commit(m: Manifest) -> str:
-    """Upstream HEAD of the manifest's ref (a `git ls-remote`, no clone)."""
-    out = subprocess.run(
-        ["git", "ls-remote", m.url, m.ref],
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=60,
-    ).stdout.strip()
-    if not out:
+    """Upstream HEAD of the manifest's ref (a `git ls-remote`, no clone).
+
+    Shares `_resolve_ref` with `resolve_tag` (#500), so the two can never again
+    disagree on what a ref names. `m.ref` may itself be a branch, a tag, an
+    already-qualified refname, or `HEAD` — this repo pins the first two under
+    one field, and `_resolve_ref` accepts all four — so the call omits
+    `--tags` (baking it in would return EMPTY for every branch source,
+    silently). See `_resolve_ref`'s own docstring for exactly which candidate
+    refnames get checked and in what order; that rule is stated there once,
+    not restated here, so it cannot drift out of sync with the code again
+    (#500 respec round 2, finding 2 — a prior revision of THIS docstring
+    restated it and went stale when `_resolve_ref`'s was corrected).
+    """
+    sha = _resolve_ref(m.url, m.ref, tags=False)
+    if sha is None:
         raise RuntimeError(f"{m.name}: ref {m.ref!r} not found at {m.url}")
-    return out.split()[0]
+    return sha
 
 
 def write_commit(m: Manifest, commit: str) -> Manifest:
@@ -243,6 +249,101 @@ def _tag_candidates(version: str, prefix: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(ordered))
 
 
+def _resolve_ref(url: str, ref: str, *, tags: bool) -> str | None:
+    """One `git ls-remote` for `ref` (+ its dereference), resolved to a commit sha.
+
+    Returns the PEELED commit when `ref` names an annotated tag, the ref's own
+    sha for a lightweight tag, a branch, or `HEAD`, or `None` — a MISS — when
+    `ref` matches nothing at `url`. Shared by `resolve_tag` and `latest_commit`
+    (#500) so the two can never again disagree on what a ref names.
+
+    `tags=True` passes `--tags`, restricting the remote search to
+    `refs/tags/*` — which also disambiguates a GUESSED tag name from a
+    same-named branch — so only that one namespace needs checking.
+    `resolve_tag`'s candidate loop always uses this shape. `tags=False` omits
+    the flag: the search is UNRESTRICTED, so the match is checked against
+    `refs/heads/` and `refs/tags/` both, at no extra network cost (`--tags`
+    only narrows what git returns, not how many of the returned lines get
+    compared afterwards). `latest_commit` uses this shape, because a
+    manifest's `ref` may name either kind of pin.
+
+    PRECEDENCE (#500 respec round 2, finding 1 — the CODE below has not
+    changed since round 1; a claim in THIS paragraph was overgeneralised from
+    one fixture and is corrected here): every namespace's PEELED form is
+    checked before ANY namespace's plain form; within each of those two
+    passes, `refs/heads/` is checked before `refs/tags/` (the `namespaces`
+    tuple order), and the namespace-qualified forms before the raw `ref`.
+    This only matters when a branch and a tag share a name, and it splits by
+    tag KIND:
+
+    For an ANNOTATED collision the peel pass decides, before either plain
+    form is ever reached, and that agrees with `git rev-parse`:
+
+        git rev-parse <name>          -> the TAG object   (git warns: ambiguous)
+        git rev-parse <name>^{commit} -> the TAG's peeled commit  <- this function
+
+    For a LIGHTWEIGHT collision there is no peel entry, so the plain pass
+    decides — and it checks `refs/heads/` first, returning the BRANCH, while
+    `git rev-parse` prefers `refs/tags/` there (`gitrevisions`(7)'s
+    disambiguation order) and resolves to the TAG instead. Armed on a second,
+    separate fixture:
+
+        refs/heads/dup -> b5c142aa…            refs/tags/dup -> 4c3af257…  (lightweight)
+        git rev-parse dup          -> 4c3af257…   (the TAG; git warns: ambiguous)
+        _resolve_ref(url,"dup",tags=False) -> b5c142aa…   (the BRANCH — disagrees)
+
+    So this function agrees with `git rev-parse` for an annotated collision
+    and DISAGREES for a lightweight one — never "exactly what git rev-parse
+    resolves" unconditionally, which is what round 1 of this paragraph said.
+    Returning the branch for a branch-shaped pin is a defensible choice on its
+    own, and no manifest in this repo can reach either collision shape, so
+    this is documenting a resolved ambiguity, not a live bug.
+
+    `ref` itself is ALSO tried unprefixed, alongside the namespace-qualified
+    forms, because `git ls-remote` reports some refs with no `refs/…/` prefix
+    at all — `HEAD` chief among them — and a caller may already pass a fully
+    qualified name (`refs/heads/main`). Namespace-prefixing an already
+    qualified `ref` would look for `refs/heads/refs/heads/main`, which can
+    never exist; checking the raw `ref` too costs nothing, because git never
+    reports an ordinary short tag/branch name with no namespace at all, so the
+    raw form only ever matches `HEAD` or an already-qualified input.
+
+    `git ls-remote` patterns are TAIL matches on `/` boundaries, not exact
+    names — a repo holding `sub/v1.0.0` and no `v1.0.0` answers a `v1.0.0`
+    pattern too (`refs/tags/sub/v1.0.0`). So a non-empty result is not itself a
+    match: every candidate refname below is checked for EXACT equality, and a
+    non-empty output with no exact match is still a MISS.
+    """
+    namespaces = ("refs/tags/",) if tags else ("refs/heads/", "refs/tags/")
+    argv = ["git", "ls-remote", *(["--tags"] if tags else []), url, ref, f"{ref}^{{}}"]
+    out = subprocess.run(
+        argv,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    ).stdout.strip()
+    by_refname: dict[str, str] = {}
+    for line in out.splitlines():
+        sha, _, refname = line.partition("\t")
+        by_refname[refname] = sha
+    # Every refname this call could legitimately match: namespace-qualified
+    # (the ordinary case) plus the raw `ref` itself (HEAD, or an
+    # already-qualified input — see the docstring).
+    candidates = (*(f"{namespace}{ref}" for namespace in namespaces), ref)
+    # Peeled entries first, across every candidate, THEN plain ones — an
+    # annotated tag's dereference always outranks its own tag-object line.
+    for candidate in candidates:
+        sha = by_refname.get(f"{candidate}^{{}}")
+        if sha is not None:
+            return sha
+    for candidate in candidates:
+        sha = by_refname.get(candidate)
+        if sha is not None:
+            return sha
+    return None
+
+
 def resolve_tag(url: str, version: str, *, prefix: str = "") -> tuple[str, str]:
     """Resolve a release version to its (ref, commit) via `git ls-remote --tags`.
 
@@ -250,8 +351,16 @@ def resolve_tag(url: str, version: str, *, prefix: str = "") -> tuple[str, str]:
     bare `<version>` — projects tag all three ways. Raises if NONE exists at the
     remote, so the currency engine can never pin a manifest to a version that was
     published to PyPI but tagged nowhere in git (the mirror of graphify's
-    v1.0.0-tagged-not-on-PyPI trap). `--refs` strips the `^{}` dereference line so
-    a peeled annotated tag yields one clean SHA.
+    v1.0.0-tagged-not-on-PyPI trap). Each candidate resolves through
+    `_resolve_ref(..., tags=True)`, which returns the PEELED commit for an
+    annotated tag — never the tag object `write_pin` used to record (#500).
+
+    The old call carried `--refs`, which strips exactly that dereference line.
+    It never had anything to strip: the exact-ref pattern this function has
+    always used never matched `<ref>^{}` in the first place, so `--refs` was
+    dead weight, not a fix, under the old shape. It is removed here precisely
+    BECAUSE the new shape asks for the peel on purpose — keeping `--refs` would
+    turn this fix into a silent no-op that passes its own test.
 
     `prefix` exists because the two halves of #245 were fixed in different
     places and only one of them landed: `ToolSpec.tag_prefix` taught the *sync*
@@ -268,21 +377,15 @@ def resolve_tag(url: str, version: str, *, prefix: str = "") -> tuple[str, str]:
     candidates = _tag_candidates(version, prefix)
     for ref in candidates:
         try:
-            out = subprocess.run(
-                ["git", "ls-remote", "--tags", "--refs", url, ref],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=60,
-            ).stdout.strip()
+            sha = _resolve_ref(url, ref, tags=True)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
             # An unreachable host, a bad URL, or a timeout is a resolution
             # FAILURE, not a "tag not found" — but the currency engine's apply()
             # catches RuntimeError, so surface every failure mode as one, or a
             # raw traceback escapes instead of the clean "[currency] apply failed".
             raise RuntimeError(f"git ls-remote failed for {url} @ {ref}: {e}") from e
-        if out:
-            return ref, out.split()[0]
+        if sha is not None:
+            return ref, sha
     # Name EVERY candidate actually tried. The old wording hard-coded two, so a
     # prefixed miss would have reported that `rust-v` was never attempted when it
     # was — a failure message that misdescribes its own probe sends the reader to

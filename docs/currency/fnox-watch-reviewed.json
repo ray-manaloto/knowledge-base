@@ -1,0 +1,8 @@
+{
+  "local:pinned-here-global-stays-on-latest": {
+    "at": "2026-08-25",
+    "finding_digest": "db7b486d6a8c4b83a357bbaace79b34be8c5f2a1d58350fc6bc0422d0b4389db",
+    "note": "",
+    "version": "v1.34.0"
+  }
+}

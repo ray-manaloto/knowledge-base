@@ -1,0 +1,190 @@
+<title>True When Written</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#EDEFF3; --panel:#FFFFFF; --ink:#141A22; --soft:#59636F; --rule:#C9D0D9;
+    --ok:#1D6F63; --gap:#9A6410; --fail:#A33A45;
+    --ok-w:#DFEDEA; --gap-w:#F6EBD8; --fail-w:#F6E0E3;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --ground:#0E1218; --panel:#161C24; --ink:#E7ECF2; --soft:#95A1AF; --rule:#28313C;
+    --ok:#6FC5B4; --gap:#DCA94F; --fail:#E38B95;
+    --ok-w:#14261F; --gap-w:#2A2113; --fail-w:#2B171B;
+  }}
+  :root[data-theme="dark"]{
+    --ground:#0E1218; --panel:#161C24; --ink:#E7ECF2; --soft:#95A1AF; --rule:#28313C;
+    --ok:#6FC5B4; --gap:#DCA94F; --fail:#E38B95;
+    --ok-w:#14261F; --gap-w:#2A2113; --fail-w:#2B171B;
+  }
+  body{background:var(--ground);color:var(--ink);margin:0;padding:0 20px 80px;
+    font-family:"Public Sans",ui-sans-serif,system-ui,sans-serif;font-size:17px;line-height:1.62;}
+  .wrap{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:44px;}
+  header{padding-top:58px;display:flex;flex-direction:column;gap:12px;}
+  .eyebrow{font-family:"Roboto Mono",monospace;font-size:11.5px;letter-spacing:.15em;
+    text-transform:uppercase;color:var(--soft);}
+  h1{font-family:"Instrument Serif",Georgia,serif;font-weight:400;
+    font-size:clamp(42px,7.5vw,72px);line-height:1.0;margin:0;letter-spacing:-.01em;text-wrap:balance;}
+  .standfirst{font-size:20.5px;color:var(--soft);margin:0;max-width:58ch;text-wrap:balance;}
+  h2{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:31px;margin:0;
+    line-height:1.15;text-wrap:balance;}
+  section{display:flex;flex-direction:column;gap:16px;}
+  p{margin:0;max-width:66ch;}
+  code,.m{font-family:"Roboto Mono",monospace;font-size:.85em;}
+  figure{margin:0;background:var(--panel);border:1px solid var(--rule);border-radius:2px;
+    padding:26px 22px 18px;display:flex;flex-direction:column;gap:14px;overflow-x:auto;}
+  figure svg{max-width:100%;height:auto;display:block;color:var(--soft);}
+  figcaption{font-size:14.5px;color:var(--soft);max-width:70ch;}
+  table{border-collapse:collapse;width:100%;font-size:15px;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--rule);vertical-align:top;}
+  th{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);font-weight:700;}
+  td.n{font-family:"Roboto Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .chip{display:inline-block;font-family:"Roboto Mono",monospace;font-size:10.5px;
+    letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:2px;}
+  .chip.ok{background:var(--ok-w);color:var(--ok);}
+  .chip.gap{background:var(--gap-w);color:var(--gap);}
+  .chip.fail{background:var(--fail-w);color:var(--fail);}
+  ol.rank{list-style:none;counter-reset:r;margin:0;padding:0;display:flex;flex-direction:column;}
+  ol.rank li{counter-increment:r;position:relative;padding:15px 0 15px 52px;border-bottom:1px solid var(--rule);}
+  ol.rank li:last-child{border-bottom:0;}
+  ol.rank li::before{content:counter(r);position:absolute;left:0;top:15px;
+    font-family:"Roboto Mono",monospace;font-size:15px;font-weight:500;color:var(--soft);
+    width:30px;text-align:right;}
+  ol.rank .why{color:var(--soft);font-size:15px;display:block;margin-top:3px;max-width:64ch;}
+  ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;max-width:66ch;}
+  .note{border-left:3px solid var(--fail);padding:6px 0 6px 18px;max-width:64ch;}
+  footer{border-top:1px solid var(--rule);padding-top:20px;font-size:14.5px;color:var(--soft);}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">knowledge-base · guardrail survey · 2026-08-25</div>
+  <h1>True When Written</h1>
+  <p class="standfirst">Two failures in one day, same shape: something recorded a fact,
+  the world moved, and nothing ever asked again. Here is what would have caught them —
+  and what would only have added noise.</p>
+</header>
+
+<section>
+  <h2>One shape, two instances</h2>
+  <figure>
+    <svg viewBox="0 0 860 300" role="img" aria-label="Both failures follow the same three-step shape: a fact is recorded, the world changes underneath it, and no check ever re-asks, so the stale fact is acted on as if current.">
+      <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <polygon points="0,1 10,5 0,9" fill="currentColor"/></marker></defs>
+
+      <text x="16" y="30" font-size="12" font-weight="700" fill="currentColor" letter-spacing="1.3">THE SHAPE</text>
+      <rect x="16" y="48" width="200" height="48" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="116" y="70" font-size="13" text-anchor="middle" fill="currentColor">a fact is recorded</text>
+      <text x="116" y="87" font-size="11" text-anchor="middle" fill="currentColor" opacity=".75">and it is TRUE</text>
+      <line x1="216" y1="72" x2="286" y2="72" stroke="currentColor" stroke-width="1.6" marker-end="url(#a1)"/>
+      <rect x="288" y="48" width="200" height="48" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="388" y="70" font-size="13" text-anchor="middle" fill="currentColor">the world moves</text>
+      <text x="388" y="87" font-size="11" text-anchor="middle" fill="currentColor" opacity=".75">elsewhere, silently</text>
+      <line x1="488" y1="72" x2="558" y2="72" stroke="currentColor" stroke-width="1.6" marker-end="url(#a1)"/>
+      <rect x="560" y="48" width="284" height="48" rx="2" fill="#F6E0E3" stroke="#A33A45" stroke-width="1.8"/>
+      <text x="702" y="70" font-size="13" text-anchor="middle" fill="#A33A45" font-weight="700">nothing re-asks</text>
+      <text x="702" y="87" font-size="11" text-anchor="middle" fill="#A33A45">the stale fact is acted on as current</text>
+
+      <line x1="16" y1="126" x2="844" y2="126" stroke="currentColor" stroke-width="1" opacity=".3"/>
+
+      <text x="16" y="158" font-size="12" font-weight="700" fill="currentColor" letter-spacing="1.3">INSTANCE 1 — the merge</text>
+      <text x="16" y="182" font-size="12.5" fill="currentColor">the PR head was the branch tip</text>
+      <text x="288" y="182" font-size="12.5" fill="currentColor">10 commits landed locally</text>
+      <text x="560" y="182" font-size="12.5" fill="#A33A45" font-weight="700">merged the old tip, deleted the branch</text>
+      <text x="16" y="200" font-size="11" fill="currentColor" opacity=".7">receipt genuine · gates genuine</text>
+      <text x="288" y="200" font-size="11" fill="currentColor" opacity=".7">never pushed</text>
+      <text x="560" y="200" font-size="11" fill="#A33A45">printed OK — main synced</text>
+
+      <text x="16" y="240" font-size="12" font-weight="700" fill="currentColor" letter-spacing="1.3">INSTANCE 2 — the credential helper</text>
+      <text x="16" y="264" font-size="12.5" fill="currentColor">gh wrote its own absolute path</text>
+      <text x="288" y="264" font-size="12.5" fill="currentColor">mise pruned that version dir</text>
+      <text x="560" y="264" font-size="12.5" fill="#A33A45" font-weight="700">every git push over https fails</text>
+      <text x="16" y="282" font-size="11" fill="currentColor" opacity=".7">Aug 14, correct that day</text>
+      <text x="288" y="282" font-size="11" fill="currentColor" opacity=".7">Aug 20, auto_prune = true</text>
+      <text x="560" y="282" font-size="11" fill="#A33A45">config never edited, never checked</text>
+    </svg>
+    <figcaption>Neither failure involved a wrong decision. Both involved a right decision that
+    expired, in a place nothing revisits.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>What the guardrails can and cannot see</h2>
+  <table>
+    <thead><tr><th>Surface</th><th>Catches</th><th>Structurally cannot</th></tr></thead>
+    <tbody>
+      <tr><td><code>hk.pkl</code></td><td><span class="chip ok">content</span> lint, format, types, secrets, budgets — at <code>pre-commit</code> and <code>check</code></td><td>Anything at <strong>push or merge time</strong>. No <code>pre-push</code> stage exists.</td></tr>
+      <tr><td><code>.claude/rules</code></td><td><span class="chip ok">judgment</span> eager rules load every session</td><td>A <code>paths:</code>-scoped rule fires only when a matching file is <em>read</em> — it cannot guard an <strong>action</strong>.</td></tr>
+      <tr><td>Hook guards</td><td><span class="chip ok">commands</span> five stateless denials on Bash</td><td>Anything not spelled the way the matcher expects — and <strong>every write outside the repo</strong>.</td></tr>
+      <tr><td><code>CLAUDE.md</code> / <code>AGENTS.md</code></td><td><span class="chip gap">partial</span> the tracked ones are reviewed</td><td><strong>154 vendored instruction files</strong> arrive gitignored with a pin bump, seen by nobody.</td></tr>
+      <tr><td>Plugins &amp; skills</td><td><span class="chip ok">shape</span> <code>skill-lint</code>, <code>skill-score</code></td><td>Staleness. <strong>0 of 16</strong> executing third-party plugins are currency-tracked.</td></tr>
+      <tr><td>Machine state</td><td><span class="chip fail">nothing</span></td><td>Nothing in this repo looks at whether a path its tooling depends on still exists.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>A live guard hole, confirmed while checking the survey</h2>
+  <p>The survey claimed <code>hook_guard</code> misses a path-qualified <code>graphify</code>.
+  I ran it rather than believing it — and it is worse than reported:</p>
+  <table>
+    <thead><tr><th>Command</th><th>Verdict today</th></tr></thead>
+    <tbody>
+      <tr><td class="n">graphify extract .</td><td><span class="chip ok">denied</span></td></tr>
+      <tr><td class="n">./.venv/bin/graphify extract .</td><td><span class="chip fail">allowed</span></td></tr>
+      <tr><td class="n">uv run graphify extract .</td><td><span class="chip fail">allowed</span> — a second spelling the survey did not name</td></tr>
+    </tbody>
+  </table>
+  <p class="note">The survey justified its finding by saying <code>settings.json</code> uses the
+  <code>./.venv/bin/</code> spelling three times. That part is <strong>false</strong> —
+  <code>grep -c</code> returns <strong>0</strong>. The hole is real; the argument for how likely
+  anyone is to walk into it was not. Both facts are worth carrying: a true finding can arrive
+  with false supporting evidence, and only checking separates them.</p>
+</section>
+
+<section>
+  <h2>What to add, ranked</h2>
+  <ol class="rank">
+    <li><strong>Refuse a merge when local is ahead of the PR head.</strong>
+      <span class="why">Catches instance 1 exactly. Belongs in <code>pr.py</code>, not a git hook — a hook is per-worktree and would run under each of seven stale worktrees. Already specced and in implementation. Falsely flags a branch you deliberately moved past; the right answer there is a loud refusal you override on purpose.</span></li>
+    <li><strong>A currency probe for absolute paths in effective git config.</strong>
+      <span class="why">Catches instance 2 exactly, and costs no new machinery: <code>kb-currency-check</code> already runs at SessionStart, offline, ~10ms, and its whole job is "true when written, false now". False-positive cost is near zero because that task always exits 0 and can never gate.</span></li>
+    <li><strong>Deny writes to sacred out-of-repo paths.</strong>
+      <span class="why">The invariant against touching <code>~/.claude</code>, <code>~/.gitconfig</code> and friends has <strong>zero enforcement</strong> today. A deny-list, never an allow-list — an allow-list would block the scratchpad, the sibling dotfiles repo, and every worktree, and every measured guard defect here has been a false positive rather than evasion.</span></li>
+    <li><strong>Close the path-qualified <code>graphify</code> hole</strong> — and the <code>uv run</code> spelling with it.
+      <span class="why">Confirmed above.</span></li>
+    <li><strong>Enable hk's <code>no_commit_to_branch</code>.</strong>
+      <span class="why">One line. The don't-commit-to-main invariant is prose-only today, and hk ships this builtin with its own pass/fail tests.</span></li>
+    <li><strong>Track the 16 plugins for currency.</strong>
+      <span class="why">In a repo whose invariant is reproducible inputs and which pins ~84 corpus sources to a SHA, sixteen third-party plugins execute untracked.</span></li>
+  </ol>
+</section>
+
+<section>
+  <h2>What NOT to add</h2>
+  <ul class="plain">
+    <li><strong>An hk <code>pre-push</code> stage.</strong> It is the biggest coverage gap and still the wrong fix: a git hook is per-worktree, so it would run under the config of each stale worktree — the very staleness this survey is about. One copy in <code>pr.py</code> governs them all.</li>
+    <li><strong>A link checker as a blocking step.</strong> Right idea, wrong gate. Network-bound and rate-limited, so a transient becomes a red pre-commit — the exact misreading this repo has a rule against. Adopt it as a reporting task or not at all.</li>
+    <li><strong>A blanket "no absolute paths in config" lint.</strong> Absolute paths are correct here by design. The narrow question — <em>does the referenced path still exist</em> — is the one worth asking.</li>
+    <li><strong>Budgeting the agent roster.</strong> Genuinely uncovered, and six files nowhere near any threshold. Adding a class to buy zero findings buys only maintenance.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Where coverage could not be established</h2>
+  <p>Stated because a survey that reports only what it found reads as complete when it isn't:</p>
+  <ul class="plain">
+    <li>Whether any enabled plugin is stale — the cache lives outside the repo, and the no-outside-touch mandate stopped the check. <strong>Nothing in this repo could answer it either.</strong></li>
+    <li>The content of <strong>151 of 154</strong> vendored instruction files; three were sampled.</li>
+    <li>Which guardrails are missing from the seven other worktrees.</li>
+    <li>An older <code>0/684</code> dark-rule measurement was not reconciled with a fresh one over a different window. Treat the old figure as inherited, not re-derived.</li>
+  </ul>
+</section>
+
+<footer>
+  Measured 2026-08-25. Git configs backed up and verified byte-identical before any analysis;
+  no configuration was modified. The guard-hole table was produced by calling
+  <code>hook_guard.decide()</code> directly this session.
+</footer>
+
+</div>

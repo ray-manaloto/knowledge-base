@@ -6,9 +6,20 @@ Network-free: name_from_url is pure, and add()'s exists-guard fires BEFORE the
 """
 
 import re
+from pathlib import Path
 
 import pytest
 from kb_setup import manifest
+
+# `_repo`/`_clone_at`/`_git` build a REAL local git repo with a genuine
+# annotated tag — exactly what #500's regression needs and no `resolve_tag`
+# test above has ever seen (every one monkeypatches `subprocess.run`). They
+# already exist for this in `test_currency_sync.py`; reusing them is
+# `use-tool-builtins.md` applied to test fixtures, not a stretch of it — a
+# from-scratch rebuild here would be the exact mistake that rule exists to
+# prevent, and pytest's per-file import (no `tests/__init__.py`) makes the
+# cross-module import work with no extra plumbing.
+from test_currency_sync import _clone_at, _git, _repo
 
 
 def test_name_from_url_strips_git_and_trailing_slash() -> None:
@@ -67,13 +78,18 @@ def _remote(monkeypatch, *tags: str) -> list[str]:
     that answers everything: the defect being fixed is that the prefixed
     candidate was never GENERATED, and a stub returning a SHA for any input
     passes with or without the fix.
+
+    argv now ends `[..., ref, f"{ref}^{{}}"]` (#500: `_resolve_ref` asks for the
+    dereference too), so the REF is the second-to-last element, not the last —
+    a fake keyed on `argv[-1]` would key on the peel PATTERN instead and never
+    match a real tag name again.
     """
     import subprocess
 
     asked: list[str] = []
 
     def _ls_remote(argv: list[str], **_k: object) -> subprocess.CompletedProcess[str]:
-        ref = argv[-1]
+        ref = argv[-2]
         asked.append(ref)
         out = f"cafe1234\trefs/tags/{ref}\n" if ref in tags else ""
         return subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")
@@ -109,6 +125,11 @@ def test_a_prefixed_miss_names_every_candidate_it_tried(monkeypatch) -> None:
     The old wording hard-coded `<version>` and `v<version>`, so a prefixed miss
     reported that `rust-v` was never attempted when it had been — sending the
     reader to add config that is already present.
+
+    Left AS-IS, deliberately (#500 spec §5): `_remote(monkeypatch)` with no
+    tags answers "" for every candidate, so this test's green does not depend
+    on `_resolve_ref`'s peeling shape being correct — it is testing the miss
+    MESSAGE, not the resolution. Do not read its green as evidence for #500.
     """
     _remote(monkeypatch)
     with pytest.raises(RuntimeError, match=re.escape("rust-v0.147.0")):
@@ -135,3 +156,161 @@ def test_a_v_prefix_is_not_asked_for_twice(monkeypatch) -> None:
     asked = _remote(monkeypatch, "v0.9.26")
     assert manifest.resolve_tag("https://example/x", "0.9.26", prefix="v")[0] == "v0.9.26"
     assert asked == ["v0.9.26"]
+
+
+# --- #500: resolve_tag and latest_commit share one peeling code path --------
+#
+# Every test above fakes the remote, so none of them has ever seen a genuine
+# annotated tag — the fake always answers with a SINGLE `refs/tags/<ref>` line,
+# which is exactly the LIGHTWEIGHT shape. These tests drive a REAL local git
+# repo instead (via `_repo`/`_clone_at`/`_git`, reused from
+# `test_currency_sync.py`), because a stub can only confirm the stub.
+
+
+def _local_manifest(url: str, ref: str) -> manifest.Manifest:
+    """A `Manifest` good enough for `latest_commit` — it reads only `url`/`ref`."""
+    return manifest.Manifest(
+        name="fixture", path=Path("/dev/null"), url=url, ref=ref, commit="0" * 40
+    )
+
+
+def test_resolve_tag_returns_the_peeled_commit_for_an_annotated_tag(tmp_path) -> None:
+    """The regression #500 exists to fix, against a real remote.
+
+    Before this fix `resolve_tag` returned the TAG OBJECT here, not the
+    commit — the identity `write_pin` recorded and `_ensure_clone` never
+    actually checks out.
+    """
+    root = _repo(tmp_path)
+    peeled = _clone_at(root, "v0.9.25", annotated=True)
+    tag_object = _git(root, "rev-parse", "v0.9.25")
+    url = str(root / "sources" / "graphify")
+
+    ref, commit = manifest.resolve_tag(url, "0.9.25")
+
+    assert ref == "v0.9.25"
+    assert commit == peeled
+    assert commit != tag_object, (
+        "an assertion that only checks A sha came back would pass against the bug"
+    )
+
+
+def test_resolve_tag_control_arm_a_lightweight_tag_has_one_identity(tmp_path) -> None:
+    """CONTROL ARM: without this, the annotated test above cannot be shown to discriminate."""
+    root = _repo(tmp_path)
+    sha = _clone_at(root, "v0.9.25", annotated=False)
+    url = str(root / "sources" / "graphify")
+
+    ref, commit = manifest.resolve_tag(url, "0.9.25")
+
+    assert (ref, commit) == ("v0.9.25", sha)
+    assert commit == _git(root, "rev-parse", "v0.9.25"), "lightweight: one sha, both resolvers"
+
+
+def test_latest_commit_control_arm_a_branch_ref_is_unchanged(tmp_path) -> None:
+    """A plain branch through the SAME shared helper — unchanged from today.
+
+    The fixture also carries an annotated tag at the same commit, so this
+    proves the branch match is not merely the ONLY thing present to match.
+    """
+    root = _repo(tmp_path)
+    sha = _clone_at(root, "v0.9.25", annotated=True)
+    branch = _git(root, "symbolic-ref", "--short", "HEAD")
+    m = _local_manifest(str(root / "sources" / "graphify"), branch)
+
+    assert manifest.latest_commit(m) == sha
+
+
+def test_latest_commit_resolves_head(tmp_path) -> None:
+    """#500 respec round 1, finding 1: `HEAD` reports with NO namespace prefix.
+
+    `namespaces = ("refs/heads/", "refs/tags/")` alone can never match it — git
+    reports the line as the bare refname `HEAD`, so a namespace-qualified-only
+    check builds `refs/heads/HEAD`/`refs/tags/HEAD`, neither of which is ever
+    returned, and `latest_commit` raised "ref 'HEAD' not found" even though
+    `HEAD` plainly resolves. `NewSource.ref` defaults callers can override, and
+    reaches `latest_commit` via `add()`, so this is reachable from
+    `kb-manifest-add <url> --ref HEAD`, not just a hypothetical.
+    """
+    root = _repo(tmp_path)
+    sha = _clone_at(root, "v0.9.25", annotated=True)
+    m = _local_manifest(str(root / "sources" / "graphify"), "HEAD")
+
+    assert manifest.latest_commit(m) == sha
+
+
+def test_latest_commit_resolves_an_already_qualified_refname(tmp_path) -> None:
+    """#500 respec round 1, finding 1: a caller may already pass `refs/heads/<x>`.
+
+    Namespace-prefixing an already-qualified `ref` looks for
+    `refs/heads/refs/heads/<branch>`, which can never exist — the fix tries the
+    RAW `ref` too, so a fully qualified name is not double-prefixed.
+    """
+    root = _repo(tmp_path)
+    sha = _clone_at(root, "v0.9.25", annotated=True)
+    branch = _git(root, "symbolic-ref", "--short", "HEAD")
+    m = _local_manifest(str(root / "sources" / "graphify"), f"refs/heads/{branch}")
+
+    assert manifest.latest_commit(m) == sha
+
+
+def test_resolve_tag_and_latest_commit_agree_on_an_annotated_ref(tmp_path) -> None:
+    """THE INVARIANT #500 exists to establish: one identity, one shared path.
+
+    `resolve_tag` resolves the tag NAME; `latest_commit` resolves the same
+    string as a manifest's `ref`. Both must land on the peeled commit.
+    """
+    root = _repo(tmp_path)
+    peeled = _clone_at(root, "v0.9.25", annotated=True)
+    url = str(root / "sources" / "graphify")
+    m = _local_manifest(url, "v0.9.25")
+
+    _, tag_commit = manifest.resolve_tag(url, "0.9.25")
+    manifest_commit = manifest.latest_commit(m)
+
+    assert tag_commit == manifest_commit == peeled
+
+
+def test_resolve_tag_does_not_over_match_a_sibling_tag(tmp_path) -> None:
+    """Pins §3's rejected-glob case as a test: a real sibling tag, DIFFERENT commit.
+
+    A glob candidate (`ref + "*"`) — or any "scan for the last `^{}` line" —
+    would also match `v1.0.0-alpha.1` and could return ITS commit for a
+    `v1.0.0` resolve. That is exactly the corruption measured against
+    `codex`'s real `rust-v0.149.0` siblings (§3's rejected-shapes table). Two
+    DISTINCT commits make the assertion meaningful; a fixture with one commit
+    under two tags could "pass" while resolving the wrong tag entirely.
+    """
+    root = _repo(tmp_path)
+    alpha_sha = _clone_at(root, "v1.0.0-alpha.1", annotated=True)
+    clone = root / "sources" / "graphify"
+    (clone / "f2.txt").write_text("y\n", encoding="utf-8")
+    _git(root, "add", "--", "f2.txt")
+    _git(root, "commit", "-q", "-m", "c2")
+    _git(root, "tag", "-a", "-m", "release v1.0.0", "v1.0.0")
+    release_sha = _git(root, "rev-parse", "HEAD")
+    assert release_sha != alpha_sha, "control: the two tags must name different commits"
+
+    ref, commit = manifest.resolve_tag(str(clone), "1.0.0")
+
+    assert (ref, commit) == ("v1.0.0", release_sha)
+
+
+def test_resolve_tag_refuses_a_tail_matched_tag_it_did_not_ask_for(tmp_path) -> None:
+    """#503: a live latent bug, independent of #500, fixed as a side effect.
+
+    `git ls-remote` patterns are TAIL matches on `/` boundaries: a repo holding
+    `sub/v1.0.0` and NO `v1.0.0` answers a `v1.0.0` pattern with
+    `refs/tags/sub/v1.0.0` anyway. The old `if out: return ref, out.split()[0]`
+    took that line and silently pinned a manifest to a tag it never named.
+    §3's exact-refname rule (`refs/tags/<ref>` — not merely non-empty output)
+    fixes this for free: a non-exact match is a MISS, and every candidate
+    missing must raise, never guess. `_clone_at` tags at exactly the `ref` it
+    is given, and a tag name may contain `/`, so it builds this fixture too.
+    """
+    root = tmp_path
+    _clone_at(root, "sub/v1.0.0", annotated=True)
+    url = str(root / "sources" / "graphify")
+
+    with pytest.raises(RuntimeError, match="no tag found"):
+        manifest.resolve_tag(url, "1.0.0")

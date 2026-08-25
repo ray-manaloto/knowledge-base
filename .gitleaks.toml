@@ -57,6 +57,56 @@ paths = [
   # If anything authored is ever put here, narrow this the way graphify-out was.
   '''^\.self-graph/''',
   '''^raw/''',
+  # `.firecrawl/` — the Firecrawl scrape cache. UNTRUSTED FETCHED CONTENT, and
+  # gitignored since #502 precisely for that reason, so nothing here can ever
+  # reach a commit. Same class as `^raw/` one line up: someone else's words,
+  # landing in scope only because `gitleaks dir` walks directories rather than
+  # tracked files.
+  #
+  # Measured 2026-08-25: ONE 263 KB scraped page produced 24 `aws-access-token`
+  # findings — 24 hits of a SINGLE repeated `AKIA`-shaped string in a third
+  # party's prose, characterised by digest and prefix without reading the value.
+  # It turned `mise run lint` red (real rc 1) and refused an unrelated
+  # nine-file commit.
+  #
+  # ⚠️ THIS ENTRY BLINDS THE COMMIT GATE TOO, and an earlier revision of this
+  # comment claimed the opposite. `.gitleaks.toml` is read by EVERY gitleaks
+  # invocation, `git` mode included, and `git add -f` puts a gitignored file in
+  # the INDEX — which is exactly what `--staged` reads. Armed, control first:
+  #
+  #   non-ignored staged file, no config    -> rc 1   (the probe discriminates)
+  #   `.firecrawl/` staged, no config       -> rc 1   (gitleaks would flag it)
+  #   `.firecrawl/` staged, WITH this file  -> rc 0   (this entry blinds it)
+  #
+  # So `git add -f .firecrawl/<anything>` commits past the gate. That residual is
+  # accepted because it is the CLASS this list already has — but state the class
+  # ACCURATELY, because the previous two attempts at this comment did not:
+  #
+  #   `^raw/`, `^\.agent/telemetry/`, `^\.firecrawl/`  gitignored, so reaching
+  #       them needs a deliberate `git add -f`.
+  #   `^sources/`                                       NOT gitignored. Only
+  #       `sources/*/` (the re-fetchable clones) is. **158 files are tracked
+  #       under `sources/`** — every `*.manifest`, `sources/extractions/*.json`
+  #       and all of `sources/media/**` — so a PLAIN `git add sources/media/x.md`
+  #       stages an allowlisted path with NO force flag at all.
+  #
+  # Armed, control first: a non-allowlisted staged file -> rc 1 with and without
+  # this config (so the config does not blind everything); `sources/media/x.md`
+  # staged with a plain `git add` -> rc 1 without this config, **rc 0 with it**.
+  # See also the note at the top of this list: `^sources/` is deliberately BROAD
+  # and is described there as a residual. It is the largest exemption here.
+  #
+  # Tracked in #510, because nobody had ever decided any of this — the list grew
+  # one entry at a time, each with a good local reason.
+  #
+  # Do not restore the old wording. It read as a safety argument for widening
+  # the list, and it was false.
+  #
+  # Upstream, for the next reader: `gitleaks dir` takes ONE path and silently
+  # falls back to `.` when handed more (gitleaks/gitleaks#1888, open since
+  # 2025-06-05), and hk's builtin passes `{{files}}`. Allowlisting is the
+  # documented remedy (gitleaks/gitleaks#1328), not a workaround we invented.
+  '''^\.firecrawl/''',
   # The raw-API-body telemetry sink (Ray, 2026-08-17, approved with the cost
   # stated). `OTEL_LOG_RAW_API_BODIES=file:.agent/telemetry/` writes the ENTIRE
   # conversation on every request, so these files are a verbatim copy of what was

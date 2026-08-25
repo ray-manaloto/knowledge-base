@@ -1,0 +1,14 @@
+{
+  "local:depends-ban-is-now-a-choice-not-a-workaround": {
+    "at": "2026-08-25",
+    "finding_digest": "e4c0c9394dc135b89a84d1848a694e89236ef6f537391b54c4d9109f2a9dd932",
+    "note": "",
+    "version": "v1.56.1"
+  },
+  "local:hk-version-is-written-three-times": {
+    "at": "2026-08-25",
+    "finding_digest": "011f2a1d0859e9905d4497213caab72e4cac21b9a7461279cb991bd4a66f70f8",
+    "note": "",
+    "version": "v1.56.1"
+  }
+}

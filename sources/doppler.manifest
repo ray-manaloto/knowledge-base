@@ -2,5 +2,5 @@
 # Critical credential-delivery CLI; exact source pin must match mise and currency version 3.76.5.
 url = https://github.com/DopplerHQ/cli
 ref = 3.76.5
-commit = 12ca88c1227bf21ab45199b0ff6e07541c0956d9
+commit = a8671b86a839187fcbfdbd449fc5787dc62ab42f
 kind = code
