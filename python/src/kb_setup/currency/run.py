@@ -411,6 +411,24 @@ def docs_reviewed(repo_root: Path, *, only: str = "") -> int:
     return 0
 
 
+def _missing_required(only: str, ref: str, version: str) -> list[str]:
+    """Which of `--tool`/`--ref`/`--version` are absent, as their flag+placeholder.
+
+    Split out so this specific guard is directly testable. An empty string
+    ALSO fails `upstream.Version.parse`, so no input to `watch_reviewed` can
+    tell "this check refused it" apart from "the parse check refused it" —
+    they trip on the identical input by construction. A unit test against
+    this function, in isolation from the parse check, is the only way to pin
+    that dropping an entry here is itself a regression (cold review, m4).
+    """
+    required = (
+        ("--tool <name>", only),
+        ("--ref <watch-item-ref>", ref),
+        ("--version <release>", version),
+    )
+    return [flag for flag, value in required if not value]
+
+
 def watch_reviewed(
     repo_root: Path, *, only: str = "", ref: str = "", version: str = "", note: str = ""
 ) -> int:
@@ -423,9 +441,11 @@ def watch_reviewed(
     whether it described THIS release or one six bumps ago. This records the
     claim as data: which item, re-probed against which version, and when.
     `decide._gate_local` then clears an item only when the recorded version is
-    the SAME RELEASE (`issues.cleared_for`, built on `upstream.same_release`) as
-    the one currently being adopted — a record at an older version leaves the
-    gate exactly as open as no record at all.
+    the SAME RELEASE (`issues.cleared_for`, built on `upstream.same_release`) AND
+    the item's CURRENT note still hashes to the digest recorded here
+    (`issues.finding_digest`, cold review B1) — a record at an older version, or
+    one whose watch item was since redefined, leaves the gate exactly as open as
+    no record at all.
 
     Requires `--tool`, `--ref` and `--version`, all three for the reason
     `docs_reviewed` requires `--tool` and one more: this asserts a human
@@ -437,19 +457,21 @@ def watch_reviewed(
     reached; this function still refuses on its own, because it must not trust a
     caller other than the CLI to have done that.
 
+    `record_reviewed` is given `valid_keys` — every CURRENT local item's key —
+    so a clearance for a watch item edited or removed since it was recorded does
+    not linger in the store forever (cold review, B1's pruning half; mirrors
+    `save_current`'s own pruning of stale observations).
+
     Returns 2 for any unusable request, below, and writes NOTHING in that case —
     never partially. There is no `docs_reviewed`-style partial-success `1`: that
     command fans a network fetch out over several watched pages, so some can
     succeed while others 503; this command touches no network and records
-    exactly one item, so the only two outcomes are "refused, nothing written" and
-    "written".
+    exactly one item, so the outcomes are "refused, nothing written" and
+    "written" — plus one refusal (`ReviewedStoreUnreadableError`) that fires only
+    when the STORE it would merge into cannot be parsed, so this write does not
+    silently discard every other clearance already on disk (cold review, M2).
     """
-    required = (
-        ("--tool <name>", only),
-        ("--ref <watch-item-ref>", ref),
-        ("--version <release>", version),
-    )
-    missing = [flag for flag, value in required if not value]
+    missing = _missing_required(only, ref, version)
     if missing:
         print(f"[currency] watch-reviewed requires {' '.join(missing)}", file=sys.stderr)
         return 2
@@ -488,8 +510,24 @@ def watch_reviewed(
 
     report_root = repo_root / report.REPORT_DIR
     at = datetime.now(UTC).date().isoformat()
-    record = issues.Reviewed(key=match.key, version=version, at=at, note=note)
-    path = issues.record_reviewed(report_root, spec.name, record)
+    record = issues.Reviewed(
+        key=match.key,
+        version=version,
+        at=at,
+        finding_digest=issues.finding_digest(match.note),
+        note=note,
+    )
+    valid_keys = frozenset(item.key for item in local_items)
+    try:
+        path = issues.record_reviewed(report_root, spec.name, record, valid_keys=valid_keys)
+    except issues.ReviewedStoreUnreadableError as e:
+        print(
+            f"[currency] refusing to record — the existing store could not be read ({e}); "
+            "fix or remove it by hand first, so this write does not silently discard every "
+            "other tracked clearance",
+            file=sys.stderr,
+        )
+        return 2
     print(
         f"[currency] {spec.name}: {match.key} recorded reviewed @ {version} — "
         f"{path.relative_to(repo_root)}"

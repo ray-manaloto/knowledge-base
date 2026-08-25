@@ -316,10 +316,16 @@ def _gate_local(
     `issues.cleared_for` compares parsed releases, so a record stamped at an older
     version leaves the item open exactly as if nothing had been recorded at all:
     the engine now CHECKS the claim instead of believing it forever.
+
+    `current_note=o.title` (an observation's `title` IS the watch item's current
+    `note`, per `issues.observe`) is what makes `cleared_for` ALSO check the
+    finding's content, not only its version — a clearance recorded against a note
+    that has since been rewritten (or a `ref` reused by a different finding) must
+    reopen the gate exactly as if nothing had been recorded (cold review, B1).
     """
     local = [o for o in observations if o.state == "local"]
     if reviewed:
-        local = [o for o in local if not cleared_for(reviewed, o.key, target)]
+        local = [o for o in local if not cleared_for(reviewed, o.key, target, current_note=o.title)]
     if not local:
         return None
     return Ambiguity(

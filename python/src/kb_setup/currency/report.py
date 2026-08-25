@@ -164,26 +164,40 @@ def _watch_table(
         rows.append(
             f"| {_cell(o.key)} | {_cell(state)} | {_cell(o.updated_at or '—')} | "
             f"{o.comments} | {'**yes**' if o.key in moved_keys else 'no'} | "
-            f"{_cell(_reviewed_cell(reviewed, o.key, target))} |"
+            f"{_cell(_reviewed_cell(reviewed, o.key, target, current_note=o.title))} |"
         )
     return "\n".join(rows)
 
 
-def _reviewed_cell(reviewed: dict[str, Reviewed], key: str, target: str) -> str:
+def _reviewed_cell(
+    reviewed: dict[str, Reviewed], key: str, target: str, *, current_note: str = ""
+) -> str:
     """This watch item's clearance state (#486) — a stale record must not read as clean.
 
     `docs/currency/` detail pages are committed and read later as evidence, so a
     local item cleared for an OLD release must render visibly different from one
     cleared for the release actually being adopted — the exact ambiguity the
     prose-note form could never show, because it had no column that could.
+
+    Three outcomes, not two (cold review, M3). `target` is empty exactly when
+    `decide()` never reached a version to compare against — upstream was
+    unreachable, or there was no real delta (`decide.py`'s early returns) — and
+    that is NOT the same fact as "this record disagrees with the release being
+    adopted". Collapsing them made a perfectly valid clearance render as `STALE`
+    on every run where upstream happened to be unreachable, in a COMMITTED
+    evidence page. This repo's own rule is that DRIFT/SKIP/OK stay distinct
+    because collapsing them is how its defects happen; "not checked" is the
+    third state here for the identical reason.
     """
     record = reviewed.get(key)
     if record is None:
         return "—"
     when = f" ({record.at})" if record.at else ""
-    if cleared_for(reviewed, key, target):
+    if not target:
+        return f"recorded @ {record.version}{when} — not checked this run (no target version)"
+    if cleared_for(reviewed, key, target, current_note=current_note):
         return f"cleared @ {record.version}{when}"
-    return f"STALE @ {record.version}{when} — target is {target or 'unknown'}"
+    return f"STALE @ {record.version}{when} — target is {target}"
 
 
 def _ambiguity_section(verdict: Verdict, answers: tuple[tuple[str, str], ...]) -> str:
