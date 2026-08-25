@@ -373,13 +373,23 @@ def test_land_refuses_when_local_branch_is_strictly_ahead(monkeypatch, tmp_path)
 
 
 def test_land_merges_when_local_branch_equals_pr_head(monkeypatch, tmp_path):
-    """CONTROL ARM — same local branch, zero commits ahead, must still merge."""
+    """CONTROL ARM — same local branch, zero commits ahead, must still merge.
+
+    Merging alone is not evidence the guard ran and found 0 ahead — it is
+    equally consistent with the guard never having been called at all, which is
+    exactly what `test_land_refuses_when_local_branch_is_strictly_ahead` above
+    would also look like if `land_main` stopped calling `_local_ahead_gap`.
+    Assert the comparison actually happened, same as that test's own
+    "must actually compare" and `test_land_merges_when_no_local_branch_exists`'s
+    "must actually have asked" below.
+    """
     seen: list[list[str]] = []
     _reviewed(tmp_path, "deadbeefcafe1234")
     _stub_run(monkeypatch, _ahead_handler(seen, count="0"))
 
     assert pr.land_main(tmp_path, 42) == 0
     assert any(c[:3] == ["gh", "pr", "merge"] for c in seen)
+    assert any(c[:3] == ["git", "rev-list", "--count"] for c in seen), "must actually compare"
 
 
 def test_land_merges_when_no_local_branch_exists(monkeypatch, tmp_path):
