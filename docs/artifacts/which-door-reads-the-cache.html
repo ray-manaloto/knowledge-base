@@ -78,7 +78,7 @@
 </style>
 
 <header class="wrap">
-  <p class="eyebrow">Measured 2026-08-25 · graphify fork v0.9.48</p>
+  <p class="eyebrow">Measured 2026-08-25 · graphify fork v0.9.50</p>
   <h1>Which door reads the cache</h1>
   <p class="lede">There are two ways into <code>openai-cli</code> extraction. One of them
   is the route the house ranking calls <em>best</em>. The other is the only one that
@@ -207,8 +207,23 @@
   </div>
 
   <p class="cite">Read side absent throughout <code>llm.py</code>; write side at
-  <code>llm.py:2843</code>. Control hits at <code>cli.py:3753</code>, <code>:3788</code>,
-  <code>:4452</code>, <code>:4484</code>. The probe discriminates.</p>
+  <code>llm.py:2985</code>. Control hits at <code>cli.py:3771</code>, <code>:3806</code>,
+  <code>:4470</code>, <code>:4502</code>. The probe discriminates.</p>
+
+  <div class="panel" style="margin-top:22px">
+    <h3>Corrected after publication &mdash; 2026-08-25</h3>
+    <p style="color:var(--ink-soft)">Every line number in the paragraph above was
+    wrong when you may first have read it. They were measured against the graphify
+    commit pinned at the time; the pin has since moved to <code>0a2eb5fd</code>
+    (v0.9.50 plus our fork), and the citations did not move with it &mdash;
+    <code>save_semantic_cache</code> shifted 142 lines, landing in unrelated retry
+    code, and each <code>cli.py</code> hit shifted by exactly 18. The numbers above
+    are now re-measured against the pinned commit. <strong>The finding itself is
+    unchanged and was never in doubt:</strong> the read side is still absent from
+    <code>llm.py</code> and still present four times in <code>cli.py</code>. Only
+    the addresses were stale, which is precisely the failure this page warns about
+    elsewhere &mdash; a derived fact that did not move when its source did.</p>
+  </div>
 
   <div class="panel hazard">
     <h3>Why this is uncomfortable</h3>
@@ -283,7 +298,7 @@
 <div class="wrap" style="margin-top:2.5rem">
   <hr>
   <p class="stamp">Every figure on this page was measured in the session that wrote it,
-  against the pinned fork at v0.9.48 &mdash; not carried from a prior handoff. Backend list
+  against the pinned fork, and RE-measured at v0.9.50 when the pin moved &mdash; not carried from a prior handoff. Backend list
   and env-key resolution probed live; cache read/write counts control-armed against
   <span class="mono">cli.py</span>. Nothing here has been reviewed by a second lens yet.</p>
 </div>
