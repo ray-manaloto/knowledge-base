@@ -147,7 +147,11 @@
   <p class="eyebrow">Coverage audit &middot; measured 2026-08-26</p>
   <h1>What reaches what</h1>
   <p class="lede">Every graphify command, traced to the mise task and the Python
-  function that reach it &mdash; and the 16 that nothing reaches at all.</p>
+  function that reach it &mdash; and the ones nothing reaches at all.</p>
+  <p class="cite">⚠️ <strong>Two figures on this page were retracted on
+  2026-08-26</strong>, after publication. The correction is inline, beside the
+  figure it affects. The chain itself, and the <code>query</code> finding, are
+  unaffected.</p>
 </header>
 
 <div class="col"><hr></div>
@@ -208,7 +212,7 @@
       <text x="704" y="112" text-anchor="middle" font-size="8.5" fill="currentColor" opacity=".65">SDK path is private</text>
 
       <!-- ============ ROW 2: MISSING ============ -->
-      <text x="10" y="164" font-size="9.5" font-weight="500" fill="#9c5f0c">GENUINELY UNCOVERED &mdash; 16 of 83</text>
+      <text x="10" y="164" font-size="9.5" font-weight="500" fill="#9c5f0c">GENUINELY UNCOVERED — 16 (RETRACTED, see below)</text>
 
       <rect x="16" y="174" width="164" height="40" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
       <text x="98" y="199" text-anchor="middle" font-size="11" fill="currentColor">graphify clone</text>
@@ -260,7 +264,7 @@
 <figure>
   <div class="scroll">
   <svg viewBox="0 0 880 190" role="img" preserveAspectRatio="xMidYMid meet"
-       aria-label="A stacked bar dividing 64 traced command rows into four groups: 19 covered by a mise task, 4 allowed as read-only direct calls, 19 platform installers unused because the repo is project-Claude-only by design, 6 banned outright by a standing invariant, and 16 genuinely uncovered surface. Only the last group is a real gap.">
+       aria-label="A stacked bar dividing 64 traced command rows into four groups: 19 covered by a mise task, 4 allowed as read-only direct calls, 19 platform installers, 6 counted as banned, and 16 counted as genuinely uncovered. NOTE: the last two figures were retracted after publication — the real ban count is 2, and the platform rows are not out of scope. See the correction beside this figure.">
     <g font-family="'DM Mono', ui-monospace, monospace">
       <text x="10" y="20" font-size="10" fill="currentColor" opacity=".6">64 TRACED ROWS &mdash; WHERE THEY LAND</text>
 
@@ -306,16 +310,47 @@
     </g>
   </svg>
   </div>
-  <figcaption>The honest breakdown. <strong>41 MISSING</strong> collapses to
-  <strong>16</strong> once the 19 platform-installer rows (this repo is
-  project-Claude-only) and the 6 invariant-banned verbs are set aside. Building
-  tasks for those 25 would violate a standing rule, not close a gap.</figcaption>
+  <figcaption><strong>⚠️ Both numbers in this figure are RETRACTED &mdash; see the
+  correction below.</strong> As originally published: &ldquo;41 MISSING collapses
+  to 16 once the 19 platform-installer rows (this repo is project-Claude-only) and
+  the 6 invariant-banned verbs are set aside.&rdquo;</figcaption>
 </figure>
+</div>
+
+<div class="col">
+  <div class="panel" style="border-left:3px solid var(--warn)">
+    <h3>⚠️ Corrected after publication &mdash; 2026-08-26</h3>
+    <p style="color:var(--ink-soft)"><strong>The figure above is wrong in two
+    places, and both errors are the same mistake: reading a rule's shape instead
+    of its text.</strong> The bar is left standing rather than redrawn, because it
+    was published and may already have been cited.</p>
+    <p style="color:var(--ink-soft)"><strong>&ldquo;6 invariant-banned verbs&rdquo;
+    &mdash; the real number is 2.</strong> <code>do-not.md</code> #2 bans
+    <code>hook install</code>, <code>extract --global</code> and
+    <code>global add</code>. Counted wrongly: <code>global list</code> and
+    <code>global path</code> are <strong>read-only calls rule 3 explicitly
+    allows</strong>; <code>global remove</code> is not named; and
+    <code>watch</code> is <strong>explicitly NOT banned</strong> &mdash;
+    <code>do-not.md</code> had <em>already corrected itself</em> about
+    <code>watch</code> in the very entry that was misread.</p>
+    <p style="color:var(--ink-soft)"><strong>&ldquo;this repo is
+    project-Claude-only&rdquo; &mdash; false.</strong> It runs codex lanes,
+    antigravity cold reviews, an <code>openai-cli</code> graphify backend, and
+    already maintains two platform skill trees. <code>do-not.md</code> #1 is about
+    <code>--project</code> scope, not platform exclusivity. So the 19
+    platform-installer rows are <strong>not uniformly out of scope</strong> and
+    need re-triage.</p>
+    <p style="color:var(--ink-soft)"><strong>Revised: ~20 genuinely uncovered, 2
+    banned, and the platform rows unresolved.</strong> Filed as <strong>#527</strong>;
+    the arithmetic is corrected in <strong>#522</strong>'s comments.</p>
+  </div>
 </div>
 
 <div class="col">
   <div class="panel signal">
     <h3>The most useful row is the one that isn't a gap</h3>
+    <p class="cite">(This panel is unaffected by the correction above &mdash; the
+    <code>query</code> finding was measured directly, not derived from a rule.)</p>
     <p style="color:var(--ink-soft)"><code>query</code> is <strong>covered</strong>
     &mdash; a task reaches it, a function calls it &mdash; and it still lands on a
     CLI subprocess, because <code>graphify.serve._query_graph_text</code> is
