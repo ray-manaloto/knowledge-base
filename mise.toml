@@ -708,18 +708,36 @@ run = "uv run kb-setup graphify-contract"
 description = "Build or verify the pinned Graphify-only deterministic AST candidate"
 run = "uv run kb-setup graphify-baseline"
 
-# [tasks.kb-graphify-native-extract] was REMOVED 2026-08-24 — the module it ran
-# (`kb_setup.graphify_native_extract`) is PARKED, not deleted. The cold review of
-# fa4ed551ac7e confirmed three blocking defects reachable only through this task
-# and its CLI subcommand: `--out --dry-run` silently runs a REAL extraction (#479),
-# an inherited GRAPHIFY_OUT bypasses the --out guard entirely (#480), and the two
-# functions that spawn the subprocess have zero test coverage — stubbing both to
-# `return 0` leaves all 42 tests green (#481). Removing the task and the `cli.py`
-# dispatch together is what makes those paths unreachable; the module and its
-# tests stay in the tree as groundwork. Restore both together, and only once
-# #479/#480/#481 are closed. It is a STOPGAP for the SDK path, never the
-# destination (`docs/archive/README.md`), so reviving it is a decision to take,
-# not a repair to perform.
+[tasks.kb-graphify-native-extract]
+description = "graphify's OWN native deep extraction over the pinned sources/graphify clone; --cluster re-clusters an existing --out tree; --artifacts [view...] regenerates derived views (wiki/graphml/svg/...) over it"
+run = "uv run kb-setup graphify-native-extract"
+# UNPARKED 2026-08-26, together with the `cli.py` dispatch — the two are one
+# gesture, exactly as the park's own note required.
+#
+# It was REMOVED 2026-08-24 so that three blocking defects reachable ONLY
+# through this task and that dispatch could not be reached while they were
+# fixed: `--out --dry-run` swallowed the flag and ran a REAL extraction (#479),
+# an inherited GRAPHIFY_OUT bypassed the `--out` guard (#480), and the two
+# functions that spawn the subprocess had zero coverage — stubbing both to
+# `return 0` left all 42 tests green (#481).
+#
+# All three are CLOSED. The module now carries 70 tests, four of which drive
+# `_run_real`/`_run_cluster` directly.
+#
+# What the park did NOT have is a mechanism: its restore condition was prose in
+# a comment, and nothing in this repo evaluates one. The condition went true
+# weeks before anyone noticed, and surfaced only because a `/tmp` sweep for an
+# unrelated reason walked past it. That is #519, and it is the durable defect —
+# this park was just where it showed.
+#
+# No timeout here, deliberately — this is a multi-hour run that stays serial by
+# default (see the module docstring's GRAPHIFY_CLAUDE_CLI_PARALLEL section for
+# what --allow-parallel-claude-cli does and does not establish) and the caller
+# bounds it, not this task. It stays a foreground `--dry-run`-first invocation a
+# human is watching. `--cluster` and `--artifacts` are instant relative to
+# extraction and are untimed for the same reason.
+#
+# NOT in GATE_TASKS and never should be: it spends model tokens.
 
 [tasks.kb-skillopt-contract]
 description = "Verify the exact SkillOpt VCS provenance, reviewed API/CLI, lock, and isolated mock dry-run"
