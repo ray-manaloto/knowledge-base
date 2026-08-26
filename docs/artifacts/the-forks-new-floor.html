@@ -414,12 +414,14 @@
     <strong>New this session, and it changes the fork&rsquo;s status.</strong> The upstream pull request that would have made this fork unnecessary — <code>#2981</code> — is now <em>closed without being merged</em>. Upstream v0.9.50 still contains zero mentions of <code>openai-cli</code> (control arm: 23 mentions of <code>claude-cli</code> in the same file, so the search works). The fork is no longer a temporary bridge waiting for a merge. It is where this capability lives.
   </div>
 
-  <h2>What has not happened yet</h2>
+  <h2>The last step, and why it waited</h2>
 
-  <p>The rebase is done and pushed, and the MCP fix has since landed on top of it as an eighth commit. The pin has <em>not</em> moved — the repo still points at the old commit. That is deliberate: the pin lives in three places and they have to move together, or some surface will keep describing code we no longer run.</p>
+  <p>The rebase is done and pushed, the MCP fix landed on top of it as an eighth commit, and the pin has now moved with it. That last step was held back deliberately until the fix was in: the pin lives in <strong>eight</strong> places and they have to move in one commit, or some surface keeps describing code we no longer run.</p>
 
   <div class="note">
-    <strong>Revised after publication, 2026&#8209;08&#8209;25.</strong> When this page first went up, the eighth commit was pending and the diagram below showed it as a dashed outline. It has since landed as <code>825b8fb4</code> — <em>only disable MCP servers Codex can actually resolve</em> — with eleven tests passing forward and in reverse. The figure and the state table now say so. Nothing else on the page changed; the rebase account above was correct as published and still is. The pin remains unmoved, which was true then and is true now.
+    <strong>Revised twice after publication, 2026&#8209;08&#8209;25.</strong> First: the eighth commit, pending and dashed when this page went up, landed as <em>only disable MCP servers Codex can actually resolve</em> — then grew a third round (validating the assembled override set, not just its parts) and was folded into <code>0a2eb5fd</code>, 15 tests green in four orders. Second: <strong>the pin has now moved</strong>, in commit <code>66a7e1fc</code> — so the sentence below that said it had not is superseded, and the figure&rsquo;s three boxes are done rather than pending. <strong>One SHA on this page changed identity:</strong> the eighth commit was published here as <code>825b8fb4</code> and then amended to fold in the third round, so that hash no longer exists in any repository — it is <code>0a2eb5fd</code>. If you copied the old one, that is why it resolves to nothing.
+    <br><br>
+    Two corrections the reader should have, because the original page understated both. It was <strong>eight</strong> surfaces, not three — <code>uv.lock</code>, the deterministic baseline&rsquo;s accepted constants, the disposition catalog, and the generated skill stamp all carry the same pin. And <code>pyproject.toml</code>&rsquo;s <em>version</em> had to move too, not just the git rev: upstream&rsquo;s own bump made the fork report 0.9.50, so the old <code>==0.9.49</code> would not have resolved. The rebase account above was correct as published and is unchanged.
   </div>
 
 </div>
@@ -427,7 +429,7 @@
 <div class="wide">
   <figure>
     <div class="figbox">
-      <svg viewBox="0 0 880 210" role="img" aria-label="The new fork commit must be written into three files together: the source manifest, pyproject.toml, and currency.toml's ref_binding rows. A pending MCP fix would land as an eighth commit first.">
+      <svg viewBox="0 0 880 210" role="img" aria-label="The eighth fork commit, the MCP fix, had to land before the pin moved; the pin was then written into eight surfaces together, of which the source manifest, pyproject.toml and currency.toml are three.">
         <defs>
           <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <polygon points="0,0 10,5 0,10" fill="currentColor"/>
@@ -441,7 +443,7 @@
         <!-- the 8th commit, now landed -->
         <rect x="262" y="76" width="176" height="56" rx="3" fill="none" stroke="#9A7413" stroke-width="2.5"/>
         <text x="350" y="99" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="#9A7413">8th commit</text>
-        <text x="350" y="118" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#9A7413">825b8fb4 — the MCP fix</text>
+        <text x="350" y="118" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#9A7413">0a2eb5fd — the MCP fix</text>
 
         <line x1="216" y1="104" x2="256" y2="104" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
         <line x1="442" y1="104" x2="516" y2="104" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
@@ -465,7 +467,7 @@
         <text x="687" y="208" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="currentColor">one pin, three files — they move in the same commit</text>
       </svg>
     </div>
-    <figcaption>The MCP fix that unblocks every Codex&#8209;backed extraction landed as the eighth commit, <code>825b8fb4</code>, after this page was first published. What is still outstanding is the pin: the new SHA has to be written into all three sites at once. Splitting them is how a surface ends up describing code nobody runs.</figcaption>
+    <figcaption>The MCP fix that unblocks every Codex&#8209;backed extraction landed as the eighth commit, <code>0a2eb5fd</code>, and the pin followed it in <code>66a7e1fc</code>. Three sites are drawn here; there turned out to be <strong>eight</strong>, and they moved in one commit. Splitting them is how a surface ends up describing code nobody runs.</figcaption>
   </figure>
 </div>
 
@@ -485,11 +487,13 @@
         <tr><td>Our commits replayed</td><td class="num">7 of 7</td><td><code>git rev-list --count</code></td></tr>
         <tr><td>Conflicts</td><td class="num">1, changelog only</td><td>rebase log</td></tr>
         <tr><td>Fork tip after the rebase</td><td class="mono">69abe3a7db37e8d7&hellip;</td><td><code>git rev-parse HEAD</code></td></tr>
-        <tr><td>8th commit &mdash; the MCP fix</td><td class="mono">825b8fb4622f1b7a&hellip;</td><td><code>git rev-parse HEAD</code>, after</td></tr>
+        <tr><td>8th commit &mdash; the MCP fix</td><td class="mono">0a2eb5fdd3110b82&hellip;</td><td><code>git rev-parse HEAD</code>, after</td></tr>
         <tr><td>Tests on that commit</td><td class="num">11 fwd + 11 reversed</td><td><code>pytest</code>, both orders</td></tr>
         <tr><td>Branch pushed</td><td class="mono">kb-pin/openai-cli-backend-v0.9.50</td><td><code>gh api</code> branches</td></tr>
         <tr><td>Old branch</td><td>intact, untouched</td><td><code>gh api</code> branches</td></tr>
-        <tr><td>Pin advanced?</td><td><span class="pill fail">not yet</span></td><td>—</td></tr>
+        <tr><td>Pin advanced?</td><td><span class="pill pass">yes &middot; 8 surfaces</span></td><td><code>66a7e1fc</code></td></tr>
+        <tr><td>Runtime actually installed</td><td class="mono">0.9.50 @ 0a2eb5fd</td><td><code>direct_url.json</code></td></tr>
+        <tr><td>Baseline re-derived</td><td class="num">452 detected / 444 extracted</td><td><code>kb-graphify-baseline build</code></td></tr>
       </tbody>
     </table>
   </div>
