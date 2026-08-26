@@ -815,6 +815,24 @@ description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbo
 # built and never wired. `mise-tasks-only.md`: a recurring workflow ships as a task.
 run = "uv run kb-setup affected"
 
+[tasks.kb-code-intel]
+description = 'Provenance-tagged code-intel edges (mise task/skill/dispatch/config -> Python): mise run kb-code-intel [-- --lanes a,b --out PATH --format chunk|json]'
+# This repo's graph indexes Python AST ONLY — no nodes for mise tasks, skills,
+# or config files, so "what task reaches this function?" goes unanswered and
+# the entry-point diagram Ray keeps asking for is hand-drawn and goes stale
+# (#276). Every edge here is PROVENANCE-TAGGED (MISE_TASK/SKILL_FENCE/
+# CLI_DISPATCH/CONFIG_READ/TY_LSP) and carries `verified` — issue #276's own
+# requirement, because an untagged edge set merged into a 736 MiB aggregate
+# graph is unreviewable. The TY_LSP lane is STUBBED (always finds 0) pending
+# the backend decision from #276's Serena evaluation; the other four are
+# static reads (subprocess/AST/regex), all `verified=True` by construction.
+#
+# Read-only and writes NOTHING under graphify-out/: emitting a chunk is in
+# scope, merging it into the aggregate graph is a separate, later step. Not in
+# `_GRAPH_WRITERS`, so no pinned-graphify preflight — same class as
+# `kb-affected`, not `kb-build`. Logic in kb_setup.code_intel.
+run = "uv run kb-setup code-intel"
+
 [tasks.kb-insights]
 description = 'Print what the graph already computed: surprises, questions, god nodes, provenance audit'
 # graphify computes surprises/questions/gods/cohesion on every cluster-only/label run

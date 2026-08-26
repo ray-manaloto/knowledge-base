@@ -167,8 +167,14 @@ ignore = [
 "python/src/kb_setup/evals.py" = ["BLE001"]
 # Best-effort report block (BLE001); `G` is the standard NetworkX graph name (N806).
 "python/src/kb_setup/_merge_docs.py" = ["BLE001", "N806"]
-# The CLI main() is a flat command dispatch — branchy by nature, not complex logic.
-"python/src/kb_setup/cli.py" = ["C901", "PLR0911", "PLR0912"]
+# The CLI main() is a flat command dispatch — branchy by nature, not complex
+# logic. PLR0915 (statement count) joined this list 2026-08-26 (#276): `_run`
+# grows one `if cmd == ...` arm — two statements, a lazy import and a return —
+# per subcommand by design, so the LENGTH of this function is the intended
+# shape, not an accident to refactor away. The BODY complexity these ignore
+# (C901/PLR0911/PLR0912/PLR0915) is real but architectural: one flat dispatch
+# beats N smaller ones a reader has to chase across files.
+"python/src/kb_setup/cli.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
 # `archive()`'s six keyword-only parameters are a FIXED external interface
 # (session-review-report-always spec §3b): each mirrors one CLI flag
 # (`--run-json`/`--report-dir`/`--handoff`/`--date`/`--dry-run`) 1:1, so

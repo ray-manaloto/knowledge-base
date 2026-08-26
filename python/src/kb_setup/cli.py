@@ -60,7 +60,9 @@ def _print_usage() -> int:
     """
     print(
         "kb-setup: build | update <name> | watch | prose | query <question> [--prose] | "
-        "affected <symbol> [--depth N] | insights [--top N] | graph-size | "
+        "affected <symbol> [--depth N] | "
+        "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
+        "insights [--top N] | graph-size | "
         "telemetry-prune | serve | "
         "merge <chunk> | label | "
         "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
@@ -175,6 +177,12 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_ops
 
         return graphify_ops.affected(repo_root, rest)
+    if cmd == "code-intel":
+        from kb_setup import code_intel
+
+        # Read-only, like `affected` just above: no graph write, so no
+        # `_GRAPH_WRITERS` membership and no pinned-graphify preflight (#276).
+        return code_intel.code_intel_main(repo_root, rest)
     if cmd in {"insights", "graph-size", "telemetry-prune"}:
         return _dispatch_graph_hygiene(repo_root, cmd, rest)
     if cmd == "serve":
