@@ -1,0 +1,403 @@
+<title>The Parked Extractor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root{
+    --ground:#f1f4f1;
+    --panel:#ffffff;
+    --panel-2:#e6ebe6;
+    --edge:#c7d1c8;
+    --ink:#1a221c;
+    --ink-soft:#4a574d;
+    --ink-faint:#76837a;
+    --live:#1c6f47;
+    --live-soft:#d9ece2;
+    --cut:#a8402a;
+    --cut-soft:#f4e0da;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#111714;
+      --panel:#19211d;
+      --panel-2:#212b26;
+      --edge:#33413a;
+      --ink:#e2e9e4;
+      --ink-soft:#a7b5ac;
+      --ink-faint:#7c8a82;
+      --live:#4dc48a;
+      --live-soft:#123324;
+      --cut:#e0765b;
+      --cut-soft:#361c16;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#111714;
+    --panel:#19211d;
+    --panel-2:#212b26;
+    --edge:#33413a;
+    --ink:#e2e9e4;
+    --ink-soft:#a7b5ac;
+    --ink-faint:#7c8a82;
+    --live:#4dc48a;
+    --live-soft:#123324;
+    --cut:#e0765b;
+    --cut-soft:#361c16;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:"Newsreader",Georgia,serif;
+    font-size:17.5px;
+    line-height:1.62;
+    margin:0;
+    padding:0 1.25rem 6rem;
+  }
+
+  .col{max-width:35rem; margin:0 auto; display:flex; flex-direction:column; gap:1.3rem}
+  .wide{max-width:60rem; margin:0 auto; width:100%}
+
+  h1,h2,h3{
+    font-family:"Archivo",system-ui,sans-serif;
+    text-wrap:balance; margin:0; line-height:1.14;
+  }
+  h1{font-size:clamp(2.05rem,5.4vw,3.05rem); font-weight:700; letter-spacing:-.025em}
+  h2{font-size:1.4rem; font-weight:600; letter-spacing:-.012em; margin-top:1.7rem}
+  h3{font-size:1rem; font-weight:600; letter-spacing:-.005em}
+  p{margin:0}
+
+  .eyebrow{
+    font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:.7rem; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--live); margin:0;
+  }
+  .lede{font-size:1.14rem; color:var(--ink-soft)}
+
+  code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace; font-size:.84em}
+  code{background:var(--panel-2); padding:.1em .34em; border-radius:2px}
+
+  header{padding:4rem 0 .4rem}
+  hr{border:0; border-top:1px solid var(--edge); margin:.3rem 0}
+
+  figure{margin:0; display:flex; flex-direction:column; gap:.85rem}
+  figure svg{width:100%; height:auto; display:block; color:var(--ink)}
+  figcaption{
+    font-size:.85rem; color:var(--ink-faint); max-width:35rem;
+    margin-inline:auto; text-align:center; text-wrap:balance;
+  }
+
+  .scroll{overflow-x:auto}
+
+  .panel{
+    background:var(--panel); border:1px solid var(--edge); border-radius:2px;
+    padding:1.05rem 1.15rem; display:flex; flex-direction:column; gap:.55rem;
+  }
+  .panel.live{border-left:3px solid var(--live)}
+  .panel.cut{border-left:3px solid var(--cut)}
+
+  table{border-collapse:collapse; width:100%; font-size:.88rem}
+  th,td{text-align:left; padding:.48rem .6rem; border-bottom:1px solid var(--edge); vertical-align:top}
+  th{
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:.68rem;
+    letter-spacing:.11em; text-transform:uppercase; color:var(--ink-faint); font-weight:400;
+  }
+  td.mono{font-family:"JetBrains Mono",ui-monospace,monospace; font-size:.8rem}
+
+  .tag{
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:.68rem;
+    letter-spacing:.06em; text-transform:uppercase; padding:.16em .5em;
+    border-radius:2px; white-space:nowrap; font-weight:600;
+  }
+  .tag.ok{background:var(--live-soft); color:var(--live)}
+  .tag.no{background:var(--cut-soft); color:var(--cut)}
+
+  .cite{font-size:.85rem; color:var(--ink-faint)}
+
+  ol.steps{margin:0; padding-left:1.15rem; display:flex; flex-direction:column; gap:.5rem}
+  ol.steps li{padding-left:.2rem}
+
+  a{color:var(--live)}
+  a:focus-visible, *:focus-visible{outline:2px solid var(--live); outline-offset:2px}
+</style>
+
+<header class="col">
+  <p class="eyebrow">Blocked path &middot; measured 2026-08-26</p>
+  <h1>The parked extractor</h1>
+  <p class="lede">The next task needs one command. That command was deleted on
+  purpose eight weeks of work ago, under a condition that has since been met and
+  nobody went back to check.</p>
+</header>
+
+<div class="col"><hr></div>
+
+<div class="col">
+  <p>The job in front of us is the <strong>mise prose slice</strong>: take about
+  twenty-five of mise's markdown files, run them through graphify's
+  <code>openai-cli</code> extraction backend, and see what it costs before
+  committing to the other three hundred.</p>
+
+  <p>Every piece of that exists. The fork is pinned and healthy. The backend
+  works. The mise clone is sitting on disk at the right commit. What is missing
+  is smaller and more annoying than any of those: <strong>the two lines of
+  wiring that let a person type the command.</strong></p>
+</div>
+
+<div class="wide" style="margin:2.2rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 900 316" role="img" preserveAspectRatio="xMidYMid meet"
+       aria-label="A five-stage extraction pipeline. The first two stages, the mise task and the CLI dispatch, are removed and the links between them are severed. The last three stages, the module, graphify itself, and the merge into the corpus, are live. Below, three closed issues point at the severed links: they are the condition that authorised the cut, and all three are now closed.">
+    <defs>
+      <marker id="pa-live" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <polygon points="0,1 10,5 0,9" fill="currentColor"/>
+      </marker>
+      <marker id="pa-up" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <polygon points="0,1 10,5 0,9" fill="#a8402a"/>
+      </marker>
+    </defs>
+
+    <!-- ROW A: the pipeline -->
+    <g font-family="'JetBrains Mono', ui-monospace, monospace">
+
+      <!-- 1. mise task — REMOVED -->
+      <rect x="12" y="46" width="148" height="66" rx="2"
+            fill="none" stroke="#a8402a" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="86" y="70" text-anchor="middle" font-size="11.5" font-weight="600" fill="#a8402a">REMOVED</text>
+      <text x="86" y="88" text-anchor="middle" font-size="11" fill="currentColor">mise task</text>
+      <text x="86" y="103" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".65">kb-graphify-native-extract</text>
+
+      <!-- 2. CLI dispatch — REMOVED -->
+      <rect x="194" y="46" width="148" height="66" rx="2"
+            fill="none" stroke="#a8402a" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="268" y="70" text-anchor="middle" font-size="11.5" font-weight="600" fill="#a8402a">REMOVED</text>
+      <text x="268" y="88" text-anchor="middle" font-size="11" fill="currentColor">CLI dispatch</text>
+      <text x="268" y="103" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".65">cli.py:239</text>
+
+      <!-- 3. the module — LIVE -->
+      <rect x="376" y="46" width="148" height="66" rx="2"
+            fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="450" y="70" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1c6f47">LIVE &middot; 70 TESTS</text>
+      <text x="450" y="88" text-anchor="middle" font-size="11" fill="currentColor">the module</text>
+      <text x="450" y="103" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".65">graphify_native_extract.py</text>
+
+      <!-- 4. graphify — LIVE -->
+      <rect x="558" y="46" width="148" height="66" rx="2"
+            fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="632" y="70" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1c6f47">LIVE</text>
+      <text x="632" y="88" text-anchor="middle" font-size="11" fill="currentColor">graphify extract</text>
+      <text x="632" y="103" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".65">--backend openai-cli</text>
+
+      <!-- 5. the corpus — LIVE -->
+      <rect x="740" y="46" width="148" height="66" rx="2"
+            fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="814" y="70" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1c6f47">LIVE</text>
+      <text x="814" y="88" text-anchor="middle" font-size="11" fill="currentColor">the corpus</text>
+      <text x="814" y="103" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".65">chunk &rarr; kb-merge</text>
+
+      <!-- CUT 1: between box 1 and box 2 -->
+      <line x1="160" y1="79" x2="169" y2="79" stroke="#a8402a" stroke-width="1.5"/>
+      <line x1="185" y1="79" x2="194" y2="79" stroke="#a8402a" stroke-width="1.5"/>
+      <line x1="171" y1="71" x2="183" y2="87" stroke="#a8402a" stroke-width="2"/>
+      <line x1="183" y1="71" x2="171" y2="87" stroke="#a8402a" stroke-width="2"/>
+
+      <!-- CUT 2: between box 2 and box 3 -->
+      <line x1="342" y1="79" x2="351" y2="79" stroke="#a8402a" stroke-width="1.5"/>
+      <line x1="367" y1="79" x2="376" y2="79" stroke="#a8402a" stroke-width="1.5"/>
+      <line x1="353" y1="71" x2="365" y2="87" stroke="#a8402a" stroke-width="2"/>
+      <line x1="365" y1="71" x2="353" y2="87" stroke="#a8402a" stroke-width="2"/>
+
+      <!-- LIVE LINK 3 -->
+      <line x1="524" y1="79" x2="552" y2="79" stroke="currentColor" stroke-width="1.5"
+            marker-end="url(#pa-live)"/>
+      <text x="538" y="68" text-anchor="middle" font-size="8.5" fill="currentColor" opacity=".6">spawns</text>
+
+      <!-- LIVE LINK 4 -->
+      <line x1="706" y1="79" x2="734" y2="79" stroke="currentColor" stroke-width="1.5"
+            marker-end="url(#pa-live)"/>
+      <text x="720" y="68" text-anchor="middle" font-size="8.5" fill="currentColor" opacity=".6">writes</text>
+
+      <!-- the caller, entering from the left -->
+      <text x="12" y="30" font-size="9.5" fill="currentColor" opacity=".55">you type this &darr;</text>
+
+      <!-- reachability bracket -->
+      <line x1="376" y1="128" x2="888" y2="128" stroke="#1c6f47" stroke-width="1"/>
+      <line x1="376" y1="128" x2="376" y2="122" stroke="#1c6f47" stroke-width="1"/>
+      <line x1="888" y1="128" x2="888" y2="122" stroke="#1c6f47" stroke-width="1"/>
+      <text x="632" y="143" text-anchor="middle" font-size="10" fill="#1c6f47">all of this works &mdash; and nothing can reach it</text>
+
+      <!-- ROW B: the authorising condition -->
+      <line x1="12" y1="186" x2="888" y2="186" stroke="currentColor" stroke-width="1" opacity=".22"/>
+      <text x="12" y="212" font-size="10" fill="currentColor" opacity=".65">Why the two links were cut &mdash; three defects reachable only through them:</text>
+
+      <rect x="12" y="228" width="164" height="44" rx="2" fill="none" stroke="#1c6f47" stroke-width="1.2"/>
+      <text x="94" y="247" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">#479</text>
+      <text x="94" y="262" text-anchor="middle" font-size="9.5" fill="#1c6f47">CLOSED</text>
+
+      <rect x="192" y="228" width="164" height="44" rx="2" fill="none" stroke="#1c6f47" stroke-width="1.2"/>
+      <text x="274" y="247" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">#480</text>
+      <text x="274" y="262" text-anchor="middle" font-size="9.5" fill="#1c6f47">CLOSED</text>
+
+      <rect x="372" y="228" width="164" height="44" rx="2" fill="none" stroke="#1c6f47" stroke-width="1.2"/>
+      <text x="454" y="247" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">#481</text>
+      <text x="454" y="262" text-anchor="middle" font-size="9.5" fill="#1c6f47">CLOSED</text>
+
+      <!-- arrow from the chips back up to the cuts -->
+      <path d="M 274 228 L 274 206 L 177 206 L 177 92" fill="none"
+            stroke="#a8402a" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#pa-up)"/>
+
+      <text x="560" y="243" font-size="10.5" fill="currentColor">The removal note says: restore both links</text>
+      <text x="560" y="259" font-size="10.5" fill="currentColor">&ldquo;only once those three are closed.&rdquo;</text>
+      <text x="560" y="277" font-size="10.5" font-weight="600" fill="#a8402a">They are. The links are still cut.</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption>The path from a typed command to a merged chunk. Stages three
+  through five are live and tested; the two links that let any caller reach
+  stage three were removed on 2026-08-24, and the condition their own removal
+  note set for restoring them is now satisfied.</figcaption>
+</figure>
+</div>
+
+<div class="col">
+  <h2>What actually happened</h2>
+
+  <p>On 2026-08-24 a cold review of <code>fa4ed551ac7e</code> found three real
+  defects in the extraction module, all of them reachable <em>only</em> through
+  the mise task and the CLI subcommand. The response was not to leave them
+  open &mdash; it was to <strong>delete the two entry points</strong>, which made
+  every one of the three unreachable by construction while the fixes were
+  written.</p>
+
+  <p>That was the right call. Both removal sites still carry the note explaining
+  it, and both name the same restore condition in the same words: <em>restore
+  this branch and the mise task together, and only once those three are
+  closed.</em></p>
+
+  <p>The fixes landed. All three issues are closed. The module now carries
+  seventy tests, four of which drive <code>_run_real</code> and
+  <code>_run_cluster</code> directly &mdash; the exact hole <a
+  href="https://github.com/ray-manaloto/knowledge-base/issues/481">#481</a> was
+  about. <strong>The wiring was never put back.</strong></p>
+
+  <div class="panel cut">
+    <h3>Why this is easy to miss</h3>
+    <p style="color:var(--ink-soft)">A removal note is written by the session
+    doing the removing, and read by nobody afterwards. It states its own expiry
+    condition in prose, inside a comment, in two files &mdash; and no gate,
+    check, or task ever evaluates whether that condition has come true. The
+    issues closed on a different branch, weeks later, with nothing pointing
+    back.</p>
+  </div>
+</div>
+
+<div class="col">
+  <h2>The evidence</h2>
+  <p class="cite">Every row read this session, at <code>6fbd74a3</code> / merge
+  <code>1d03e461</code>.</p>
+
+  <div class="scroll">
+  <table>
+    <thead>
+      <tr><th>what</th><th>where</th><th>state</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>the mise task</td>
+        <td class="mono">mise.toml:711&ndash;723</td>
+        <td><span class="tag no">removed</span></td>
+      </tr>
+      <tr>
+        <td>the CLI dispatch</td>
+        <td class="mono">cli.py:239&ndash;247</td>
+        <td><span class="tag no">removed</span></td>
+      </tr>
+      <tr>
+        <td>the module</td>
+        <td class="mono">graphify_native_extract.py</td>
+        <td><span class="tag ok">present</span></td>
+      </tr>
+      <tr>
+        <td>its test suite</td>
+        <td class="mono">tests/test_graphify_native_extract.py</td>
+        <td><span class="tag ok">70 tests</span></td>
+      </tr>
+      <tr>
+        <td><code>_run_real</code> / <code>_run_cluster</code> coverage</td>
+        <td class="mono">&hellip;:637, 651, 663, 681</td>
+        <td><span class="tag ok">4 direct</span></td>
+      </tr>
+      <tr>
+        <td>the three blockers</td>
+        <td class="mono">#479 &middot; #480 &middot; #481</td>
+        <td><span class="tag ok">all closed</span></td>
+      </tr>
+      <tr>
+        <td>the mise clone</td>
+        <td class="mono">sources/mise @ c2a0cb9da</td>
+        <td><span class="tag ok">matches pin</span></td>
+      </tr>
+      <tr>
+        <td>slice material</td>
+        <td class="mono">336 .md &mdash; 319 under docs/</td>
+        <td><span class="tag ok">on disk</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="cite">The handoff says 337 markdown files; the measured count at this
+  pin is <strong>336</strong>, 319 of them under <code>docs/</code>. A
+  one-file difference that changes nothing about the plan, corrected here rather
+  than carried.</p>
+</div>
+
+<div class="col">
+  <h2>What restoring it actually is</h2>
+
+  <p>Two deletions to undo, in one commit, plus the gates. But the removal note
+  is explicit that this is <strong>not a repair</strong>:</p>
+
+  <div class="panel">
+    <p style="color:var(--ink-soft)">&ldquo;The module is a <strong>stopgap</strong>
+    for the SDK path, not the destination &mdash; so reviving it is a decision to
+    take, not a repair to perform.&rdquo;</p>
+    <p class="cite">&mdash; the same sentence, in both removal notes</p>
+  </div>
+
+  <p>That matters because of a standing call: <em>SDK over CLI, never
+  internals.</em> This module shells out to the <code>graphify</code> binary.
+  The destination is the Python SDK. Un-parking the stopgap buys the slice
+  today and puts a known-temporary path back into daily use.</p>
+
+  <p>The alternative is to reach the same backend without the module &mdash;
+  which is possible, because <code>--backend</code> is a flag on
+  <code>graphify extract</code> itself. But this repo denies hand-run
+  <code>graphify</code> at the hook, by design, so that route needs its own
+  narrow task rather than a typed command.</p>
+</div>
+
+<div class="col">
+  <h2>The decision</h2>
+  <ol class="steps">
+    <li><strong>Restore the wiring.</strong> Put both lines back, run the gates,
+    and start the slice today. Accepts the stopgap staying in service.</li>
+    <li><strong>Build the narrow task instead.</strong> One task that does only
+    the slice, going straight to the pinned binary, leaving the parked module
+    parked. More work before the slice starts; no stopgap revival.</li>
+    <li><strong>Go SDK-first.</strong> Skip both and drive extraction through
+    graphify's Python SDK, which is where this is meant to end up. Most work,
+    and the slice becomes the vehicle for a larger change.</li>
+  </ol>
+</div>
+
+<div class="col" style="margin-top:2.6rem">
+  <hr>
+  <p class="cite">Figures measured 2026-08-26 in this session against
+  <code>6fbd74a3</code>. Issue states read from the GitHub API, not from a
+  cached list. The file counts and the clone SHA were measured on disk. Nothing
+  on this page is inherited from a prior session's table.</p>
+</div>
