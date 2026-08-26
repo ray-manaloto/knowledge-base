@@ -1,0 +1,274 @@
+<title>The Hook Is Not The Bug</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Public+Sans:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root{
+    --ground:#f6f4f7; --panel:#fff; --edge:#d9d2de; --panel-2:#ebe5ef;
+    --ink:#241d2b; --ink-soft:#544b5e; --ink-faint:#7d7387;
+    --pass:#1f7a5c; --pass-bg:#dceee6;
+    --stop:#b5432f; --stop-bg:#f7e2dd;
+    --measure:35rem;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#1a1520; --panel:#221b2a; --edge:#3b3145; --panel-2:#2b2335;
+      --ink:#ece7f0; --ink-soft:#b6acc0; --ink-faint:#8a7f95;
+      --pass:#5cc79b; --pass-bg:#153027;
+      --stop:#e8836b; --stop-bg:#33201b;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#1a1520; --panel:#221b2a; --edge:#3b3145; --panel-2:#2b2335;
+    --ink:#ece7f0; --ink-soft:#b6acc0; --ink-faint:#8a7f95;
+    --pass:#5cc79b; --pass-bg:#153027;
+    --stop:#e8836b; --stop-bg:#33201b;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Public Sans",system-ui,sans-serif; font-size:17px; line-height:1.62;
+    margin:0; padding:0 1.25rem 6rem;
+  }
+  .wrap{max-width:var(--measure); margin:0 auto; display:flex; flex-direction:column; gap:1.3rem}
+  .bleed{max-width:64rem; margin-inline:auto; width:100%}
+  h1,h2,h3{font-family:Fraunces,Georgia,serif; text-wrap:balance; margin:0; line-height:1.12}
+  h1{font-size:clamp(2.1rem,6vw,3.4rem); font-weight:800; letter-spacing:-.015em}
+  h2{font-size:1.6rem; font-weight:600; margin-top:2rem}
+  h3{font-size:1.08rem; font-weight:600; font-family:"Public Sans",sans-serif}
+  p{margin:0}
+  .lede{font-size:1.18rem; color:var(--ink-soft)}
+  .step{
+    font-family:"JetBrains Mono",monospace; font-size:.7rem; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--ink-faint);
+  }
+  code{font-family:"JetBrains Mono",monospace; font-size:.85em; background:var(--panel-2); padding:.1em .34em; border-radius:3px}
+  .mono{font-family:"JetBrains Mono",monospace}
+  header{padding:4rem 0 .5rem}
+  hr{border:0; border-top:1px solid var(--edge); margin:.3rem 0}
+  figure{margin:0; display:flex; flex-direction:column; gap:.75rem}
+  figure svg{width:100%; height:auto; display:block; color:var(--ink)}
+  figcaption{font-size:.87rem; color:var(--ink-faint); max-width:var(--measure); margin-inline:auto; text-align:center; text-wrap:balance}
+  .scroll{overflow-x:auto}
+  .card{background:var(--panel); border:1px solid var(--edge); border-radius:3px; padding:1.05rem 1.15rem; display:flex; flex-direction:column; gap:.5rem}
+  .card.pass{border-left:4px solid var(--pass)}
+  .card.stop{border-left:4px solid var(--stop)}
+  .verdict{font-family:"JetBrains Mono",monospace; font-size:.74rem; letter-spacing:.1em; text-transform:uppercase; font-weight:700}
+  .verdict.ok{color:var(--pass)} .verdict.bad{color:var(--stop)}
+  blockquote{
+    margin:0; padding:.75rem 1rem; background:var(--panel-2); border-radius:3px;
+    font-family:"JetBrains Mono",monospace; font-size:.83rem; line-height:1.5; color:var(--ink-soft);
+  }
+  table{border-collapse:collapse; width:100%; font-size:.9rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--edge); vertical-align:top}
+  th{font-family:"JetBrains Mono",monospace; font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); font-weight:400}
+  td.n{font-variant-numeric:tabular-nums; font-family:"JetBrains Mono",monospace}
+  .cite{font-family:"JetBrains Mono",monospace; font-size:.76rem; color:var(--ink-faint)}
+</style>
+
+<header class="wrap">
+  <p class="step">Measured 2026-08-25</p>
+  <h1>The hook is not the bug</h1>
+  <p class="lede">Two completely different things happened, at two different places in the
+  chain, and they got tangled together. Here they are, pulled apart.</p>
+</header>
+
+<div class="wrap"><hr></div>
+
+<div class="wrap">
+  <h2>First: the forked graphify works</h2>
+  <p>You asked to just run it on a simple file. Done &mdash; and it worked:</p>
+  <div class="card pass">
+    <p class="verdict ok">exit code 0</p>
+    <p><strong>45 nodes, 67 edges, 12 communities</strong> written from two source files.</p>
+    <p class="cite">Real run through the forked CLI, with <code>--backend openai-cli</code> on
+    the command line. Nothing mocked.</p>
+  </div>
+  <p>So graphify is fine. The fork is fine. The install is fine. Whatever is broken is
+  somewhere narrower than &ldquo;graphify&rdquo;.</p>
+</div>
+
+<div class="bleed" style="margin:2.6rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 940 300" role="img" aria-label="The chain from a typed command to the provider has four hops. The hook sits only on the first hop, watching commands typed into a terminal. Running graphify through a mise task or a Python module bypasses the hook entirely and is the sanctioned path. The failure happens at the last hop, where graphify hands a config override to codex.">
+    <defs>
+      <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+      </marker>
+      <marker id="a-stop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#b5432f"/>
+      </marker>
+    </defs>
+
+    <!-- lane 1: typed by hand -->
+    <text x="20" y="44" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="currentColor" letter-spacing="1.4">WHAT I TYPE BY HAND</text>
+    <rect x="20" y="56" width="185" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="112" y="83" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">graphify extract …</text>
+
+    <line x1="205" y1="78" x2="268" y2="78" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+
+    <rect x="270" y="52" width="120" height="52" rx="3" fill="none" stroke="#b5432f" stroke-width="2"/>
+    <text x="330" y="74" text-anchor="middle" font-size="12" font-weight="700" fill="#b5432f">THE HOOK</text>
+    <text x="330" y="92" text-anchor="middle" font-size="11" fill="#b5432f">stops it here</text>
+
+    <line x1="390" y1="78" x2="452" y2="78" stroke="#b5432f" stroke-width="1.5" stroke-dasharray="4 4" opacity=".5"/>
+    <line x1="436" y1="64" x2="464" y2="92" stroke="#b5432f" stroke-width="2.5"/>
+    <line x1="464" y1="64" x2="436" y2="92" stroke="#b5432f" stroke-width="2.5"/>
+    <text x="486" y="82" font-size="11.5" fill="#b5432f">never runs</text>
+
+    <!-- lane 2: through the sanctioned path -->
+    <text x="20" y="168" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="currentColor" letter-spacing="1.4">WHAT A MISE TASK / PYTHON MODULE RUNS</text>
+    <rect x="20" y="180" width="185" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="112" y="207" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">mise run kb-…</text>
+
+    <line x1="205" y1="202" x2="268" y2="202" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="270" y="176" width="120" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 4" opacity=".4"/>
+    <text x="330" y="200" text-anchor="middle" font-size="11" fill="currentColor" opacity=".55">hook never</text>
+    <text x="330" y="216" text-anchor="middle" font-size="11" fill="currentColor" opacity=".55">sees this</text>
+
+    <line x1="390" y1="202" x2="452" y2="202" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+
+    <rect x="454" y="176" width="140" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="524" y="200" text-anchor="middle" font-size="12" fill="currentColor">graphify runs</text>
+    <text x="524" y="217" text-anchor="middle" font-size="11" fill="#1f7a5c" font-weight="600">works &mdash; 45 nodes</text>
+
+    <line x1="594" y1="202" x2="656" y2="202" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+    <text x="600" y="192" font-size="10.5" fill="currentColor" opacity=".7">only if there is</text>
+    <text x="600" y="180" font-size="10.5" fill="currentColor" opacity=".7">prose to read</text>
+
+    <rect x="658" y="176" width="150" height="52" rx="3" fill="none" stroke="#b5432f" stroke-width="2"/>
+    <text x="733" y="198" text-anchor="middle" font-size="12" font-weight="700" fill="#b5432f">codex</text>
+    <text x="733" y="216" text-anchor="middle" font-size="11" fill="#b5432f">THE REAL BREAK</text>
+
+    <line x1="808" y1="202" x2="866" y2="202" stroke="#b5432f" stroke-width="1.5" marker-end="url(#a-stop)"/>
+    <text x="872" y="199" font-size="11" fill="#b5432f" font-weight="600">$</text>
+
+    <text x="470" y="278" text-anchor="middle" font-size="12.5" fill="currentColor">The hook guards hop&nbsp;1. The bug lives at hop&nbsp;4.</text>
+    <text x="470" y="296" text-anchor="middle" font-size="12" fill="currentColor" opacity=".75">They never touched each other &mdash; the working run above went straight past the hook.</text>
+  </svg>
+  </div>
+  <figcaption>The hook only inspects commands typed into a terminal. Everything the repo
+  runs through a task or a module goes around it by design &mdash; which is why the successful
+  extraction was never blocked.</figcaption>
+</figure>
+</div>
+
+<div class="wrap">
+  <h2>So why is the hook there at all?</h2>
+  <p>It isn&rsquo;t a safety rail against graphify. It&rsquo;s a <strong>redirect</strong>,
+  and it says so in its own words:</p>
+  <blockquote>Do not run `graphify extract` by hand. Use the mise task: mise run kb-build.
+  All graphify work goes through a mise task.</blockquote>
+  <p>The reason is that running it by hand skips three things the task does for you: it
+  pins which graphify version actually ran, it strips every non-Claude provider key out of
+  the environment, and it points the output somewhere that isn&rsquo;t your real graph. A
+  hand-run command silently gets none of that.</p>
+  <div class="card">
+    <h3>The part worth remembering</h3>
+    <p style="color:var(--ink-soft)">It blocks <em>typing</em>, not <em>running</em>. Reading
+    commands are never blocked at all &mdash; <code>query</code>, <code>explain</code>,
+    <code>path</code>, <code>--version</code> all pass straight through. It only stops the
+    handful of commands that <em>write</em>.</p>
+  </div>
+</div>
+
+<div class="wrap">
+  <h2>Now the actual bug</h2>
+  <p>When there <em>is</em> prose to read, graphify calls <code>codex</code>. Before doing
+  that it tries to be tidy: it turns off your MCP servers, so extraction doesn&rsquo;t
+  boot ten of them for a job that calls no tools.</p>
+  <p>To do that it asks codex &ldquo;what servers do you have?&rdquo; &mdash; gets
+  <strong>ten</strong> &mdash; and passes back ten switch-off instructions.</p>
+</div>
+
+<div class="bleed" style="margin:2.4rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 880 250" role="img" aria-label="Codex reports ten MCP servers. Only five are written in a config file; the other five come from plugins. Graphify sends a switch-off instruction for all ten. For the five that are not in any config file, the instruction creates an entry with no address, and codex rejects the entire configuration.">
+    <rect x="20" y="30" width="180" height="46" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="110" y="50" text-anchor="middle" font-size="12" fill="currentColor">codex reports</text>
+    <text x="110" y="68" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">10 servers</text>
+
+    <path d="M 200 53 L 236 53 L 236 122 L 268 122" fill="none" stroke="#1f7a5c" stroke-width="1.5"/>
+    <path d="M 200 53 L 236 53 L 236 196 L 268 196" fill="none" stroke="#b5432f" stroke-width="1.5"/>
+
+    <rect x="270" y="100" width="230" height="44" rx="3" fill="none" stroke="#1f7a5c" stroke-width="1.5"/>
+    <text x="385" y="119" text-anchor="middle" font-size="12" fill="#1f7a5c" font-weight="600">5 written in a config file</text>
+    <text x="385" y="136" text-anchor="middle" font-size="11" fill="#1f7a5c">they have an address</text>
+
+    <rect x="270" y="174" width="230" height="44" rx="3" fill="none" stroke="#b5432f" stroke-width="1.5"/>
+    <text x="385" y="193" text-anchor="middle" font-size="12" fill="#b5432f" font-weight="600">5 come from plugins</text>
+    <text x="385" y="210" text-anchor="middle" font-size="11" fill="#b5432f">no config entry at all</text>
+
+    <line x1="500" y1="122" x2="556" y2="122" stroke="#1f7a5c" stroke-width="1.5" marker-end="url(#a1)" color="#1f7a5c"/>
+    <line x1="500" y1="196" x2="556" y2="196" stroke="#b5432f" stroke-width="1.5"/>
+
+    <rect x="558" y="100" width="290" height="44" rx="3" fill="none" stroke="#1f7a5c" stroke-width="1.5"/>
+    <text x="703" y="119" text-anchor="middle" font-size="12" fill="#1f7a5c">&ldquo;switch off&rdquo; &rarr; understood</text>
+    <text x="703" y="136" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#1f7a5c" font-weight="700">rc = 0</text>
+
+    <rect x="558" y="166" width="290" height="60" rx="3" fill="none" stroke="#b5432f" stroke-width="2"/>
+    <text x="703" y="185" text-anchor="middle" font-size="12" fill="#b5432f">&ldquo;switch off&rdquo; &rarr; invents a blank entry</text>
+    <text x="703" y="202" text-anchor="middle" font-size="12" fill="#b5432f">with no address at all</text>
+    <text x="703" y="220" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#b5432f" font-weight="700">Error: invalid transport &mdash; rc = 1</text>
+  </svg>
+  </div>
+  <figcaption>Five of the ten server names exist only because a plugin registered them.
+  Telling codex to disable a name it has no entry for makes it create an addressless one
+  &mdash; and it then rejects the whole configuration rather than skipping that line.</figcaption>
+</figure>
+</div>
+
+<div class="wrap">
+  <p>One bad name spoils the whole file. So every prose extraction dies in about three
+  seconds, before spending anything.</p>
+
+  <h2>How I know that&rsquo;s the cause</h2>
+  <p>Same command, same everything, run twice &mdash; only the list of names changed:</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>names sent</th><th>result</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>the 5 that exist in a config</td><td class="n">rc 0</td><td class="verdict ok">works</td></tr>
+      <tr><td>the 5 that don&rsquo;t</td><td class="n">rc 1</td><td class="verdict bad">invalid transport</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="cite">Both arms outside graphify, driving codex directly &mdash; so the split
+  isolates the cause rather than restating the symptom.</p>
+
+  <div class="card stop">
+    <h3>Something I got wrong first</h3>
+    <p style="color:var(--ink-soft)">My first attempt at this test reported the failing
+    combination as <em>passing</em>. It hadn&rsquo;t &mdash; I wrote the flag list into a
+    shell variable, and this shell hands that to a command as one long argument instead of
+    twenty separate ones, so none of the switches applied. The test looked clean because it
+    tested nothing. Written properly, the answer reversed.</p>
+  </div>
+</div>
+
+<div class="wrap">
+  <h2>Where that leaves us</h2>
+  <div class="card pass">
+    <h3>Not broken</h3>
+    <p style="color:var(--ink-soft)">The forked graphify. Your codex install. The hook.
+    Code extraction. The whole existing pipeline.</p>
+  </div>
+  <div class="card stop">
+    <h3>Broken</h3>
+    <p style="color:var(--ink-soft)">One tidy-up step inside the fork&rsquo;s own
+    openai-cli patch &mdash; it doesn&rsquo;t check whether the servers it&rsquo;s
+    switching off actually exist. It only ever ran with the Claude backend before, so
+    nothing had exercised this path.</p>
+  </div>
+  <p>The fix is small and it&rsquo;s in our fork: send a switch-off only for a server that
+  is really there. Everything downstream of that &mdash; including the cache question from
+  the other page &mdash; is waiting on this one line.</p>
+</div>
+
+<div class="wrap" style="margin-top:2.6rem">
+  <hr>
+  <p class="cite">Every result here was produced in the session that wrote this page: one
+  successful code-only extraction, one failing prose extraction, and a two-arm split that
+  isolates the cause. The hook&rsquo;s wording is quoted from the hook itself, not
+  paraphrased. Nothing here has had a second reviewer yet.</p>
+</div>

@@ -207,11 +207,11 @@ os = ["macos"]
 # instructions above stay correct however many bindings remain.
 [tool.graphify.fork]
 upstream = "Graphify-Labs/graphify"
-base_ref = "v0.9.49"
-base_commit = "282976b2f4066b55cf2fa346c3d5568f7ac044e2"
-pr = "#2981"
-reason = "graphify 0.9.48 and upstream v8 have no codex backend; PR #2981 adds openai-cli, which shells to the locally authenticated codex CLI"
-clears_when = "#2981 merges and ships to PyPI — then revert pyproject.toml to an == pin, point sources/graphify.manifest back at Graphify-Labs, and delete this block"
+base_ref = "v0.9.50"
+base_commit = "43d54acbfa9e731f7a592bb582c1f4b9d48ed73e"
+pr = "#2981 — CLOSED WITHOUT MERGING, measured 2026-08-25"
+reason = "upstream has no codex backend and is not getting ours: PR #2981 added openai-cli (a sibling of claude-cli that shells to the locally authenticated codex CLI) and was closed unmerged on 2026-08-25. Upstream v0.9.50 still contains ZERO mentions of openai-cli, control-armed against 23 mentions of claude-cli in the same file. This fork is where that capability lives."
+clears_when = "upstream ships an openai-cli backend of its own — NOT #2981, which is closed and will not merge (Ray's ruling, 2026-08-25: record the fork as permanent). If that ever happens: revert pyproject.toml to an == pin, point sources/graphify.manifest back at Graphify-Labs, and delete this block."
 
 [[tool.graphify.ref_binding]]
 path = "python/src/kb_setup/graphify_baseline.py"

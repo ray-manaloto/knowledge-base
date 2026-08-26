@@ -1,0 +1,512 @@
+<title>The Fork's New Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --paper:      #EFF3F2;
+    --card:       #FFFFFF;
+    --ink:        #131A19;
+    --muted:      #5A6A67;
+    --hair:       #CBD6D3;
+    --upstream:   #2E7D74;
+    --ours:       #9A7413;
+    --fail:       #A93F3C;
+    --plate:      #F6F8F7;
+    --shadow:     0 1px 2px rgba(19,26,25,.06), 0 8px 24px rgba(19,26,25,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:    #101615;
+      --card:     #171F1E;
+      --ink:      #E4EBE9;
+      --muted:    #93A5A1;
+      --hair:     #2C3A38;
+      --upstream: #6FC4B8;
+      --ours:     #D8B341;
+      --fail:     #E58A85;
+      --plate:    #1C2524;
+      --shadow:   0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:    #101615;
+    --card:     #171F1E;
+    --ink:      #E4EBE9;
+    --muted:    #93A5A1;
+    --hair:     #2C3A38;
+    --upstream: #6FC4B8;
+    --ours:     #D8B341;
+    --fail:     #E58A85;
+    --plate:    #1C2524;
+    --shadow:   0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 720px; margin: 0 auto; }
+  .wide { max-width: 940px; margin: 0 auto; }
+
+  header.masthead {
+    padding: 72px 0 40px;
+    border-bottom: 1px solid var(--hair);
+    margin-bottom: 48px;
+  }
+  .eyebrow {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: clamp(38px, 7vw, 62px);
+    line-height: 1.02;
+    letter-spacing: -.025em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-size: 20px;
+    color: var(--muted);
+    margin: 0;
+    max-width: 34em;
+  }
+
+  h2 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 27px;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+    margin: 64px 0 14px;
+  }
+  h3 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 17px;
+    letter-spacing: .01em;
+    margin: 32px 0 8px;
+  }
+  p { margin: 0 0 18px; }
+  a { color: var(--upstream); }
+
+  code, .mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: .84em;
+    font-variant-ligatures: none;
+  }
+  code {
+    background: var(--plate);
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    padding: .08em .34em;
+  }
+
+  figure {
+    margin: 34px 0 40px;
+    padding: 0;
+  }
+  .figbox {
+    background: var(--card);
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    padding: 26px 22px 18px;
+    overflow-x: auto;
+  }
+  figure svg { display: block; width: 100%; height: auto; min-width: 460px; }
+  figcaption {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--muted);
+    margin-top: 12px;
+    max-width: 46em;
+  }
+
+  .lede {
+    border-left: 3px solid var(--ours);
+    padding: 2px 0 2px 20px;
+    margin: 30px 0;
+    font-size: 19px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+    margin: 8px 0 26px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px 9px 0;
+    border-bottom: 1px solid var(--hair);
+    vertical-align: top;
+  }
+  th {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 11.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  td.num { font-variant-numeric: tabular-nums; }
+
+  .pill {
+    display: inline-block;
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 100px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .pill.pass { color: var(--upstream); }
+  .pill.fail { color: var(--fail); }
+
+  .tablescroll { overflow-x: auto; }
+
+  .note {
+    background: var(--plate);
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+    padding: 18px 20px;
+    margin: 30px 0;
+    font-size: 16px;
+  }
+  .note strong { font-family: "Archivo", system-ui, sans-serif; font-weight: 700; }
+
+  ul { padding-left: 22px; margin: 0 0 18px; }
+  li { margin-bottom: 8px; }
+
+  .provenance {
+    margin-top: 72px;
+    padding-top: 22px;
+    border-top: 1px solid var(--hair);
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .provenance h2 { font-size: 16px; margin: 0 0 10px; }
+  .provenance li { margin-bottom: 5px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a { transition: color .15s ease; }
+  }
+  a:focus-visible, :focus-visible {
+    outline: 2px solid var(--ours);
+    outline-offset: 2px;
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">graphify fork &middot; measured 2026-08-25</p>
+    <h1>The Fork&rsquo;s New Floor</h1>
+    <p class="standfirst">We keep seven patches graphify itself does not have. Upstream released a new version, so the seven had to be lifted off the old floor and set down on the new one — without losing a single one.</p>
+  </header>
+</div>
+
+<div class="wrap">
+
+  <p>Imagine you built seven rooms onto a house that sits on rented land. The landlord replaces the land underneath you with a newer, better plot. Your rooms don&rsquo;t automatically come along. You have to lift them off, set them down on the new ground, and then walk every room to check nothing was left behind.</p>
+
+  <p>That is a <strong>rebase</strong>. The land is graphify&rsquo;s official release. The seven rooms are our own commits — the ones that teach graphify to talk to the Codex CLI. Nobody else has them, so nobody else will carry them for us.</p>
+
+  <p class="lede">The whole job is: move seven, lose none, and be able to <em>prove</em> none were lost.</p>
+
+  <h2>What moved</h2>
+
+  <p>The old floor was release <strong>v0.9.49</strong>. Since then upstream shipped <strong>17 commits</strong> and cut <strong>v0.9.50</strong>. Ray named that exact commit as the new floor. Our seven were replayed one at a time onto it.</p>
+
+</div>
+
+<div class="wide">
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 300" role="img" aria-label="Seven fork commits are lifted off upstream release v0.9.49 and replayed one at a time onto v0.9.50, which sits 17 upstream commits later.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+          </marker>
+          <marker id="ar-ours" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" fill="#9A7413"/>
+          </marker>
+        </defs>
+
+        <!-- upstream trunk -->
+        <g stroke="currentColor" fill="none" opacity=".85">
+          <line x1="40" y1="215" x2="820" y2="215" stroke-width="1.5" marker-end="url(#ar)"/>
+        </g>
+        <circle cx="130" cy="215" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="600" cy="215" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+
+        <text x="130" y="245" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">v0.9.49</text>
+        <text x="130" y="262" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".65">282976b2</text>
+        <text x="130" y="279" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" fill="currentColor" opacity=".6">old floor</text>
+
+        <text x="600" y="245" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">v0.9.50</text>
+        <text x="600" y="262" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".65">43d54acb</text>
+        <text x="600" y="279" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" fill="currentColor" opacity=".6">new floor</text>
+
+        <text x="365" y="207" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" fill="currentColor" opacity=".75">17 upstream commits</text>
+        <text x="800" y="245" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" fill="currentColor" opacity=".55">upstream</text>
+
+        <!-- old stack -->
+        <g>
+          <line x1="130" y1="208" x2="130" y2="120" stroke="#9A7413" stroke-width="1.5" stroke-dasharray="3 3" opacity=".55"/>
+          <g opacity=".45">
+            <rect x="72" y="86" width="116" height="34" rx="3" fill="none" stroke="#9A7413" stroke-width="1.5"/>
+            <text x="130" y="102" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="#9A7413">our 7</text>
+            <text x="130" y="115" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#9A7413">cdfb11c0</text>
+          </g>
+          <text x="130" y="70" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" fill="currentColor" opacity=".5">before</text>
+        </g>
+
+        <!-- lift arrow -->
+        <path d="M 200 100 C 320 32, 470 32, 588 92" stroke="#9A7413" stroke-width="2" fill="none" marker-end="url(#ar-ours)"/>
+        <text x="394" y="34" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12.5" font-weight="700" fill="#9A7413">replayed, one commit at a time</text>
+
+        <!-- new stack -->
+        <g>
+          <line x1="600" y1="208" x2="600" y2="122" stroke="#9A7413" stroke-width="1.5"/>
+          <rect x="536" y="86" width="128" height="36" rx="3" fill="none" stroke="#9A7413" stroke-width="2.5"/>
+          <text x="600" y="102" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="#9A7413">our 7</text>
+          <text x="600" y="115" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#9A7413">69abe3a7</text>
+          <text x="600" y="70" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" fill="currentColor" opacity=".5">after</text>
+        </g>
+
+        <!-- conflict marker -->
+        <g>
+          <line x1="700" y1="104" x2="770" y2="104" stroke="currentColor" stroke-width="1" opacity=".45"/>
+          <text x="775" y="100" font-family="Archivo, sans-serif" font-size="11.5" fill="currentColor" opacity=".7">1 clash</text>
+          <text x="775" y="115" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity=".55">CHANGELOG</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>The seven fork commits leave the old release untouched and are re&#8209;applied on top of the new one. Only one of the seven collided with upstream&rsquo;s own edits, and only in <code>CHANGELOG.md</code> — every source file merged cleanly.</figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <h2>The one thing that clashed</h2>
+
+  <p>Upstream wrote a <code>0.9.50</code> section at the top of the changelog. One of our commits had renamed the same heading to <code>## Unreleased</code>. Git could not guess which one we wanted, so it stopped and asked.</p>
+
+  <p>The resolution keeps <em>both</em>: upstream&rsquo;s changelog verbatim, with our entries carried above it under <code>## Unreleased</code>. That also quietly restored 25 lines of upstream&rsquo;s <code>0.9.49</code> notes that the fork had deleted by accident when it renamed the heading.</p>
+
+  <h2>How we know nothing was lost</h2>
+
+  <p>Here is the trap. After a rebase, the code <em>looks</em> fine and the version number reads <code>0.9.50</code> — exactly what plain upstream reads. <strong>The version string cannot tell you whether our patches survived.</strong> It never could; it moves when upstream releases, not when we patch.</p>
+
+  <p>So the check has to be a test that can come back <em>both</em> ways. Four test files ship with our seven commits. Run them against our rebased fork — they should pass. Run the identical four against plain upstream, with none of our patches — they should fail. If they pass in both places, the test is measuring nothing.</p>
+
+</div>
+
+<div class="wide">
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="The same four test files run against two sources: the rebased fork, where 48 tests pass, and plain upstream v0.9.50, where all four files fail or error. The test therefore discriminates.">
+        <defs>
+          <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- the shared test files -->
+        <rect x="330" y="98" width="220" height="54" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="440" y="121" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">the same 4 test files</text>
+        <text x="440" y="139" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11.5" fill="currentColor" opacity=".65">byte-identical in both runs</text>
+
+        <!-- left: fork -->
+        <rect x="34" y="42" width="196" height="58" rx="3" fill="none" stroke="#9A7413" stroke-width="2"/>
+        <text x="132" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="#9A7413">rebased fork</text>
+        <text x="132" y="85" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11.5" fill="#9A7413" opacity=".8">7 patches present</text>
+
+        <path d="M 234 74 C 290 74, 300 112, 326 118" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#ar2)"/>
+        <text x="272" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11.5" fill="currentColor" opacity=".7">run against</text>
+
+        <rect x="34" y="150" width="196" height="56" rx="3" fill="none" stroke="#2E7D74" stroke-width="2.5"/>
+        <text x="132" y="174" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="#2E7D74">48 passed</text>
+        <text x="132" y="192" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11.5" fill="#2E7D74" opacity=".85">exit 0</text>
+        <line x1="132" y1="102" x2="132" y2="146" stroke="#2E7D74" stroke-width="1.5" marker-end="url(#ar2)" opacity=".7"/>
+
+        <!-- right: upstream -->
+        <rect x="650" y="42" width="196" height="58" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="748" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">plain v0.9.50</text>
+        <text x="748" y="85" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11.5" fill="currentColor" opacity=".7">0 patches present</text>
+
+        <path d="M 646 74 C 590 74, 580 112, 554 118" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#ar2)"/>
+        <text x="608" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11.5" fill="currentColor" opacity=".7">run against</text>
+
+        <rect x="650" y="150" width="196" height="56" rx="3" fill="none" stroke="#A93F3C" stroke-width="2.5"/>
+        <text x="748" y="174" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="#A93F3C">4 of 4 fail</text>
+        <text x="748" y="192" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11.5" fill="#A93F3C" opacity=".85">exit 1, 1, 2, 1</text>
+        <line x1="748" y1="102" x2="748" y2="146" stroke="#A93F3C" stroke-width="1.5" marker-end="url(#ar2)" opacity=".7"/>
+
+        <text x="440" y="196" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12.5" font-weight="700" fill="currentColor">two different answers &rArr; the test is real</text>
+      </svg>
+    </div>
+    <figcaption>The control arm. A test suite that only ever passes proves nothing; running the identical files against a source with the patches removed is what makes the green result evidence. Both runs were executed this session.</figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <div class="tablescroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Test file</th>
+          <th>On the rebased fork</th>
+          <th>On plain upstream</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">test_openai_cli_backend</td>
+          <td><span class="pill pass">pass</span></td>
+          <td><span class="pill fail">fail &middot; rc 1</span></td>
+        </tr>
+        <tr>
+          <td class="mono">test_fallback_backend</td>
+          <td><span class="pill pass">pass</span></td>
+          <td><span class="pill fail">fail &middot; rc 1</span></td>
+        </tr>
+        <tr>
+          <td class="mono">test_watch_semantic</td>
+          <td><span class="pill pass">pass</span></td>
+          <td><span class="pill fail">import error &middot; rc 2</span></td>
+        </tr>
+        <tr>
+          <td class="mono">test_batched_push</td>
+          <td><span class="pill pass">pass</span></td>
+          <td><span class="pill fail">fail &middot; rc 1</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>A second, independent check backs this up: the code the seven commits add is <em>the same size</em> before and after the move. Diffing old&#8209;base&#8209;to&#8209;old&#8209;tip against new&#8209;base&#8209;to&#8209;new&#8209;tip, with the changelog excluded, gives an identical line count. Nothing was dropped in the replay.</p>
+
+  <div class="note">
+    <strong>New this session, and it changes the fork&rsquo;s status.</strong> The upstream pull request that would have made this fork unnecessary — <code>#2981</code> — is now <em>closed without being merged</em>. Upstream v0.9.50 still contains zero mentions of <code>openai-cli</code> (control arm: 23 mentions of <code>claude-cli</code> in the same file, so the search works). The fork is no longer a temporary bridge waiting for a merge. It is where this capability lives.
+  </div>
+
+  <h2>The last step, and why it waited</h2>
+
+  <p>The rebase is done and pushed, the MCP fix landed on top of it as an eighth commit, and the pin has now moved with it. That last step was held back deliberately until the fix was in: the pin lives in <strong>eight</strong> places and they have to move in one commit, or some surface keeps describing code we no longer run.</p>
+
+  <div class="note">
+    <strong>Revised twice after publication, 2026&#8209;08&#8209;25.</strong> First: the eighth commit, pending and dashed when this page went up, landed as <em>only disable MCP servers Codex can actually resolve</em> — then grew a third round (validating the assembled override set, not just its parts) and was folded into <code>0a2eb5fd</code>, 15 tests green in four orders. Second: <strong>the pin has now moved</strong>, in commit <code>66a7e1fc</code> — so the sentence below that said it had not is superseded, and the figure&rsquo;s three boxes are done rather than pending. <strong>The pass count also moved:</strong> this page said 38, which was true of the seven-commit state it described and became false the moment the eighth commit added ten tests. Re-measured at the pinned commit, it is 48. <strong>One SHA on this page changed identity:</strong> the eighth commit was published here as <code>825b8fb4</code> and then amended to fold in the third round, so that hash no longer exists in any repository — it is <code>0a2eb5fd</code>. If you copied the old one, that is why it resolves to nothing.
+    <br><br>
+    Two corrections the reader should have, because the original page understated both. It was <strong>eight</strong> surfaces, not three — <code>uv.lock</code>, the deterministic baseline&rsquo;s accepted constants, the disposition catalog, and the generated skill stamp all carry the same pin. And <code>pyproject.toml</code>&rsquo;s <em>version</em> had to move too, not just the git rev: upstream&rsquo;s own bump made the fork report 0.9.50, so the old <code>==0.9.49</code> would not have resolved. The rebase account above was correct as published and is unchanged.
+  </div>
+
+</div>
+
+<div class="wide">
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 210" role="img" aria-label="The eighth fork commit, the MCP fix, had to land before the pin moved; the pin was then written into eight surfaces together, of which the source manifest, pyproject.toml and currency.toml are three.">
+        <defs>
+          <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <rect x="30" y="76" width="182" height="56" rx="3" fill="none" stroke="#9A7413" stroke-width="2.5"/>
+        <text x="121" y="99" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="#9A7413">new fork tip</text>
+        <text x="121" y="118" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#9A7413">69abe3a7</text>
+
+        <!-- the 8th commit, now landed -->
+        <rect x="262" y="76" width="176" height="56" rx="3" fill="none" stroke="#9A7413" stroke-width="2.5"/>
+        <text x="350" y="99" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="#9A7413">8th commit</text>
+        <text x="350" y="118" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#9A7413">0a2eb5fd — the MCP fix</text>
+
+        <line x1="216" y1="104" x2="256" y2="104" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+        <line x1="442" y1="104" x2="516" y2="104" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+        <text x="479" y="94" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" fill="currentColor" opacity=".65">then pin</text>
+
+        <!-- the three pin sites -->
+        <rect x="524" y="18" width="326" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text x="540" y="45" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">sources/graphify.manifest</text>
+
+        <rect x="524" y="82" width="326" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text x="540" y="109" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">pyproject.toml</text>
+
+        <rect x="524" y="146" width="326" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text x="540" y="166" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">currency.toml</text>
+        <text x="540" y="182" font-family="Archivo, sans-serif" font-size="10.5" fill="currentColor" opacity=".65">ref_binding rows</text>
+
+        <path d="M 516 100 C 516 40, 516 40, 520 40" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#ar3)" opacity=".8"/>
+        <path d="M 516 104 L 520 104" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#ar3)" opacity=".8"/>
+        <path d="M 516 108 C 516 168, 516 168, 520 168" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#ar3)" opacity=".8"/>
+
+        <text x="687" y="208" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="currentColor">one pin, three files — they move in the same commit</text>
+      </svg>
+    </div>
+    <figcaption>The MCP fix that unblocks every Codex&#8209;backed extraction landed as the eighth commit, <code>0a2eb5fd</code>, and the pin followed it in <code>66a7e1fc</code>. Three sites are drawn here; there turned out to be <strong>eight</strong>, and they moved in one commit. Splitting them is how a surface ends up describing code nobody runs.</figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <h2>The state, in one table</h2>
+
+  <div class="tablescroll">
+    <table>
+      <thead>
+        <tr><th>Thing</th><th>Value</th><th>Read from</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Old base</td><td class="mono">282976b2 &middot; v0.9.49</td><td>manifest + <code>gh api</code> tags</td></tr>
+        <tr><td>New base</td><td class="mono">43d54acb &middot; v0.9.50</td><td>Ray; confirmed = <code>v8</code> HEAD</td></tr>
+        <tr><td>Upstream commits between them</td><td class="num">17</td><td><code>gh api</code> compare</td></tr>
+        <tr><td>Our commits replayed</td><td class="num">7 of 7</td><td><code>git rev-list --count</code></td></tr>
+        <tr><td>Conflicts</td><td class="num">1, changelog only</td><td>rebase log</td></tr>
+        <tr><td>Fork tip after the rebase</td><td class="mono">69abe3a7db37e8d7&hellip;</td><td><code>git rev-parse HEAD</code></td></tr>
+        <tr><td>8th commit &mdash; the MCP fix</td><td class="mono">0a2eb5fdd3110b82&hellip;</td><td><code>git rev-parse HEAD</code>, after</td></tr>
+        <tr><td>Tests on that commit</td><td class="num">11 fwd + 11 reversed</td><td><code>pytest</code>, both orders</td></tr>
+        <tr><td>Branch pushed</td><td class="mono">kb-pin/openai-cli-backend-v0.9.50</td><td><code>gh api</code> branches</td></tr>
+        <tr><td>Old branch</td><td>intact, untouched</td><td><code>gh api</code> branches</td></tr>
+        <tr><td>Pin advanced?</td><td><span class="pill pass">yes &middot; 8 surfaces</span></td><td><code>66a7e1fc</code></td></tr>
+        <tr><td>Runtime actually installed</td><td class="mono">0.9.50 @ 0a2eb5fd</td><td><code>direct_url.json</code></td></tr>
+        <tr><td>Baseline re-derived</td><td class="num">452 detected / 444 extracted</td><td><code>kb-graphify-baseline build</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="provenance">
+    <h2>Provenance</h2>
+    <p>Every figure on this page was measured on 2026&#8209;08&#8209;25 in the session that performed the rebase. Nothing here is inherited from a prior session&rsquo;s notes.</p>
+    <ul>
+      <li>Commit counts and the diff&#8209;size equivalence: <code>git</code> in a fresh full clone of the fork, not the repo&rsquo;s shallow gitignored copy.</li>
+      <li>Base identity, tag mapping, and pull&#8209;request state: <code>gh api</code> against <code>Graphify-Labs/graphify</code>.</li>
+      <li>Test results: <code>pytest</code>, both arms, exit codes read directly rather than through a pipe.</li>
+      <li>Presence of <code>openai-cli</code> upstream: content search with a <code>claude-cli</code> control arm, so a zero result is an answer rather than a broken search.</li>
+    </ul>
+  </div>
+
+</div>

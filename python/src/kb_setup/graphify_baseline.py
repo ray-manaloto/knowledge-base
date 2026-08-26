@@ -240,12 +240,12 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.49"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.50"
 # FORKED 2026-08-24: this names WHAT RUNS, so it followed the pin onto the fork
 # (`currency.toml` binds it with `tracks = "manifest"`). Contrast the semantic
 # corpus/slice constants, which are snapshot identities of completed runs and
 # correctly hold at the upstream base `v0.9.48`.
-_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.49"
+_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.50"
 
 #: The public spelling of the version above, for the ONE cross-module consumer:
 #: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
@@ -296,14 +296,14 @@ _ACCEPTED_RUNTIME_HASHES = {
     # STRONGER identity — a wheel hash names a built artifact, a resolved
     # commit names the source tree it was built from. Reverts to the wheel/sdist
     # pair when #2981 merges and the pin returns to PyPI.
-    "git_commit": "cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8",
+    "git_commit": "0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8",
-    source_tree="a9cc5fde41d669af21e7a9685eb8c6af6d4cd450",
-    catalog_sha256="aafca9d6eca4c964fa1afdf2e4de50a08f494769cf9bd2f3a7eb43cee3abed8a",
-    source_manifest_sha256="bcc3a0d09536207c78dc2275df631e73a8e5ae7cbe42d31fa9b5114463b8e5bd",
+    source_commit="0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956",
+    source_tree="38f958e839905df52ca48d799054e27dff95dab3",
+    catalog_sha256="dddef4925e07b2d7a018c245278fb19a24548243ebc098080eb1acdb9efb50b7",
+    source_manifest_sha256="8dda1b70d234943e3061f303f352945c3b153da382e231a2566b5c27339d7ffc",
     # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
     # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
     # RE-DERIVED by a real build against the installed 0.9.47, never carried
@@ -326,7 +326,7 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # ACCEPTED for every drifted key (#373). Before that it named the key only
     # and deleted its output, so the build could not tell you what to move the
     # constants to while refusing to run until you had.
-    detected_count=450,
+    detected_count=452,
     # FORKED 2026-08-24, then REBASED onto upstream v0.9.49 the same day:
     # 429 -> 450 detected, 421 -> 442 extracted. RE-DERIVED
     # by a real `kb-graphify-baseline build` against the INSTALLED fork, never
@@ -340,7 +340,27 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # UNCHANGED at 8 and no warning was emitted. A fork that changed the gap
     # would mean it changed EXTRACTION behaviour, which is the thing a
     # backend-only addition must not do.
-    extracted_count=442,
+    # REBASED 2026-08-25 onto upstream v0.9.50, plus an eighth fork commit:
+    # 450 -> 452 detected, 442 -> 444 extracted. RE-DERIVED by a real
+    # `kb-graphify-baseline build` against the INSTALLED fork, never carried
+    # forward — the same run reproduced `source_tree` independently, which is
+    # what makes these counts a measurement rather than an inheritance.
+    #
+    # The +2/+2 is ACCOUNTED FOR rather than assumed:
+    # `compare/282976b2...43d54acb` lists exactly TWO added files,
+    # `tests/test_csharp_enum_members.py` and
+    # `tests/test_typescript_enum_members.py` — ordinary supported source, so
+    # neither needed a disposition entry. Nothing was removed. The gap between
+    # the two counts is UNCHANGED at 8: our eighth commit is backend-only and a
+    # backend-only change must not move extraction behaviour.
+    #
+    # ONE catalog entry moved, again `uv.lock` (upstream f725eec synced it for
+    # the postgres tree-sitter-sql extra), out of the catalog's 20.
+    #
+    # All three drifted authority values came from the build's own OBSERVED vs
+    # ACCEPTED diagnostic (#373) rather than a hand derivation — which is the
+    # thing that note says it exists to prevent, and it worked.
+    extracted_count=444,
 )
 # The ignored-path control's fixture: an UNTRACKED file under a directory the
 # pinned source's own `.gitignore` matches. Untracked is load-bearing.
