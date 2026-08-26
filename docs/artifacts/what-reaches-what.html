@@ -464,31 +464,44 @@
       <span class="where">All but one; <code>kb-query</code> verification leaves no artifact, so it is UNKNOWN rather than done</span></span></li>
     <li><span class="box done">✓</span><span class="what">3 &mdash; Did we generate every artifact?
       <span class="where">7 of 8; <code>svg</code> is a designed skip, control-armed against the aggregate graph</span></span></li>
-    <li><span class="box part">◐</span><span class="what">4 &mdash; How could tree-sitter AST and the ty LSP help?
-      <span class="where">The mechanism is drawn above — an LSP crosses the function boundary an AST pass cannot. Full write-up pending</span></span></li>
+    <li><span class="box done">✓</span><span class="what">4 &mdash; How could tree-sitter AST and the ty LSP help?
+      <span class="where">Answered on its own page, <em>What the AST Cannot See</em> — and <code>ty</code> ships call &amp; type hierarchy natively at the version already pinned here</span></span></li>
     <li><span class="box done">✓</span><span class="what">5 &mdash; Name every use of the /graphify skill, SDK, CLI, and our modules
       <span class="where">Ledger reported each turn; the skill remains un-invoked and is named as owed</span></span></li>
     <li><span class="box part">◐</span><span class="what">6 &mdash; Artifact mapping each graphify command through the chain
       <span class="where">This page. Generated-from-graph version pending the extractor</span></span></li>
     <li><span class="box done">✓</span><span class="what">7 &mdash; Find the history of the earlier diagram work
       <span class="where">Found: three prototypes, 11 research reports, 3 open epics, 5 handoffs carrying it</span></span></li>
-    <li><span class="box open">○</span><span class="what">8 &mdash; File issues for anything discovered without one
-      <span class="where">Candidates identified; filing pending</span></span></li>
+    <li><span class="box done">✓</span><span class="what">8 &mdash; File issues for anything discovered without one
+      <span class="where">Six filed — #518 #519 #520 #521 #522 #523 — plus #478 connected to its fix, #436 closed, #370 and #435 commented</span></span></li>
     <li><span class="box done">✓</span><span class="what">9 &mdash; A numbered checkbox list of every question
       <span class="where">This list</span></span></li>
     <li><span class="box open">○</span><span class="what">10 &mdash; A codex lane reviewing instruction compliance
       <span class="where">Scoped: prompt + diff + artifacts → docs/review/, three numbered lists</span></span></li>
     <li><span class="box done">✓</span><span class="what">11 &mdash; Run /grilling until shared understanding
       <span class="where">Five rounds, 20 decisions settled</span></span></li>
-    <li><span class="box part">◐</span><span class="what">12 &mdash; Which diagram tools are prototyped, pending, eliminated?
-      <span class="where">Three prototyped with output on disk; the never-evaluated list is still being swept</span></span></li>
+    <li><span class="box done">✓</span><span class="what">12 &mdash; Which diagram tools are prototyped, pending, eliminated?
+      <span class="where">38 candidates surveyed on its own page — 16 eliminated, 10 evaluated only, 6 pending, 6 actually run</span></span></li>
     <li><span class="box done">✓</span><span class="what">13 &mdash; Is the output style working? Build a skill for it
       <span class="where">Style works; compliance was 1 in 5. Skill built, linted, mirrored, live</span></span></li>
     <li><span class="box done">✓</span><span class="what">14 &mdash; Research how to get past the size gate
       <span class="where">Measured; 3 of 5 candidate options refuted, telemetry sized from a real 2,610-byte record</span></span></li>
     <li><span class="box part">◐</span><span class="what">15 &mdash; Re-run deep extraction on another backend when tokens deplete
-      <span class="where">Feasible and partly built upstream — but the cache is backend-blind, which needs a decision first</span></span></li>
+      <span class="where">The vehicle is live and armed on both backends; graphify ships <code>--fallback-backend</code>. Blocked on #518 — the cache is backend-blind</span></span></li>
   </ul>
+
+  <div class="panel" style="margin-top:1.4rem">
+    <h3>Updated after publication &mdash; 2026-08-26</h3>
+    <p style="color:var(--ink-soft)">Items <strong>4</strong>, <strong>8</strong>
+    and <strong>12</strong> were open when this page first went up and are now
+    answered; <strong>15</strong> moved from feasible-in-principle to
+    vehicle-live-but-blocked. Recorded rather than silently overwritten, because
+    a checklist someone has already read is a claim they may have acted on.</p>
+    <p style="color:var(--ink-soft)">Item <strong>10</strong> is the one that
+    genuinely has not moved. And item <strong>5</strong>'s honest answer got worse
+    rather than better: the <code>/graphify</code> skill is <em>still</em>
+    un-invoked, which is now a thing this page has said twice.</p>
+  </div>
 </div>
 
 <div class="col" style="margin-top:2.4rem">
