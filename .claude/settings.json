@@ -81,6 +81,7 @@
     "antigravity@antigravity-for-claude-code": true,
     "astral@astral-sh": true,
     "mattpocock-skills@mattpocock": true,
+    "plugin-dev@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
