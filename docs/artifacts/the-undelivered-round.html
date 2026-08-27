@@ -179,6 +179,33 @@
     padding: 1.5rem 1rem;
     overflow-x: auto;
   }
+  /* Mermaid renders its own SVG and does NOT inherit the container's theme, so a
+     dark-mode viewer got black-on-black. Forced light plate + forced dark ink in
+     BOTH themes; the init themeVariables alone did not reach edge labels,
+     cluster titles or sequence actors. Reported by a viewer, 2026-08-27. */
+  .mermaid svg { background: #ffffff !important; max-width: 100%; height: auto; }
+  .mermaid svg text,
+  .mermaid svg .nodeLabel,
+  .mermaid svg .edgeLabel,
+  .mermaid svg .cluster-label,
+  .mermaid svg .messageText,
+  .mermaid svg .labelText,
+  .mermaid svg .loopText,
+  .mermaid svg .noteText,
+  .mermaid svg .actor-line + text,
+  .mermaid svg .sequenceNumber { fill: #1b1b1b !important; color: #1b1b1b !important; }
+  .mermaid svg .edgeLabel rect,
+  .mermaid svg .label-container,
+  .mermaid svg rect.actor { fill: #f4f4f6 !important; stroke: #8d8d94 !important; }
+  .mermaid svg .cluster rect { fill: #fafafa !important; stroke: #b8b8be !important; }
+  .mermaid svg .edgePath path,
+  .mermaid svg line,
+  .mermaid svg .messageLine0,
+  .mermaid svg .messageLine1,
+  .mermaid svg .actor-line { stroke: #4a4a4a !important; }
+  .mermaid svg marker path,
+  .mermaid svg .arrowheadPath { fill: #4a4a4a !important; stroke: #4a4a4a !important; }
+
 
   .pull {
     border-left: 2px solid var(--work);
@@ -337,7 +364,7 @@
   </p>
 
   <figure>
-    <div class="mermaid">
+    <pre class="mermaid">
 %%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#eef2f6','primaryTextColor':'#141b24','primaryBorderColor':'#8a99ab','lineColor':'#59677a','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
 flowchart LR
   A["Claude architect"] -->|"dispatch spec"| B["codex lane"]
@@ -345,7 +372,7 @@ flowchart LR
   B -.->|"notification<br/>ARRIVES LATE OR NEVER"| A
   A -->|"waits on the dotted arrow"| A
   C -.->|"nobody reads it until asked"| A
-    </div>
+    </pre>
     <figcaption>
       Today. The solid path always works; the dotted path is what the architect
       blocks on. Three recorded failure classes all live on that one dotted arrow.
@@ -425,7 +452,7 @@ flowchart LR
   </div>
 
   <figure>
-    <div class="mermaid">
+    <pre class="mermaid">
 %%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#e2eff1','primaryTextColor':'#141b24','primaryBorderColor':'#0e6f80','lineColor':'#0e6f80','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
 flowchart LR
   A["Claude architect"] -->|"spec + --output-schema"| B["codex lane"]
@@ -433,7 +460,7 @@ flowchart LR
   A -->|"POLLS for the sentinel"| C
   C -->|"validated object,<br/>not prose"| A
   B -.->|"notification: nice to have"| A
-    </div>
+    </pre>
     <figcaption>
       After. The architect waits on the durable path, and the notification becomes
       an optimisation rather than a dependency. The one arrow that changed direction

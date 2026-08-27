@@ -96,19 +96,79 @@ near-misses and why they lose:
 
 ## Diagram tooling
 
-Artifacts render **mermaid natively** — `<pre class="mermaid">` in HTML. Use it
-for flowcharts, dependency graphs, sequence and state diagrams; it is the right
-tool and far less error-prone than hand-authored SVG for those shapes.
+Artifacts render **mermaid natively**. Use it for flowcharts, dependency graphs,
+sequence and state diagrams; it is the right tool and far less error-prone than
+hand-authored SVG for those shapes.
 
-Two mechanics that are easy to get wrong:
+**Mermaid has broken twice here, both times silently, and both fixes are
+mechanical. Copy the two blocks below rather than reasoning about them.**
 
-- **Pin a light plate under every mermaid block.** Mermaid draws with its own
-  palette and renders dark-on-dark for a viewer in dark mode. Give `.mermaid` an
-  explicit light background token that stays light in *both* themes, or theme it
-  via `%%{init: {'theme':'base','themeVariables':{…}}}%%`.
-- Hand-author inline SVG only where the shape is a genuine comparison figure
-  mermaid cannot express. Then `artifact-diagramming`'s rules apply in full:
-  `viewBox`, `currentColor`, `<figure>` + `<figcaption>`, `role="img"`.
+### 1. The element is `<pre>`. Never `<div>`
+
+```html
+<pre class="mermaid">
+flowchart LR
+  A --> B
+</pre>
+```
+
+`<div class="mermaid">` renders **nothing at all** — `div` collapses the
+whitespace mermaid's grammar depends on. Reported by Ray as *"visual is not
+working"* on two figures, 2026-08-27.
+
+This section already said `<pre>` in plain text and **three pages were authored
+with `<div>` anyway**, plus two earlier pages that had been broken since
+publication and nobody noticed. Armed at the time: 13 tracked artifacts used
+`<pre>` correctly against 5 using `<div>` — the repo's own precedent was right
+and the author broke it. That is why the rule is now a copyable block and not a
+sentence: a norm you must retype is a norm you will retype wrong.
+
+### 2. `%%{init}%%` is NOT enough. Force the plate in CSS
+
+Getting the element right only makes the diagram *render*. Mermaid then draws
+its own SVG that **does not inherit the container's theme**, and
+`themeVariables` reaches node fills but **not** edge labels, cluster titles or
+sequence actors — those keep mermaid's own dark ink and vanish on a dark ground.
+Ray, on the very next revision: *"this is hard to see with black background and
+black text."*
+
+Ship this beside every `.mermaid` rule, verbatim:
+
+```css
+.mermaid svg { background: #ffffff !important; max-width: 100%; height: auto; }
+.mermaid svg text,
+.mermaid svg .nodeLabel, .mermaid svg .edgeLabel, .mermaid svg .cluster-label,
+.mermaid svg .messageText, .mermaid svg .labelText, .mermaid svg .loopText,
+.mermaid svg .noteText, .mermaid svg .sequenceNumber { fill: #1b1b1b !important; color: #1b1b1b !important; }
+.mermaid svg .edgeLabel rect, .mermaid svg .label-container,
+.mermaid svg rect.actor { fill: #f4f4f6 !important; stroke: #8d8d94 !important; }
+.mermaid svg .cluster rect { fill: #fafafa !important; stroke: #b8b8be !important; }
+.mermaid svg .edgePath path, .mermaid svg line,
+.mermaid svg .messageLine0, .mermaid svg .messageLine1,
+.mermaid svg .actor-line { stroke: #4a4a4a !important; }
+.mermaid svg marker path, .mermaid svg .arrowheadPath { fill: #4a4a4a !important; stroke: #4a4a4a !important; }
+```
+
+Keep the `%%{init: {'theme':'base','themeVariables':{…}}}%%` header too — it
+still sets node fills to your palette. The CSS is the backstop for everything it
+misses, and it is deliberately `!important` and theme-independent: the plate
+stays light in **both** themes, so there is no dark-mode arm to get wrong.
+
+### 3. A publish result is not evidence the diagram rendered
+
+**Nothing in the publish output tells you a mermaid block parsed.** Both defects
+above shipped green and were caught only because a human opened the page. So
+after publishing a page with a diagram on it, **say so and ask** — one line is
+enough: *"reload and tell me if the diagrams render."* Do not report a diagram
+page as done on the strength of a successful publish.
+
+### Inline SVG
+
+Hand-author it only where the shape is a genuine comparison figure mermaid
+cannot express. Then `artifact-diagramming`'s rules apply in full: `viewBox`,
+`currentColor`, `<figure>` + `<figcaption>`, `role="img"`. Inline SVG has none of
+mermaid's theme problem — it inherits `currentColor` — which is a real reason to
+prefer it for a small figure.
 
 ## Persistence — the part that is usually skipped
 

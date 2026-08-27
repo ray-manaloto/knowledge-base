@@ -1,0 +1,593 @@
+<title>Aggregated Research, Assembled</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&display=swap">
+
+<style>
+  :root {
+    --ground:   #f0eeec;
+    --panel:    #fbfaf9;
+    --ink:      #221d1b;
+    --muted:    #6b615d;
+    --hair:     #d8d2ce;
+    --brick:    #9e3b26;
+    --brick-bg: #f6e2dc;
+    --steel:    #3a5f7d;
+    --steel-bg: #dde7ee;
+    --plate:    #ffffff;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #171413;
+      --panel:    #211c1a;
+      --ink:      #efe9e6;
+      --muted:    #a2948e;
+      --hair:     #362e2b;
+      --brick:    #e08063;
+      --brick-bg: #3b201a;
+      --steel:    #7fa9c6;
+      --steel-bg: #1a2b36;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #171413;
+    --panel:    #211c1a;
+    --ink:      #efe9e6;
+    --muted:    #a2948e;
+    --hair:     #362e2b;
+    --brick:    #e08063;
+    --brick-bg: #3b201a;
+    --steel:    #7fa9c6;
+    --steel-bg: #1a2b36;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Atkinson Hyperlegible", system-ui, sans-serif;
+    font-size: 1rem;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 1.25rem 6rem;
+  }
+
+  .wrap  { max-width: 43rem; margin: 0 auto; }
+  .bleed { max-width: 62rem; margin: 0 auto; }
+
+  header { padding: 4.5rem 0 0; }
+
+  .eyebrow {
+    font-family: "Space Mono", monospace;
+    font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--brick); margin: 0 0 1rem;
+  }
+
+  h1 {
+    font-family: "DM Serif Display", Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(2.4rem, 7vw, 3.9rem);
+    line-height: 1.02;
+    text-wrap: balance;
+    margin: 0 0 1rem;
+  }
+
+  h2 {
+    font-family: "DM Serif Display", Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(1.5rem, 3.4vw, 1.95rem);
+    line-height: 1.14;
+    text-wrap: balance;
+    margin: 3.4rem 0 0.8rem;
+  }
+
+  h3 {
+    font-family: "Space Mono", monospace;
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 2rem 0 0.5rem;
+  }
+
+  .standfirst {
+    font-size: 1.16rem; line-height: 1.5; color: var(--muted);
+    margin: 0 0 2.2rem; text-wrap: pretty;
+  }
+
+  p { margin: 0 0 1rem; }
+  strong { font-weight: 700; }
+
+  code {
+    font-family: "Space Mono", monospace;
+    font-size: 0.82em;
+    background: var(--panel);
+    border: 1px solid var(--hair);
+    padding: 0.05em 0.28em;
+    border-radius: 2px;
+  }
+
+  hr.rule { border: 0; border-top: 1px solid var(--hair); margin: 3.2rem 0 0; }
+
+  figure { margin: 2.3rem 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-family: "Space Mono", monospace;
+    font-size: 0.71rem; line-height: 1.6;
+    color: var(--muted); margin-top: 0.8rem;
+  }
+
+  .scroll { overflow-x: auto; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; margin: 0.3rem 0 1.3rem; }
+  th, td { text-align: left; padding: 0.46rem 0.8rem 0.46rem 0; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  th {
+    font-family: "Space Mono", monospace;
+    font-size: 0.64rem; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--muted); font-weight: 400; white-space: nowrap;
+  }
+  td.m { font-family: "Space Mono", monospace; font-size: 0.82em; white-space: nowrap; }
+
+  .pill {
+    display: inline-block; font-family: "Space Mono", monospace;
+    font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 0.12em 0.42em; border-radius: 2px; white-space: nowrap;
+  }
+  .p-in  { background: var(--steel-bg); color: var(--steel); }
+  .p-new { background: var(--brick-bg); color: var(--brick); }
+  .p-ask { background: var(--panel);    color: var(--muted); border: 1px solid var(--hair); }
+
+  .mermaid {
+    background: var(--plate);
+    color: #221d1b;
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    padding: 1.4rem 1rem;
+    overflow-x: auto;
+  }
+  /* Mermaid renders its own SVG and does NOT inherit the container's theme, so a
+     dark-mode viewer got black-on-black. Forced light plate + forced dark ink in
+     BOTH themes; the init themeVariables alone did not reach edge labels,
+     cluster titles or sequence actors. Reported by a viewer, 2026-08-27. */
+  .mermaid svg { background: #ffffff !important; max-width: 100%; height: auto; }
+  .mermaid svg text,
+  .mermaid svg .nodeLabel,
+  .mermaid svg .edgeLabel,
+  .mermaid svg .cluster-label,
+  .mermaid svg .messageText,
+  .mermaid svg .labelText,
+  .mermaid svg .loopText,
+  .mermaid svg .noteText,
+  .mermaid svg .actor-line + text,
+  .mermaid svg .sequenceNumber { fill: #1b1b1b !important; color: #1b1b1b !important; }
+  .mermaid svg .edgeLabel rect,
+  .mermaid svg .label-container,
+  .mermaid svg rect.actor { fill: #f4f4f6 !important; stroke: #8d8d94 !important; }
+  .mermaid svg .cluster rect { fill: #fafafa !important; stroke: #b8b8be !important; }
+  .mermaid svg .edgePath path,
+  .mermaid svg line,
+  .mermaid svg .messageLine0,
+  .mermaid svg .messageLine1,
+  .mermaid svg .actor-line { stroke: #4a4a4a !important; }
+  .mermaid svg marker path,
+  .mermaid svg .arrowheadPath { fill: #4a4a4a !important; stroke: #4a4a4a !important; }
+
+
+  .callout {
+    background: var(--panel);
+    border: 1px solid var(--hair);
+    border-left: 3px solid var(--brick);
+    padding: 1rem 1.2rem;
+    margin: 1.6rem 0;
+    font-size: 0.95rem;
+  }
+  .callout h3 { margin-top: 0; color: var(--brick); }
+
+  .cites div {
+    font-family: "Space Mono", monospace;
+    font-size: 0.69rem; line-height: 1.62;
+    color: var(--muted); padding: 0.38rem 0;
+    border-bottom: 1px solid var(--hair);
+  }
+
+  a { color: var(--brick); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--brick); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">knowledge-base &middot; the plugin, part by part</p>
+    <h1>Aggregated Research, Assembled</h1>
+    <p class="standfirst">
+      Every component, what it is, what it depends on, and the exact path one
+      question takes through all of them. Nothing here is installed yet except
+      what is marked as already present.
+    </p>
+  </header>
+
+  <p>
+    <code>aggregated-research</code> stops being a skill in this repo and becomes a
+    <strong>plugin</strong> — one that composes tools it does not own. It ships the
+    ordering, the control-arm discipline and four new wrappers; it
+    <strong>declares</strong> the search surfaces as dependencies rather than
+    vendoring them.
+  </p>
+
+  <p>
+    That composition is possible because the marketplace schema supports it, which
+    was the fact that settled the design:
+    <code>plugin.dependencies</code> &mdash; <em>&ldquo;Plugins that must be enabled
+    for this plugin to function&rdquo;</em> &mdash; plus
+    <code>allowCrossMarketplaceDependenciesOn</code>, <em>&ldquo;marketplace names
+    whose plugins may be auto-installed as dependencies. Only the root
+    marketplace's allowlist applies &mdash; no transitive trust.&rdquo;</em>
+  </p>
+</div>
+
+<div class="bleed">
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#f4f1ef','primaryTextColor':'#221d1b','primaryBorderColor':'#9b8f8a','lineColor':'#6b615d','fontFamily':'Space Mono, monospace','fontSize':'12px'}}}%%
+flowchart TB
+  subgraph OURS["ray-manaloto/claude-code-marketplace"]
+    P["aggregated-research<br/><i>the plugin</i>"]
+    SK["skills/aggregated-research<br/>the ORDERING + the arm rule"]
+    AG["agents/<br/>arm-verifier · synthesist"]
+    CM["commands/<br/>/research"]
+    P --> SK
+    P --> AG
+    P --> CM
+  end
+
+  subgraph DEPS["declared dependencies — auto-installed"]
+    L["last30days@last30days-skill"]
+    F["firecrawl@firecrawl"]
+    E["exa@exa"]
+    C["context7@context7-marketplace"]
+  end
+
+  subgraph OWNED["kb-research — our uv package"]
+    M1["links → lychee"]
+    M2["packages → deps.dev"]
+    M3["codesearch → grep.app"]
+    M4["pkgsource → Chroma"]
+  end
+
+  subgraph HOST["already on the host"]
+    G["graphify → the corpus graph"]
+    GH["gh CLI"]
+    AGY["agy-delegate"]
+    CX["codex exec"]
+  end
+
+  P -.->|"dependencies[]"| DEPS
+  P -->|"bin/ on PATH"| OWNED
+  SK -->|"step 0 · always first"| G
+  SK -->|"steps 2–3"| GH
+  SK -->|"step 4 breadth"| F
+  SK -->|"step 4 recency"| L
+  SK -->|"step 4 arm"| E
+  SK -->|"library docs"| C
+  SK -->|"cross-family"| AGY
+  AG -->|"expensive negatives"| CX
+    </pre>
+    <figcaption>
+      Components and dependencies. Solid arrows are things the plugin invokes;
+      the dotted arrow is a manifest declaration that causes auto-install.
+      Nothing in <code>DEPS</code> is vendored &mdash; four plugins already enabled
+      here become required rather than copied.
+    </figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+  <h2>The full parts list</h2>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>component</th><th>kind</th><th>what it answers</th><th></th></tr></thead>
+    <tbody>
+      <tr><td class="m">graphify</td><td class="m">CLI 0.9.50</td><td>is it already in our corpus? (step 0, hook-enforced, zero LLM tokens)</td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">gh</td><td class="m">CLI 2.98.0</td><td>source at a pinned ref · issues · PRs · discussions · <code>has_issues</code></td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">firecrawl</td><td class="m">CLI 1.23.1 + plugin</td><td><code>developer</code> index · <code>research</code> papers · <code>search</code> · scrape/crawl/map</td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">last30days</td><td class="m">plugin</td><td>what people are <em>doing</em>, dated &mdash; Reddit/HN/X/YouTube/GitHub</td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">exa</td><td class="m">plugin + MCP</td><td>a <strong>second independent index</strong> — the arm on a web null</td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">context7 / ctx7</td><td class="m">plugin + CLI 0.5.8</td><td>library and API documentation</td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">agy-delegate</td><td class="m">wrapper, agy 1.1.21</td><td>cross-family grounded web legwork, Gemini does the reading</td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">codex exec</td><td class="m">CLI 0.150.1</td><td>cross-family check on a claim that is expensive to get wrong</td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">kb-adversarial-verifier</td><td class="m">agent</td><td>the control-arm rule, executable — hunts the refuting probe</td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">premise-verifier</td><td class="m">agent</td><td>per-premise CONFIRMED / REFUTED / UNVERIFIABLE, cited</td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">kb-synthesist</td><td class="m">agent</td><td>combines single-source analyses into one comparison</td><td><span class="pill p-in">have</span></td></tr>
+      <tr><td class="m">lychee</td><td class="m">CLI, via <code>lychee-bin</code></td><td><strong>do our cited URLs still resolve?</strong> 551 unchecked here</td><td><span class="pill p-new">build</span></td></tr>
+      <tr><td class="m">deps.dev</td><td class="m">HTTP, keyless</td><td>package versions, publish dates, advisories, licences</td><td><span class="pill p-new">build</span></td></tr>
+      <tr><td class="m">mcp.grep.app</td><td class="m">MCP, no auth</td><td>regex over ~1M public repos' source in one query</td><td><span class="pill p-new">build</span></td></tr>
+      <tr><td class="m">Chroma Package Search</td><td class="m">MCP, needs key</td><td>read the real source of a <em>published package version</em></td><td><span class="pill p-new">build</span></td></tr>
+      <tr><td class="m">/deep-research</td><td class="m">bundled workflow</td><td>voting fan-out — <strong>user-invoked only</strong>, an agent cannot reach it</td><td><span class="pill p-ask">ask</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout">
+    <h3>Why four new wrappers and not four new plugins</h3>
+    <p style="margin-bottom:0">
+      Three of the four have <strong>no Python library to wrap</strong> &mdash;
+      measured: <code>grep.app</code> has zero PyPI packages, <code>deps.dev</code>
+      has two community packages both effectively unmaintained, and Chroma's
+      Package Search is absent from <code>chromadb</code>. Only lychee ships
+      anything, and what it ships is <em>the binary itself</em>
+      (<code>lychee-bin</code> 0.24.2 on PyPI). So each is a small module in one
+      package, sharing this repo's existing <code>Ok</code>/<code>Err</code>/<code>External</code>
+      result type &mdash; not four dependencies, and not four plugins.
+    </p>
+  </div>
+
+  <h2>One question, end to end</h2>
+
+  <p>
+    The sequence below is the real path, in the real order, for a question with no
+    primary source &mdash; the hardest class. Each rung can end the whole thing:
+    <strong>stop at the first one that answers.</strong>
+  </p>
+</div>
+
+<div class="bleed">
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#f4f1ef','primaryTextColor':'#221d1b','primaryBorderColor':'#9b8f8a','lineColor':'#6b615d','actorBkg':'#f4f1ef','actorBorder':'#9b8f8a','fontFamily':'Space Mono, monospace','fontSize':'12px'}}}%%
+sequenceDiagram
+  autonumber
+  actor U as you
+  participant S as aggregated-research
+  participant G as graphify
+  participant B as the binary
+  participant GH as gh api
+  participant W as breadth lanes
+  participant A as arm verifier
+  participant R as report
+
+  U->>S: a question
+  S->>G: kb-query (step 0, hook-enforced)
+  G-->>S: hits, or nothing
+  alt nothing came back
+    S->>G: query a term KNOWN ingested
+    G-->>S: hits — so the probe works, the miss is real
+  end
+  S->>B: --help + a throwaway probe
+  Note over B: the only rung that answers<br/>what no document says
+  B-->>S: real local behaviour
+  S->>GH: contents?ref=TAG — source at the pin
+  GH-->>S: the shipped code
+  S->>GH: repos/OWNER/REPO → has_issues?
+  Note over GH: a disabled channel<br/>reports zero forever
+  GH-->>S: channel state, then the search
+  S->>W: firecrawl developer · research · last30days · agy-delegate
+  W-->>S: leads, with URLs and dates
+  S->>A: every null, and every claim you'd hate to be wrong about
+  A-->>S: refuted / survived, with the probe that decided it
+  S->>R: answer · ranked sources · nulls+arms · NOT MEASURED · repos touched
+  R-->>U: a report, and an artifact if it is a decision
+    </pre>
+    <figcaption>
+      The sweep, ordered cheapest-refutable-first. The <code>alt</code> block is
+      the control arm and it is not optional: a miss with no arm is a lead, never a
+      finding. Steps 9&ndash;10 are the channel check that must precede any tracker
+      null.
+    </figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+  <h2>The mechanism worth copying, now known</h2>
+
+  <p>
+    The <code>/deep-research</code> lane landed. Its script is embedded verbatim and
+    unminified in the Claude Code binary, and its own header comment states the
+    architecture in one line:
+  </p>
+
+  <pre style="font-family:'Space Mono',monospace;font-size:0.76rem;line-height:1.6;background:var(--panel);border:1px solid var(--hair);border-left:3px solid var(--steel);padding:0.9rem 1rem;overflow-x:auto;margin:1.4rem 0"><code style="background:none;border:none;padding:0">// deep-research: Scope → pipeline(Search → URL-dedup → Fetch+Extract)
+//                → 3-vote Verify → Synthesize
+// Ported from bughunter architecture. WebSearch/WebFetch instead of git/grep.
+
+const VOTES_PER_CLAIM      = 3
+const REFUTATIONS_REQUIRED  = 2
+const MAX_FETCH             = 15
+const MAX_VERIFY_CLAIMS     = 25</code></pre>
+
+  <p>
+    <strong>And the tally is three-outcome, not binary.</strong> That is the part
+    worth copying, and it is the same rule this skill already enforces one level
+    up &mdash; an infrastructure failure must never read as an answer:
+  </p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>outcome</th><th>condition</th><th>meaning</th></tr></thead>
+    <tbody>
+      <tr><td class="m">survives</td><td class="m">valid ≥ 2 AND refuted &lt; 2</td><td>a quorum of votes actually landed, and they did not kill it</td></tr>
+      <tr><td class="m">refuted</td><td class="m">refuted ≥ 2</td><td>adjudicated against on merit</td></tr>
+      <tr><td class="m">unverified</td><td class="m">too few VALID votes</td><td>the verifiers errored &mdash; never reported as refuted</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>
+    Its verifier prompt is adversarial by construction &mdash;
+    <em>&ldquo;Be SKEPTICAL. Try to REFUTE this claim. Default to refuted=true if
+    uncertain&rdquo;</em> &mdash; and all three buckets reach the output, with the
+    synthesizer explicitly handed the refuted and unverified lists and told to name
+    the unverified count in its caveats.
+  </p>
+
+  <p>
+    <strong>Its agents get exactly two tools: WebSearch and WebFetch.</strong>
+    Nothing else is named in any of its five prompts. So its breadth is wide and its
+    depth is shallow by design &mdash; it never reads source at a pinned ref, never
+    checks whether a tracker channel exists, and never touches a local corpus. Those
+    are the rungs our ordering adds, and this settles that the two are complements
+    rather than substitutes.
+  </p>
+
+  <div class="callout">
+    <h3>And it is unreachable by any agent, by design</h3>
+    <p>
+      The registration carries <code>disableModelInvocation</code>, which resolves
+      <strong>true</strong> unless an account feature gate is on. The Skill-tool
+      check keys on <em>userTypedThisTurn</em>, not on whether you are the main
+      session &mdash; and the refusal message says so in words:
+      <em>&ldquo;It cannot be invoked via the Skill tool in this session, by the
+      coordinator or by workers.&rdquo;</em> Workers are subagents.
+    </p>
+    <p style="margin-bottom:0">
+      So the earlier finding was right for a reason nobody had read: <strong>only a
+      human typing <code>/deep-research</code> unlocks it.</strong> The skill asks
+      the user; it does not plan around running it.
+    </p>
+  </div>
+
+  <h2>Who pins whom</h2>
+
+  <p>
+    Five layers. Each one pins the layer above it, and the gate at the bottom is
+    what stops the failure that produced this whole design.
+  </p>
+</div>
+
+<div class="bleed">
+  <figure>
+    <svg viewBox="0 0 900 400" role="img" aria-label="Five stacked layers showing what pins what: the upstream tool is pinned by a kb-research module, which is invoked by a mise task, which is named by the SKILL.md, which is bundled by the plugin manifest, which /plugins updates in another repo. A test gates entry into the skill layer.">
+      <defs>
+        <marker id="up" markerWidth="9" markerHeight="9" refX="4.5" refY="2" orient="auto">
+          <polygon points="0,8 9,8 4.5,0" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <g font-family="Space Mono, monospace">
+        <rect x="150" y="330" width="600" height="52" fill="var(--panel)" stroke="var(--hair)"/>
+        <text x="450" y="352" font-size="13" font-weight="700" text-anchor="middle" fill="currentColor">the upstream tool</text>
+        <text x="450" y="370" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.65">lychee-bin 0.24.2 · deps.dev · mcp.grep.app · Chroma</text>
+
+        <rect x="150" y="256" width="600" height="52" fill="var(--panel)" stroke="var(--hair)"/>
+        <text x="450" y="278" font-size="13" font-weight="700" text-anchor="middle" fill="currentColor">kb-research module</text>
+        <text x="450" y="296" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.65">one package, four modules · returns Ok / Err / External</text>
+
+        <rect x="150" y="182" width="600" height="52" fill="var(--panel)" stroke="var(--hair)"/>
+        <text x="450" y="204" font-size="13" font-weight="700" text-anchor="middle" fill="currentColor">mise task</text>
+        <text x="450" y="222" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.65">this repo's convenience — never the plugin's instruction</text>
+
+        <rect x="150" y="108" width="600" height="52" fill="var(--panel)" stroke="var(--brick)" stroke-width="1.6"/>
+        <text x="450" y="130" font-size="13" font-weight="700" text-anchor="middle" fill="var(--brick)">SKILL.md — the ordering</text>
+        <text x="450" y="148" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.65">cheapest-refutable-first · an arm on every null · five traps</text>
+
+        <rect x="150" y="34" width="600" height="52" fill="var(--panel)" stroke="var(--hair)"/>
+        <text x="450" y="56" font-size="13" font-weight="700" text-anchor="middle" fill="currentColor">.claude-plugin/marketplace.json</text>
+        <text x="450" y="74" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.65">/plugins updates it in any other repo</text>
+
+        <line x1="450" y1="330" x2="450" y2="314" stroke="currentColor" stroke-width="1.5" marker-end="url(#up)" opacity="0.55"/>
+        <line x1="450" y1="256" x2="450" y2="240" stroke="currentColor" stroke-width="1.5" marker-end="url(#up)" opacity="0.55"/>
+        <line x1="450" y1="182" x2="450" y2="166" stroke="currentColor" stroke-width="1.5" marker-end="url(#up)" opacity="0.55"/>
+        <line x1="450" y1="108" x2="450" y2="92"  stroke="currentColor" stroke-width="1.5" marker-end="url(#up)" opacity="0.55"/>
+
+        <rect x="14" y="108" width="118" height="52" fill="var(--brick-bg)" stroke="var(--brick)"/>
+        <text x="73" y="131" font-size="11.5" font-weight="700" text-anchor="middle" fill="var(--brick)">a passing</text>
+        <text x="73" y="147" font-size="11.5" font-weight="700" text-anchor="middle" fill="var(--brick)">test</text>
+        <line x1="132" y1="134" x2="148" y2="134" stroke="var(--brick)" stroke-width="2" stroke-dasharray="4 3"/>
+        <text x="770" y="128" font-size="10.5" fill="var(--brick)">NO test,</text>
+        <text x="770" y="144" font-size="10.5" fill="var(--brick)">NO entry</text>
+
+        <text x="770" y="352" font-size="10.5" fill="currentColor" opacity="0.6">version omitted</text>
+        <text x="770" y="368" font-size="10.5" fill="currentColor" opacity="0.6">⇒ git SHA</text>
+      </g>
+    </svg>
+    <figcaption>
+      The dashed edge is the gate Ray set: a tool enters the skill only once its
+      module exists and its test can go red. Bottom-right notes the version trap
+      &mdash; measured live on <code>plugin-dev</code> itself, where a fixed
+      <code>0.1.0</code> string left one copy <strong>nine months stale</strong>
+      while the SHA-keyed copy tracked reality.
+    </figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <h2>What each new module actually is</h2>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>module</th><th>transport</th><th>the shape</th></tr></thead>
+    <tbody>
+      <tr><td class="m">links</td><td class="m">subprocess</td><td><code>lychee --format json</code>, parsed. Confirmed from source at tag <code>lychee-v0.24.2</code> and corroborated by its README and a real migration PR &mdash; three routes agree.</td></tr>
+      <tr><td class="m">packages</td><td class="m">HTTP, keyless</td><td><code>api.deps.dev/v3/systems/&lt;sys&gt;/packages/&lt;name&gt;</code>. Google ships no client and says to use any HTTP client.</td></tr>
+      <tr><td class="m">codesearch</td><td class="m">MCP client</td><td><code>mcp</code> SDK 2.1.1 against <code>mcp.grep.app</code>. Handshake measured live &mdash; protocol <code>2025-06-18</code>, no auth.</td></tr>
+      <tr><td class="m">pkgsource</td><td class="m">MCP + key</td><td>Chroma's three tools. <strong>Blocked on a decision</strong>: it needs a credential and its pricing is unpublished.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>
+    <strong>One gap in the house pattern.</strong> <code>kb_setup</code> has no helper
+    anywhere for parsing JSON out of a subprocess &mdash; <code>check.py</code>
+    inherits stdio and reads only an exit code, and only <code>gates.py</code>
+    writes JSON at all. The <code>links</code> module is the first of that shape
+    here, so it is a design decision rather than a copy.
+  </p>
+
+  <hr class="rule">
+
+  <h2>Settled, and open</h2>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th></th><th>decision</th></tr></thead>
+    <tbody>
+      <tr><td class="m">validated</td><td>a real question end-to-end with output pasted, <strong>plus</strong> a failing case, <strong>plus</strong> a test that can go red</td></tr>
+      <tr><td class="m">shape</td><td>one package, four modules</td></tr>
+      <tr><td class="m">home</td><td>standalone <code>uv</code>-installable, staged &mdash; built in <code>kb_setup/research/</code> first, split out once proven</td></tr>
+      <tr><td class="m">marketplace</td><td>reuse <code>ray-manaloto/claude-code-marketplace</code>, wiped, tagged <code>pre-reset-2026-08-27</code> first</td></tr>
+      <tr><td class="m">local copy</td><td><strong>deleted</strong> — this repo installs its own plugin and dogfoods the distribution</td></tr>
+      <tr><td class="m">open</td><td>Chroma's key and cost · whether <code>/deep-research</code>'s voting can be copied at all</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Not measured</h2>
+
+  <p>
+    Stated because a diagram is believed faster than prose.
+  </p>
+
+  <div class="scroll">
+  <table>
+    <tbody>
+      <tr><td class="m">/deep-research</td><td><strong>Now measured</strong> &mdash; read from the binary, not the docs. What remains unmeasured: it has never been RUN here, so nothing on this page is a statement about its output quality, only about its construction.</td></tr>
+      <tr><td class="m">grep.app</td><td>proven to <em>handshake</em>, never to answer a real question. Its tool list was not enumerated &mdash; that needs the session id from an <code>Mcp-Session-Id</code> header the probe did not capture.</td></tr>
+      <tr><td class="m">Chroma</td><td>never called. No key, pricing unpublished.</td></tr>
+      <tr><td class="m">lychee</td><td>never run here. Its 551 targets are counted; how many are broken is unknown.</td></tr>
+      <tr><td class="m">the plugin</td><td>does not exist. Every arrow on this page is a design, not an observation.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Everything above, and where it was read</h2>
+
+  <div class="cites">
+    <div>READ, this session &mdash; <code>json.schemastore.org/claude-code-marketplace.json</code>: required <code>[name, owner, plugins]</code>; plugin entry required <code>[name, source]</code>; <code>dependencies</code> and <code>allowCrossMarketplaceDependenciesOn</code> quoted verbatim. Armed: schema 200, control <code>package.json</code> 200, control bogus 404 (a first attempt returned 301 for BOTH and could not discriminate).</div>
+    <div>READ, this session &mdash; <code>plugin-dev:plugin-structure</code>, for the directory contract and the rule that every component except <code>plugin.json</code> sits at the plugin root.</div>
+    <div>MEASURED, this session &mdash; <code>plugin-dev</code> last touched <code>2025-11-17</code> in <code>anthropics/claude-code</code> vs <code>2026-08-06</code> in <code>anthropics/claude-plugins-official</code>; control paths in both repos pushed <code>2026-08-26</code> and <code>2026-07-04</code>, so the older date is real staleness.</div>
+    <div>RUN, this session &mdash; <code>agy-delegate --tier flash --yolo</code>, <code>AGY_USAGE status SUCCESS, total 217,992</code>; three of four load-bearing claims then confirmed against primary sources, one left unverified.</div>
+    <div>RUN, this session &mdash; <code>mise exec -- firecrawl developer</code> returned lychee's README comparison table and a real migration PR. The CLI works; the MCP <code>firecrawl_search</code> failed with <code>socket hang up</code> for one lane.</div>
+    <div>MEASURED, this session &mdash; CLI versions by asking each binary, not by reading a directory name: graphify 0.9.50, gh 2.98.0, firecrawl 1.23.1, ctx7 0.5.8, codex-cli 0.150.1, agy 1.1.21.</div>
+    <div>READ, this session &mdash; the <code>/deep-research</code> Workflow source, extracted verbatim and unminified from the Claude Code binary <code>2.1.247</code>. Armed: <code>grep -ac 'deep-research'</code> &rarr; <strong>8</strong>, control <code>WebSearch</code> &rarr; 55, control <code>zzzqqqnotastring</code> &rarr; <strong>0</strong>. The docs-site phrasing <em>&ldquo;Fan out web searches on a question&rdquo;</em> returns <strong>0</strong> against the binary &mdash; that sentence is the docs', not the code's.</div>
+    <div>INHERITED from lane reports, re-read but not re-derived &mdash; 551 unique external URLs; <code>lychee-bin</code> 0.24.2 and its <code>--format json</code>; zero PyPI packages for grep.app; the two weak deps.dev clients.</div>
+  </div>
+
+  <p style="margin-top:2.6rem; font-size:0.87rem; color:var(--muted)">
+    Source: <code>docs/artifacts/the-aggregated-research-plugin.html</code>, tracked.
+    Companion pages: <em>The Research Ladder</em> (the ordering) and
+    <em>The Undelivered Round</em> (why the lanes are shaped this way).
+  </p>
+
+</div>
