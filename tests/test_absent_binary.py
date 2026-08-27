@@ -256,7 +256,7 @@ def test_the_gate_redirect_still_wins_over_this_one(absent) -> None:
     assert "kb-check" in value, "the older, more specific remedy must win"
 
 
-def test_an_introspector_behind_a_transparent_prefix_is_not_denied() -> None:
+def test_an_introspector_behind_a_transparent_prefix_is_not_denied(resolves_but_broken) -> None:
     """The cold lane's P2 on `c27bddf60480` — the guard denied its own control arm.
 
     `command` sits in BOTH this module's `_INTROSPECTORS` and `check_first`'s
@@ -269,6 +269,18 @@ def test_an_introspector_behind_a_transparent_prefix_is_not_denied() -> None:
     The negative arm matters as much: widening the check to "any token anywhere"
     would let `timeout 5 which foo` through, because `which` appears in it. Only
     the tokens `command_word` actually STRIPPED may exempt a segment.
+
+    Uses `resolves_but_broken` rather than trusting the live host for the final
+    assertion. This test originally ran unmocked against the real machine, which
+    was reliable exactly until it was not — TWICE: once when a mise reshim broke
+    `timeout` silently (the whole reason this module changed on 2026-08-26), and
+    again a few hours later when coreutils turned out to be genuinely installed
+    here and due to be ACTIVATED via `mise.toml`, which would make `timeout` run
+    and turn the final `is not None` false out from under this test. What this
+    assertion is actually about — an introspector LATER in the line must not
+    exempt an otherwise-denied command word — has nothing to do with whether
+    `timeout` happens to work on this laptop today, so the fixture controls that
+    and leaves the parser behaviour, which is the actual subject, live.
     """
     for wrapped in (
         "env command -v timeout",
@@ -282,8 +294,9 @@ def test_an_introspector_behind_a_transparent_prefix_is_not_denied() -> None:
 
     denied = absent_binary.decide("timeout 5 which foo")
     assert denied is not None, (
-        "an introspector LATER in the line must not exempt the absent binary "
-        "that actually runs — this is the false negative the narrow fix avoids"
+        "an introspector LATER in the line must not exempt a command word "
+        "that is otherwise denied — this is the false negative the narrow "
+        "fix avoids, independent of whether `timeout` works on this host"
     )
     assert "timeout" in denied
 
