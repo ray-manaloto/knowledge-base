@@ -44,8 +44,8 @@ graphify's surface splits by transport AND by liveness:
 
 - CLI: `mise run kb-query -- "how does X work?"` (deterministic, no LLM,
   source-cited). Asking about the DOCUMENTS? **`--prose`** reads the prose-only
-  graph (2,553 nodes, not 140,295 of which 138k are code AST crowding prose out
-  of the budget; both re-derived 2026-08-02); **`--idf`** also ranks the
+  graph (**4,868** nodes vs **492,654** aggregate — 99% is code AST crowding
+  prose out; re-derived 2026-08-27, both STALE ON SIGHT); **`--idf`** ranks the
   RETURNED SET by BM25/IDF — best arm, natural recall 1/8 -> 3/8 -> 5/8 (#12
   P0/P1). NOT unscored BFS — it ranks SEEDS by IDF; evidence in `mise.toml`.
 - MCP: `mise run kb-serve` starts the read-only server pinned to this graph.
