@@ -49,17 +49,26 @@ Adopted plugins (enabled in `.claude/settings.json`): `fable-orchestrator@fable-
 Opus fallback) and `antigravity@antigravity-for-claude-code` (Google Antigravity/Gemini 3.x lane via
 `agy`). The Claude architect plans and **verifies evidence** before "done"; only execution is delegated.
 
-Four more were enabled 2026-08-03 without needing a note here — `pr-review-toolkit`,
+Four were enabled 2026-08-03 without needing a note here — `pr-review-toolkit`,
 `skill-creator`, `claude-md-management` (all `@claude-plugins-official`) and
-`mise@brentmitchell25`, all Ray's, all ordinary tooling. Since then, three more of the
-same kind: `codex@openai-codex`, `mcp2cli@claude-community`, and
-`eli5@claude-community` (2026-08-23, plain-language explainers).
-**TWELVE plugins are enabled** — which is what `md-size-budgets.md` § the
-skill-listing budget is about, and that budget scales with the COUNT, so the number
-matters more than the names. **Re-derive it, never quote this line**: it read "Nine"
-until 2026-08-23 and was stale by three, having drifted silently across three
-separate enablements. `jq '.enabledPlugins | to_entries | map(select(.value)) | length'`
-over this directory's `settings.json` is the measurement.
+`mise@brentmitchell25`, all Ray's, all ordinary tooling. More followed piecemeal
+through 2026-08-27, the same kind of ordinary tooling and none needing its own
+note: `codex@openai-codex`, `mcp2cli@claude-community`, `eli5@claude-community`,
+`astral@astral-sh`, `mattpocock-skills@mattpocock`, `firecrawl@firecrawl`,
+`exa@exa`, `context7@context7-marketplace`, `last30days@last30days-skill`,
+`i-have-adhd@i-have-adhd`, `ponytail@ponytail`.
+
+**Stop reading this paragraph for a count — it is a history, not an inventory,
+and the count next to it has now drifted stale three times** ("Nine" until
+2026-08-23 → stale by three → bolded as 12 → stale by six), each time by being
+quoted instead of measured. `.claude/settings.json` currently declares
+**18** plugins `true` in `enabledPlugins` — re-derive, never quote:
+`jq '.enabledPlugins | to_entries | map(select(.value)) | length' .claude/settings.json`. That is not the same as how many actually run:
+`.claude/settings.local.json` overrides two of the 18 back to `false`
+(`claude-md-management@claude-plugins-official`, `mise@brentmitchell25`), so the
+**effective** count is **16** — `jq -s '(.[0].enabledPlugins + (.[1].enabledPlugins // {})) | to_entries | map(select(.value)) | length' .claude/settings.json .claude/settings.local.json`. Both numbers feed
+`md-size-budgets.md` § the skill-listing budget, which scales with whichever a
+session actually loads.
 
 One is enabled for skill self-improvement and DOES need a note, PROJECT-scope
 (`do-not.md` #11 — `extraKnownMarketplaces` + `enabledPlugins` here, never a write to
