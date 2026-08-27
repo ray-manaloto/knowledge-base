@@ -175,7 +175,7 @@ gh = "2.98.0"
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
 "npm:@openai/codex" = "0.150.1"
-antigravity-cli = "1.1.20"
+antigravity-cli = "1.1.21"
 "npm:ctx7" = { version = "0.5.8", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.1"
 # coreutils: macOS ships BSD userland, not GNU — this repo's own rules and
