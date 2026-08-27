@@ -85,6 +85,12 @@ Via the Skill tool, **before authoring**:
    normal outcome** for an explainer, and a page that declares capabilities
    cannot be shared publicly.
 
+Then, **between writing the file and publishing it**, one more step that is not a
+skill: every mermaid diagram goes through the **Mermaid Chart MCP** — see
+*Diagram tooling* § 3. A diagram that has not been validated is not ready to
+publish, and this is the only step in this skill with a machine-checkable
+outcome.
+
 Then **say which other skills you considered and did not use, and why.** Ray asked
 for that list explicitly so the gaps are visible rather than silent. The usual
 near-misses and why they lose:
@@ -181,6 +187,12 @@ default primary) and none of my hexes; with it, `#ECECFF` drops to **0** and my
 genuinely works — which is what makes the two rows above findings rather than a
 broken probe.
 
+**And the two diagram types differ — sequence is the dangerous one.** Measured
+across six validated blocks: flowcharts emit `background` **9** times and carry
+**1-7** hardcoded dark inks; sequence diagrams emit it **0** times and carry
+**10-40**. So a sequence diagram has no plate at all *and* the most un-themed
+ink. If a page has one, assume it is the figure that will be unreadable.
+
 The mechanism is therefore settled: **mermaid emits a transparent SVG that still
 carries hardcoded dark inks.** On a dark page ground that is black-on-black by
 construction, and no `themeVariables` set fixes it — `background` is used for
@@ -189,19 +201,46 @@ must come from CSS outside the SVG**, which is what §2 does.
 
 ### 3. Validate the source before you publish
 
-The **Mermaid Chart MCP** (`validate_and_render_mermaid_diagram`) is the closest
-thing to a runtime surface available here. Feed it the diagram body and it
-returns `valid`, `diagramType` and the rendered SVG — so a syntax error is caught
-before a reader ever meets a blank figure. **Run every new diagram through it.**
+The **Mermaid Chart MCP** is the closest thing to a runtime surface available
+here, and it is a **required step between writing the file and publishing it.**
+Ray enabled it 2026-08-27, after three revisions of this skill had shipped
+guesses.
 
-Two limits, both real:
+The tool is deferred, so load it first, then send each diagram body:
 
-- **It renders with its own config, not the artifact's.** A pass proves the
-  *source* parses; it says nothing about how the artifact will colour it or what
-  ground sits behind it.
-- **Its result is ~100–140 KB and exceeds the tool-result cap**, landing in a
-  file. Extract from that file rather than dumping it — `valid`, `diagramType`
-  and a colour histogram over `rawSVG` are the parts worth reading.
+```text
+ToolSearch  "select:mcp__claude_ai_Mermaid_Chart__validate_and_render_mermaid_diagram"
+→ validate_and_render_mermaid_diagram({diagramCode: "<the block, init header and all>"})
+```
+
+**Its result is ~100–140 KB every time and blows the tool-result cap, landing in
+a file.** That is expected, not a failure. Extract rather than read — this is the
+whole check:
+
+```bash
+uv run python -c "
+import json,pathlib,re,collections
+d=json.loads(pathlib.Path('<the file the tool named>').read_text())
+print('valid:', d.get('valid'), '| type:', d.get('diagramType'))
+svg=d.get('rawSVG') or ''
+print('bytes:', len(svg), '| background occurrences:', len(re.findall(r'background', svg)))
+c=collections.Counter(re.findall(r'(?:fill|stroke|color)\s*[:=]\s*[\"\x27]?(#[0-9a-fA-F]{3,6}|none)', svg))
+print(c.most_common(12))
+"
+```
+
+What each field buys you:
+
+| field | what it settles |
+|---|---|
+| `valid` | the source parses — a blank figure is now caught before a reader meets one |
+| `diagramType` | you drew what you meant to draw (`sequence` when you wrote a sequence) |
+| colour histogram over `rawSVG` | which inks actually survived your `themeVariables`, and which hardcoded ones did not |
+
+**One limit, and it is the important one: it renders with its own config, not the
+artifact's.** A pass proves the *source* parses. It says nothing about how the
+artifact will colour it or what ground sits behind it — which is exactly the half
+that broke three times.
 
 **Colour still needs the reader.** So the honest verdict on a diagram page is
 **BLOCKED on the reader**, and the last line of the message must ask for it:
@@ -271,11 +310,17 @@ necessary; if the page is necessary, the message must not duplicate it.
 ## Done means
 
 - The page exists at `docs/artifacts/<name>.html`, tracked.
+- **Every mermaid block came back `valid: true` from the Mermaid Chart MCP**, with
+  the right `diagramType`, BEFORE the page was published. This is the one item
+  here with a machine-checkable answer — the rest are judgement.
+- Every mermaid block is a `<pre class="mermaid">`, and the page carries the
+  `svg[id^="claude-mermaid"]` rule set.
 - It is published, and you have **read the live bytes back** to confirm what
   shipped — a publish result is a claim, the live page is the evidence.
 - Every figure has a `<figcaption>` stating what it shows.
 - Every number on it was measured this session or is labelled.
-- The terminal message is the link, the headline, and the ask — nothing more.
+- The terminal message is the link, the headline, and the ask — and on a page
+  with diagrams the ask is *"do they render, is anything unreadable"*.
 - You have named the skills you considered and did not use.
 
 ## See also
