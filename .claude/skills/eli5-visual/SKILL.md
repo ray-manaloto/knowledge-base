@@ -165,15 +165,46 @@ still sets node fills to your palette. The CSS is the backstop, deliberately
 `!important` and theme-independent: the plate stays light in **both** themes, so
 there is no dark-mode arm to get wrong.
 
-### 3. You cannot see the page. Say so, and ask
+### 2a. Why, measured — the SVG has no background and keeps dark inks
 
-**There is no runtime surface here you can drive.** The publish result says a
-file was uploaded; it says nothing about whether a mermaid block parsed or what
-colour anything came out. Reading the source back does not help either — the
-defect lives in the *rendered DOM*, which you never see.
+Run through the Mermaid Chart MCP (§3) and inspected, 2026-08-27:
 
-So the honest verdict on a diagram page is always **BLOCKED on the reader**, and
-the last line of the message must ask for the observation:
+| probe | result |
+|---|---|
+| `background` occurrences in the rendered SVG | **0** — with and without an init header |
+| `'background':'#ffffff'` in `themeVariables` → `#ffffff` in the output | **0** |
+| un-themed inks surviving a full `themeVariables` set | `#666`×5, `#999`×3, `#eaeaea`×4, `#333`×1, `#000000`×1 |
+
+**Control arm:** without the init header the output carries `#ECECFF` (mermaid's
+default primary) and none of my hexes; with it, `#ECECFF` drops to **0** and my
+`#221d1b` / `#f4f1ef` / `#9b8f8a` appear 12 / 5 / 7 times. So `%%{init}%%`
+genuinely works — which is what makes the two rows above findings rather than a
+broken probe.
+
+The mechanism is therefore settled: **mermaid emits a transparent SVG that still
+carries hardcoded dark inks.** On a dark page ground that is black-on-black by
+construction, and no `themeVariables` set fixes it — `background` is used for
+internal contrast derivation and never becomes a rect. **The plate and the ink
+must come from CSS outside the SVG**, which is what §2 does.
+
+### 3. Validate the source before you publish
+
+The **Mermaid Chart MCP** (`validate_and_render_mermaid_diagram`) is the closest
+thing to a runtime surface available here. Feed it the diagram body and it
+returns `valid`, `diagramType` and the rendered SVG — so a syntax error is caught
+before a reader ever meets a blank figure. **Run every new diagram through it.**
+
+Two limits, both real:
+
+- **It renders with its own config, not the artifact's.** A pass proves the
+  *source* parses; it says nothing about how the artifact will colour it or what
+  ground sits behind it.
+- **Its result is ~100–140 KB and exceeds the tool-result cap**, landing in a
+  file. Extract from that file rather than dumping it — `valid`, `diagramType`
+  and a colour histogram over `rawSVG` are the parts worth reading.
+
+**Colour still needs the reader.** So the honest verdict on a diagram page is
+**BLOCKED on the reader**, and the last line of the message must ask for it:
 
 > *"Reload and tell me whether the diagrams render, and whether any text is
 > unreadable."*
