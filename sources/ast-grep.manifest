@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# SURVEY CANDIDATE - 2026-08-26 diagram/tool funnel (sources/REGISTRY.md row 114+). PENDING - named only as the maintained tree-sitter-based tool if that layer is ever wanted; never evaluated as a diagram generator itself. Source: .agent/kb/reports/agents/diagram-tool-status-2026-08-26.md. EXTRACTION DEFERRED: kb-build is currently FAILING (#397/#417 detect-preflight) - this manifest only pins the source; REGISTRY.md Status stays manifest until a build succeeds.
+url = https://github.com/ast-grep/ast-grep
+ref = main
+commit = 40dab3c0de635a7450ddbb88f255b099533afbd4
+kind = code

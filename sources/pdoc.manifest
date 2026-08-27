@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# SURVEY CANDIDATE - 2026-08-26 diagram/tool funnel (sources/REGISTRY.md row 114+). No diagrams produced by design - a docstring renderer, recommended for the separate doc-generation ask (U10 in docs/plans/2026-08-23-directive-execution-plan.md), not run. Source: .agent/kb/reports/agents/diagram-tool-status-2026-08-26.md. EXTRACTION DEFERRED: kb-build is currently FAILING (#397/#417 detect-preflight) - this manifest only pins the source; REGISTRY.md Status stays manifest until a build succeeds.
+url = https://github.com/mitmproxy/pdoc
+ref = main
+commit = 00e18eb12ae2f06f3c245f796bfe7f6224db033a
+kind = code

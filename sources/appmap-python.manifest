@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# SURVEY CANDIDATE - 2026-08-26 diagram/tool funnel (sources/REGISTRY.md row 114+). EVALUATED-ONLY, not run. Quoted verdict: the most serious engineering and the only live project, but it is config-driven not annotation-driven, needs a Node toolchain beside Python, and its natural unit is one diagram per test - the largest adoption cost by far. No Mermaid output. Default branch is master, not main. Source: .agent/kb/reports/agents/diagram-tool-status-2026-08-26.md. EXTRACTION DEFERRED: kb-build is currently FAILING (#397/#417 detect-preflight) - this manifest only pins the source; REGISTRY.md Status stays manifest until a build succeeds.
+url = https://github.com/getappmap/appmap-python
+ref = master
+commit = 352c573a68aedf99cb1b16eae92b4337aab30d05
+kind = code

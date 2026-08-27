@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# SURVEY CANDIDATE - 2026-08-26 diagram/tool funnel (sources/REGISTRY.md row 114+). EVALUATED-ONLY, not run. Quoted verdict: Best-designed gate in the whole survey, but JS/TS only - right tool for .claude/workflows/*.js, irrelevant to the four python pipelines the survey scoped. Source: .agent/kb/reports/agents/diagram-tool-status-2026-08-26.md. EXTRACTION DEFERRED: kb-build is currently FAILING (#397/#417 detect-preflight) - this manifest only pins the source; REGISTRY.md Status stays manifest until a build succeeds.
+url = https://github.com/sverweij/dependency-cruiser
+ref = main
+commit = 1f28f44a49c054dc128226543188220818b1ab52
+kind = code

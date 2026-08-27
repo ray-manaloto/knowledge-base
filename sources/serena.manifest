@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# SURVEY CANDIDATE - 2026-08-26 diagram/tool funnel (sources/REGISTRY.md row 114+, amends existing row 70). Issue #276 says to evaluate Serena's python_ty adapter before writing a JSON-RPC LSP client. Already a peer-tool candidate in REGISTRY.md row 70 (T2, pending) as an LSP-backed semantic code toolkit exposed over MCP; this manifest is what row 70 was missing. Source: .agent/kb/reports/agents/tool-gap-sweep-2026-08-26.md. EXTRACTION DEFERRED: kb-build is currently FAILING (#397/#417 detect-preflight) - this manifest only pins the source; REGISTRY.md Status stays manifest until a build succeeds.
+url = https://github.com/oraios/serena
+ref = main
+commit = 7fcbca7e62555ec2287ddb2f083caee805848ea6
+kind = code
