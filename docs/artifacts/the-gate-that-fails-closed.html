@@ -1,0 +1,485 @@
+<title>The Gate That Fails Closed</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --paper:   #F3F6F4;
+    --surface: #FFFFFF;
+    --sunk:    #E9EEEB;
+    --ink:     #131E1B;
+    --muted:   #576863;
+    --line:    #D2DCD8;
+    --accent:  #0C7160;
+    --accent-soft: #D6EDE7;
+    --signal:  #9C5406;
+    --signal-soft: #F7E6D0;
+    --plate:   #FFFFFF;
+
+    --display: "Bricolage Grotesque", "Helvetica Neue", sans-serif;
+    --body: "Newsreader", Georgia, serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:   #0E1513;
+      --surface: #16201D;
+      --sunk:    #1B2724;
+      --ink:     #E2EAE7;
+      --muted:   #90A39E;
+      --line:    #293834;
+      --accent:  #4ECFB4;
+      --accent-soft: #12332C;
+      --signal:  #E0A055;
+      --signal-soft: #33230F;
+      --plate:   #FFFFFF;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:   #0E1513;
+    --surface: #16201D;
+    --sunk:    #1B2724;
+    --ink:     #E2EAE7;
+    --muted:   #90A39E;
+    --line:    #293834;
+    --accent:  #4ECFB4;
+    --accent-soft: #12332C;
+    --signal:  #E0A055;
+    --signal-soft: #33230F;
+    --plate:   #FFFFFF;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 18px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 74ch;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.75rem;
+  }
+
+  .eyebrow {
+    font-family: var(--display);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2.4rem, 7vw, 3.6rem);
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+    margin: 0.4rem 0 0;
+  }
+
+  .standfirst {
+    font-size: 1.22rem;
+    line-height: 1.5;
+    color: var(--muted);
+    margin: 0;
+    max-width: 62ch;
+  }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 0.5rem;
+  }
+
+  h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.02rem;
+    letter-spacing: -0.005em;
+    margin: 0 0 0.35rem;
+  }
+
+  p { margin: 0 0 0.9rem; }
+  p:last-child { margin-bottom: 0; }
+
+  section { display: flex; flex-direction: column; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.84em;
+    background: var(--sunk);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+
+  .rule {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 0;
+  }
+
+  /* ---- the failure block ---- */
+  .fail {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--signal);
+    padding: 1.1rem 1.25rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.65;
+    overflow-x: auto;
+  }
+  .fail .hi { color: var(--signal); font-weight: 600; }
+
+  /* ---- the count table ---- */
+  .tablewrap { overflow-x: auto; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.94rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.55rem 0.7rem 0.55rem 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom-color: var(--ink);
+  }
+  td.n {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    padding-right: 1.1rem;
+    white-space: nowrap;
+  }
+  td.ex { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); }
+  tr.total td { border-bottom: none; font-weight: 600; }
+
+  /* ---- figures ---- */
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  figure svg { max-width: 100%; height: auto; display: block; }
+  .figbox {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    padding: 1.4rem 1rem;
+    overflow-x: auto;
+  }
+  figcaption {
+    font-size: 0.88rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  pre.mermaid {
+    background: var(--plate);
+    color: #131E1B;
+    border: 1px solid var(--line);
+    padding: 1.2rem;
+    margin: 0;
+    overflow-x: auto;
+    text-align: center;
+  }
+
+  /* ---- route cards ---- */
+  .routes { display: flex; flex-direction: column; gap: 1rem; }
+  .route {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .route.lead { border-color: var(--accent); border-width: 2px; }
+  .route header { display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; }
+  .tag {
+    font-family: var(--display);
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.22em 0.55em;
+    border-radius: 2px;
+  }
+  .tag.a { background: var(--accent-soft); color: var(--accent); }
+  .tag.s { background: var(--signal-soft); color: var(--signal); }
+  .route ul { margin: 0; padding-left: 1.1rem; }
+  .route li { margin-bottom: 0.3rem; }
+  .cost {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    border-top: 1px dashed var(--line);
+    padding-top: 0.5rem;
+  }
+
+  .callout {
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+    padding: 1rem 1.2rem;
+  }
+  .callout p { margin-bottom: 0.6rem; }
+
+  .cites {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+  .cites div { padding-left: 1.4rem; text-indent: -1.4rem; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Issue #397 &middot; measured 2026-08-27</p>
+    <h1>The gate that fails closed</h1>
+  </header>
+
+  <p class="standfirst">Eleven of eighty-six sources stop <code>mise run kb-build</code> dead. Fifty-six files are the reason. Three different doors lead past them, and they are not equally sized &mdash; one of them was never on the table when the mechanism was chosen.</p>
+
+  <hr class="rule">
+
+  <section>
+    <h2>What actually happens today</h2>
+    <p>Run the build and it gets all the way to detection, then refuses to write anything at all:</p>
+    <div class="fail">
+[kb-build] 86 source(s)<br>
+Graphify detect preflight failed for <span class="hi">11 source(s)</span>;<br>
+categories={timeout: 1, <span class="hi">unclassified-files: 10</span>};<br>
+<span class="hi">no aggregate artifact or stamp was mutated</span>
+    </div>
+    <p style="margin-top:0.9rem">That last line is the whole problem. The gate is all-or-nothing: fifty-six files nobody wants in the graph anyway block eighty-six sources from producing one. The ticket blamed <code>anthropic-sdk-python</code> and <code>ref = main</code>; that manifest now pins <code>v1.0.0</code> and no longer appears. <strong>#397's body is stale &mdash; this is the current, re-measured failure.</strong></p>
+  </section>
+
+  <section>
+    <h2>The fifty-six, sorted by what they are</h2>
+    <p>Not one of them is a per-repo oddity. Every single one belongs to a <em>file class</em> &mdash; a name shape or an extension that will recur in the next source, and the one after that.</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Class</th><th style="text-align:right">Files</th><th>Examples</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Marker &amp; hook files</td><td class="n">12</td><td class="ex">PLACEHOLDER &times;8, .husky/pre-commit, .syncCommitId.remote</td></tr>
+          <tr><td>Binary / graphics assets</td><td class="n">8</td><td class="ex">.cdr &times;5, .kra, .mcpb, .pth</td></tr>
+          <tr><td>Grammar, query &amp; schema</td><td class="n">8</td><td class="ex">.ql &times;3, .ungram &times;2, .qhelp, .grit, .dtd</td></tr>
+          <tr><td>Golden / expected output</td><td class="n">7</td><td class="ex">.formatted &times;3, 08-log-rotation.mmd.2&ndash;.5</td></tr>
+          <tr><td>Prefixed LICENSE variants</td><td class="n">6</td><td class="ex">PRETTIER_LICENSE, ROME-LICENSE-MIT, CODESPAN_LICENSE</td></tr>
+          <tr><td><code>*rc</code> config files</td><td class="n">3</td><td class="ex">pylintrc, flake8rc, .yarnrc</td></tr>
+          <tr><td>Not displayed by the log's 12-path cap</td><td class="n">12</td><td class="ex">biome (9), gh (3) &mdash; unmeasured, see below</td></tr>
+          <tr class="total"><td>Total blocking</td><td class="n">56</td><td class="ex">across 10 sources</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:0.9rem"><strong>Honesty note:</strong> the build log truncates each source's list at twelve paths, so 44 of the 56 are read directly and 12 are inferred as more of the same &mdash; a display bound, and it is stated rather than hidden. The classes above are derived from the 44 that were actually printed.</p>
+  </section>
+
+  <section>
+    <h2>Where the refusal is decided</h2>
+    <p>Detection does not run against the pinned clone. It runs against a <em>disposable snapshot</em> cloned fresh at the verified commit, and that snapshot is checked for drift before and after. Everything that happens to a source passes through this spine:</p>
+
+    <figure>
+      <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#EEF4F1','primaryTextColor':'#131E1B','primaryBorderColor':'#7B8F89','lineColor':'#576863','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
+flowchart TD
+  M["sources/&lt;name&gt;.manifest<br/>url + ref + commit"] --> C["clone_dir<br/>(gitignored)"]
+  C -->|"git clone --no-local<br/>+ checkout --detach"| S["disposable snapshot"]
+  S --> G1{"identity assert<br/>tree + HEAD + status"}
+  G1 -->|"any untracked path<br/>= snapshot-drift"| X1(["FAIL"])
+  G1 -->|clean| D["graphify detect"]
+  D --> CL["classify_unclassified()"]
+  CL --> NS["non_source<br/>absorbed silently"]
+  CL --> UL["unsupported_language<br/>absorbed + tallied"]
+  CL --> UR["unresolved"]
+  UR -->|"non-empty"| X2(["FAIL &mdash; nothing written"])
+  UR -->|"empty"| OK(["graph.json + stamp"])
+      </pre>
+      <figcaption>The build spine. Two gates can refuse: the snapshot identity assert (any untracked file counts as drift) and the unresolved-files check. Both currently fire.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>The three doors &mdash; and where each one cuts in</h2>
+    <p>The routes differ by <em>where on that spine they intervene</em>, and that single fact is what decides the cost of each.</p>
+
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 760 300" role="img" aria-label="The build spine with three intervention points: route A writes a .graphifyignore into the snapshot before detect and trips the identity assert; route B extends the classifier's shared rules after detect; route C adds per-source inventory entries after detect.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+            <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#0C7160"/>
+            </marker>
+            <marker id="ar-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#9C5406"/>
+            </marker>
+          </defs>
+
+          <!-- spine -->
+          <g fill="none" stroke="currentColor" stroke-width="1.4">
+            <rect x="20"  y="130" width="118" height="42" rx="2"/>
+            <rect x="188" y="130" width="118" height="42" rx="2"/>
+            <rect x="356" y="130" width="118" height="42" rx="2"/>
+            <rect x="524" y="130" width="118" height="42" rx="2"/>
+          </g>
+          <g font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" text-anchor="middle">
+            <text x="79"  y="156">snapshot</text>
+            <text x="247" y="150">identity</text>
+            <text x="247" y="164">assert</text>
+            <text x="415" y="156">detect</text>
+            <text x="583" y="150">classify</text>
+            <text x="583" y="164">unclassified</text>
+          </g>
+          <g stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)">
+            <line x1="138" y1="151" x2="182" y2="151"/>
+            <line x1="306" y1="151" x2="350" y2="151"/>
+            <line x1="474" y1="151" x2="518" y2="151"/>
+          </g>
+          <line x1="642" y1="151" x2="700" y2="151" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+          <text x="712" y="147" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">un-</text>
+          <text x="712" y="161" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">resolved</text>
+
+          <!-- Route A: injects before detect -->
+          <line x1="79" y1="92" x2="79" y2="126" stroke="#9C5406" stroke-width="2" marker-end="url(#ar-s)"/>
+          <text x="79" y="66" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="#9C5406" text-anchor="middle">A &middot; .graphifyignore</text>
+          <text x="79" y="82" font-family="JetBrains Mono, monospace" font-size="11" fill="#9C5406" text-anchor="middle">write file into snapshot</text>
+          <!-- collision arrow into the assert -->
+          <path d="M 108 78 C 190 78 214 96 240 124" fill="none" stroke="#9C5406" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#ar-s)"/>
+          <text x="196" y="112" font-family="JetBrains Mono, monospace" font-size="11" fill="#9C5406">trips drift</text>
+
+          <!-- Route B: extends the classifier -->
+          <line x1="583" y1="216" x2="583" y2="178" stroke="#0C7160" stroke-width="2.4" marker-end="url(#ar-a)"/>
+          <text x="583" y="238" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="#0C7160" text-anchor="middle">B &middot; widen shared rules</text>
+          <text x="583" y="254" font-family="JetBrains Mono, monospace" font-size="11" fill="#0C7160" text-anchor="middle">7 name/suffix classes</text>
+          <text x="583" y="270" font-family="JetBrains Mono, monospace" font-size="11" fill="#0C7160" text-anchor="middle">covers all 10 sources at once</text>
+
+          <!-- Route C: per-source inventory -->
+          <path d="M 300 216 C 360 216 400 200 470 178" fill="none" stroke="currentColor" stroke-width="1.6" marker-end="url(#ar)"/>
+          <text x="240" y="220" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor" text-anchor="middle">C &middot; inventory</text>
+          <text x="240" y="236" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" text-anchor="middle">56 reviewed entries,</text>
+          <text x="240" y="252" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" text-anchor="middle">one per file, by hand</text>
+        </svg>
+      </div>
+      <figcaption>The same spine, three cut points. Route&nbsp;A intervenes <em>upstream</em> of the identity assert, so its own written file registers as snapshot drift &mdash; it needs a second change to the drift allowance before it can work at all. Routes&nbsp;B and&nbsp;C intervene downstream, where absorption already happens.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>The routes, priced</h2>
+    <div class="routes">
+
+      <div class="route">
+        <header><span class="tag s">Route A</span><h3><code>.graphifyignore</code> written into each snapshot</h3></header>
+        <p>A new manifest field lists paths; <code>kb_setup</code> writes them into the snapshot after fetch. This is the mechanism the last session recorded as settled.</p>
+        <ul>
+          <li>Needs a manifest field, a parser change, a writer, <em>and</em> a widening of the snapshot drift allowance so its own file is not read as tampering.</li>
+          <li>The path list is still per-source and still hand-written &mdash; 56 entries, spread across 10 manifests.</li>
+          <li>The next source with a <code>PRETTIER_LICENSE</code> blocks the build again and needs its own entry.</li>
+        </ul>
+        <p class="cost">cost &asymp; 4 code changes + 56 data entries &middot; recurring per new source</p>
+      </div>
+
+      <div class="route lead">
+        <header><span class="tag a">Route B</span><h3>Widen the classifier this repo already owns &mdash; recommended</h3></header>
+        <p><code>kb_setup.graphify_sdk.classify_unclassified()</code> already sorts detector leftovers into <em>non-source</em>, <em>unsupported-language</em> and <em>unresolved</em>, and only the third blocks. Every one of the 56 fits a class it nearly has.</p>
+        <ul>
+          <li>Roughly seven rule additions: widen the LICENSE match past its anchor, add an <code>*rc</code> shape, add the binary and grammar suffixes, add the marker names.</li>
+          <li>Fixes all 10 sources in one edit, and pre-empts every future source with the same file shapes.</li>
+          <li>Admission stays structural &mdash; a path only leaves <code>unresolved</code> if it resolves to a real regular file inside the tree. That containment check is untouched.</li>
+        </ul>
+        <p class="cost">cost &asymp; 1 module + its tests &middot; no per-source data &middot; no recurrence</p>
+      </div>
+
+      <div class="route">
+        <header><span class="tag s">Route C</span><h3>Per-source reviewed inventory entries</h3></header>
+        <p>The existing <code>ExpectedUnclassifiedFile</code> path: one reviewed, content-hashed entry per file. Maximum auditability, maximum labour.</p>
+        <ul>
+          <li>56 entries by hand, each with a SHA and a stated reason.</li>
+          <li>This is exactly the cost that made #409 skip two sources outright rather than write 94 and 233 entries.</li>
+          <li>Every upstream bump that changes one of those files invalidates its hash.</li>
+        </ul>
+        <p class="cost">cost &asymp; 56 hand-written entries &middot; recurring on every pin advance</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Why this is a question and not just work</h2>
+    <div class="callout">
+      <p><strong>The recommendation that was overridden was labelled &ldquo;the fork's classifier&rdquo;.</strong> Route&nbsp;B is not that. <code>classify_unclassified</code> lives in <code>python/src/kb_setup/graphify_sdk.py</code> &mdash; this repo's own absorption layer, sitting on top of graphify. Changing it touches no fork, no vendored code, and no pin.</p>
+      <p>So the option now on the table may never have been the one that was rejected. That is the only reason the settled mechanism is being reopened rather than executed &mdash; and it is being reopened once, here, not re-litigated later.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Out of scope, deliberately</h2>
+    <p><code>ffmpeg</code> fails on a detect <em>timeout</em>, not on unclassified files. That is the sixth case in <strong>#491</strong>, which the last round settled as <em>defers, does not close</em>. It stays deferred; unblocking the other ten is what #397 is.</p>
+    <p>The <code>ref = main</code> half of #397 is now <strong>#546</strong> and is untouched here.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Outcome &mdash; added after publication</h2>
+    <p class="eyebrow" style="margin-bottom:0.6rem">Route B was chosen and executed the same session. Nothing above was removed; this is what happened next.</p>
+    <div class="callout">
+      <p><strong>Detect preflight went from 11 failing sources to 0, across all 85 built sources.</strong> Five rule edits in <code>graphify_sdk.py</code> plus one in <code>graphify_health.py</code>. No fork, no manifest data, no per-source entries.</p>
+      <p>The <code>A</code> premise held for 10 of the 12 undisplayed paths. The two it missed were <code>gh</code>'s <code>script/distributions</code> and <code>script/override.ubuntu</code> &mdash; Debian/APT packaging tables, read and then classified as counted rather than guessed at.</p>
+      <p><code>ffmpeg</code> is now <code>build = defer</code> citing <strong>#491</strong>: a detect timeout, which no classifier rule reaches.</p>
+    </div>
+    <p style="margin-top:1rem">One thing this page got wrong by omission: it framed the 56 files as the whole blockage. They were the whole of <em>detection</em>. Past that gate, <code>kb-build</code> now dies in <strong>extraction</strong> instead &mdash; <code>ast-grep</code>'s <code>Cargo.toml</code> produces zero nodes (upstream graphify #1666) and one <code>.d.ts</code> extracts partially. That is <strong>#417</strong>'s family, with its own ruling and its own cost, and it is filed rather than absorbed here.</p>
+    <p><strong>So #397's blocker is fixed; #397's acceptance criterion 3 &mdash; &ldquo;<code>kb-build</code> completes and writes the stamp&rdquo; &mdash; is not yet met, and is blocked behind #417.</strong> Stated plainly because a green preflight reads like a green build, and it is not one.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Everything above, and where it was read</h2>
+    <div class="cites">
+      <div>MEASURED &mdash; <code>mise run kb-build</code> rc=1, this session: 11 sources fail, categories <code>{timeout: 1, unclassified-files: 10}</code>, 56 unresolved paths.</div>
+      <div>MEASURED &mdash; <code>uv run kb-setup detect-census --source biome</code> and <code>--source gh</code>, this session.</div>
+      <div>READ &mdash; <code>python/src/kb_setup/graphify_sdk.py:1288</code> <code>classify_unclassified()</code>; <code>:1329</code> <code>_is_non_source()</code>; <code>:1344</code> <code>_is_unsupported_language()</code>; <code>:1361</code> <code>_classifiable_name()</code> containment check.</div>
+      <div>READ &mdash; <code>python/src/kb_setup/graphify_sdk.py:1246</code> <code>source_detection_policy()</code>; <code>:1270</code> <code>_apply_detection_classes()</code>.</div>
+      <div>READ &mdash; <code>python/src/kb_setup/graph.py:1004</code> <code>_create_source_snapshot()</code>; <code>:1076</code> <code>_assert_disposable_clone_identity()</code>; <code>:1124</code> <code>_is_detector_sidecar()</code>; <code>:1256</code> <code>_require_post_detection_clone_identity()</code>.</div>
+      <div>READ &mdash; <code>python/src/kb_setup/graphify_health.py:337</code> <code>_unresolved_unclassified()</code>; <code>:346</code> <code>_coverage_reasons()</code>.</div>
+      <div>READ &mdash; <code>sources/anthropic-sdk-python.manifest</code>: <code>ref = v1.0.0</code>, refuting #397's body.</div>
+      <div>INHERITED, UNVERIFIED &mdash; the 12 paths the build log's per-source cap did not print.</div>
+      <div>INHERITED &mdash; #409's 94 and 233 entry counts, and Ray's override, both from the 2026-08-27c handoff rather than re-measured.</div>
+    </div>
+  </section>
+
+</div>

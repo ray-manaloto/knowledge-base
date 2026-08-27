@@ -281,9 +281,23 @@ class GraphifyEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
 #: alone, would launder those through as if reviewed. Anchoring on the full
 #: line (`\A…\Z`) means a benign line carrying extra trailing text is NOT
 #: silently approved either.
-_ROUTINE_PRUNE_PROGRESS = re.compile(
-    r"\A\[graphify\] Pruned \d+ (?:node|edge)\(s\) from(?: \d+)? deleted or "
-    r"excluded source file\(s\)\.\Z"
+#:
+#: The `Replaced` sibling is the SAME statement family, printed from the same
+#: merge (`graphify/build.py:1724`, READ 2026-08-27), and it is the weaker claim
+#: of the two: `_kept` only drops a node whose `source_file` appears in the NEW
+#: chunks, and `all_chunks = base + list(new_chunks)` re-adds that file's nodes
+#: in the same build. So a source is never removed without a replacement being
+#: merged for it. The count can still fall — a re-extraction genuinely yielding
+#: fewer nodes — and that is not this filter's job to catch: Graphify keeps
+#: `_disk_nodes`/`_disk_n` across the rebind precisely so the #479 shrink guard
+#: still sees the true on-disk baseline. Approving the narration therefore
+#: leaves the loss detector armed, which is the whole reason it is safe to
+#: approve; #231's buried 1,024 nodes are what that distinction is guarding.
+_ROUTINE_MERGE_PROGRESS = re.compile(
+    r"\A\[graphify\] (?:"
+    r"Pruned \d+ (?:node|edge)\(s\) from(?: \d+)? deleted or excluded source file\(s\)"
+    r"|Replaced \d+ node\(s\) from re-extracted source file\(s\)"
+    r")\.\Z"
 )
 
 
@@ -298,7 +312,7 @@ def _unaccounted_stderr(stderr: str, residual_stderr: str | None) -> str:
     license to wave the rest of the same stderr through unread.
     """
     raw = stderr if residual_stderr is None else residual_stderr
-    kept = [line for line in raw.splitlines() if not _ROUTINE_PRUNE_PROGRESS.match(line.strip())]
+    kept = [line for line in raw.splitlines() if not _ROUTINE_MERGE_PROGRESS.match(line.strip())]
     return "\n".join(kept)
 
 
