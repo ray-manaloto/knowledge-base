@@ -1,17 +1,22 @@
 # Copyright (c) 2026 Raymond Manaloto
-"""`kb_setup.absent_binary` — deny a probe whose command word is not installed.
+"""`kb_setup.absent_binary` — deny a probe whose command word cannot RUN.
 
-Every test here fakes `shutil.which` rather than trusting the host, and the
-reason is this module's own subject: a test that passes because `timeout`
-happens to be absent on the developer's mac is a test that could only pass, and
-it would go green on a Linux CI box for the opposite reason while asserting
-nothing. Both directions are driven explicitly.
+Every test here fakes `shutil.which` AND `_probe_runs` rather than trusting the
+host, and the reason is this module's own subject, twice over now. Round one
+(2026-08-18): a test that passes because `timeout` happens to be absent on the
+developer's mac is a test that could only pass, and it would go green on a
+Linux CI box for the opposite reason while asserting nothing — both directions
+of `which` are driven explicitly. Round two (2026-08-26): the guard went
+silently inert on THIS SAME MACHINE because a mise reshim made `which` resolve
+`timeout`/`nproc`/`tac` to a shim that cannot run, and nothing here controlled
+that second layer — so it is now driven explicitly too. The one test that is
+allowed to trust the live host is `test_an_introspector_behind_a_transparent_
+prefix_is_not_denied`, and it is that way on purpose: see its own docstring.
 """
 
 from __future__ import annotations
 
 import json
-import shutil
 from collections.abc import Callable
 
 import pytest
@@ -20,7 +25,14 @@ from kb_setup import absent_binary, hook_guard
 
 @pytest.fixture
 def absent(monkeypatch: pytest.MonkeyPatch) -> Callable[..., str | None]:
-    """Make every trap name unresolvable, and everything else resolvable."""
+    """Make every trap name unresolvable, and everything else resolvable.
+
+    `_probe_runs` is left unpatched here on purpose: with every trap name
+    unresolvable, `decide` never reaches it (`shutil.which` returns None
+    first), so a test using this fixture that DID reach the probe would be
+    proof the "which first, cheap filter" ordering broke — see
+    `test_the_probe_never_runs_for_a_name_that_never_resolves`.
+    """
 
     def which(name: str, *_args: object, **_kwargs: object) -> str | None:
         return None if name in absent_binary.TRAPS else f"/usr/bin/{name}"
@@ -31,12 +43,46 @@ def absent(monkeypatch: pytest.MonkeyPatch) -> Callable[..., str | None]:
 
 @pytest.fixture
 def present(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make EVERY name resolvable — the host where the guard must stay inert."""
+    """Make EVERY name resolve AND actually run — the host where the guard is inert.
+
+    Two layers now, both faked: `shutil.which` resolving a name used to be the
+    whole story, and stopped being it on 2026-08-26 (see the module docstring's
+    "RE-ARMED" section). A fixture that only faked `which` would prove the OLD
+    predicate goes inert, not the current one.
+    """
 
     def which(name: str, *_args: object, **_kwargs: object) -> str:
         return f"/usr/bin/{name}"
 
+    def probe_runs(_path: str) -> absent_binary._Probe:
+        return absent_binary._Probe(ok=True, returncode=0, detail="")
+
     monkeypatch.setattr(absent_binary.shutil, "which", which)
+    monkeypatch.setattr(absent_binary, "_probe_runs", probe_runs)
+
+
+@pytest.fixture
+def resolves_but_broken(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every trap name resolves, but actually running it fails — the 2026-08-26 shape.
+
+    Reproduces the exact regression without depending on this machine's mise
+    state: a name `shutil.which` finds, whose invocation nonetheless exits
+    non-zero with a mise-shaped error on stderr.
+    """
+
+    def which(name: str, *_args: object, **_kwargs: object) -> str | None:
+        return f"/Users/dev/.local/share/mise/shims/{name}" if name in absent_binary.TRAPS else None
+
+    def probe_runs(path: str) -> absent_binary._Probe:
+        name = path.rsplit("/", 1)[-1]
+        return absent_binary._Probe(
+            ok=False,
+            returncode=1,
+            detail=f"mise ERROR No version is set for shim: {name}",
+        )
+
+    monkeypatch.setattr(absent_binary.shutil, "which", which)
+    monkeypatch.setattr(absent_binary, "_probe_runs", probe_runs)
 
 
 @pytest.mark.parametrize(
@@ -103,11 +149,60 @@ def test_allows_what_is_not_an_absent_command_word(absent, command: str) -> None
 def test_inert_when_the_binary_is_present(present) -> None:
     """The guard is host-conditional, and this is the arm proving it.
 
-    On Linux `timeout` resolves and the command is legitimate. A guard that
-    denied it anyway would be enforcing a fact about one laptop.
+    On Linux `timeout` resolves AND runs, and the command is legitimate. A
+    guard that denied it anyway would be enforcing a fact about one laptop.
+    Both layers are faked (`present` patches `shutil.which` AND `_probe_runs`)
+    — patching only `which` would prove the PRE-2026-08-26 predicate goes
+    inert, which is exactly the version of this test that missed the
+    regression the first time.
     """
     assert absent_binary.decide("timeout 30 ls") is None
     assert absent_binary.decide("nproc") is None
+
+
+def test_denies_a_binary_that_resolves_but_will_not_run(resolves_but_broken) -> None:
+    """The re-arm's whole point: a resolvable name is not a runnable one.
+
+    Reproduces the 2026-08-26 regression (`shutil.which` finds a mise shim,
+    running it exits 1 with 'No version is set for shim') without depending on
+    THIS machine's mise state — see `resolves_but_broken`. Before the re-arm,
+    `decide` returned None here because it only ever checked `which`.
+    """
+    reason = absent_binary.decide("timeout 5 ls")
+    assert reason is not None, "a resolvable-but-broken binary must still be denied"
+    assert "PROBE reason" in reason
+    assert "resolves to" in reason
+    assert "does not exist on this host" not in reason, (
+        "this is the BROKEN-shim message, not the absent one -- conflating them "
+        "would tell the reader `command -v` returns 1 when it returns 0"
+    )
+    assert "**1**" in reason, "the rc must be stated, and it is no longer 127"
+    assert "No version is set for shim" in reason, "the real failure detail belongs in the message"
+
+
+def test_the_probe_never_runs_for_a_name_that_never_resolves(
+    absent, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ordering guard: `_probe_runs` is the expensive step and must stay LAST.
+
+    `absent` already proves this indirectly (it never patches `_probe_runs`,
+    so a call into the real `subprocess.run` would either hang the test suite
+    or raise). This test makes the guarantee explicit and immediate: patch
+    `_probe_runs` to blow up, and confirm every absent-command-word case still
+    resolves cleanly because `decide` never calls it once `which` says None.
+    """
+
+    def explode(_path: str) -> absent_binary._Probe:
+        raise AssertionError("_probe_runs must not run once `which` already returned None")
+
+    monkeypatch.setattr(absent_binary, "_probe_runs", explode)
+    for command in (
+        "timeout 30 ls",
+        "gtimeout 10 curl https://example.com",
+        "nproc",
+        "tac /tmp/log",
+    ):
+        assert absent_binary.decide(command) is not None
 
 
 def test_unparsable_input_is_allowed(absent) -> None:
@@ -122,19 +217,21 @@ def test_unparsable_input_is_allowed(absent) -> None:
 def test_the_hook_actually_denies_it() -> None:
     """`decide` could be perfect and inert — this drives the real hook payload.
 
-    `a-validator-nothing-calls-is-not-a-gate.md`. Runs against the LIVE host: on
-    a machine where `timeout` exists this asserts nothing about denial, so it
-    asserts the one thing true either way — that the wiring returns a verdict of
-    the right shape rather than raising.
+    `a-validator-nothing-calls-is-not-a-gate.md`. Runs against the LIVE host,
+    and compares the hook's verdict to `absent_binary.decide` called directly
+    rather than to `shutil.which("timeout") is None` — that used to be the
+    whole predicate and stopped being it on 2026-08-26, when `timeout` started
+    resolving to a broken mise shim on this very machine (`which` is not None,
+    yet the right verdict is still a deny). Comparing to `decide` itself keeps
+    this test correct on ANY host state — absent, broken, or genuinely fixed —
+    while still proving the thing it exists to prove: that the hook's wiring
+    actually reaches this module rather than silently swallowing the call.
     """
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "timeout 5 ls"}})
     result = hook_guard.check_hook_call(payload)
     value = getattr(result, "value", None)
-    if shutil.which("timeout") is None:
-        assert value is not None
-        assert "does not exist on this host" in value
-    else:
-        assert value is None
+    expected = absent_binary.decide("timeout 5 ls")
+    assert value == expected
 
 
 def test_the_gate_redirect_still_wins_over_this_one(absent) -> None:
@@ -213,3 +310,50 @@ def test_bare_command_runs_its_argument_and_is_not_an_introspection_probe() -> N
         assert absent_binary.decide(asks_about_it) is None, (
             f"{asks_about_it} is the control arm this guard's own message recommends"
         )
+
+
+def test_probe_runs_reports_success_for_a_real_working_binary() -> None:
+    """`_probe_runs` itself, armed positive, against a REAL binary.
+
+    `/usr/bin/perl` is the one non-mise binary this repo already treats as a
+    given host fact (see `TRAPS["timeout"]`'s own remedy text), so this is the
+    one `_probe_runs` assertion allowed to depend on live host state — every
+    other case below controls it.
+    """
+    probe = absent_binary._probe_runs("/usr/bin/perl")
+    assert probe.ok is True
+    assert probe.returncode == 0
+
+
+def test_probe_runs_reports_failure_for_a_path_that_cannot_exec() -> None:
+    """The OSError arm: `which` resolved a moment ago, exec fails now.
+
+    Simulated with a path that was never resolvable, which is the same OSError
+    shape (`FileNotFoundError`, a subclass of `OSError`) Python raises for a
+    permission-denied or exec-format-mismatch path too — `_probe_runs` does not
+    distinguish those cases and none of them means "this would work".
+    """
+    probe = absent_binary._probe_runs("/nonexistent/kb-setup-absent-binary-probe-fixture")
+    assert probe.ok is False
+    assert probe.returncode is None
+    assert probe.detail, "the OSError text belongs in the deny message"
+
+
+def test_probe_runs_fails_open_on_a_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The one branch this guard cannot explain, and chooses not to deny on.
+
+    Never observed for a real `TRAPS` entry (see the module docstring), so this
+    is controlled directly rather than chased on a real host — the module's own
+    `subprocess` is patched, one layer below `_probe_runs`, the same pattern
+    `absent_binary.shutil` above uses.
+    """
+    import subprocess
+    from typing import Never
+
+    def raises_timeout(*_args: object, **_kwargs: object) -> Never:
+        raise subprocess.TimeoutExpired(cmd=["timeout", "--version"], timeout=2.0)
+
+    monkeypatch.setattr(absent_binary.subprocess, "run", raises_timeout)
+    probe = absent_binary._probe_runs("/usr/bin/timeout")
+    assert probe.ok is True, "fail OPEN: an inconclusive probe must not brick the call"
+    assert probe.returncode is None
