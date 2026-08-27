@@ -1,0 +1,1003 @@
+<title>Part Two, Measured</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground:      #f5f7f4;
+    --surface:     #ffffff;
+    --surface-2:   #ecefe9;
+    --ink:         #161a17;
+    --ink-soft:    #4c534d;
+    --ink-faint:   #7b827c;
+    --rule:        #d5dbd3;
+    --accent:      #a3630a;   /* measured this session */
+    --accent-soft: #f2e6d2;
+    --refute:      #8a2b36;   /* refuted / blocked */
+    --refute-soft: #f6e2e3;
+    --hold:        #3d6a52;   /* stands */
+    --hold-soft:   #dfeee5;
+    --plate:       #fbfcfa;   /* mermaid plate, light in BOTH themes */
+    --plate-rule:  #d9ded6;
+    --shadow:      0 1px 2px rgba(22,26,23,.06), 0 8px 24px -12px rgba(22,26,23,.14);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #101310;
+      --surface:     #171b18;
+      --surface-2:   #1e2320;
+      --ink:         #e7ebe6;
+      --ink-soft:    #a9b1a9;
+      --ink-faint:   #7d857e;
+      --rule:        #2b312d;
+      --accent:      #dfa650;
+      --accent-soft: #35291a;
+      --refute:      #d8848d;
+      --refute-soft: #331d21;
+      --hold:        #7fb494;
+      --hold-soft:   #17291f;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 28px -14px rgba(0,0,0,.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #101310;
+    --surface:     #171b18;
+    --surface-2:   #1e2320;
+    --ink:         #e7ebe6;
+    --ink-soft:    #a9b1a9;
+    --ink-faint:   #7d857e;
+    --rule:        #2b312d;
+    --accent:      #dfa650;
+    --accent-soft: #35291a;
+    --refute:      #d8848d;
+    --refute-soft: #331d21;
+    --hold:        #7fb494;
+    --hold-soft:   #17291f;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 28px -14px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Newsreader", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+  }
+
+  h1, h2, h3, .disp {
+    font-family: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  code, .mono, .num {
+    font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  code {
+    font-size: .84em;
+    background: var(--surface-2);
+    padding: .12em .38em;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .mast { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", monospace;
+    font-size: .7rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  h1 {
+    font-size: clamp(2.6rem, 7vw, 4.4rem);
+    font-weight: 800;
+    line-height: .98;
+    letter-spacing: -.025em;
+  }
+
+  .standfirst {
+    font-size: 1.2rem;
+    color: var(--ink-soft);
+    max-width: 40rem;
+    line-height: 1.55;
+  }
+
+  .standfirst em { color: var(--ink); font-style: italic; }
+
+  .provenance {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.4rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+    font-family: "JetBrains Mono", monospace;
+    font-size: .72rem;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- verdict board ---------- */
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .board-cell {
+    background: var(--surface);
+    padding: 1.1rem 1.05rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+
+  .board-cell .n {
+    font-family: "JetBrains Mono", monospace;
+    font-size: .7rem;
+    color: var(--ink-faint);
+  }
+
+  .board-cell .t {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 700;
+    font-size: .96rem;
+    line-height: 1.25;
+    letter-spacing: -.01em;
+  }
+
+  .pill {
+    align-self: flex-start;
+    font-family: "JetBrains Mono", monospace;
+    font-size: .64rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: .22rem .5rem;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  .pill.no    { background: var(--refute-soft); color: var(--refute); }
+  .pill.part  { background: var(--accent-soft); color: var(--accent); }
+  .pill.yes   { background: var(--hold-soft);   color: var(--hold); }
+
+  /* ---------- case sections ---------- */
+
+  section.case {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    scroll-margin-top: 2rem;
+  }
+
+  .case-head {
+    display: flex;
+    gap: 1.1rem;
+    align-items: baseline;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: .7rem;
+  }
+
+  .case-head .idx {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .case-head h2 {
+    font-size: clamp(1.5rem, 3.4vw, 2.1rem);
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.1;
+    flex: 1;
+  }
+
+  blockquote.ask {
+    margin: 0;
+    padding: .9rem 0 .9rem 1.15rem;
+    border-left: 3px solid var(--accent);
+    color: var(--ink-soft);
+    font-style: italic;
+    font-size: 1.02rem;
+  }
+
+  blockquote.ask p { margin: 0 0 .5rem; }
+  blockquote.ask p:last-child { margin-bottom: 0; }
+
+  p { margin: 0 0 1rem; max-width: 42rem; }
+  p:last-child { margin-bottom: 0; }
+
+  .lede { font-size: 1.06rem; }
+
+  strong { font-weight: 500; color: var(--ink); background: linear-gradient(transparent 62%, var(--accent-soft) 62%); }
+
+  /* ---------- measurement strip ---------- */
+
+  .measures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .m {
+    background: var(--surface);
+    padding: .95rem 1rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .22rem;
+  }
+
+  .m .v {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 1.45rem;
+    font-weight: 600;
+    letter-spacing: -.03em;
+    line-height: 1.1;
+  }
+
+  .m .v.bad  { color: var(--refute); }
+  .m .v.warn { color: var(--accent); }
+  .m .v.ok   { color: var(--hold); }
+
+  .m .k {
+    font-size: .82rem;
+    color: var(--ink-soft);
+    line-height: 1.35;
+  }
+
+  .m .src {
+    font-family: "JetBrains Mono", monospace;
+    font-size: .64rem;
+    color: var(--ink-faint);
+    word-break: break-all;
+  }
+
+  /* ---------- verdict block ---------- */
+
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent);
+    border-radius: 4px;
+    padding: 1.15rem 1.3rem;
+    box-shadow: var(--shadow);
+  }
+
+  .verdict.no  { border-left-color: var(--refute); }
+  .verdict.yes { border-left-color: var(--hold); }
+
+  .verdict .lab {
+    font-family: "JetBrains Mono", monospace;
+    font-size: .66rem;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: .45rem;
+  }
+
+  .verdict p { font-size: 1.02rem; max-width: none; }
+
+  /* ---------- figures ---------- */
+
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+  }
+
+  .plate {
+    background: var(--plate);
+    border: 1px solid var(--plate-rule);
+    border-radius: 6px;
+    padding: 1.2rem .9rem;
+    overflow-x: auto;
+  }
+
+  .plate .mermaid { background: var(--plate); }
+
+  figcaption {
+    font-size: .84rem;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    max-width: 42rem;
+  }
+
+  figcaption b { font-weight: 500; color: var(--ink); }
+
+  svg.fig { width: 100%; max-width: 100%; height: auto; color: var(--ink); }
+
+  /* ---------- tables ---------- */
+
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: .88rem;
+    background: var(--surface);
+  }
+
+  th, td {
+    text-align: left;
+    padding: .62rem .85rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  th {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 700;
+    font-size: .74rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  td.mono, th.mono { font-family: "JetBrains Mono", monospace; font-size: .8rem; }
+
+  /* ---------- gauge ---------- */
+
+  .gauge { display: flex; flex-direction: column; gap: .45rem; }
+
+  .gauge-track {
+    position: relative;
+    height: 2.4rem;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .gauge-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--accent);
+    opacity: .78;
+  }
+
+  .gauge-mark {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: var(--ink);
+  }
+
+  .gauge-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem 1.2rem;
+    font-family: "JetBrains Mono", monospace;
+    font-size: .7rem;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- misc ---------- */
+
+  ul.tight { margin: 0 0 1rem; padding-left: 1.15rem; max-width: 42rem; }
+  ul.tight li { margin-bottom: .45rem; }
+
+  .note {
+    background: var(--surface-2);
+    border-radius: 4px;
+    padding: .9rem 1.05rem;
+    font-size: .9rem;
+    color: var(--ink-soft);
+  }
+
+  .note b { color: var(--ink); font-weight: 500; }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.6rem;
+    font-size: .84rem;
+    color: var(--ink-soft);
+  }
+
+  footer h3 { font-size: .95rem; margin-bottom: .6rem; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, .board-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div class="eyebrow">docs/direction/2026-08-26-ray-directives.md · part two</div>
+    <h1>Part Two,<br>Measured</h1>
+    <p class="standfirst">Five directives were filed verbatim and left deliberately unanalysed. Here is each one against what the code and the disk actually say — <em>not</em> against what the handoff remembered.</p>
+    <div class="provenance">
+      <span>measured 2026-08-27</span>
+      <span>HEAD 048b6a7215ec</span>
+      <span>graphify 0.9.48 (fork)</span>
+      <span>no code changed</span>
+    </div>
+  </header>
+
+  <div class="board" role="list">
+    <div class="board-cell" role="listitem">
+      <span class="n">01</span>
+      <span class="t">Lift the graphify ban?</span>
+      <span class="pill no">ban stands, goal is right</span>
+    </div>
+    <div class="board-cell" role="listitem">
+      <span class="n">02</span>
+      <span class="t">Generate every wrapper type</span>
+      <span class="pill part">half of it</span>
+    </div>
+    <div class="board-cell" role="listitem">
+      <span class="n">03</span>
+      <span class="t">Stop typing the prefix</span>
+      <span class="pill yes">one hook</span>
+    </div>
+    <div class="board-cell" role="listitem">
+      <span class="n">04</span>
+      <span class="t">Memory bloat &amp; typed output</span>
+      <span class="pill part">already ticketed ×5</span>
+    </div>
+    <div class="board-cell" role="listitem">
+      <span class="n">05</span>
+      <span class="t">Why the loop repeats</span>
+      <span class="pill no">structural</span>
+    </div>
+  </div>
+
+  <!-- ===================== 01 ===================== -->
+  <section class="case" id="item-1">
+    <div class="case-head">
+      <span class="idx">01</span>
+      <h2>One graphify tree for the whole mac</h2>
+    </div>
+
+    <blockquote class="ask">
+      <p>“should we lift the ban on graphify? i really only want one graphify source tree for common knowledge that is relevant for all projects and coding agents on this mac. provide pros/cons and what features we lose/gain based on the graphify source tree vs global”</p>
+    </blockquote>
+
+    <p class="lede">The ban and the goal are not actually in conflict, because <strong>graphify's global mode is not an alternative to project graphs — it is a union of them.</strong> Every project still builds its own <code>graph.json</code> first; <code>global add</code> then copies that finished graph into <code>~/.graphify/global-graph.json</code> with every node ID prefixed by a repo tag.</p>
+
+    <figure>
+      <div class="plate">
+        <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#fbfcfa','primaryColor':'#ffffff','primaryTextColor':'#161a17','primaryBorderColor':'#8d968c','lineColor':'#4c534d','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
+flowchart LR
+  subgraph P1["project: knowledge-base"]
+    E1["graphify extract<br/>(AST, free)"] --> G1["graphify-out/graph.json<br/>736.4 MiB"]
+  end
+  subgraph P2["project: dotfiles"]
+    E2["graphify extract"] --> G2["graphify-out/graph.json"]
+  end
+  G1 -- "global add --as kb<br/>prefixes every node id" --> GG
+  G2 -- "global add --as dot<br/>prefixes every node id" --> GG
+  GG["~/.graphify/global-graph.json<br/>ONE file, union of both"]
+  GG -. "no edge can form<br/>across the prefix boundary" .-> X(("cross-project<br/>insight"))
+  style X stroke-dasharray: 4 3
+        </pre>
+      </div>
+      <figcaption><b>Global is a union, not a merge.</b> <code>prefix_graph_for_global(src_G, repo_tag)</code> renames every node so projects cannot collide — which is also why they cannot <i>connect</i>. The only dedup is external-library nodes matched by label where <code>source_file</code> is empty. <span class="mono">global_graph.py:79–158</span></figcaption>
+    </figure>
+
+    <div class="measures">
+      <div class="m">
+        <span class="v bad">736.4 MiB</span>
+        <span class="k">this project's <code>graph.json</code> alone</span>
+        <span class="src">772,120,976 B · measured</span>
+      </div>
+      <div class="m">
+        <span class="v">512 MiB</span>
+        <span class="k">graphify's stock read cap</span>
+        <span class="src">security.py:32</span>
+      </div>
+      <div class="m">
+        <span class="v warn">1,024 MiB</span>
+        <span class="k">our raised cap — “a ratchet, not a fix”. But the cap is <b>per-file</b>, so N graphs each under it never trip</span>
+        <span class="src">mise.toml:271 · security.py:35 · #130</span>
+      </div>
+      <div class="m">
+        <span class="v ok">0.0%</span>
+        <span class="k">prefix waste today — <b>#120 said 41%</b> and is stale-open</span>
+        <span class="src">re-derived: max 1 rep per id, was 26</span>
+      </div>
+    </div>
+
+    <h3 class="disp" style="font-size:1.1rem;margin-top:.4rem">There is no “instead of” — both doors lead to the same call</h3>
+
+    <p>graphify offers two ways in, and the second looks like the architecture you described — extract straight into the global graph, never build a project one:</p>
+
+    <ul class="tight">
+      <li><code>graphify global add graphify-out/graph.json --as myrepo</code></li>
+      <li><code>graphify extract ./docs --global --as myrepo</code> — the form <code>do-not.md</code> bans by name</li>
+    </ul>
+
+    <p><strong>They are the same thing.</strong> Read at <code>cli.py:4256</code>: the <code>--global</code> branch writes <code>graphify-out/graph.json</code> exactly as normal, then calls <code>_global_add(graphify_out / "graph.json", tag)</code> — the identical function. <b>Global is strictly additive: a second copy layered on top, never a replacement for the per-project tree.</b> “One source tree instead of many” is not a mode graphify has.</p>
+
+    <div class="verdict no">
+      <span class="lab">and its failure mode is the one this repo hunts</span>
+      <p>That same block wraps the merge in <code>except Exception as exc: print(…, file=sys.stderr)</code> and then exits <b>0</b>. So a global merge that fails — on the cap, on a lock, on anything — leaves the extract reporting success with a warning on stderr. In a repo whose standing rules say <i>no warning shall be dismissed</i>, and which has already filed <b>#438</b> because a stderr-is-a-refusal rule broke on a tool's own progress output, <b>adopting global means adopting a silent-loss path.</b></p>
+    </div>
+
+    <h3 class="disp" style="font-size:1.1rem;margin-top:1.4rem">Ray already asked this, and the answer was measured on 2026-08-02</h3>
+
+    <p>Issue <b>#130</b> — <i>“Stop merging: federate the query across per-source graphs?”</i> — opens by quoting you: <i>“research how to get around it? it should be something like having multiple sources and just connecting their graphs.”</i> Its conclusion, verified again this session:</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#130's finding</th><th>re-checked today</th></tr></thead>
+        <tbody>
+          <tr><td>The 512 MiB cap is <b>soft and per-FILE</b> — <code>check_graph_file_size_cap</code> stats one path, so N graphs each under it never trip</td><td class="mono" style="color:var(--hold)">CONFIRMED — <code>security.py:35</code> re-reads the env on every call</td></tr>
+          <tr><td><b>graphify cannot federate, but we can</b> — <code>--graph</code> takes exactly one value at all 8 parse sites</td><td class="mono" style="color:var(--hold)">STANDS — unchanged</td></tr>
+          <tr><td>Merging IS the prefix bug — up to <b>26</b> stacked prefixes, <b>164.4 MB / 41%</b> of the graph (#120)</td><td class="mono" style="color:var(--refute)">NO LONGER TRUE — see below</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note" style="border-left:3px solid var(--hold)">
+      <b>Live finding: #120 is fixed, and stale-open.</b> Re-derived on today's <code>graph.json</code>: prefix repetitions per node id run <b>0 to 1</b>, never higher — 487,786 ids carry exactly one prefix, 4,868 carry none. <b>Redundant bytes: 0.0 MiB, 0.0% of the file.</b> Against #120's measured max of 26 and 164.4 MB. The 736 MiB is real content, not padding. Somebody's fix landed and the issue never closed — which is precisely the hazard this repo documents: <i>source beats issue tracker; a stale-open issue read as current state.</i>
+    </div>
+
+    <div class="verdict no" style="margin-top:1rem">
+      <span class="lab">verdict</span>
+      <p><b>The ban stands, and your goal is right — they are not in conflict.</b> What you want is one knowledge surface for every agent on this mac. Global mode does not deliver it: it cannot replace the per-project trees, it prefixes specifically so projects <i>cannot</i> relate, it fails by stderr-and-exit-0, and <code>do-not.md</code> bans it as shared mutable machine state.<br><br>
+      The two things that <i>do</i> deliver it are both already ticketed and neither is built: <b>#130's federated retrieval</b> — our own code, since <code>lexical.py</code> loads exactly one graph today — and <b>#109, “knowledge-base becomes the one internal research tool.”</b> That is where this question has been waiting since 2026-08-02.</p>
+    </div>
+
+    <div class="note"><b>And a 4.5 GB loose end.</b> <code>~/.graphify/repos</code> holds <b>79 repos</b>. Only <b>11</b> overlap this corpus's 92 manifests — so <b>68 repos sit there with no manifest</b>, invisible to every query, predating the ban. Under <code>research-repo-enumeration.md</code> that is an unregistered source backlog, not junk. Nobody has decided whether to register it or reclaim it.</div>
+  </section>
+
+  <!-- ===================== 02 ===================== -->
+  <section class="case" id="item-2">
+    <div class="case-head">
+      <span class="idx">02</span>
+      <h2>Every function a generated wrapper type</h2>
+    </div>
+
+    <blockquote class="ask">
+      <p>“can we just make every function in the python library be a wrapper type that is generated by datamodel-code-generator so that we can just get this done in one swoop… is this advisable?”</p>
+      <p>“add path based and/or file type filters… or some type of deny rule… recursively under <code>python/src/kb_setup/</code> and <code>tests/</code>”</p>
+    </blockquote>
+
+    <p class="lede">The generator is already pinned. <strong>Nothing has ever been generated from it.</strong> <code>codegen = ["datamodel-code-generator==0.75.1"]</code> sits in an isolated dependency group at <code>pyproject.toml:88</code>, and there is no models package anywhere under <code>python/src/kb_setup/</code>.</p>
+
+    <div class="measures">
+      <div class="m">
+        <span class="v bad">1,310</span>
+        <span class="k"><code>def</code>s in <code>kb_setup</code> — the literal blast radius of “every function”</span>
+        <span class="src">measured</span>
+      </div>
+      <div class="m">
+        <span class="v">462</span>
+        <span class="k">module-level public functions</span>
+        <span class="src">measured</span>
+      </div>
+      <div class="m">
+        <span class="v ok">131</span>
+        <span class="k">hand-written <code>@dataclass</code>es across 42 modules — already typed, would be replaced</span>
+        <span class="src">measured</span>
+      </div>
+      <div class="m">
+        <span class="v">113</span>
+        <span class="k">test files that would need regenerating alongside</span>
+        <span class="src">measured</span>
+      </div>
+    </div>
+
+    <p><b>“One swoop” is the part that does not survive contact.</b> A wrapper type per function means an input type and a result type each — roughly 2,600 generated classes from a JSON-Schema source that does not exist yet and would itself have to be authored by hand, function by function. The generator does not read Python; it reads schemas. So the swoop is not “run a generator”, it is “hand-author 1,310 schemas, then run a generator.”</p>
+
+    <p>The half that <i>is</i> advisable is the half already decided and never built: <strong>a base schema for common types and enums, with every other schema <code>$ref</code>-ing it</strong> — applied to the <b>seams</b> (what a mise task returns, what a gate reports, what an error code is), not to every internal helper. That is the same surface item 4's structured-output request needs, which is why these two are one project and not two.</p>
+
+    <div class="verdict">
+      <span class="lab">verdict</span>
+      <p>Adopt the protocol at the <b>seam</b> layer — task results, gate results, error enums — where the generated types earn their keep as a machine contract. Reject it at the function layer: 1,310 wrappers is a schema-authoring project wearing a code-generation costume. <b>The deny rule is buildable and cheap</b> — this repo already runs five stateless <code>PreToolUse</code> guards, and a sixth keyed on <code>python/src/kb_setup/**</code> and <code>tests/**</code> is one more entry in the same table.</p>
+    </div>
+
+    <div class="note"><b>The precondition nobody has stated:</b> a deny rule enforcing “models are generated” is unenforceable until at least one model is generated. Order matters — base schema first, one seam converted second, the guard third. A guard shipped first would deny every edit to a protocol that does not exist.</div>
+  </section>
+
+  <!-- ===================== 03 ===================== -->
+  <section class="case" id="item-3">
+    <div class="case-head">
+      <span class="idx">03</span>
+      <h2>The prefix you type every single turn</h2>
+    </div>
+
+    <blockquote class="ask">
+      <p>“i've also been starting every prompt with <code>/fable-orchestrator:orchestration</code> <code>/graphify</code> — what is the best way to setup the prompt to enforce using the fable-orchestrator workflow and to force the agents to search the graphify sources first”</p>
+    </blockquote>
+
+    <p class="lede">Half of what you type is <strong>already enforced by a hook and does not need typing</strong>. The other half is enforced only by a sentence in <code>CLAUDE.md</code> that a model may or may not act on — and this session proves it doesn't reliably, because you typed the prefix.</p>
+
+    <figure>
+      <svg class="fig" viewBox="0 0 880 300" role="img" aria-label="Today the graph-first rule fires from a PreToolUse hook while the orchestration rule is only prose a model may skip; adding one UserPromptSubmit hook makes both deterministic and removes the typed prefix.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+          <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#a3630a"/>
+          </marker>
+        </defs>
+
+        <text x="0" y="16" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".6">TODAY</text>
+        <text x="470" y="16" font-family="JetBrains Mono, monospace" font-size="11" fill="#a3630a">WITH ONE UserPromptSubmit HOOK</text>
+
+        <line x1="440" y1="30" x2="440" y2="290" stroke="currentColor" stroke-opacity=".18" stroke-dasharray="3 4"/>
+
+        <!-- LEFT: today -->
+        <rect x="0" y="34" width="150" height="34" rx="4" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="75" y="55" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor">Ray types prefix</text>
+
+        <line x1="75" y1="68" x2="75" y2="98" stroke="currentColor" marker-end="url(#ar)"/>
+        <text x="83" y="87" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity=".65">every turn</text>
+
+        <rect x="0" y="98" width="400" height="34" rx="4" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="12" y="119" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor">/graphify  →  redundant: hook already denies broad search</text>
+
+        <rect x="0" y="146" width="400" height="34" rx="4" fill="none" stroke="#8a2b36" stroke-opacity=".8"/>
+        <text x="12" y="167" font-family="JetBrains Mono, monospace" font-size="11" fill="#8a2b36">/orchestration  →  CLAUDE.md prose, model may skip it</text>
+
+        <rect x="0" y="206" width="400" height="52" rx="4" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-dasharray="4 3"/>
+        <text x="12" y="226" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".75">PreToolUse: fires AFTER a tool call is attempted</text>
+        <text x="12" y="244" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".75">UserPromptSubmit: none declared</text>
+
+        <!-- RIGHT: proposed -->
+        <rect x="470" y="34" width="150" height="34" rx="4" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="4 3"/>
+        <text x="545" y="55" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".5">Ray types nothing</text>
+
+        <line x1="545" y1="68" x2="545" y2="98" stroke="#a3630a" marker-end="url(#ar-a)"/>
+
+        <rect x="470" y="98" width="400" height="46" rx="4" fill="none" stroke="#a3630a"/>
+        <text x="482" y="117" font-family="JetBrains Mono, monospace" font-size="11" fill="#a3630a">UserPromptSubmit hook</text>
+        <text x="482" y="134" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".8">injects both rules, once, before the model reads</text>
+
+        <line x1="670" y1="144" x2="670" y2="172" stroke="#a3630a" marker-end="url(#ar-a)"/>
+
+        <rect x="470" y="172" width="400" height="34" rx="4" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="482" y="193" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor">deterministic · same text every turn · zero typing</text>
+
+        <rect x="470" y="220" width="400" height="38" rx="4" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-dasharray="4 3"/>
+        <text x="482" y="243" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".75">PreToolUse deny stays as the backstop</text>
+      </svg>
+      <figcaption><b>The gap is the event, not the rule.</b> Every hook this repo declares is <code>PreToolUse</code>, <code>SessionStart</code> or <code>SessionEnd</code> — <b>zero</b> <code>UserPromptSubmit</code>. So nothing can speak before the model reads a prompt; the graph-first rule can only object <i>after</i> a search is attempted, and the orchestration rule cannot object at all.</figcaption>
+    </figure>
+
+    <div class="verdict yes">
+      <span class="lab">verdict</span>
+      <p>One <code>UserPromptSubmit</code> hook entry in <code>.claude/settings.json</code>, printing the two standing rules. No new module, no new task, no new skill — the harness already re-injects it every turn, which is exactly the behaviour you were producing by hand. <b>Cost: a few lines of context per turn</b>, against a prefix you have typed on every prompt for two days.</p>
+    </div>
+
+    <div class="note"><b>Unverified:</b> whether <code>UserPromptSubmit</code> output reaches subagents and forks, or only the main thread. That distinction decides whether this also fixes half of item 4 — and it has not been probed.</div>
+  </section>
+
+  <!-- ===================== 04 ===================== -->
+  <section class="case" id="item-4">
+    <div class="case-head">
+      <span class="idx">04</span>
+      <h2>Context at 20% before the first prompt</h2>
+    </div>
+
+    <blockquote class="ask">
+      <p>“the context limit is always close to 20% even before the first prompt after /kb-resume… i think the MEMORY.md file is not setup properly and is injecting too much context right away”</p>
+      <p>“i keep requesting this and it is not being done. we need to have universal logging from mise task onto python library module(s)/function(s)… our code should be generating structured output that is machine readable so that return values and error codes are just enums that can be directly parsed w zero subjective reasoning”</p>
+    </blockquote>
+
+    <div class="note" style="border-left:3px solid var(--refute)">
+      <b>Correction, 2026-08-27, after first publication.</b> This section first printed the cap as <b>24.4 KiB</b>, a figure inherited through the directive and two handoffs. The pinned docs say something different, verbatim at <code>sources/agent-harness-docs/docs/claude-code/memory.md:386</code>: <i>“The first <b>200 lines</b> of <code>MEMORY.md</code>, or the first <b>25KB</b>, whichever comes first, are loaded at the start of every conversation.”</i> Two caps, not one. The numbers below are re-derived against both. Issue <b>#490</b> had already read this correctly on 2026-08-25 and nothing carried it forward — which is item 5's loop, arriving inside item 4.
+    </div>
+
+    <h3 class="disp" style="font-size:1.1rem;margin-top:.4rem">4a — two caps, and only one of them is close</h3>
+
+    <div class="gauge">
+      <div class="gauge-track" aria-label="MEMORY.md is 24,308 bytes, 95 percent of the 25 KiB byte cap, against a 17.1 KiB target">
+        <div class="gauge-fill" style="width:95.0%"></div>
+        <div class="gauge-mark" style="left:68.4%"></div>
+      </div>
+      <div class="gauge-legend">
+        <span>■ bytes <b>24,308</b> — <b>95.0%</b> of 25 KiB (97.2% if the cap is a round 25,000)</span>
+        <span>│ target <b>17.1 KiB</b></span>
+      </div>
+    </div>
+
+    <div class="gauge" style="margin-top:.8rem">
+      <div class="gauge-track" aria-label="MEMORY.md is 106 lines against a 200 line cap, 53 percent">
+        <div class="gauge-fill" style="width:53.0%;background:var(--hold)"></div>
+      </div>
+      <div class="gauge-legend">
+        <span>■ lines <b>106</b> of <b>200</b> — <b>53.0%</b>, nowhere near</span>
+      </div>
+    </div>
+
+    <p style="margin-top:1rem"><strong>The byte cap is the live one and the line cap is not — which is the whole shape of the problem.</strong> 24,308 bytes over 106 lines is <b>229 bytes per line</b>, against a docs instruction that reads “keep one line per entry, move detail into topic files.” The index is not too long. Each of its lines is a paragraph.</p>
+
+    <h3 class="disp" style="font-size:1.1rem;margin-top:1.4rem">The arithmetic nobody has stated: compaction cannot fix this</h3>
+
+    <div class="measures">
+      <div class="m">
+        <span class="v">346</span>
+        <span class="k">topic files behind the index</span>
+        <span class="src">measured · 809,301 B · avg 2,339 B</span>
+      </div>
+      <div class="m">
+        <span class="v ok">255</span>
+        <span class="k">linked directly from the index</span>
+        <span class="src">measured</span>
+      </div>
+      <div class="m">
+        <span class="v">24</span>
+        <span class="k">reached only by the SPENT-rounds glob catch-all</span>
+        <span class="src">10 patterns</span>
+      </div>
+      <div class="m">
+        <span class="v bad">67</span>
+        <span class="k">ORPHANED — unlinked and unglobbed. Written, paid for, unreachable</span>
+        <span class="src">#540 measured 64 on 08-26; +3 since</span>
+      </div>
+    </div>
+
+    <p style="margin-top:1rem">Run the numbers forward. Even at a genuinely terse <b>60 bytes per entry</b>, 346 entries is <b>20.8 KB</b> — 85% of the byte cap, with nothing left for the standing hazards the index exists to carry. At the 17.1 KB target it does not fit at all. <strong>The index has outgrown its own format; another compaction pass buys one round and sheds more entries into the orphan pile.</strong> That is exactly what has happened four rounds running (#454), and the orphan count is the receipt.</p>
+
+    <h3 class="disp" style="font-size:1.1rem;margin-top:1.4rem">The subagent premise is refuted</h3>
+
+    <p>The directive says: <i>“/kb-resume is only needed for the initial prompt after /clear. i dont think it needs to be there for every subagent or subtask/fork to read.”</i> <strong>It already isn't.</strong> Verbatim at <code>sub-agents.md:935</code>:</p>
+
+    <blockquote class="ask" style="border-left-color:var(--hold)">
+      <p>“<b>Auto memory</b>: the main conversation's auto memory isn't loaded [into a non-fork subagent]. To give a subagent persistent memory of its own, use the <code>memory</code> field.”</p>
+    </blockquote>
+
+    <p>A subagent sees <code>MEMORY.md</code> only if its frontmatter declares <code>memory: user|project|local</code> — and then it is <i>that agent's own</i> <code>~/.claude/agent-memory/&lt;name&gt;/MEMORY.md</code>, never this project's. <b>Zero of the six roster agents declare it.</b> So the index costs <b>one load, in the main thread, per session</b>. Forks are the exception and inherit by construction, which is what a fork is for.</p>
+
+    <div class="note"><b>The same page carries a second answer you have asked for repeatedly.</b> <code>sub-agents.md:934</code>: a subagent runs its own system prompt, so <b>your output style does not shape its responses either — except in a fork.</b> That is why lane reports keep coming back in a voice you did not ask for.</div>
+
+    <h3 class="disp" style="font-size:1.1rem;margin-top:1.4rem">Can graphify carry the tail? Already asked, already answered</h3>
+
+    <p>Issue <b>#540</b> opens with your exact question — <i>“can we offload MEMORY.md's tail into graphify memory and just point at it?”</i> — and its answer is <strong>no, and the reason is worse than a missing pointer</strong>: <code>kb-remember</code> has written <b>275</b> work-memory files and <b>zero</b> of them are reachable from any <code>kb-query</code>. Pointing the index at that store would replace a visible leak with an invisible one.</p>
+
+    <figure>
+      <div class="plate">
+        <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#fbfcfa','primaryColor':'#ffffff','primaryTextColor':'#161a17','primaryBorderColor':'#8d968c','lineColor':'#4c534d','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
+flowchart TB
+  subgraph AM["Claude auto-memory — OUTSIDE the repo"]
+    IDX["MEMORY.md<br/>24,308 B · 106 lines<br/>THE ONLY THING LOADED"]
+    TOP["346 topic files · 809 KB<br/>255 linked · 24 globbed · 67 ORPHANED"]
+    IDX -- "read on demand,<br/>only if linked" --> TOP
+  end
+  subgraph GM["graphify work-memory — IN the repo"]
+    WM["graphify-out/memory/<br/>275 files, committed"]
+  end
+  WM -. "0 nodes in graph-prose.json<br/>#540: write-only" .-> Q["kb-query"]
+  TOP -. "never ingested<br/>as a corpus source" .-> Q
+  DOC["THIS REPO's own prose<br/>CLAUDE.md · .claude/rules · .claude/skills · docs<br/>0 nodes in the graph"] -- "MOVE 1 — already tracked,<br/>no privacy question,<br/>refuted 3/3 probe misses" --> Q
+  TOP -. "MOVE 3 — last, and only<br/>if 1 and 2 leave a gap" .-> Q
+  style DOC stroke:#3d6a52,color:#3d6a52
+  style WM stroke:#8a2b36,color:#8a2b36
+  style Q stroke:#3d6a52,color:#3d6a52
+        </pre>
+      </div>
+      <figcaption><b>Three sources of self-knowledge, and the graph holds none of them.</b> Both dashed paths are dead — <code>graphify-out/memory/</code> produces no graph nodes (#540), and the topic files were never ingested. The solid arrow is the corrected first move, and it is not a memory move at all: <b>this repo's own rules, skills and docs are absent from its own graph</b>, which is what the probe below actually caught.</figcaption>
+    </figure>
+
+    <div class="note" style="border-left:3px solid var(--refute)">
+      <b>Second correction, same day — this section first proposed ingesting the 346 topic files FIRST.</b> A throwaway probe run immediately afterwards refuted that ordering. The measurement is below; the original proposal is not deleted because it was already sent, but it is not the first move.
+    </div>
+
+    <h3 class="disp" style="font-size:1.1rem;margin-top:1.4rem">The probe: does the graph already know what memory knows?</h3>
+
+    <p>Before ingesting anything, the cheap question is whether the corpus already covers this material under a different name. Three questions whose answers live only in this project's own history, asked of <code>kb-query --prose --idf</code>, plus one control whose answer is definitely in the corpus:</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>asked</th><th class="mono">top score</th><th>what came back</th><th class="mono">verdict</th></tr></thead>
+        <tbody>
+          <tr><td>annotated tag pins the tag object, not the commit</td><td class="mono">13.19</td><td>a YouTube transcript on SHA-256 hashing</td><td class="mono" style="color:var(--refute)">MISS</td></tr>
+          <tr><td>a review round finds defects introduced by the last round's fix</td><td class="mono">14.56</td><td>an anthropic.com blog on code migration</td><td class="mono" style="color:var(--refute)">MISS</td></tr>
+          <tr><td>compliance is a rate, not a yes; enforced directives go to zero</td><td class="mono">12.82</td><td>the Claude Code glossary on managed settings</td><td class="mono" style="color:var(--refute)">MISS</td></tr>
+          <tr><td><b>CONTROL</b> — graphify community detection and god nodes</td><td class="mono">18.56</td><td>graphify's own <code>analyze</code>, <code>AGENTS.md</code>, <code>how-it-works</code></td><td class="mono" style="color:var(--hold)">HIT ×3</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1rem">The control scores higher than every miss and returns three obviously-correct sources, so <b>the probe discriminates</b>. Three for three, the graph knows other people's writing about a topic and nothing about this repo's own experience of it.</p>
+
+    <h3 class="disp" style="font-size:1.1rem;margin-top:1.4rem">Why — and it is bigger than memory</h3>
+
+    <div class="measures">
+      <div class="m">
+        <span class="v bad">0</span>
+        <span class="k">prose nodes from <code>CLAUDE.md</code></span>
+        <span class="src">measured on graph.json</span>
+      </div>
+      <div class="m">
+        <span class="v bad">0</span>
+        <span class="k">nodes from <code>.claude/rules/**</code> or <code>.claude/skills/**</code> — the 92 <code>.claude/</code> nodes are <code>.py</code>, <code>.json</code> and <code>.js</code> only</span>
+        <span class="src">measured</span>
+      </div>
+      <div class="m">
+        <span class="v ok">2,386</span>
+        <span class="k">nodes from <code>python/src/kb_setup</code> — the code IS there, free, via AST</span>
+        <span class="src">measured</span>
+      </div>
+      <div class="m">
+        <span class="v">3,647</span>
+        <span class="k">prose nodes about external docs and blogs — <b>74.9%</b> of the prose graph</span>
+        <span class="src">measured · 4,868 total</span>
+      </div>
+    </div>
+
+    <p style="margin-top:1rem"><strong>The knowledge base contains its own code and none of its own doctrine.</strong> Every rule the agents are told to follow, every skill, every directive, every lesson — absent. Meanwhile the repo's first invariant is <i>query the graph first</i>, enforced by a hook that <b>denies</b> a broad search until a graph query has run. That guard points agents at a graph which cannot answer one question about the rules it is enforcing.</p>
+
+    <div class="verdict no" style="margin-top:1rem">
+      <span class="lab">corrected proposal — three moves, in this order</span>
+      <p><b>1. Ingest this repo's own prose</b> — <code>CLAUDE.md</code>, <code>.claude/rules/**</code>, <code>.claude/skills/**</code>, <code>docs/**</code>. Already tracked, already committed, <b>zero privacy question</b>, and it is the exact content agents are instructed to obey and cannot retrieve. This is the move, and it was not on anyone's list.<br><br>
+      <b>2. Unblock <code>graphify-out/memory/</code></b> — #540, the 275 work-memories, with its stated acceptance test.<br><br>
+      <b>3. The 346 personal topic files</b> — last, and only if 1 and 2 leave a gap. That is where the “commit your session memory into the repo” decision actually lives, and it is a smaller decision once the first two have run.</p>
+    </div>
+
+    <p>Move 1 shares #397's precondition — <code>kb-build</code> must work — but nothing else. It needs no ruling from you, costs host-agent extraction on roughly 30 markdown files, and would have made all three misses above into hits.</p>
+
+    <div class="note"><b>Two numbers this probe also caught in passing.</b> <code>graph.json</code> holds <b>492,654</b> nodes; <code>CLAUDE.md</code> says <b>140,295</b>. And a first pass at this measurement bucketed by path prefix and reported “79,186 own-repo nodes” — wrong: <code>docs/registry.data.ts</code> and <code>tests/main/jsonschema/</code> belong to <i>ingested sources</i> whose own trees carry those names. The prefix was a bound, not an identity. The corrected figures are the ones above.</div>
+
+    <h3 class="disp" style="font-size:1.1rem;margin-top:1.4rem">4b — the structured-output request, and why it keeps not landing</h3>
+
+    <div class="measures">
+      <div class="m">
+        <span class="v bad">328</span>
+        <span class="k"><code>print(</code> calls across <code>kb_setup</code></span>
+        <span class="src">measured, 77 modules</span>
+      </div>
+      <div class="m">
+        <span class="v warn">15</span>
+        <span class="k">modules defining any <code>Enum</code></span>
+        <span class="src">measured</span>
+      </div>
+      <div class="m">
+        <span class="v">32</span>
+        <span class="k"><code>--json</code> flags offered</span>
+        <span class="src">measured</span>
+      </div>
+      <div class="m">
+        <span class="v bad">79</span>
+        <span class="k">mise tasks — the transport that flattens it all to text</span>
+        <span class="src">mise.toml</span>
+      </div>
+    </div>
+
+    <figure>
+      <div class="plate">
+        <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#fbfcfa','primaryColor':'#ffffff','primaryTextColor':'#161a17','primaryBorderColor':'#8d968c','lineColor':'#4c534d','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
+flowchart TB
+  F["kb_setup function<br/>knows the real outcome"] --> R{"how does it leave?"}
+  R -- "328x today" --> P["print() to stdout"]
+  R -- "32x today" --> J["--json flag"]
+  P --> M["mise run wrapper<br/>+ output redaction"]
+  J --> M
+  M --> A["agent greps a phrase<br/>out of a line of text"]
+  A --> D["subjective reasoning<br/>about what went wrong"]
+  M -. "redaction MANGLES<br/>SHAs, branches, PR numbers" .-> A
+  style D stroke:#8a2b36,color:#8a2b36
+  style A stroke:#8a2b36
+        </pre>
+      </div>
+      <figcaption><b>The loss is at the transport, not the function.</b> Even the 32 paths that already emit JSON are re-flattened to text by the <code>mise run</code> wrapper — and that wrapper's redaction is a no-word-boundary literal replace, which this repo has already documented as mangling SHAs, branch names and PR numbers. That is why “just add <code>--json</code>” has not closed the request: the typed value is produced and then discarded one layer later.</figcaption>
+    </figure>
+
+    <div class="verdict">
+      <span class="lab">verdict</span>
+      <p>Both halves are real and both have been scoped wrongly. <b>4a is not the 20%</b> — the index is 24,308 bytes loaded <i>once</i>, in the main thread only; the rest of the pre-prompt load is rules, skills and plugin listings nobody has measured. And <b>compaction is not the fix</b>: 346 entries do not fit the format at any per-entry size that leaves room for the hazards. The index needs to stop being a catalogue and become a router — which is a <i>query</i>, and the query surface is blocked by #540 and #397, in that order. <b>4b is a transport problem</b>: a typed result object crossing the mise boundary intact — the same seam-layer schema item 2 needs — not 328 individual <code>print</code> conversions.</p>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:.4rem">
+      <table>
+        <thead><tr><th class="mono">#</th><th>the issue already open on this</th><th>what it settled</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">454</td><td>within 2 KB of the limit for four rounds, every round adds</td><td>the bulk is the <b>glosses</b>, which duplicate each target's own frontmatter — so the index may be <b>generable</b>, not authored</td></tr>
+          <tr><td class="mono">490</td><td>at 97–99% of the documented cap</td><td>read the docs sentence correctly — <b>200 lines OR 25KB</b>; and named the architecture as already right</td></tr>
+          <tr><td class="mono">540</td><td><code>graphify-out/memory/</code> is write-only</td><td>asked <b>this exact question</b> and answered no; <b>blocks</b> pointing the index at the graph</td></tr>
+          <tr><td class="mono">397</td><td><code>kb-build</code> fails</td><td>blocks any new ingestion, so it gates the unblocked path too</td></tr>
+          <tr><td class="mono">492</td><td>hooks/rules context cost, graph-first for subagents</td><td>the <i>measure the whole load</i> work this section says is missing</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note"><b>Not measured this session:</b> the actual composition of the pre-first-prompt context. Claiming <code>MEMORY.md</code> is or isn't the cause without that breakdown is exactly the guess this project keeps paying for — and <b>#492 is that ticket</b>, open and unstarted.</div>
+  </section>
+
+  <!-- ===================== 05 ===================== -->
+  <section class="case" id="item-5">
+    <div class="case-head">
+      <span class="idx">05</span>
+      <h2>An honest read on the back-and-forth</h2>
+    </div>
+
+    <blockquote class="ask">
+      <p>“provide an honest assessment and adversarial review of what this project is doing and ways to improve its goal and the current workflows and constant back and forth with issues and re-implementations due to miscommunication or misunderstanding”</p>
+    </blockquote>
+
+    <p class="lede">The four items above are not four unrelated asks. <strong>Each one is a decision that was already made, recorded, and then not built</strong> — and the recording is what makes it look done.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>The decision</th><th>Where it was recorded</th><th class="mono">Built?</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Generated model types, base schema for common types</td><td><code>pyproject.toml:88</code> pin + a memory note</td><td class="mono">no models package</td></tr>
+          <tr><td>Structured machine-readable task output</td><td>asked repeatedly; 32 <code>--json</code> paths exist</td><td class="mono">flattened at transport</td></tr>
+          <tr><td>Memory that injects at optimal times</td><td>347 topic files written</td><td class="mono">0 ever loaded</td></tr>
+          <tr><td>Graph as the research surface</td><td>hook-enforced, 5 guards</td><td class="mono">0 cross-source edges</td></tr>
+          <tr><td>Work-memory compounds per ingestion</td><td>275 memories via <code>kb-remember</code></td><td class="mono">0 reachable by query (#540)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure style="margin-top:.4rem">
+      <div class="plate">
+        <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#fbfcfa','primaryColor':'#ffffff','primaryTextColor':'#161a17','primaryBorderColor':'#8d968c','lineColor':'#4c534d','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
+flowchart LR
+  D["a decision is made"] --> W["it is WRITTEN DOWN<br/>rule · memory · pin · issue"]
+  W --> L["the writing satisfies the ask<br/>the round closes"]
+  L --> S["nothing consumes the writing"]
+  S --> F["a later session reads it<br/>as already true"]
+  F --> R["re-asked, re-specced,<br/>re-implemented"]
+  R --> D
+  W -. "the ONE exit:<br/>a consumer that FAILS<br/>when it isn't true" .-> X["hook deny · gate · generated code"]
+  style R stroke:#8a2b36,color:#8a2b36
+  style X stroke:#3d6a52,color:#3d6a52
+        </pre>
+      </div>
+      <figcaption><b>The loop is not miscommunication.</b> Every item above was communicated precisely — in writing, verbatim, often twice. What is missing is a <i>consumer</i>: something that breaks when the recorded decision stops being true. This repo has already measured the difference and written it down: the warning-only graph-first rule scored <b>0 compliance in 19 chances</b>; the deny that replaced it took its violations <b>62 → 0</b>.</figcaption>
+    </figure>
+
+    <div class="verdict no">
+      <span class="lab">verdict</span>
+      <p>The adversarial read is that <b>this project's dominant output is prose about itself</b>. It has 79 mise tasks, 5 hook guards and a 736 MiB graph, and its own instruction files record that the graph has zero cross-source edges and that 275 work-memories are unreachable from it. The documentation layer is healthy; the consumption layer is where every one of these five items dies. <b>The single highest-leverage change is not on Ray's list:</b> stop accepting “recorded” as “done” — every decision either gets a consumer that fails without it, or it gets deleted rather than filed.</p>
+    </div>
+  </section>
+
+  <footer>
+    <h3>How this page was made</h3>
+    <p>Every number here was measured in this session on <code>048b6a7215ec</code> and is cited to a file, a line, or the command that produced it. Nothing is inherited from the handoff — where the handoff and the measurement disagreed (the memory-index size, the scope of item 4), the measurement is what is printed. <b>No code was changed</b>, per the directive's instruction to analyse only.</p>
+    <p>Three claims on this page are explicitly <b>unverified</b> and marked as such: whether <code>UserPromptSubmit</code> output reaches subagents; the true composition of the pre-first-prompt context load; and whether the 4.5 GB <code>~/.graphify/repos</code> tree contains anything worth ingesting.</p>
+    <p style="font-size:.78rem;color:var(--ink-faint);margin-top:1rem">Skills used: <code>eli5-visual</code> (house default), <code>artifact-design</code>, <code>artifact-diagramming</code>, <code>artifact-capabilities</code> (read; <b>none declared</b> — this is a static analysis page with no live data, shared state, or viewer identity). Considered and not used: <code>dataviz</code> (charts of data, not diagrams of mechanism), <code>design</code> (multi-artboard visual design), <code>writing-for-agents</code> (governs skills and AGENTS.md, not reader prose), <code>goal-engineering</code> (no <code>/goal</code> is being set).</p>
+  </footer>
+
+</div>
