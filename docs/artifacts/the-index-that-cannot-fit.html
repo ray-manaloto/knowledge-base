@@ -1,0 +1,325 @@
+<title>The Index That Cannot Fit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+  :root{
+    --ground:#f2f3f8; --panel:#ffffff; --panel-2:#e7e9f3;
+    --edge:#d3d7e6; --edge-soft:#e6e9f2;
+    --ink:#161930; --ink-soft:#4b5070; --ink-faint:#7d8299;
+    --indigo:#3a3d9e; --indigo-soft:#e0e1f6;
+    --rose:#a3304c; --rose-soft:#f7dde4;
+    --amber:#8a6212; --amber-soft:#f6ecd4;
+    --plate:#f8f9fc; --plate-edge:#dfe3ee;
+    --shadow:0 1px 2px rgba(22,25,48,.06), 0 10px 28px rgba(22,25,48,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0e0f1e; --panel:#171930; --panel-2:#20233c;
+      --edge:#2f3350; --edge-soft:#242741;
+      --ink:#e9eaf5; --ink-soft:#a8adc8; --ink-faint:#7d8299;
+      --indigo:#a2a6f2; --indigo-soft:#1e2048;
+      --rose:#ef8ca7; --rose-soft:#3d1523;
+      --amber:#e0b45c; --amber-soft:#33260c;
+      --shadow:0 1px 2px rgba(0,0,0,.45), 0 10px 28px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0e0f1e; --panel:#171930; --panel-2:#20233c;
+    --edge:#2f3350; --edge-soft:#242741;
+    --ink:#e9eaf5; --ink-soft:#a8adc8; --ink-faint:#7d8299;
+    --indigo:#a2a6f2; --indigo-soft:#1e2048;
+    --rose:#ef8ca7; --rose-soft:#3d1523;
+    --amber:#e0b45c; --amber-soft:#33260c;
+    --shadow:0 1px 2px rgba(0,0,0,.45), 0 10px 28px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+    font-size:17px; line-height:1.65; margin:0; padding:0 20px 90px;
+  }
+  .wrap{max-width:960px;margin:0 auto}
+  .col{max-width:65ch}
+
+  header{padding:70px 0 34px;border-bottom:1px solid var(--edge);margin-bottom:42px}
+  .eyebrow{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);margin:0 0 18px;
+  }
+  h1{
+    font-family:"Newsreader",Georgia,serif;font-weight:600;
+    font-size:clamp(2.6rem,7vw,4.3rem);line-height:1.02;letter-spacing:-.018em;
+    text-wrap:balance;margin:0 0 20px;
+  }
+  .standfirst{font-family:"Newsreader",Georgia,serif;font-size:1.35rem;line-height:1.5;color:var(--ink-soft);max-width:58ch;margin:0}
+  .standfirst strong{color:var(--ink);font-weight:600}
+
+  h2{font-family:"Newsreader",Georgia,serif;font-weight:600;font-size:1.95rem;line-height:1.15;text-wrap:balance;margin:62px 0 6px}
+  h2 + .sub{color:var(--ink-faint);font-size:.97rem;margin:0 0 26px}
+  h3{font-family:"Newsreader",Georgia,serif;font-weight:600;font-size:1.15rem;margin:0 0 8px}
+  p{margin:0 0 18px}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.87em}
+  code{background:var(--panel-2);padding:.1em .34em;border-radius:3px}
+
+  figure{margin:34px 0;padding:0}
+  figcaption{font-size:.9rem;color:var(--ink-faint);line-height:1.55;margin-top:12px;max-width:62ch}
+  .plate{background:var(--plate);border:1px solid var(--plate-edge);border-radius:10px;padding:24px 20px;overflow-x:auto}
+  .plate svg{display:block;margin:0 auto;max-width:100%;height:auto;color:#161930}
+  pre.mermaid{background:var(--plate);border:1px solid var(--plate-edge);border-radius:10px;padding:24px 12px;margin:0;overflow-x:auto;text-align:center}
+
+  .scroll{overflow-x:auto;border:1px solid var(--edge);border-radius:10px;background:var(--panel);box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;font-size:.92rem}
+  th,td{padding:12px 15px;text-align:left;border-bottom:1px solid var(--edge-soft);vertical-align:top}
+  th{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;
+    letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);
+    font-weight:400;background:var(--panel-2);
+  }
+  tr:last-child td{border-bottom:none}
+  td.num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+  .verdict{display:inline-block;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap;font-weight:600}
+  .v-do{background:var(--indigo-soft);color:var(--indigo)}
+  .v-no{background:var(--rose-soft);color:var(--rose)}
+  .v-later{background:var(--amber-soft);color:var(--amber)}
+
+  .note{border-left:3px solid var(--indigo);background:var(--panel);padding:19px 22px;border-radius:0 10px 10px 0;margin:28px 0;box-shadow:var(--shadow)}
+  .note.blocked{border-left-color:var(--rose)}
+  .note p:last-child{margin-bottom:0}
+
+  ul{margin:0 0 18px;padding-left:1.15em} li{margin-bottom:9px}
+  footer{margin-top:74px;padding-top:22px;border-top:1px solid var(--edge);font-size:.86rem;color:var(--ink-faint);line-height:1.6}
+  footer strong{color:var(--ink-soft);font-weight:600}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">auto-memory · measured 2026-08-26</p>
+  <h1>The Index That Cannot Fit</h1>
+  <p class="standfirst"><strong>339 memories. An index that holds 249 of them.</strong>
+  Listing every one at today's writing style would take <strong>~95 KB</strong> against a
+  <strong>24.4 KB</strong> ceiling — so every compaction sheds entries, and they vanish
+  rather than shorten.</p>
+</header>
+
+<div class="col">
+<p>This is not a tidiness problem. The arithmetic makes a complete index impossible, which
+means the file has been quietly making a decision nobody wrote down: <em>which memories stop
+being reachable.</em></p>
+</div>
+
+<h2>The arithmetic</h2>
+<p class="sub">Four numbers, all measured this session. Only one of them is a choice.</p>
+
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 760 210" role="img" aria-label="A bar chart comparing four sizes: the 17.1 KB target, the 23.5 KB current index, the 24.4 KB hard read limit, and the 95 KB a complete index would need — nearly four times the limit.">
+      <!-- axis -->
+      <line x1="150" y1="20" x2="150" y2="180" stroke="currentColor" stroke-width="1" opacity=".25"/>
+
+      <!-- target 17.1 -->
+      <text x="142" y="42" font-size="12" text-anchor="end" fill="#4b5070">target</text>
+      <rect x="150" y="30" width="103" height="17" rx="2" fill="#3a3d9e" opacity=".28"/>
+      <text x="262" y="43" font-size="12" font-family="IBM Plex Mono, monospace" fill="#161930">17.1 KB</text>
+
+      <!-- current 23.5 -->
+      <text x="142" y="82" font-size="12" text-anchor="end" fill="#4b5070">now</text>
+      <rect x="150" y="70" width="141" height="17" rx="2" fill="#3a3d9e"/>
+      <text x="300" y="83" font-size="12" font-family="IBM Plex Mono, monospace" fill="#161930">23.5 KB</text>
+
+      <!-- limit 24.4 -->
+      <text x="142" y="122" font-size="12" text-anchor="end" fill="#4b5070">hard limit</text>
+      <rect x="150" y="110" width="146" height="17" rx="2" fill="#a3304c" opacity=".3"/>
+      <text x="305" y="123" font-size="12" font-family="IBM Plex Mono, monospace" fill="#161930">24.4 KB</text>
+      <text x="372" y="123" font-size="11" fill="#a3304c">past here, the tail is silently dropped</text>
+
+      <!-- complete 95 -->
+      <text x="142" y="166" font-size="12" text-anchor="end" fill="#4b5070">all 339</text>
+      <rect x="150" y="154" width="570" height="17" rx="2" fill="#a3304c"/>
+      <text x="150" y="188" font-size="12" font-family="IBM Plex Mono, monospace" fill="#a3304c">~95 KB — 3.9× the limit, at the median entry length of 289 bytes</text>
+    </svg>
+  </div>
+  <figcaption>The bottom bar is the whole argument. Even rewritten to a terse 60 bytes per
+  line, 339 entries would still come to ~20 KB — over the target. <strong>No amount of
+  editing makes the index a complete inventory.</strong></figcaption>
+</figure>
+
+<h2>Where a memory can live</h2>
+<p class="sub">Two stores, very different costs — and one edge that does not exist.</p>
+
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#f8f9fc','primaryColor':'#ffffff','primaryTextColor':'#161930','primaryBorderColor':'#8b90ad','lineColor':'#4b5070','fontFamily':'IBM Plex Sans, sans-serif','fontSize':'14px'}}}%%
+flowchart LR
+    A["a lesson worth keeping"] --> B["auto-memory<br/><tt>~/.claude/…/memory/</tt>"]
+    A --> C["work-memory<br/><tt>graphify-out/memory/</tt><br/>271 files, committed"]
+    B --> D["MEMORY.md index<br/>249 links"]
+    D -->|"loaded IN FULL,<br/>every session"| E["the next session<br/>reads it"]
+    C -.->|"0 of 271 reach<br/>the prose graph"| F(["kb-query<br/>NEVER returns them"])
+
+    classDef live fill:#e0e1f6,stroke:#3a3d9e,color:#1b1d46;
+    classDef dead fill:#f7dde4,stroke:#a3304c,color:#5c1b2b;
+    classDef plain fill:#ffffff,stroke:#8b90ad,color:#161930;
+    class B,D,E live;
+    class C,F dead;
+    class A plain;
+</pre>
+<p class="figcaption" style="color:var(--ink-faint);font-size:.9rem;max-width:62ch">
+The left path costs context in <em>every</em> session, which is why it is budgeted. The right
+path would cost nothing until queried — but the dashed edge is not implemented. Measured:
+the prose graph holds 4,868 nodes and <strong>none</strong> come from the work-memory store.
+Filed as #540; #212 is the same break one layer up and was already open.</p>
+
+<h2>The four ways out</h2>
+<p class="sub">What each one actually does to the index and to the tail.</p>
+
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 780 250" role="img" aria-label="Four options drawn side by side: index the live ones keeps the index full and the tail unreachable; pattern catch-all shrinks the index and keeps the tail findable by grep; prune deletes the tail; offload to the graph would move the tail to a queryable store but the edge does not exist yet.">
+      <defs>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <!-- headers -->
+      <text x="95"  y="18" font-size="12.5" text-anchor="middle" fill="#161930" font-weight="600">index live ones</text>
+      <text x="285" y="18" font-size="12.5" text-anchor="middle" fill="#3a3d9e" font-weight="600">pattern catch-all</text>
+      <text x="475" y="18" font-size="12.5" text-anchor="middle" fill="#161930" font-weight="600">prune</text>
+      <text x="665" y="18" font-size="12.5" text-anchor="middle" fill="#161930" font-weight="600">offload to graph</text>
+
+      <!-- index boxes (top row) -->
+      <rect x="25" y="34" width="140" height="46" rx="4" fill="#ffffff" stroke="#8b90ad"/>
+      <text x="95" y="53" font-size="11.5" text-anchor="middle" fill="#161930">index grows</text>
+      <text x="95" y="70" font-size="11" text-anchor="middle" fill="#a3304c">back toward 24.4 KB</text>
+
+      <rect x="215" y="34" width="140" height="46" rx="4" fill="#e0e1f6" stroke="#3a3d9e"/>
+      <text x="285" y="53" font-size="11.5" text-anchor="middle" fill="#1b1d46">index shrinks</text>
+      <text x="285" y="70" font-size="11" text-anchor="middle" fill="#3a3d9e">classes, not entries</text>
+
+      <rect x="405" y="34" width="140" height="46" rx="4" fill="#ffffff" stroke="#8b90ad"/>
+      <text x="475" y="53" font-size="11.5" text-anchor="middle" fill="#161930">index shrinks</text>
+      <text x="475" y="70" font-size="11" text-anchor="middle" fill="#161930">fewer files exist</text>
+
+      <rect x="595" y="34" width="140" height="46" rx="4" fill="#ffffff" stroke="#8b90ad" stroke-dasharray="4 3"/>
+      <text x="665" y="53" font-size="11.5" text-anchor="middle" fill="#161930">index becomes</text>
+      <text x="665" y="70" font-size="11" text-anchor="middle" fill="#161930">a pointer</text>
+
+      <!-- arrows -->
+      <line x1="95"  y1="86" x2="95"  y2="122" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+      <line x1="285" y1="86" x2="285" y2="122" stroke="#3a3d9e"     stroke-width="1.3" marker-end="url(#a3)"/>
+      <line x1="475" y1="86" x2="475" y2="122" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+      <line x1="665" y1="86" x2="665" y2="122" stroke="#a3304c" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#a3)"/>
+
+      <!-- tail boxes (bottom row) -->
+      <rect x="25" y="128" width="140" height="56" rx="4" fill="#f7dde4" stroke="#a3304c"/>
+      <text x="95" y="150" font-size="11.5" text-anchor="middle" fill="#5c1b2b">tail still orphaned</text>
+      <text x="95" y="167" font-size="11" text-anchor="middle" fill="#5c1b2b">leak resumes next round</text>
+
+      <rect x="215" y="128" width="140" height="56" rx="4" fill="#e0e1f6" stroke="#3a3d9e"/>
+      <text x="285" y="150" font-size="11.5" text-anchor="middle" fill="#1b1d46">tail declared,</text>
+      <text x="285" y="167" font-size="11" text-anchor="middle" fill="#3a3d9e">findable by grep</text>
+
+      <rect x="405" y="128" width="140" height="56" rx="4" fill="#f7dde4" stroke="#a3304c"/>
+      <text x="475" y="150" font-size="11.5" text-anchor="middle" fill="#5c1b2b">tail deleted</text>
+      <text x="475" y="167" font-size="11" text-anchor="middle" fill="#5c1b2b">irreversible</text>
+
+      <rect x="595" y="128" width="140" height="56" rx="4" fill="#ffffff" stroke="#a3304c" stroke-dasharray="4 3"/>
+      <text x="665" y="150" font-size="11.5" text-anchor="middle" fill="#a3304c">tail unreachable</text>
+      <text x="665" y="167" font-size="11" text-anchor="middle" fill="#a3304c">the edge is missing</text>
+
+      <line x1="20" y1="202" x2="760" y2="202" stroke="#d3d7e6" stroke-width="1"/>
+      <text x="285" y="222" font-size="12" text-anchor="middle" fill="#3a3d9e" font-weight="600">the only one that fixes the arithmetic</text>
+      <text x="665" y="222" font-size="12" text-anchor="middle" fill="#a3304c">right destination, blocked today</text>
+      <text x="665" y="238" font-size="11" text-anchor="middle" fill="#7d8299">becomes correct when #540 closes</text>
+    </svg>
+  </div>
+  <figcaption>The difference that matters is the bottom row, not the top. Three of the four
+  shrink the index; only one leaves the tail reachable without deleting it.</figcaption>
+</figure>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>option</th><th>index</th><th>the 64 orphans</th><th>cost</th><th></th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Pattern catch-all</strong><br><span style="color:var(--ink-faint);font-size:.88rem">declare classes by glob; say the index is curated, not complete</span></td>
+      <td class="num">shrinks</td>
+      <td>re-index the live ones; the rest declared and grep-findable</td>
+      <td>one honest sentence admitting the index is not an inventory</td>
+      <td><span class="verdict v-do">DO NOW</span></td>
+    </tr>
+    <tr>
+      <td><strong>Index the live ones</strong><br><span style="color:var(--ink-faint);font-size:.88rem">add back ~10, compress prose</span></td>
+      <td class="num">grows</td>
+      <td>~54 stay orphaned</td>
+      <td>leak resumes immediately — the arithmetic is untouched</td>
+      <td><span class="verdict v-no">NO</span></td>
+    </tr>
+    <tr>
+      <td><strong>Prune</strong><br><span style="color:var(--ink-faint);font-size:.88rem">delete what is genuinely dead</span></td>
+      <td class="num">shrinks</td>
+      <td>deleted</td>
+      <td>the only irreversible option, and the judgement least suited to an agent alone</td>
+      <td><span class="verdict v-later">NOT ALONE</span></td>
+    </tr>
+    <tr>
+      <td><strong>Offload to graphify</strong><br><span style="color:var(--ink-faint);font-size:.88rem">index points at the queryable store</span></td>
+      <td class="num">shrinks hard</td>
+      <td>would move to a store nothing can query</td>
+      <td>trades a visible leak for an invisible one — <em>today</em></td>
+      <td><span class="verdict v-later">AFTER #540</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note blocked">
+  <h3>Why the best answer is currently the wrong one</h3>
+  <p>Offloading the tail into the graph is the right architecture: auto-memory costs context
+  in every session, the graph costs nothing until queried, and the split is exactly what the
+  two stores were built for. It is blocked on one measured fact — <strong>0 of 271
+  work-memory files are reachable from the graph.</strong> Pointing the index there would
+  make the tail look reachable while being less findable than a <code>grep</code> is today.</p>
+  <p>The acceptance test is not "the write succeeded". It is a control-armed read: a
+  <code>kb-query</code> returns a fact recorded by <code>kb-remember</code>, <em>and</em> the
+  same query shape returns nothing for a fact never recorded.</p>
+</div>
+
+<div class="note">
+  <h3>The pattern worth taking away</h3>
+  <p>Both breaks here — this one and #212 — have the same shape: <strong>a write path with
+  no read path.</strong> Every observable is green. The file lands, the commit includes it,
+  the aggregate regenerates. Nothing in the loop ever asks the question the loop exists to
+  answer, so the absence is invisible from inside it.</p>
+  <p>Worth asking of every loop in this repo whose success criterion is <em>"the artifact was
+  written"</em>.</p>
+</div>
+
+<footer>
+  <p><strong>Provenance.</strong> Measured this session by reading the memory directory
+  directly: 339 topic files, 249 distinct link targets in <code>MEMORY.md</code>, 90 orphans
+  of which 26 match the existing pattern catch-all and 64 do not, index at 23,469 bytes over
+  103 lines, median indexed-entry length 289 bytes. The ~95 KB figure is that median × 339 —
+  <strong>derived, not measured</strong>, and it is an estimate of what a complete index
+  would cost at today's writing style, not of any file that exists. The 24.4 KB read limit
+  and 17.1 KB target are the values the write hook reports. The graph figures — 4,868 prose
+  nodes, 0 sourced from <code>graphify-out/memory/</code>, 271 files in that store — were
+  read from <code>graph-prose.json</code> this session.</p>
+  <p><strong>Skills.</strong> <code>artifact-design</code>, <code>artifact-diagramming</code>
+  and <code>artifact-capabilities</code> were loaded earlier in this session and applied
+  fresh here — new palette and type pairing (Newsreader / IBM Plex) deliberately unlike the
+  two pages published earlier today, mechanism drawn rather than named, and
+  <strong>no capabilities declared</strong> (static page, stays shareable).
+  <strong>Considered and not used:</strong> <code>dataviz</code> — the bar figure is a
+  four-value comparison in service of an argument, not a chart of a dataset, and its rules
+  would over-build it; <code>design</code> — multi-artboard canvas, wrong deliverable;
+  <code>eli5:eli5</code> — three lines, no persistence, and none of the honesty rules this
+  page's numbers need.</p>
+</footer>
+
+</div>

@@ -422,3 +422,132 @@ def test_a_brewfile_is_counted_as_unsupported_language(tmp_path) -> None:
     assert not unresolved, "a Brewfile must not block the build"
     assert not non_source, "a Brewfile must be COUNTED, never silently absorbed"
     assert unsupported == paths
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        # #397, round two: the six spellings `biome` vendors. Every one of these
+        # was `unresolved` and blocking until the licence regex grew a LEADING
+        # boundary, because `.match()` anchors at position 0 and the licence word
+        # is not there. Reverting that boundary turns all six red.
+        "packages/@biomejs/biome/ROME-LICENSE-MIT",
+        "crates/biome_js_formatter/PRETTIER_LICENSE",
+        "crates/biome_console/CODESPAN_LICENSE",
+        "crates/biome_js_syntax/RSLINT_LICENSE",
+    ],
+)
+def test_a_prefixed_licence_is_still_a_licence(tmp_path: Path, relative: str) -> None:
+    _write(tmp_path, relative)
+    non_source, _unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert non_source == (relative,)
+    assert unresolved == ()
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        # A lowercase word merely CONTAINING the licence token has a letter where
+        # the boundary must be, so widening to `.search()` did not open this up.
+        "src/mylicense.py",
+        "pkg/relicensing.go",
+    ],
+)
+def test_an_embedded_licence_word_without_a_boundary_still_blocks(
+    tmp_path: Path, relative: str
+) -> None:
+    _write(tmp_path, relative)
+    non_source, _unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert unresolved == (relative,)
+    assert non_source == ()
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        # `mermaid-trace` ships four of these. `Path.suffix` is `.2`, so the
+        # `.mmd` one segment earlier is invisible to every extension rule.
+        "mermaid_diagrams/examples/08-log-rotation.mmd.2",
+        "mermaid_diagrams/examples/08-log-rotation.mmd.5",
+        # `.ql`/`.qhelp` are CodeQL (`gh`), `.ungram` and `.grit` are `biome`'s
+        # own grammar and pattern languages, `.dtd` is `trafilatura`'s TEI
+        # schema, `.formatted` is a `biome` formatter golden under `e2e-tests/`
+        # — which `_FIXTURE_SEGMENTS` cannot see, because it anchors on whole
+        # segments and `e2e-tests` is not the segment `tests`.
+        ".github/codeql/queries/SafeURLPathConstruction.ql",
+        ".github/codeql/queries/unsanitized-response-to-terminal.qhelp",
+        "crates/biome_ungrammar/ungrammar.ungram",
+        "plugins/no-object-assign.grit",
+        "trafilatura/data/tei_corpus.dtd",
+        "e2e-tests/stdin-nested-config/app.js.formatted",
+        # Extensionless tool configs and hooks, and `gh`'s APT packaging tables.
+        "pylintrc",
+        ".yarnrc",
+        ".husky/pre-commit",
+        "script/distributions",
+        "script/override.ubuntu",
+    ],
+)
+def test_the_397_counted_classes_are_absorbed_but_tallied(tmp_path: Path, relative: str) -> None:
+    """COUNTED, never silent: each of these has a schema a reader could want."""
+    _write(tmp_path, relative)
+    non_source, unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert unsupported == (relative,)
+    assert non_source == ()
+    assert unresolved == ()
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "internal/licenses/embed/linux-arm64/PLACEHOLDER",
+        "src/interprompt/.syncCommitId.remote",
+        "resources/serena-logo.cdr",
+        "packages/mcp/mcpb/context7.mcpb",
+        "appmap.pth",
+    ],
+)
+def test_the_397_silent_classes_are_repo_bookkeeping(tmp_path: Path, relative: str) -> None:
+    _write(tmp_path, relative)
+    non_source, unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert non_source == (relative,)
+    assert unsupported == ()
+    assert unresolved == ()
+
+
+def test_a_numeric_suffix_does_not_absorb_a_real_extension(tmp_path: Path) -> None:
+    """The numeric rule reads the LAST suffix only — `foo.2.py` is still Python."""
+    relative = _write(tmp_path, "src/foo.2.py")
+    _non_source, unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert unsupported == ()
+    assert unresolved == (relative,)
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        # REGRESSION, cold lane on c66da9e0. Widening the licence rule to admit
+        # a prefixed spelling also admitted any CONTENT file with the word in a
+        # hyphen- or dot-delimited segment, moving it from the counted class to
+        # the silent one. Control arm below: the same extension without the word
+        # must stay counted, or this test passes for the wrong reason.
+        "docs/verify-license.adoc",
+        "docs/licence-policy.adoc",
+        "spec/copying-rules.graphql",
+    ],
+)
+def test_a_content_file_merely_naming_a_licence_is_never_silent(
+    tmp_path: Path, relative: str
+) -> None:
+    _write(tmp_path, relative)
+    non_source, unsupported, _unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert non_source == ()
+    assert unsupported == (relative,)
+
+
+def test_the_licence_content_control_arm(tmp_path: Path) -> None:
+    """Same extension, no licence word — proves the test above discriminates."""
+    relative = _write(tmp_path, "docs/api.adoc")
+    non_source, unsupported, _unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert non_source == ()
+    assert unsupported == (relative,)

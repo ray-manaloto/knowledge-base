@@ -34,6 +34,13 @@ minutes, or the sort breaks.
 | `2026-07-31-1348-kb-fluent-stale-graph` | **Fluent** | SessionStart stale-graph detection + the graphify/mise/hk/fnox release-notes review | achieved |
 | `2026-07-31-2056-kb-navigable-graph` | **Navigable** | Index our own library for blast radius, ingest three peer tools, stand up a reusable cross-family review team, fold in the graphify version-sync tail | stalled |
 | `2026-08-01-2116-kb-settled-claims` | **Settled** | Re-derive every deferred or inherited claim: #101's cross-namespace edges, the currency tail, two cross-report disagreements, and `kb-tool-review.js` exercised end-to-end on a fourth peer tool | achieved |
+| `2026-08-27-1342-kb-aggregated-research` | **Aggregated** | Build the `aggregated-research` skill (#509), point it at itself for prior art and tooling, then at the Claude↔Codex handoff question | achieved |
+
+**Note the 26-day gap between the fourth pair and the fifth.** Every round from
+2026-08-02 to 2026-08-27 ran with no goal at all, and in that window the open-issue
+count went from 36 to 294. The discipline was not abandoned deliberately; nothing
+reminded anyone it existed. Recorded here rather than in a handoff because a handoff
+is read once and this table is read every time a goal is written.
 
 ## Why the goal file is capped at 4,000 characters
 

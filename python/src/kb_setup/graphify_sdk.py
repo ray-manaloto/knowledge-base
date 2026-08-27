@@ -999,6 +999,15 @@ _NON_SOURCE_NAMES = frozenset(
         # A per-environment variant of an ignore file. `_is_ignore_metadata_name`
         # cannot see it: the name ends `.ci`, not `ignore`.
         ".dockerignore.ci",
+        # `gh` ships eight of these, one per cross-compile target, so that an
+        # otherwise-empty embed directory survives `go:embed`. Same job as
+        # `.gitkeep`, different spelling — an empty marker, by construction.
+        "PLACEHOLDER",
+        # `serena` vendors `interprompt` and records which upstream commit the
+        # copy came from. A bare SHA in a file; matched by NAME because the
+        # apparent suffixes (`.remote`, `.this`) are part of the marker's name.
+        ".syncCommitId.remote",
+        ".syncCommitId.this",
     }
 )
 #: Repo bookkeeping, packaging data and binary artifacts — never graph source.
@@ -1048,6 +1057,19 @@ _NON_SOURCE_SUFFIXES = frozenset(
         ".woff2",
         ".xz",
         ".zst",
+        # Proprietary vector-graphics documents, in the same class as the
+        # `.afdesign` above: `serena` ships five CorelDRAW logos and
+        # `dependency-cruiser` one Krita source image.
+        ".cdr",
+        ".kra",
+        # A `.mcpb` is a zip archive of an MCP server bundle — opaque bytes,
+        # like the `.jar` and `.whl` already here.
+        ".mcpb",
+        # Both `.pth` meanings land here and neither is graph source: the
+        # setuptools spelling is a line of text appended to `sys.path`, and the
+        # PyTorch spelling — much the more common one in the wild — is a
+        # serialised checkpoint, opaque bytes like the `.bin` above.
+        ".pth",
     }
 )
 #: Real source in a language Graphify does not parse. Absorbed so the build can
@@ -1104,6 +1126,23 @@ _UNSUPPORTED_LANGUAGE_NAMES = frozenset(
         "pr_lint",
         # Extensionless prose Graphify declines to classify.
         "README",
+        # Tool configs spelled WITHOUT a leading dot, so neither the dotfile
+        # names above nor any suffix rule reaches them. Same class as the
+        # `.coveragerc`/`.prettierrc` entries: a schema, so COUNTED, not silent.
+        "pylintrc",
+        "flake8rc",
+        ".yarnrc",
+        # A husky git hook: an executable shell script whose name carries no
+        # extension, in the same family as `activate` and `pr_lint` above.
+        # `dependency-cruiser` and `firecrawl-cli` each ship one.
+        "pre-commit",
+        # Debian/APT repository metadata `gh` ships to publish its own packages:
+        # `script/distributions` is the RFC822 `conf/distributions` table
+        # (Origin/Codename/Architectures/SignWith) and `script/override.ubuntu`
+        # is a dpkg override list. Both READ this session. Declarative packaging
+        # data with a real schema, so COUNTED rather than absorbed silently.
+        "distributions",
+        "override.ubuntu",
     }
 )
 #: `Dockerfile.alpine`, `Makefile.cbm`, `Makefile.deepseek-v4.units`, `Justfile`
@@ -1203,6 +1242,19 @@ _UNSUPPORTED_LANGUAGE_SUFFIXES = frozenset(
         ".xcscheme",
         ".xcworkspacedata",
         ".entitlements",
+        # Grammars and query languages with real structure and no Graphify
+        # parser: ungrammar (`biome`'s own syntax definitions), GritQL patterns,
+        # CodeQL queries and their `.qhelp` documentation (`gh` vendors four),
+        # and the XML DTD `trafilatura` ships for its TEI corpus.
+        ".ungram",
+        ".grit",
+        ".ql",
+        ".qhelp",
+        ".dtd",
+        # Golden output for a formatter round-trip. `biome` keeps three under
+        # `e2e-tests/`, which `_FIXTURE_SEGMENTS` cannot see: it anchors on whole
+        # segments, and `e2e-tests` is not the segment `tests`.
+        ".formatted",
     }
 )
 #: `LICENSE`, `LICENCE.md`, `License-Apache`, `LICENSE.BSD`, … one rule instead
@@ -1218,9 +1270,22 @@ _UNSUPPORTED_LANGUAGE_SUFFIXES = frozenset(
 #: failure class recurs as `LICENSE_KEYS.py` and `COPYING_utils.c`, which are
 #: real source, while `LICENSE_1_0.txt` (Boost's spelling) is a licence file
 #: and must keep matching.
+#: The LEADING boundary is what admits a prefixed spelling. `biome` vendors six
+#: — `PRETTIER_LICENSE`, `ROME-LICENSE-MIT`, `CODESPAN_LICENSE`, `RSLINT_LICENSE`
+#: — and an anchored `.match()` could never see any of them, because the licence
+#: word is not at position 0. Requiring a non-alphanumeric character before it
+#: keeps the protection that mattered: `mylicense.py` has a letter there and
+#: still does not match, and the trailing `_(?![A-Za-z])` guard that saves
+#: `LICENSE_KEYS.py` is untouched.
 _LICENSE_NAME = re.compile(
-    r"(LICENSE|LICENCE|COPYING)($|[^A-Za-z0-9_]|_(?![A-Za-z]))", re.IGNORECASE
+    r"(^|[^A-Za-z0-9])(LICENSE|LICENCE|COPYING)($|[^A-Za-z0-9_]|_(?![A-Za-z]))",
+    re.IGNORECASE,
 )
+#: `08-log-rotation.mmd.2` — a numbered variant of a file whose real extension is
+#: one segment earlier. Its `Path.suffix` is `.2`, so no extension rule can ever
+#: see the `.mmd`. Generalises `.1` (already a member below, as a man page):
+#: a purely numeric extension carries no structure to parse either way.
+_NUMERIC_SUFFIX = re.compile(r"^\.\d+$")
 #: Vendored test fixtures — `gitleaks` ships fake `.git` trees, `typos` ships
 #: `*.in/` input dirs, `pkl` ships `.jva` goldens. These are inputs to somebody
 #: else's test suite, not corpus knowledge.
@@ -1336,7 +1401,18 @@ def _is_non_source(name: str, suffix: str) -> bool:
     return (
         name in _NON_SOURCE_NAMES
         or suffix in _NON_SOURCE_SUFFIXES
-        or _LICENSE_NAME.match(name) is not None
+        # `.search`, not `.match`: the licence word is not at position 0 in a
+        # prefixed spelling, and the regex now carries its own leading boundary.
+        #
+        # The suffix guard is what keeps that widening from reaching CONTENT.
+        # Every licence spelling this class exists for is extensionless or
+        # carries an inert one (`LICENSE`, `LICENSE.md`, `LICENSE_1_0.txt`,
+        # `PRETTIER_LICENSE`), while `docs/verify-license.adoc` is an AsciiDoc
+        # document that merely has the word in a hyphenated segment. Without
+        # this it moved from the COUNTED class to the SILENT one — measured
+        # both ways, and the silent direction is the one that loses corpus
+        # without saying so. Caught by the cold lane on c66da9e0.
+        or (suffix not in _UNSUPPORTED_LANGUAGE_SUFFIXES and _LICENSE_NAME.search(name) is not None)
         or _is_ignore_metadata_name(name)
     )
 
@@ -1353,6 +1429,7 @@ def _is_unsupported_language(relative: str, name: str, suffix: str) -> bool:
         name in _UNSUPPORTED_LANGUAGE_NAMES
         or suffix in _UNSUPPORTED_LANGUAGE_SUFFIXES
         or name.split(".", maxsplit=1)[0] in _UNSUPPORTED_LANGUAGE_STEMS
+        or _NUMERIC_SUFFIX.match(suffix) is not None
         or _FIXTURE_SEGMENTS.search(relative) is not None
         or relative.endswith(f"{_SERVICE_LOADER_DIR}{name}")
     )

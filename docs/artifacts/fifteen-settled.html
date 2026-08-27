@@ -1,0 +1,260 @@
+<title>Fifteen Settled</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --ground:   #eef1f2;
+    --card:     #ffffff;
+    --sunk:     #e2e7e9;
+    --ink:      #12191c;
+    --ink-2:    #48565c;
+    --ink-3:    #7c8b91;
+    --rule:     #cdd6d9;
+    --accent:   #0f6b6b;
+    --accent-w: #d7e9e7;
+    --flag:     #9a5510;
+    --flag-w:   #f6e8d8;
+    --open:     #7c3a4a;
+    --open-w:   #f4e2e6;
+    --plate:    #fafcfc;
+    --plate-r:  #ccd6d8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0d1214; --card: #141c1f; --sunk: #1b2528;
+      --ink: #e3eaec; --ink-2: #9fb0b5; --ink-3: #74858a; --rule: #263237;
+      --accent: #4fb3ad; --accent-w: #10302f;
+      --flag: #d9a05c; --flag-w: #33260f;
+      --open: #d78ba0; --open-w: #2e1a20;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0d1214; --card: #141c1f; --sunk: #1b2528;
+    --ink: #e3eaec; --ink-2: #9fb0b5; --ink-3: #74858a; --rule: #263237;
+    --accent: #4fb3ad; --accent-w: #10302f;
+    --flag: #d9a05c; --flag-w: #33260f;
+    --open: #d78ba0; --open-w: #2e1a20;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+    font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 58rem; margin: 0 auto; padding: 3rem 1.4rem 5rem; display: flex; flex-direction: column; gap: 2.75rem; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  code { font-size: .84em; background: var(--sunk); padding: .1em .36em; border-radius: 2px; word-break: break-word; }
+
+  h1 { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: clamp(2.8rem, 8vw, 4.6rem); line-height: .95; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+  h2 { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: clamp(1.5rem, 4vw, 2rem); margin: 0; letter-spacing: -.01em; }
+  h2 em { font-style: italic; color: var(--accent); }
+  .eyebrow { font-family: "IBM Plex Mono", monospace; font-size: .68rem; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-3); }
+  .lede { font-size: 1.1rem; color: var(--ink-2); max-width: 40rem; }
+  .lede b { color: var(--ink); font-weight: 500; }
+  p { margin: 0 0 .9rem; max-width: 42rem; } p:last-child { margin-bottom: 0; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: .4rem 1.5rem; padding-top: .9rem; border-top: 1px solid var(--rule); font-family: "IBM Plex Mono", monospace; font-size: .7rem; color: var(--ink-3); }
+
+  section { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  .group { background: var(--card); border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
+  .group > header { padding: .75rem 1.1rem; background: var(--sunk); border-bottom: 1px solid var(--rule); display: flex; align-items: baseline; gap: .7rem; }
+  .group > header .k { font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .1em; color: var(--accent); font-weight: 500; }
+  .group > header .t { font-weight: 600; font-size: .95rem; }
+  .group > header .n { margin-left: auto; font-family: "IBM Plex Mono", monospace; font-size: .7rem; color: var(--ink-3); }
+
+  .d { display: grid; grid-template-columns: 2.4rem 1fr; gap: 0 .9rem; padding: .85rem 1.1rem; border-bottom: 1px solid var(--rule); }
+  .d:last-child { border-bottom: none; }
+  .d .num { font-family: "IBM Plex Mono", monospace; font-size: .95rem; color: var(--ink-3); font-weight: 500; padding-top: .05rem; }
+  .d .body { display: flex; flex-direction: column; gap: .3rem; }
+  .d .head { font-weight: 500; line-height: 1.4; }
+  .d .why { font-size: .88rem; color: var(--ink-2); line-height: 1.5; }
+  .tag { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: .62rem; letter-spacing: .07em; text-transform: uppercase; padding: .13rem .42rem; border-radius: 2px; font-weight: 500; margin-right: .3rem; vertical-align: .08em; }
+  .tag.ovr { background: var(--flag-w); color: var(--flag); }
+  .tag.iss { background: var(--accent-w); color: var(--accent); }
+  .tag.opn { background: var(--open-w); color: var(--open); }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: .55rem; }
+  .plate { background: var(--plate); border: 1px solid var(--plate-r); border-radius: 5px; padding: 1.1rem .8rem; overflow-x: auto; }
+  .plate .mermaid { background: var(--plate); }
+  figcaption { font-size: .84rem; color: var(--ink-2); max-width: 42rem; line-height: 1.5; }
+  figcaption b { color: var(--ink); font-weight: 500; }
+
+  .note { background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--flag); border-radius: 4px; padding: .95rem 1.15rem; font-size: .92rem; color: var(--ink-2); }
+  .note b { color: var(--ink); font-weight: 500; }
+  .note.open { border-left-color: var(--open); }
+
+  .tbl { overflow-x: auto; border: 1px solid var(--rule); border-radius: 5px; }
+  table { border-collapse: collapse; width: 100%; font-size: .87rem; background: var(--card); }
+  th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { background: var(--sunk); font-size: .68rem; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.m { font-family: "IBM Plex Mono", monospace; font-size: .8rem; white-space: nowrap; }
+
+  footer { border-top: 1px solid var(--rule); padding-top: 1.4rem; font-size: .84rem; color: var(--ink-2); }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header style="display:flex;flex-direction:column;gap:1rem">
+    <div class="eyebrow">grilling · part two · 2026-08-27 · four rounds</div>
+    <h1>Fifteen Settled</h1>
+    <p class="lede">Every decision from the PART TWO grilling, with what forced it and where it now lives. <b>One is Ray's override of a recommendation. Two facts are recorded as unverified rather than guessed.</b> Nothing here was built — that was decision 15.</p>
+    <div class="meta">
+      <span>15 decisions · 4 rounds</span>
+      <span>3 issues filed · 5 commented</span>
+      <span>context at decision 15: 51.2%</span>
+      <span>0 lines of implementation</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>What blocks <em>what</em></h2>
+    <figure>
+      <div class="plate">
+        <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#fafcfc','primaryColor':'#ffffff','primaryTextColor':'#12191c','primaryBorderColor':'#8c9b9f','lineColor':'#48565c','fontFamily':'IBM Plex Mono, monospace','fontSize':'12.5px'}}}%%
+flowchart TB
+  H["14 · UserPromptSubmit hook<br/>#548 — blocks nothing, blocked by nothing"]
+  B["2,3,4 · #397 blocker<br/>graphifyignore via manifest field"]
+  B --> ING["ingest THIS repo's own prose<br/>CLAUDE.md · rules · skills · docs<br/>0 nodes today"]
+  B --> M540["#540 — work-memory reachable"]
+  R["9,10,11 · generate MEMORY.md<br/>tiered, from clear-prep"]
+  ING -. "only makes the index<br/>a ROUTER instead of a catalogue" .-> R
+  S["6,7 · result object<br/>Rc + typed payload · #547"]
+  S --> RB["runbooks per error code"]
+  S --> DR["8 · deny rule — THIRD, never first"]
+  S --> DOC["12,13 · claims check<br/>inside kb-doctor #525"]
+  REF["1 · #130 re-scoped<br/>keep merging"] -. "trigger: a MEASURED<br/>threshold, not a hunch" .-> CEIL(("graph nears<br/>the cap"))
+  RM["#546 · 52 of 73 pin ref = main"] -. "split OUT of #397:<br/>different size, different risk" .-> B
+  style DR stroke:#9a5510,color:#9a5510
+  style CEIL stroke-dasharray: 4 3
+        </pre>
+      </div>
+      <figcaption><b>Three of the fifteen are ordering constraints, not choices.</b> The deny rule is third because a guard shipped before its protocol denies edits to a thing that does not exist. Runbooks follow the result object because they would otherwise key on codes carrying no payload. And <code>#546</code> was split out of <code>#397</code> precisely so a 52-manifest re-pin could not keep a one-source build blocker hostage — which is why #397 sat from 08-19.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>The decisions</h2>
+
+    <div class="group">
+      <header><span class="k">A</span><span class="t">The corpus</span><span class="n">5 decisions</span></header>
+      <div class="d"><span class="num">01</span><div class="body">
+        <span class="head"><span class="tag iss">#130</span>Keep merging. Re-scope #130 to a ceiling plan on a measured trigger.</span>
+        <span class="why">Its urgency rested on merging causing 41% prefix waste. Re-derived today: <b>max 1 repetition per node id, 0.0 MiB redundant, 0.0%</b> — against #120's recorded 26 and 164.4 MB. #120 is fixed and stale-open. The 736 MiB is real content.</span>
+      </div></div>
+      <div class="d"><span class="num">02</span><div class="body">
+        <span class="head"><span class="tag iss">#397 → #546</span>Fix #397's blocker only. Split the <code>ref = main</code> finding into its own issue.</span>
+        <span class="why">One is a frozenset-sized fix; the other re-pins 52 of 73 manifests, each of which can move bytes and invalidate an extraction. Bundling them is why nothing moved for eight days.</span>
+      </div></div>
+      <div class="d"><span class="num">03</span><div class="body">
+        <span class="head"><span class="tag ovr">Ray's override</span>Unblock via <code>.graphifyignore</code>, not the fork's classifier.</span>
+        <span class="why">Verified rather than assumed: excluded files never reach <code>classify_file()</code>, so they never enter the <code>unclassified</code> list that fails the build (<code>detect.py:1886-1892</code>), and the mechanism is exclude-only by design (<code>:1185</code>).</span>
+      </div></div>
+      <div class="d"><span class="num">04</span><div class="body">
+        <span class="head">The exclusion is a field in the existing <code>.manifest</code>.</span>
+        <span class="why"><b>Forced by a fact, not chosen.</b> <code>detect.py:1206</code>: the ignore's walk ceiling is <i>the nearest VCS root</i>. Every clone carries its own <code>.git</code>, so a <code>.graphifyignore</code> at this repo's root is never read — and clones are re-fetched each build, so one placed inside is destroyed. <code>kb_setup</code> writes it after fetch, from committed config.</span>
+      </div></div>
+      <div class="d"><span class="num">05</span><div class="body">
+        <span class="head"><span class="tag iss">#491</span>Defer #491, do not close it.</span>
+        <span class="why"><code>Brewfile</code> genuinely is a type graphify should classify — an ignore hides the file, a classifier decides about it. Closing it would have been the <b>fifth</b> recorded-then-dropped decision of one session.</span>
+      </div></div>
+    </div>
+
+    <div class="group">
+      <header><span class="k">B</span><span class="t">Types and structured output — items 2 and 4b are one project</span><span class="n">3</span></header>
+      <div class="d"><span class="num">06</span><div class="body">
+        <span class="head"><span class="tag iss">#547</span>Seam layer only. One base schema for common types and enums.</span>
+        <span class="why">Not 1,310 function wrappers. The generator reads schemas, not Python, so "one swoop" is really <i>hand-author 1,310 schemas, then run a generator</i>.</span>
+      </div></div>
+      <div class="d"><span class="num">07</span><div class="body">
+        <span class="head">First seam: the result object — <code>Rc</code> plus a typed payload. Then runbooks.</span>
+        <span class="why"><code>kb_setup.result.Rc</code> already exists at <code>result.py:57</code> and <b>23 modules import it</b>, so the vocabulary is built. <code>result.py:184</code> records that a payload was <i>deliberately</i> not attached — that is the gap. The mise-task JSON contract falls out nearly free.</span>
+      </div></div>
+      <div class="d"><span class="num">08</span><div class="body">
+        <span class="head">The path-based deny rule ships <b>third</b>.</span>
+        <span class="why">A guard shipped before the protocol exists denies every edit to a thing that does not exist.</span>
+      </div></div>
+    </div>
+
+    <div class="group">
+      <header><span class="k">C</span><span class="t">Memory</span><span class="n">3</span></header>
+      <div class="d"><span class="num">09</span><div class="body">
+        <span class="head"><span class="tag iss">#454</span>Generate <code>MEMORY.md</code> from each topic file's own <code>description:</code>.</span>
+        <span class="why">The glosses duplicate frontmatter that already exists — a manual join, so it drifts by construction. Generation makes the orphan count structurally zero. Today: 255 linked, 24 glob-covered, <b>67 orphaned</b>.</span>
+      </div></div>
+      <div class="d"><span class="num">10</span><div class="body">
+        <span class="head">Tiered, and the generator enforces the tiers.</span>
+        <span class="why"><b>Generation fixes drift, not size.</b> 24,308 B over 106 lines is 229 bytes per line against a docs rule saying one line per entry — and 346 entries at even 60 B is 20.8 KB, 85% of the cap with nothing left for hazards. Hazards always; current round always; the rest collapses to a glob.</span>
+      </div></div>
+      <div class="d"><span class="num">11</span><div class="body">
+        <span class="head">Triggered by a mise task called from <code>/clear-prep</code>.</span>
+        <span class="why">The one moment the round's entry is authored and its tier is knowable. A write hook would regenerate hundreds of times per session for the same file — and the write hook is what already warns today and gets ignored.</span>
+      </div></div>
+    </div>
+
+    <div class="group">
+      <header><span class="k">D</span><span class="t">The loop — item 5</span><span class="n">2</span></header>
+      <div class="d"><span class="num">12</span><div class="body">
+        <span class="head">Consumer-or-delete: a decision gets something that fails when it stops being true, or it gets deleted rather than filed.</span>
+        <span class="why">Five times in one session the answer already existed and nothing read it — #490, #540, #130, #120, and a research report from 2026-08-05 whose recommendation went unconsumed while 4.5 GB accumulated.</span>
+      </div></div>
+      <div class="d"><span class="num">13</span><div class="body">
+        <span class="head"><span class="tag iss">#525</span>It lives inside <code>kb-doctor</code>, not a new task.</span>
+        <span class="why">A second health surface would <i>itself</i> be the recorded-twice-consumed-zero-times pattern. It is also the first real consumer of decision 07.</span>
+      </div></div>
+    </div>
+
+    <div class="group">
+      <header><span class="k">E</span><span class="t">Session shape</span><span class="n">2</span></header>
+      <div class="d"><span class="num">14</span><div class="body">
+        <span class="head"><span class="tag iss">#548</span>One <code>UserPromptSubmit</code> hook, carrying a short pointer.</span>
+        <span class="why"><b>Zero exist today</b> — every hook here is PreToolUse, SessionStart or SessionEnd, so nothing can speak before the model reads a prompt. Rejected: the rules verbatim (cost per turn, forever) and the round's live traps (a hook body that goes stale is this round's own subject).</span>
+      </div></div>
+      <div class="d"><span class="num">15</span><div class="body">
+        <span class="head">File everything, build nothing, then <code>/clear-prep</code>.</span>
+        <span class="why">At <b>51.2% of a 1M window</b>, measured. Fifteen decisions with no consumer is precisely the pattern the day measured — and a half-built one would recreate it.</span>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Two things recorded as <em>unverified</em></h2>
+    <div class="note open">
+      <b>Does <code>UserPromptSubmit</code> output reach subagents and forks? UNDOCUMENTED.</b> <code>hooks.md:746</code> settles what it does — <i>"stdout is added as context that Claude can see and act on"</i> — but <code>sub-agents.md</code> mentions the event <b>zero times</b>, and its never-reaches-a-subagent list at <code>:932-935</code> names output style, auto memory and window size, not hooks in either direction. Decision 14 stands on the main-thread case alone. <b>Three read-only lanes went idle without reporting today</b>; the facts here were settled by hand in three commands, which cost less than the dispatch.
+    </div>
+    <div class="note">
+      <b>What was verified instead, and it strengthened decision 01.</b> <code>lexical.py</code> is not graphify's — it does not exist in the installed package. It is <b>ours</b>: <code>python/src/kb_setup/lexical.py</code>, 318 lines, <code>load_index(graph_path: Path)</code> at <code>:248</code>, one Path, opened once at <code>:268</code>. And graphify's <code>cli.py</code> has 33 <code>--graph</code> mentions, every parse site single-valued, no <code>nargs</code> or <code>append</code> — the only <code>nargs</code> in the file is on <code>--nodes</code> at <code>:1322</code>. So #130's central claim is confirmed this session rather than inherited.
+    </div>
+  </section>
+
+  <section>
+    <h2>Where each one now lives</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th class="m">issue</th><th>state</th><th>carries</th></tr></thead>
+        <tbody>
+          <tr><td class="m">#546</td><td>filed</td><td>52 of 73 manifests pin <code>ref = main</code> — split out of #397</td></tr>
+          <tr><td class="m">#547</td><td>filed</td><td>the seam contract: result object → runbooks → deny rule</td></tr>
+          <tr><td class="m">#548</td><td>filed</td><td>the <code>UserPromptSubmit</code> hook</td></tr>
+          <tr><td class="m">#397</td><td>commented</td><td>scoped to the blocker; the ignore mechanism and where it must live</td></tr>
+          <tr><td class="m">#130</td><td>commented</td><td>re-scoped to a ceiling plan; leg 3 refuted, leg 2 re-derived</td></tr>
+          <tr><td class="m">#454</td><td>commented</td><td>generate + tier + trigger; the corrected cap; the arithmetic</td></tr>
+          <tr><td class="m">#491</td><td>commented</td><td>deferred not closed, with the four other stale-open cases named</td></tr>
+          <tr><td class="m">#525</td><td>commented</td><td>the claims check folded in</td></tr>
+          <tr><td class="m">#544 #545</td><td>filed earlier</td><td>the 4.5 GB <code>~/.graphify/repos</code> disposal and its cause</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <p>Every figure was measured or re-derived on <code>7f7090ca</code> in the session that settled these, and cited to a file, a line, or the command that produced it. Where a number was inherited and not re-run — the 52-of-73 in #546 — the issue says so in its own body rather than presenting it as fresh.</p>
+    <p style="font-size:.78rem;color:var(--ink-3);margin-top:.9rem">Companion to <b>Part Two, Measured</b>, the analysis this tree was grilled against. Skills used: <code>mattpocock-skills:grilling</code> (the four rounds), <code>eli5-visual</code>, <code>artifact-design</code>, <code>artifact-diagramming</code>, <code>artifact-capabilities</code> (read; <b>none declared</b> — a static record). Considered and not used: <code>dataviz</code> (charts of data, not a decision tree), <code>goal-engineering</code> (no <code>/goal</code> is being set), <code>writing-for-agents</code> (governs skills and AGENTS.md, not reader prose).</p>
+  </footer>
+
+</div>

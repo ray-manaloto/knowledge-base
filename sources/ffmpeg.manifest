@@ -8,3 +8,5 @@ url = https://github.com/FFmpeg/FFmpeg
 ref = n9.0.1
 commit = bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
 kind = code
+build = defer
+defer_reason = #491: graphify detect exceeds its per-source deadline on FFmpeg's tree. A timeout, not an unclassified-file class, so #397's classifier widening does not reach it and the last round settled #491 as defers-not-closes. Clears when the per-source deadline is raised or detection is made incremental -- not by a manifest edit.

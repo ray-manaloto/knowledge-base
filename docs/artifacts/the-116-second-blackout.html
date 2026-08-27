@@ -1,0 +1,480 @@
+<title>The 116-Second Blackout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  :root {
+    --paper:    #F2F3F6;
+    --surface:  #FFFFFF;
+    --ink:      #191E28;
+    --muted:    #656D7C;
+    --rule:     #D9DCE3;
+    --accent:   #A66E14;
+    --accent-b: #F6ECD9;
+    --ok:       #2C7349;
+    --bad:      #AF322A;
+    --plate:    #FBFBFC;
+    --shadow:   0 1px 2px rgba(25,30,40,.05), 0 6px 20px rgba(25,30,40,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:    #0F1319;
+      --surface:  #181D25;
+      --ink:      #E4E8EF;
+      --muted:    #98A1B0;
+      --rule:     #29313C;
+      --accent:   #D6A247;
+      --accent-b: #2A2216;
+      --ok:       #5CB585;
+      --bad:      #E4736A;
+      --plate:    #F4F5F7;
+      --shadow:   0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:    #0F1319;
+    --surface:  #181D25;
+    --ink:      #E4E8EF;
+    --muted:    #98A1B0;
+    --rule:     #29313C;
+    --accent:   #D6A247;
+    --accent-b: #2A2216;
+    --ok:       #5CB585;
+    --bad:      #E4736A;
+    --plate:    #F4F5F7;
+    --shadow:   0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.25rem;
+  }
+
+  h1, h2, h3, .eyebrow, .lane, th, .pill, .stat-n {
+    font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .eyebrow {
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    font-size: clamp(2.1rem, 6vw, 3.1rem);
+    font-weight: 700;
+    line-height: 1.06;
+    letter-spacing: -.022em;
+    text-wrap: balance;
+    margin: .35rem 0 0;
+  }
+
+  .deck {
+    font-size: 1.16rem;
+    color: var(--muted);
+    max-width: 34rem;
+    margin: 0;
+  }
+
+  h2 {
+    font-size: 1.36rem;
+    font-weight: 600;
+    letter-spacing: -.012em;
+    text-wrap: balance;
+    margin: 0;
+    padding-top: 1.75rem;
+    border-top: 2px solid var(--accent);
+  }
+
+  h3 {
+    font-size: 1.02rem;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -.005em;
+  }
+
+  section { display: flex; flex-direction: column; gap: 1rem; }
+
+  p { margin: 0; max-width: 40rem; }
+
+  code, .mono, td.mono {
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: .855em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  code {
+    background: var(--accent-b);
+    padding: .1em .35em;
+    border-radius: 3px;
+  }
+
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 5px solid var(--ok);
+    border-radius: 4px;
+    padding: 1.3rem 1.5rem;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+  }
+  .verdict .stat-n {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--ok);
+  }
+
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+  }
+  figure .frame {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.25rem;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+  figure svg { max-width: 100%; height: auto; display: block; }
+  figcaption {
+    font-size: .875rem;
+    color: var(--muted);
+    max-width: 40rem;
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  .mermaid {
+    background: var(--plate);
+    color: #191E28;
+    border-radius: 3px;
+    padding: .5rem;
+    text-align: center;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .93rem;
+  }
+  .tablewrap { overflow-x: auto; }
+  th {
+    text-align: left;
+    font-size: .7rem;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--rule);
+    padding: 0 .8rem .5rem 0;
+    white-space: nowrap;
+  }
+  td {
+    padding: .68rem .8rem .68rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  td:last-child, th:last-child { padding-right: 0; }
+
+  .pill {
+    display: inline-block;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: .2em .55em;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .pill.ok  { color: var(--ok);  background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .pill.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+
+  .struck { text-decoration: line-through; color: var(--muted); }
+
+  .note {
+    border-left: 3px solid var(--rule);
+    padding-left: 1.1rem;
+    color: var(--muted);
+    font-size: .95rem;
+  }
+  .note b { color: var(--ink); }
+
+  ul { margin: 0; padding-left: 1.15rem; max-width: 40rem; }
+  li { margin-bottom: .4rem; }
+  li::marker { color: var(--accent); }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.5rem;
+    font-size: .84rem;
+    color: var(--muted);
+  }
+  footer a { color: var(--accent); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a { transition: opacity .15s ease; }
+  }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Session forensics · knowledge-base · 2026-08-27</p>
+    <h1>The 116-Second Blackout</h1>
+    <p class="deck">Two cold review lanes finished. The session that dispatched them died in the same second as the first one's notification, and its handoff recorded both as dead. Nothing was lost — but the record said it was.</p>
+  </header>
+
+  <div class="verdict">
+    <span class="stat-n">Nothing was lost.</span>
+    <p>All four subagent lanes dispatched by session <code>298fdc02</code> wrote complete reports to disk. The two the handoff called dead are <b>270</b> and <b>353</b> lines, each ending in a final verdict. The handoff's §8 has been corrected in place, and <code>handoff-check</code> now exits <code>0</code>.</p>
+  </div>
+
+  <section>
+    <h2>What the handoff said, and what is on disk</h2>
+    <p>Every row here was re-derived this session: <code>wc -l</code> on each file, and the four <code>Agent</code> dispatches read out of the session's own transcript.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Lane</th><th>Handoff §8 claimed</th><th>Actually on disk</th><th></th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">cold-397</td>
+            <td>report written</td>
+            <td class="mono">review-ea7e76ff…-cold.md</td>
+            <td><span class="pill ok">Agreed</span></td>
+          </tr>
+          <tr>
+            <td class="mono">gfx-issue-research</td>
+            <td>report written</td>
+            <td class="mono">337 lines</td>
+            <td><span class="pill ok">Agreed</span></td>
+          </tr>
+          <tr>
+            <td class="mono">handoff-verify</td>
+            <td class="struck">119 lines, partial — timed out mid-run</td>
+            <td class="mono">270 lines, complete</td>
+            <td><span class="pill bad">Wrong</span></td>
+          </tr>
+          <tr>
+            <td class="mono">session-review</td>
+            <td class="struck">absent — timed out, wrote nothing</td>
+            <td class="mono">353 lines, complete</td>
+            <td><span class="pill bad">Wrong</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="note"><b>The handoff reasoned from those two wrong values.</b> It concluded that the incremental-write instruction was what separated a lane leaving 119 usable lines from one leaving nothing — a measurement of a difference that did not exist. It then told the next session to treat this round's work-memory as <i>self-reviewed only</i>, because the outside lane that would have checked it had supposedly died. That lane had in fact finished and found no P0s.</p>
+  </section>
+
+  <section>
+    <h2>Why the record went wrong</h2>
+    <p>Not a lane failure. A <b>timing</b> failure, inside a sixteen-second window.</p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 760 250" role="img" aria-label="Timing trace from 17:33:30 to 17:36:15 UTC. handoff-verify finishes at 17:33:59, sixteen seconds before the handoff section is written at 17:34:15. The session hits Prompt is too long in the same second. session-review finishes 99 seconds later, into a dead session.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <!-- axis -->
+          <line x1="40" y1="200" x2="730" y2="200" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+          <g font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity=".6" text-anchor="middle">
+            <line x1="40"  y1="196" x2="40"  y2="204" stroke="currentColor"/><text x="40"  y="220">17:33:30</text>
+            <line x1="207" y1="196" x2="207" y2="204" stroke="currentColor"/><text x="207" y="220">17:34:00</text>
+            <line x1="374" y1="196" x2="374" y2="204" stroke="currentColor"/><text x="374" y="220">17:34:30</text>
+            <line x1="541" y1="196" x2="541" y2="204" stroke="currentColor"/><text x="541" y="220">17:35:00</text>
+            <line x1="708" y1="196" x2="708" y2="204" stroke="currentColor"/><text x="708" y="220">17:35:30</text>
+          </g>
+          <text x="385" y="242" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity=".45" text-anchor="middle">UTC, from the session transcript</text>
+
+          <!-- the 16s window in which the handoff was authored -->
+          <rect x="203" y="34" width="90" height="166" fill="currentColor" opacity=".055"/>
+          <line x1="203" y1="34" x2="203" y2="200" stroke="currentColor" stroke-width="1" opacity=".3" stroke-dasharray="3 3"/>
+          <line x1="293" y1="34" x2="293" y2="200" stroke="currentColor" stroke-width="1" opacity=".3" stroke-dasharray="3 3"/>
+          <text x="248" y="28" font-family="Archivo, sans-serif" font-size="10.5" font-weight="600" fill="currentColor" opacity=".65" text-anchor="middle">16 s window</text>
+
+          <!-- event 1: handoff-verify lands -->
+          <circle cx="203" cy="88" r="6" fill="#2C7349"/>
+          <line x1="203" y1="94" x2="203" y2="200" stroke="#2C7349" stroke-width="1.5"/>
+          <text x="196" y="80" font-family="Archivo, sans-serif" font-size="12" font-weight="600" fill="#2C7349" text-anchor="end">handoff-verify DONE</text>
+          <text x="196" y="94" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity=".7" text-anchor="end">17:33:59.405 · 270 lines</text>
+
+          <!-- event 2: handoff written + death -->
+          <rect x="287" y="118" width="12" height="12" fill="#AF322A"/>
+          <line x1="293" y1="130" x2="293" y2="200" stroke="#AF322A" stroke-width="1.5"/>
+          <text x="308" y="120" font-family="Archivo, sans-serif" font-size="12" font-weight="600" fill="#AF322A">§8 written · session dies</text>
+          <text x="308" y="134" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity=".7">17:34:15.821 edit · .882 &quot;Prompt is too long&quot;</text>
+
+          <!-- event 3: session-review lands -->
+          <circle cx="654" cy="166" r="6" fill="#2C7349"/>
+          <line x1="654" y1="172" x2="654" y2="200" stroke="#2C7349" stroke-width="1.5"/>
+          <text x="644" y="158" font-family="Archivo, sans-serif" font-size="12" font-weight="600" fill="#2C7349" text-anchor="end">session-review DONE</text>
+          <text x="644" y="172" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity=".7" text-anchor="end">17:35:54.502 · 353 lines</text>
+
+          <!-- the 99s span into a dead session -->
+          <line x1="299" y1="182" x2="646" y2="182" stroke="currentColor" stroke-width="1" opacity=".45" stroke-dasharray="4 3"/>
+          <text x="472" y="177" font-family="Archivo, sans-serif" font-size="10.5" fill="currentColor" opacity=".6" text-anchor="middle">99 s — nobody left to read it</text>
+        </svg>
+      </div>
+      <figcaption><b>Figure 1 — the sixteen seconds that decided the record.</b> <code>handoff-verify</code> finished <b>16 seconds before</b> §8 was written, so even the already-complete lane was misrecorded; its idle notification arrived <b>68 ms after</b> the edit, into a session that had just hit <code>Prompt is too long</code>. <code>session-review</code> landed 99 seconds later, with nobody left to receive it. Times read from the session's own transcript this session.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Two channels, and only one of them died</h2>
+    <p>A lane reports twice, over paths that fail independently. That separation is exactly what <code>agent-report-persistence.md</code> rule 1 exists to create, and it is why this incident cost a correction rather than two re-dispatches.</p>
+
+    <figure>
+      <div class="frame">
+        <pre class="mermaid">%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#191E28','primaryBorderColor':'#A66E14','lineColor':'#656D7C','secondaryColor':'#F6ECD9','tertiaryColor':'#F2F3F6','fontFamily':'Archivo, sans-serif','fontSize':'13px'}}}%%
+flowchart LR
+  L["codex lane<br/>handoff-verify · session-review"]
+
+  L -->|"writes incrementally,<br/>then final verdict"| D[".agent/kb/reports/agents/*.md<br/>SURVIVED — 270 + 353 lines"]
+  L -->|"idle notification"| S["main session 298fdc02"]
+  S -->|"Prompt is too long<br/>at 17:34:15.882"| X["notification never processed"]
+  X --> H["handoff §8 records<br/>both lanes as dead"]
+  H --> N["next session would<br/>re-dispatch 2 x 900 s"]
+  D -.->|"read directly — what<br/>this session actually did"| N
+
+  style D fill:#E6F1EA,stroke:#2C7349,color:#191E28
+  style X fill:#F7E4E2,stroke:#AF322A,color:#191E28
+  style H fill:#F7E4E2,stroke:#AF322A,color:#191E28
+  style N fill:#F6ECD9,stroke:#A66E14,color:#191E28
+</pre>
+      </div>
+      <figcaption><b>Figure 2 — the disk channel outlived the notification channel.</b> The lanes' reports never depended on the dispatching session being alive to receive them. The dashed edge is the recovery actually taken: read the files, ignore what the handoff said about them.</figcaption>
+    </figure>
+
+    <p class="note"><b>The correction is on the handoff, not silently over it.</b> §8 now carries a dated <code>CORRECTED</code> block naming the old values, the two timestamps, and an explicit <b>do not re-dispatch either lane</b> — because the failure mode this leaves behind is a future session spending 2 × 900 s re-deriving work already written.</p>
+  </section>
+
+  <section>
+    <h2>What <code>session-review</code> found, now that anyone can read it</h2>
+    <p>Its own revised severity summary, after it downgraded two of its P1s on further reading:</p>
+    <ul>
+      <li><b>No P0s, and no new errors</b> beyond what the round had already self-caught.</li>
+      <li><b>P1</b> — the original <i>“<code>callflow-html</code> absent from <code>--help</code>”</i> claim was false. Self-caught inside the round; the correction's own accuracy was then independently verified.</li>
+      <li><b>P2</b> — <code>61 in graph / 9 stale</code> reproduces only via the raw-grep method the memory documents. A naive JSON-field scan under-counts at <code>59/7</code>. A trap laid for the next verifier.</li>
+      <li><b>P2</b> ×3 — the review-receipt gap (already in §0), Ray's PR-bot directive being listed in §9 but absent from the two assigned memory files' text, and a <code>#541</code> mechanism stated too narrowly.</li>
+      <li>Every other figure it re-derived independently — <code>77/61/25/9</code>, the 14-path arithmetic, the <code>manifest.json</code> claim, the <code>mise.toml [env]</code> transport claim — <b>reproduced exactly</b>.</li>
+    </ul>
+    <p>Both lanes reached the same numbers on the same claims from different starting points, which is the strongest thing this round has going for it.</p>
+  </section>
+
+  <section>
+    <h2>A second defect, found while fixing the first — and my own diagnosis was wrong</h2>
+    <p>Running <code>handoff-check</code> to verify the correction returned <code>RC=1</code> with <b>six</b> FAILs, each naming a work-memory file that is on disk. I filed <a href="https://github.com/ray-manaloto/knowledge-base/issues/552">#552</a> blaming <code>resolve.build_index</code> — <b>before</b> control-arming the alternative. That was wrong, and the issue has been rewritten.</p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 720 216" role="img" aria-label="Comparison. A bare filename citation cannot resolve because the graphify-out tree is pruned from the index walk. The same file cited with its full directory path resolves OK. A nonexistent file cited the same way still fails, proving the path form is a real resolution.">
+          <!-- left: bare -->
+          <text x="20" y="20" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="#AF322A">BARE FILENAME — what /clear-prep writes</text>
+          <rect x="20" y="32" width="300" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/>
+          <text x="32" y="53" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor">`query_20260827_170634_….md`</text>
+
+          <line x1="170" y1="66" x2="170" y2="96" stroke="currentColor" stroke-width="1.5"/>
+          <text x="180" y="85" font-family="Archivo, sans-serif" font-size="10.5" fill="currentColor" opacity=".7">searched against the index</text>
+
+          <rect x="20" y="96" width="300" height="52" rx="3" fill="currentColor" opacity=".05"/>
+          <rect x="20" y="96" width="300" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity=".35" stroke-dasharray="4 3"/>
+          <text x="32" y="116" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor">build_index walk</text>
+          <text x="32" y="134" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#AF322A">graphify-out/ PRUNED by name</text>
+
+          <line x1="170" y1="148" x2="170" y2="176" stroke="#AF322A" stroke-width="1.5"/>
+          <rect x="112" y="176" width="116" height="26" rx="3" fill="#AF322A"/>
+          <text x="170" y="194" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">FAIL</text>
+
+          <!-- divider -->
+          <line x1="360" y1="10" x2="360" y2="206" stroke="currentColor" stroke-width="1" opacity=".2"/>
+
+          <!-- right: full path -->
+          <text x="400" y="20" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="#2C7349">FULL PATH — the same file, cited with its directory</text>
+          <rect x="400" y="32" width="300" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/>
+          <text x="412" y="53" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor">`graphify-out/memory/query_….md`</text>
+
+          <line x1="550" y1="66" x2="550" y2="96" stroke="currentColor" stroke-width="1.5"/>
+          <text x="560" y="85" font-family="Archivo, sans-serif" font-size="10.5" fill="currentColor" opacity=".7">read as a literal path</text>
+
+          <rect x="400" y="96" width="300" height="52" rx="3" fill="currentColor" opacity=".05"/>
+          <rect x="400" y="96" width="300" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity=".35"/>
+          <text x="412" y="116" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor">no walk needed</text>
+          <text x="412" y="134" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2C7349">stat the path directly</text>
+
+          <line x1="550" y1="148" x2="550" y2="176" stroke="#2C7349" stroke-width="1.5"/>
+          <rect x="492" y="176" width="116" height="26" rx="3" fill="#2C7349"/>
+          <text x="550" y="194" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">OK</text>
+        </svg>
+      </div>
+      <figcaption><b>Figure 3 — the difference is the citation form, not the checker.</b> <code>resolve.py:64</code> prunes <code>graphify-out</code> by name, and <code>resolve.py:19-25</code> states the design plainly: only that root's top level resolves by bare name, because <i>“anything deeper is cited with its directory.”</i> The handoff was not doing that.</figcaption>
+    </figure>
+
+    <h3>The probe, armed both directions</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Citation passed to <code>handoff.check()</code></th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">`query_20260827_170634_….md` — bare</td><td><span class="pill bad">FAIL</span></td></tr>
+          <tr><td class="mono">`graphify-out/memory/query_20260827_170634_….md`</td><td><span class="pill ok">OK</span></td></tr>
+          <tr><td class="mono">control + · `python/src/kb_setup/resolve.py`</td><td><span class="pill ok">OK</span></td></tr>
+          <tr><td class="mono">control − · `graphify-out/memory/query_THIS_DOES_NOT_EXIST.md`</td><td><span class="pill bad">FAIL</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note"><b>The negative control is the row that settles it.</b> A file that does not exist, cited under the same directory with the same form, still FAILs — so the full-path row is a real resolution and not a slash making the checker lenient. Without that arm, “full paths work” would have been indistinguishable from “the checker stops caring once it sees a directory.”</p>
+
+    <p>Rewriting §9's six citations to full paths took <code>handoff-check</code> from <code>40 OK / 6 broken, RC=1</code> to <b><code>45 OK, 2 ambiguous, 0 broken, RC=0</code></b>. No code changed. The fix belongs in what <code>/clear-prep</code> emits.</p>
+  </section>
+
+  <section>
+    <h2>What to carry forward</h2>
+    <ul>
+      <li><b>A handoff written while lanes are in flight is a claim about the future.</b> §8 asserted two lanes were dead while one had already finished and the other was 99 seconds out. Report a lane's outcome from <b>the file on disk</b>, never from whether its notification arrived.</li>
+      <li><b>Incremental persistence did its job — and the handoff credited it with a difference that never happened.</b> Both lanes wrote complete reports. The prose explaining <i>why one left 119 lines and the other nothing</i> was a mechanism invented to explain two wrong numbers.</li>
+      <li><b>File the issue after the control arm, not before.</b> <a href="https://github.com/ray-manaloto/knowledge-base/issues/552">#552</a>'s first version named the wrong module and guessed a symbol name (<code>_AUTHORED_SOURCE_DIRS</code>; it is <code>_SOURCES_KEPT</code>, <code>resolve.py:88</code>). One four-row probe refuted the whole diagnosis.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p><b>Provenance.</b> Every figure on this page was measured in session <code>14c497b3</code> on 2026-08-27: line counts by <code>wc -l</code>; timestamps and the four <code>Agent</code> dispatches read from session <code>298fdc02</code>'s transcript; <code>handoff-check</code> results from a file-captured exit code, not a pipe; the four probe rows from a direct call to <code>kb_setup.handoff.check()</code>. Findings attributed to <code>session-review</code> and <code>handoff-verify</code> are <b>those lanes' own claims, quoted from their reports</b> — read this session, but not independently re-derived here.</p>
+    <p>Source: <code>docs/artifacts/the-116-second-blackout.html</code> · corrected handoff: <code>.agent/plans/session-2026-08-27-e.md</code> §8 · <a href="https://github.com/ray-manaloto/knowledge-base/issues/552">#552</a></p>
+  </footer>
+
+</div>
