@@ -29,10 +29,24 @@ verdict follows from the FIXTURE, never from what happens to be pinned today.
 WHICH TESTS DO NOT, AND WHY EACH ONE IS SAFE ANYWAY — the complete list, so a
 future addition can be checked against it rather than assumed:
 
-* `test_the_hook_actually_denies_it` — compares the hook's verdict to
-  `absent_binary.decide()` called directly, rather than asserting an expected
-  DENY or allow. It is checking that the wiring reaches this module, not what
-  this module currently decides, so it passes under any host state.
+* `test_the_hook_actually_denies_it` — drives the real hook payload with
+  `gtimeout 5 ls` and asserts the DENY message's literal text. `gtimeout` is
+  the one name this file's own WHY-THIS-KEEPS-HAPPENING note above says "has
+  stayed absent throughout" — its live-host verdict is a fixed fact, not a
+  claim about `mise.toml`'s current pin state, same footing as the two
+  entries below. Until round 2 of the 2026-08-26 review this test compared
+  the hook's verdict to `absent_binary.decide()` called directly instead —
+  which is structurally incapable of catching a regression IN `decide()`
+  itself, because both sides always move together. That is exactly why the
+  mutant that rebinds `hook_guard._absent_binary` to `lambda _: None` —
+  unwiring the guard from the hook entirely — survived: it used `timeout`,
+  which already resolves on THIS host, so `decide("timeout 5 ls")`
+  legitimately returned `None` and the mutated wiring's `None` matched it by
+  coincidence. Asserting fixed literal text against a name that can never
+  resolve here closes that hole, and doubles as the live arm
+  `long-running-command-hangs.md` rule 3a asks a reader to run by hand
+  ("check `gtimeout 5 ls` still denies") after the coreutils pin narrowed
+  this guard's live-host coverage from four names to one.
 * `test_probe_runs_reports_success_for_a_real_working_binary` — a unit test of
   `_probe_runs` ITSELF against `/usr/bin/perl`, which is Apple's vendored
   system perl, not a mise-managed tool. No `mise.toml` change can affect it.
@@ -251,20 +265,31 @@ def test_the_hook_actually_denies_it() -> None:
     """`decide` could be perfect and inert — this drives the real hook payload.
 
     `a-validator-nothing-calls-is-not-a-gate.md`. Runs against the LIVE host,
-    and compares the hook's verdict to `absent_binary.decide` called directly
-    rather than to `shutil.which("timeout") is None` — that used to be the
-    whole predicate and stopped being it on 2026-08-26, when `timeout` started
-    resolving to a broken mise shim on this very machine (`which` is not None,
-    yet the right verdict is still a deny). Comparing to `decide` itself keeps
-    this test correct on ANY host state — absent, broken, or genuinely fixed —
-    while still proving the thing it exists to prove: that the hook's wiring
-    actually reaches this module rather than silently swallowing the call.
+    using `gtimeout` rather than `timeout`: the module docstring's WHY-THIS-
+    KEEPS-HAPPENING note says `gtimeout` alone "has stayed absent throughout"
+    every pin change this file has lived through, so its live-host verdict is
+    a fixed fact, never a claim about `mise.toml`'s current state — unlike
+    `timeout`, which resolved and ran cleanly once `conda:coreutils` was
+    pinned (`7eb281a8`) and made the ORIGINAL version of this test (comparing
+    to `absent_binary.decide("timeout 5 ls")`, itself `None` on this host)
+    pass for a broken reason.
+
+    Asserts the DENY message's literal text, never `decide()`'s own return
+    value. That self-comparison is the defect this replaces: it can only ever
+    show that the hook calls the SAME function this test also calls, so a
+    regression inside `decide()` itself moves both sides together and the
+    test cannot see it — which is also why it could not see `decide()`
+    legitimately returning `None` on this host and the hook's wiring being
+    unplugged entirely both producing the same `None`. Asserting a literal,
+    host-stable string is the fix: it proves BOTH that the hook's wiring
+    reaches this module AND that what `decide()` returns is what this file
+    documents it returning.
     """
-    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "timeout 5 ls"}})
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "gtimeout 5 ls"}})
     result = hook_guard.check_hook_call(payload)
     value = getattr(result, "value", None)
-    expected = absent_binary.decide("timeout 5 ls")
-    assert value == expected
+    assert value is not None, "the hook allowed a command whose binary cannot run"
+    assert "`gtimeout` does not exist on this host" in value, value
 
 
 def test_the_gate_redirect_still_wins_over_this_one(absent) -> None:

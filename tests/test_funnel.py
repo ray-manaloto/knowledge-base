@@ -235,6 +235,46 @@ def test_verdict_default_base_works_with_no_local_main_branch(
     assert v.docs_paths == ("docs/research/finding.md",)
 
 
+def test_verdict_default_base_is_no_base_with_no_origin_main_ref(
+    git: Callable[..., str], commit_file: Callable[..., str], tmp_path: Path
+) -> None:
+    """The mirror the test above never exercised.
+
+    Local `main` present, NO `origin/main` — a `git init` sandbox, a clone
+    whose remote isn't named `origin`, or a fetch-less checkout.
+
+    `test_verdict_default_base_works_with_no_local_main_branch` above deletes
+    only LOCAL `main`; `origin/main` stays untouched, so that test can never
+    observe what happens when `origin/main` itself is the one missing.
+    Flagged by review round 2 of the 2026-08-26 round as the branch this
+    module's `no_base` test suite left unexercised.
+
+    The behaviour asserted here is not a new policy call — it is inherited
+    from one already made and documented: `review.py`'s own
+    `DEFAULT_BASE_REF` docstring (Ray, 2026-07-30) states that a clone with no
+    `origin/main` ref resolves `review.base_sha` to `""`, and REFUSES rather
+    than silently falling back to local `main`, because "could not check" is
+    never rendered as clean anywhere in that module. `funnel.verdict` reuses
+    `review.DEFAULT_BASE_REF` as its own default specifically "so this default
+    and `review`'s own definition can never name different refs"
+    (`funnel.py`'s `verdict` docstring) — so a repo with local `main` and no
+    `origin/main` must land on `no_base` here too, not silently fall back and
+    report a delta measured against the wrong ref.
+    """
+    commit_file("docs/research/finding.md", "# a finding\n")
+    git("update-ref", "-d", "refs/remotes/origin/main")  # origin/main GONE; local main untouched
+
+    v = funnel.verdict(tmp_path)
+
+    assert v.state == "no_base", (
+        f"expected the gate to refuse rather than silently fall back to local "
+        f"main with no origin/main ref, got {v.state!r}"
+    )
+    assert v.docs_paths == ()
+    assert v.sources_paths == ()
+    assert "could not" in v.note.lower()
+
+
 def test_main_reports_not_run_on_an_unresolvable_default_base(tmp_path: Path) -> None:
     """The CLI boundary's `no_base` arm: not a git repo at all.
 

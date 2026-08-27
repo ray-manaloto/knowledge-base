@@ -290,12 +290,33 @@ def _cmd_literals(test: ast.expr) -> list[str]:
 def _first_call(stmts: list[ast.stmt]) -> tuple[str, int] | None:
     """The arm's real dispatch call — the first call that is NOT `print`.
 
-    Walks the arm body exactly as before — `ast.walk`, depth-first, one
-    top-level statement at a time, in source order — with ONE change: a bare
-    `print(...)` call is SKIPPED rather than accepted as the answer, and the
-    walk continues past it looking for the next candidate. `print` is builtin
-    I/O, never a delegation to a real function this lane should trace as a
-    dispatch target.
+    Walks the arm body one top-level statement at a time, in source order —
+    that half is genuine: the outer `for stmt in stmts` loop visits `stmts`
+    in list order, which IS `node.body`'s source order. Within one statement
+    it uses `ast.walk`, which CPython's own docstring says yields descendants
+    "in no specified order" — a breadth-first walk via a `deque`
+    (`ast.walk.__doc__`; check it before trusting a claim of depth-first or
+    source order here again), not the depth-first, source-order traversal an
+    earlier version of this paragraph claimed. `node.lineno` on the returned
+    call is therefore the lineno of whichever call `ast.walk` happens to
+    yield first among a statement's candidates, not necessarily that
+    statement's smallest lineno.
+
+    That correction does not touch correctness, because neither SKIP this
+    function makes — a bare `print(...)` call, or an unqualifiable chained
+    receiver, below — depends on visiting calls in lineno order. Each only
+    needs "if this candidate is not acceptable, keep taking whatever
+    `ast.walk` yields next," a property breadth-first provides exactly as
+    well as depth-first would. The two cases documented next both hold for a
+    narrower reason than "source order": each guard clause's `print(...)`
+    and each version arm's `print(...)` is the ONLY call inside its own
+    top-level statement, so however `ast.walk` orders THAT statement's other
+    nodes never comes into it. The ordering guarantee this function actually
+    relies on is the OUTER per-statement loop, not `ast.walk`'s internal
+    order — a bare `print(...)` call is SKIPPED rather than accepted as the
+    answer, and the walk continues past it looking for the next candidate.
+    `print` is builtin I/O, never a delegation to a real function this lane
+    should trace as a dispatch target.
 
     This is the fix for the confirmed defect at `06e5c615`: FIVE emitted
     edges targeted `fn:print`, `verified=True`. Two shapes, two different
@@ -330,6 +351,21 @@ def _first_call(stmts: list[ast.stmt]) -> tuple[str, int] | None:
     simple name — most arms end in `<module>.main(...)` after a lazy
     `from kb_setup import <module>`, so a bare `.attr` extraction would
     collapse dozens of distinct dispatch targets onto one ambiguous label.
+
+    A receiver that is ITSELF an attribute — `sys.stderr.write(...)`,
+    `self.opts.run(...)` — cannot be qualified this way at all without
+    resolving the receiver expression, which is call-graph work this lane
+    does not do (see the module docstring). The code used to fall through to
+    a bare `func.attr` in that case: `target="fn:write"`, `verified=True` —
+    the exact false-fact class `06e5c615` fixed for `print`, one AST node
+    shape over, since it names a symbol the source does not call standalone.
+    Latent, not live, at `fc3e084b` (`dispatch_edges` emits 25 edges there,
+    none a bare unqualified attribute) — confirmed by review round 2, and
+    fixed the same way as `print`: SKIP it and keep walking for a resolvable
+    candidate, rather than emit a guess. Same honest-emptiness argument as
+    the version arm's `print` above — an arm whose only call is a chained
+    receiver now contributes NO edge, visible as a lower count from
+    `dispatch_edges`, not as a wrong target.
     """
     for stmt in stmts:
         for node in ast.walk(stmt):
@@ -343,7 +379,11 @@ def _first_call(stmts: list[ast.stmt]) -> tuple[str, int] | None:
             if isinstance(func, ast.Attribute):
                 if isinstance(func.value, ast.Name):
                     return f"{func.value.id}.{func.attr}", node.lineno
-                return func.attr, node.lineno
+                # A chained receiver (`sys.stderr.write(...)`) cannot be
+                # qualified without resolving the receiver expression itself.
+                # Skip it, same as `print` above, rather than emit the bare
+                # `.attr` guess this branch used to return.
+                continue
     return None
 
 

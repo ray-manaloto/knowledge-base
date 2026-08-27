@@ -135,6 +135,53 @@ def test_dispatch_lane_resolves_the_arms_trailing_call_not_a_guards_print(
     )
 
 
+def test_dispatch_lane_skips_a_chained_attribute_receiver_it_cannot_qualify(
+    tmp_path: Path,
+) -> None:
+    """P1 confirmed by review round 2 of the 2026-08-26 round.
+
+    `_first_call` used to fall through to a bare `func.attr` for a receiver
+    that is ITSELF an attribute (`sys.stderr.write(...)`, `self.opts.run(...)`),
+    emitting `target="fn:write"`, `verified=True` — the exact false-fact class
+    `06e5c615` fixed for `print`, one AST node shape over: `write` is not a
+    function this arm calls standalone, it is a method on `sys.stderr`, whose
+    receiver this lane does not resolve.
+
+    Two arms, mirroring the print-skip test above's two documented shapes:
+    `broken`'s ONLY call is the unresolvable chained receiver, so it must
+    contribute no edge at all; `salvage` has the same chained receiver
+    followed by a real target, proving the walk continues past the skip
+    rather than aborting — the same property the print fix relies on.
+    """
+    src = tmp_path / "python" / "src" / "kb_setup"
+    src.mkdir(parents=True)
+    (src / "cli.py").write_text(
+        "def _run(argv):\n"
+        "    cmd = argv[0]\n"
+        '    if cmd == "broken":\n'
+        '        sys.stderr.write("nope")\n'
+        "        return 2\n"
+        '    if cmd == "salvage":\n'
+        '        sys.stderr.write("warn")\n'
+        "        return graphify_ops.real_target(cmd)\n"
+        "    return 1\n",
+        encoding="utf-8",
+    )
+
+    edges = code_intel.dispatch_edges(tmp_path)
+
+    broken_targets = {e.target for e in edges if e.source == "cli:broken"}
+    assert broken_targets == set(), (
+        f"expected no dispatch edge for an unresolvable chained receiver, got "
+        f"{broken_targets!r} — fn:write means the bare `.attr` fallback returned"
+    )
+    salvage_targets = {e.target for e in edges if e.source == "cli:salvage"}
+    assert salvage_targets == {"fn:graphify_ops.real_target"}, (
+        f"expected the walk to continue past the chained receiver to the real "
+        f"target, got {salvage_targets!r}"
+    )
+
+
 def test_config_lane_stamps_its_provenance_and_cites_a_file_line(fake_repo: Path) -> None:
     """The fixture's `other.py` reads one config-shaped literal path."""
     edges = code_intel.config_edges(fake_repo)
