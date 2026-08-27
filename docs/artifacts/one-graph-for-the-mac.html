@@ -1,0 +1,464 @@
+<title>One Graph For The Mac</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Public+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<style>
+  :root {
+    --ground:        #F6F7F9;
+    --panel:         #FFFFFF;
+    --ink:           #171B23;
+    --ink-soft:      #4E586A;
+    --rule:          #D6DAE2;
+    --rule-soft:     #E7EAF0;
+    --scoped:        #0F6E6B;   /* project-scoped */
+    --global:        #A96410;   /* global / shared mutable */
+    --hazard:        #A32B26;   /* hard blocker */
+    --plate:         #FBFBFD;   /* light plate that stays light in both themes */
+    --plate-ink:     #171B23;
+    --plate-rule:    #D6DAE2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:     #10131A;
+      --panel:      #171B24;
+      --ink:        #E6EAF1;
+      --ink-soft:   #98A3B5;
+      --rule:       #2C3340;
+      --rule-soft:  #222834;
+      --scoped:     #4FBDB6;
+      --global:     #E2A24C;
+      --hazard:     #E8776F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:     #10131A;
+    --panel:      #171B24;
+    --ink:        #E6EAF1;
+    --ink-soft:   #98A3B5;
+    --rule:       #2C3340;
+    --rule-soft:  #222834;
+    --scoped:     #4FBDB6;
+    --global:     #E2A24C;
+    --hazard:     #E8776F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 47rem;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.4rem;
+  }
+
+  .eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: "Newsreader", Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(2.2rem, 6vw, 3.3rem);
+    line-height: 1.06;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  h2 {
+    font-family: "Newsreader", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.65rem;
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 1.6rem 0 0;
+    padding-top: 1.6rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin: 0 0 0.4rem;
+  }
+
+  p { margin: 0; max-width: 40rem; }
+  .lede { font-size: 1.14rem; color: var(--ink-soft); max-width: 38rem; }
+
+  .stack { display: flex; flex-direction: column; gap: 1rem; }
+
+  code, .mono {
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.87em;
+  }
+  code {
+    background: var(--rule-soft);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+
+  /* ---- the two-scope key ---- */
+  .key { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: center; font-size: 0.84rem; color: var(--ink-soft); }
+  .key span { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .swatch { width: 0.85rem; height: 0.85rem; border-radius: 2px; flex: none; }
+
+  /* ---- figures ---- */
+  figure { margin: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+  .plate {
+    background: var(--plate);
+    border: 1px solid var(--plate-rule);
+    border-radius: 6px;
+    padding: 1.4rem 1rem;
+    overflow-x: auto;
+    color: var(--plate-ink);
+  }
+  .plate svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  figcaption { font-size: 0.86rem; color: var(--ink-soft); max-width: 40rem; }
+
+  /* ---- measurement table ---- */
+  .measure { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  .measure th, .measure td {
+    text-align: left;
+    padding: 0.62rem 0.7rem;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+  .measure th {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--rule);
+  }
+  .measure td.num { font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cite { font-family: "JetBrains Mono", monospace; font-size: 0.76rem; color: var(--ink-soft); white-space: nowrap; }
+  .tablewrap { overflow-x: auto; }
+
+  /* ---- gain / lose columns ---- */
+  .ledger { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+  @media (min-width: 44rem) { .ledger { grid-template-columns: 1fr 1fr; } }
+  .col {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 1.1rem 1.2rem 1.3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  .col-head { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; }
+  .col.gain { border-top: 3px solid var(--scoped); }
+  .col.lose { border-top: 3px solid var(--hazard); }
+  .col.gain .col-head { color: var(--scoped); }
+  .col.lose .col-head { color: var(--hazard); }
+  .col ul { margin: 0; padding-left: 1.05rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  .col li { font-size: 0.94rem; line-height: 1.5; }
+
+  .callout {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--global);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .callout.verdict { border-left-color: var(--scoped); }
+  .callout.risk { border-left-color: var(--hazard); }
+  .callout-label { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: var(--ink-soft); }
+
+  .footnote { font-size: 0.84rem; color: var(--ink-soft); border-top: 1px solid var(--rule); padding-top: 1.2rem; }
+  .footnote ul { margin: 0.6rem 0 0; padding-left: 1.05rem; display: flex; flex-direction: column; gap: 0.35rem; }
+
+  a { color: inherit; text-decoration-color: var(--ink-soft); text-underline-offset: 2px; }
+  a:focus-visible, :focus-visible { outline: 2px solid var(--scoped); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="stack">
+    <p class="eyebrow">Directive 2026-08-26 · Part Two, item 1 · analysis only</p>
+    <h1>One Graph For The Mac</h1>
+    <p class="lede">You asked whether to lift the ban and keep a single graphify source tree that every project and every coding agent on this machine can read. Here is what <code>graphify global</code> actually does, what it would give you, and what it would cost — read from the pinned 0.9.50 source, not from the rules that describe it.</p>
+    <div class="key">
+      <span><i class="swatch" style="background: var(--scoped)"></i> project-scoped (today)</span>
+      <span><i class="swatch" style="background: var(--global)"></i> global / shared state</span>
+      <span><i class="swatch" style="background: var(--hazard)"></i> hard blocker</span>
+    </div>
+  </header>
+
+  <section class="stack">
+    <h2>First: the ban is two bans, and only one is about the graph</h2>
+    <p>They are written next to each other, so they read as one rule. They govern different files for different reasons, and lifting one does not lift the other.</p>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 760 300" role="img" aria-label="Two separate bans: the skill-install ban governs files under the home directory used by every agent, and the global-graph ban governs a single merged graph file at ~/.graphify. Only the second one is about knowledge.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <text x="16" y="24" font-size="12" font-weight="700" fill="currentColor" letter-spacing="1.4">BAN A — HOW AGENTS LEARN TO USE IT</text>
+          <line x1="16" y1="34" x2="744" y2="34" stroke="currentColor" stroke-opacity="0.25"/>
+
+          <rect x="16" y="52" width="150" height="52" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="91" y="74" font-size="12" text-anchor="middle" fill="currentColor">graphify install</text>
+          <text x="91" y="90" font-size="11" text-anchor="middle" fill="currentColor" opacity="0.7">(no --project)</text>
+
+          <line x1="166" y1="78" x2="252" y2="78" stroke="#A32B26" stroke-width="1.6" marker-end="url(#ar)" color="#A32B26"/>
+          <text x="209" y="70" font-size="10.5" text-anchor="middle" fill="#A32B26">writes</text>
+
+          <rect x="256" y="46" width="200" height="30" rx="4" fill="none" stroke="#A32B26" stroke-width="1.4"/>
+          <text x="356" y="65" font-size="11.5" text-anchor="middle" fill="#A32B26">~/.claude/skills/graphify/</text>
+          <rect x="256" y="82" width="200" height="30" rx="4" fill="none" stroke="#A32B26" stroke-width="1.4"/>
+          <text x="356" y="101" font-size="11.5" text-anchor="middle" fill="#A32B26">~/.claude/CLAUDE.md</text>
+
+          <text x="474" y="66" font-size="11" fill="currentColor" opacity="0.75">18 Path.home() call sites</text>
+          <text x="474" y="82" font-size="11" fill="currentColor" opacity="0.75">the CLAUDE.md append is</text>
+          <text x="474" y="97" font-size="11" fill="currentColor" opacity="0.75">hardcoded — install.py:637</text>
+
+          <text x="16" y="164" font-size="12" font-weight="700" fill="currentColor" letter-spacing="1.4">BAN B — WHERE THE KNOWLEDGE LIVES</text>
+          <line x1="16" y1="174" x2="744" y2="174" stroke="currentColor" stroke-opacity="0.25"/>
+
+          <rect x="16" y="192" width="150" height="52" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="91" y="214" font-size="12" text-anchor="middle" fill="currentColor">graphify global add</text>
+          <text x="91" y="230" font-size="11" text-anchor="middle" fill="currentColor" opacity="0.7">extract --global</text>
+
+          <line x1="166" y1="218" x2="252" y2="218" stroke="#A96410" stroke-width="1.6" marker-end="url(#ar)" color="#A96410"/>
+          <text x="209" y="210" font-size="10.5" text-anchor="middle" fill="#A96410">merges into</text>
+
+          <rect x="256" y="200" width="200" height="36" rx="4" fill="none" stroke="#A96410" stroke-width="1.4"/>
+          <text x="356" y="223" font-size="11.5" text-anchor="middle" fill="#A96410">~/.graphify/global-graph.json</text>
+
+          <text x="474" y="212" font-size="11" fill="currentColor" opacity="0.75">one file, all projects</text>
+          <text x="474" y="228" font-size="11" fill="currentColor" opacity="0.75">global_graph.py:11</text>
+
+          <text x="16" y="278" font-size="11.5" fill="currentColor" opacity="0.85">Ban A is about a machine every agent shares. Ban B is about a graph. Your question is Ban B.</text>
+        </svg>
+      </div>
+      <figcaption>The two bans write to different places for different reasons. <strong>Ban A</strong> (<code>CLAUDE.md</code> invariant 1) stops graphify editing the home directory every agent on the Mac reads. <strong>Ban B</strong> (<code>do-not.md</code> #2) stops it merging this project's graph into one shared file. Only Ban B answers &ldquo;one source tree for common knowledge&rdquo;.</figcaption>
+    </figure>
+  </section>
+
+  <section class="stack">
+    <h2>The surprise: the global tree already exists</h2>
+    <p>The ban stopped <em>this repo</em> writing there. It never stopped the directory existing. Measured this session:</p>
+
+    <div class="tablewrap">
+      <table class="measure">
+        <thead>
+          <tr><th>What is already at <code>~/.graphify/</code></th><th>Size</th><th>Last touched</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>repos/</code> — 39 owner directories of cloned upstreams</td><td class="num">4.5 GB</td><td class="num">Jul 21</td></tr>
+          <tr><td><code>graphify-out/</code> — a graph built there</td><td class="num">182 MB</td><td class="num">Apr 26</td></tr>
+          <tr><td><code>raw/</code> — fetched sources</td><td class="num">38 MB</td><td class="num">Apr 28</td></tr>
+          <tr><td><code>repo-archive/</code></td><td class="num">3.5 MB</td><td class="num">Apr 26</td></tr>
+          <tr><td><code>config.json</code> — 3 keys, <strong>all three dead</strong> on the pinned 0.9.50</td><td class="num">338 B</td><td class="num">Aug 7</td></tr>
+          <tr><td><code>global-graph.json</code> — the thing Ban B forbids</td><td class="num">absent</td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <span class="callout-label">Control-armed</span>
+      <p><code>config.json</code> sets <code>active_llm_assistant: "colibri"</code>, a local DeepSeek server URL, and a <code>global_memory_dir</code>. None of those three keys appears anywhere in the installed 0.9.50 package — while the control term <code>global_add</code> returns 2 files from the same sweep, so the probe discriminates. That is four months of stale global config nobody could have noticed, which is itself an argument about shared machine state.</p>
+    </div>
+  </section>
+
+  <section class="stack">
+    <h2>What <code>global add</code> actually builds</h2>
+    <p>This is the part that decides the answer, and it is not what the name suggests. It does not re-extract anything, and it does not relate your projects to each other.</p>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 760 360" role="img" aria-label="global add takes each project's finished graph, prefixes every node id with the repo tag, and appends it to one file. The only bridge between two projects is a shared external library node with no source file, which is deduplicated by label.">
+          <defs>
+            <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <!-- inputs -->
+          <rect x="14" y="40" width="140" height="46" rx="4" fill="none" stroke="#0F6E6B" stroke-width="1.4"/>
+          <text x="84" y="60" font-size="11.5" text-anchor="middle" fill="#0F6E6B">knowledge-base</text>
+          <text x="84" y="76" font-size="10.5" text-anchor="middle" fill="#0F6E6B" opacity="0.8">graph.json</text>
+
+          <rect x="14" y="104" width="140" height="46" rx="4" fill="none" stroke="#0F6E6B" stroke-width="1.4"/>
+          <text x="84" y="124" font-size="11.5" text-anchor="middle" fill="#0F6E6B">dotfiles</text>
+          <text x="84" y="140" font-size="10.5" text-anchor="middle" fill="#0F6E6B" opacity="0.8">graph.json</text>
+
+          <rect x="14" y="168" width="140" height="46" rx="4" fill="none" stroke="#0F6E6B" stroke-width="1.4"/>
+          <text x="84" y="188" font-size="11.5" text-anchor="middle" fill="#0F6E6B">some-app</text>
+          <text x="84" y="204" font-size="10.5" text-anchor="middle" fill="#0F6E6B" opacity="0.8">graph.json</text>
+
+          <!-- prefix step -->
+          <line x1="154" y1="63" x2="222" y2="100" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+          <line x1="154" y1="127" x2="222" y2="127" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+          <line x1="154" y1="191" x2="222" y2="154" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+
+          <rect x="226" y="100" width="132" height="54" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="292" y="122" font-size="11.5" text-anchor="middle" fill="currentColor">prefix every id</text>
+          <text x="292" y="140" font-size="11" text-anchor="middle" fill="currentColor" font-family="monospace">tag::&lt;id&gt;</text>
+          <text x="292" y="170" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.7">build.py:1999</text>
+
+          <line x1="358" y1="127" x2="426" y2="127" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+          <text x="392" y="119" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.75">append</text>
+
+          <!-- the global file -->
+          <rect x="430" y="34" width="316" height="192" rx="5" fill="none" stroke="#A96410" stroke-width="1.6"/>
+          <text x="588" y="54" font-size="12" text-anchor="middle" fill="#A96410" font-weight="700">~/.graphify/global-graph.json</text>
+
+          <rect x="450" y="66" width="120" height="34" rx="3" fill="none" stroke="#A96410" stroke-width="1" stroke-dasharray="3 2"/>
+          <text x="510" y="87" font-size="10.5" text-anchor="middle" fill="#A96410">knowledge-base::*</text>
+
+          <rect x="450" y="110" width="120" height="34" rx="3" fill="none" stroke="#A96410" stroke-width="1" stroke-dasharray="3 2"/>
+          <text x="510" y="131" font-size="10.5" text-anchor="middle" fill="#A96410">dotfiles::*</text>
+
+          <rect x="450" y="154" width="120" height="34" rx="3" fill="none" stroke="#A96410" stroke-width="1" stroke-dasharray="3 2"/>
+          <text x="510" y="175" font-size="10.5" text-anchor="middle" fill="#A96410">some-app::*</text>
+
+          <!-- the one bridge -->
+          <circle cx="668" cy="127" r="26" fill="none" stroke="#A32B26" stroke-width="1.8"/>
+          <text x="668" y="124" font-size="9.5" text-anchor="middle" fill="#A32B26">networkx</text>
+          <text x="668" y="136" font-size="9.5" text-anchor="middle" fill="#A32B26">(external)</text>
+
+          <line x1="570" y1="83" x2="644" y2="115" stroke="#A32B26" stroke-width="1.4"/>
+          <line x1="570" y1="127" x2="642" y2="127" stroke="#A32B26" stroke-width="1.4"/>
+          <line x1="570" y1="171" x2="644" y2="139" stroke="#A32B26" stroke-width="1.4"/>
+
+          <text x="588" y="246" font-size="11" text-anchor="middle" fill="#A32B26">the ONLY cross-project link: a node with no source_file,</text>
+          <text x="588" y="262" font-size="11" text-anchor="middle" fill="#A32B26">merged by matching label — global_graph.py:122–133</text>
+
+          <line x1="14" y1="292" x2="746" y2="292" stroke="currentColor" stroke-opacity="0.25"/>
+          <text x="14" y="314" font-size="11.5" fill="currentColor" opacity="0.9">Three namespaces in one file. No edge is created between your own code in two projects —</text>
+          <text x="14" y="331" font-size="11.5" fill="currentColor" opacity="0.9">only between the third-party libraries they happen to share.</text>
+        </svg>
+      </div>
+      <figcaption><code>global_add</code> consumes each project's <em>already-built</em> <code>graph.json</code>, relabels every node to <code>tag::&lt;id&gt;</code> for isolation, and composes them into one file. Repos are individually prunable and hash-skipped, so re-adding an unchanged project is free. But isolation is the design: the sole connective tissue is external-library nodes deduplicated by label.</figcaption>
+    </figure>
+
+    <div class="callout risk">
+      <span class="callout-label">The load-bearing consequence</span>
+      <p>&ldquo;One source tree for common knowledge relevant to all projects&rdquo; asks for a <strong>web</strong>. <code>global add</code> gives a <strong>filing cabinet</strong> — N drawers in one box, and the drawers do not touch. This repo has measured that exact shape before: a cross-namespace merge produced <strong>0 cross-namespace edges out of 815,481</strong>. <em>That figure is inherited from a prior round's control-armed run, not re-derived this session</em> — but the mechanism above is read from source and predicts it.</p>
+    </div>
+  </section>
+
+  <section class="stack">
+    <h2>And nothing reads it by default</h2>
+    <p><code>query.py</code> in the pinned 0.9.50 contains <strong>zero</strong> references to <code>global</code>. A global graph is not automatically consulted by any query — it is reached only by pointing <code>--graph ~/.graphify/global-graph.json</code> at it explicitly, the same way <code>kb-serve</code> already binds an absolute path today. Whatever the global file gains you, &ldquo;agents just find it&rdquo; is not on the list; something still has to name the path.</p>
+  </section>
+
+  <section class="stack">
+    <h2>The ledger</h2>
+
+    <div class="ledger">
+      <div class="col gain">
+        <span class="col-head">What lifting Ban B gains</span>
+        <ul>
+          <li><strong>One query surface.</strong> One <code>--graph</code> path instead of registering an MCP server per project.</li>
+          <li><strong>Clean per-repo lifecycle.</strong> <code>global remove &lt;tag&gt;</code> prunes exactly one project; a re-add with an unchanged source hash is a no-op.</li>
+          <li><strong>Real shared-dependency linking.</strong> Two projects using the same library collapse onto one node — genuine cross-project value, just narrower than it sounds.</li>
+          <li><strong>Survives a project wipe.</strong> Deleting a project's <code>graphify-out/</code> does not remove its knowledge from the global file.</li>
+        </ul>
+      </div>
+      <div class="col lose">
+        <span class="col-head">What it costs</span>
+        <ul>
+          <li><strong>Reproducibility, the repo's invariant 3.</strong> The global file is derived from N project graphs at N unrelated pin states, and no manifest anywhere ties it to committed inputs. Nothing can rebuild it from source of truth.</li>
+          <li><strong>Invariant 11.</strong> This repo edits project settings only. Writing <code>~/.graphify/</code> is exactly the thing it never does.</li>
+          <li><strong>The Claude-only guard leaks.</strong> <code>clean_env()</code> is applied at every <code>subprocess.run</code> inside <code>kb_setup</code> — it is a <em>wrapper</em> guard, not a graphify one. A codex or antigravity agent running bare <code>graphify</code> against the global tree has no strip, and the machine's <code>GEMINI_API_KEY</code> is reachable again.</li>
+          <li><strong>Memory.</strong> Every add loads the whole global graph <em>and</em> the whole source graph into NetworkX. This repo's graph alone is 736 MiB of JSON. <em>The resident cost is unmeasured</em> — but it is the whole file, every time.</li>
+          <li><strong>The size cap is closer than it looks.</strong> See below.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="stack">
+    <h2>The number that decides the scale question</h2>
+
+    <div class="tablewrap">
+      <table class="measure">
+        <thead>
+          <tr><th>Measurement</th><th>Value</th><th>Where</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>This repo's <code>graph.json</code></td><td class="num">736.4 MiB</td><td class="cite">measured 2026-08-26</td></tr>
+          <tr><td>graphify's default graph-file cap</td><td class="num">512 MiB</td><td class="cite">security.py:32</td></tr>
+          <tr><td>The cap <em>this repo</em> raises it to</td><td class="num">1 GiB</td><td class="cite">mise.toml:250</td></tr>
+          <tr><td>Headroom left on the raised cap, for <em>one</em> project</td><td class="num">28 %</td><td class="cite">derived</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout risk">
+      <span class="callout-label">Read this twice</span>
+      <p>On a <strong>default</strong> machine — any other project, any codex or antigravity agent — adding this repo to the global graph is refused outright: 736 MiB against a 512 MiB cap. It only works here because <code>mise.toml</code> raises the cap for this repo, and even then one project already occupies 72 % of it. A global graph holding this corpus plus anything else does not fit without raising the cap again on every host that reads it.</p>
+    </div>
+  </section>
+
+  <section class="stack">
+    <h2>What I would do instead</h2>
+
+    <div class="callout verdict">
+      <span class="callout-label">Recommendation — yours to overrule</span>
+      <p><strong>Lift Ban A's spirit, keep Ban B.</strong> The goal — one tree of common knowledge every agent on this Mac can reach — is already 90 % built and does not need the global graph.</p>
+    </div>
+
+    <p>The three moves, in order of what they actually buy:</p>
+
+    <ol class="stack" style="padding-left: 1.2rem; gap: 0.7rem;">
+      <li><strong>This repo <em>is</em> the one source tree.</strong> It already holds every shared source, pinned and committed, and rebuilds from them. That satisfies &ldquo;one tree&rdquo; without any shared mutable state.</li>
+      <li><strong>Reach it from everywhere over MCP, not over a shared file.</strong> <code>mise run kb-serve</code> already binds an absolute <code>graph.json</code> path — invariant 4 exists precisely so several graphify projects never collide. Registering that server in another project's <code>.mcp.json</code> gives that project the corpus with zero writes outside this repo and zero reproducibility loss.</li>
+      <li><strong>Keep per-platform skill installs project-scoped and automated</strong> — which is already filed as <a href="https://github.com/ray-manaloto/knowledge-base/issues/526">#526</a>. That is the honest version of &ldquo;all coding agents on this Mac&rdquo;: each agent learns the skill in its own project, and nothing appends to <code>~/.claude/CLAUDE.md</code>.</li>
+    </ol>
+
+    <p>The one thing the global graph gives that MCP does not is the shared-external-library dedup. If that turns out to matter, it can be bought later by adding those upstreams to <em>this</em> corpus as pinned manifests — which is what <code>sources/</code> is for.</p>
+  </section>
+
+  <section class="stack">
+    <h2>What is still ambiguous</h2>
+    <p>Three questions this analysis cannot settle from source, and they change the recommendation:</p>
+    <ul class="stack" style="padding-left: 1.2rem; gap: 0.6rem; font-size: 0.96rem;">
+      <li>Is the goal <strong>querying one corpus from anywhere</strong>, or <strong>relating your projects to each other</strong>? MCP solves the first completely and the second not at all; the global graph solves the second only for shared third-party libraries.</li>
+      <li>Should the 4.7 GB already sitting in <code>~/.graphify/</code> be <strong>adopted, ingested, or deleted</strong>? It is unowned by any repo and four months stale.</li>
+      <li>Does &ldquo;all coding agents&rdquo; include agents in projects that are <strong>not</strong> this one and <strong>not</strong> dotfiles? That is the case where the 512 MiB default cap bites.</li>
+    </ul>
+  </section>
+
+  <div class="footnote">
+    <strong>Provenance.</strong> Every figure on this page was measured or read during this session, against the pinned fork <code>graphifyy 0.9.50</code> installed at <code>.venv/lib/python3.14/site-packages/graphify/</code>.
+    <ul>
+      <li><code>global_graph.py:11</code> — the global paths; <code>:102</code> hash-skip; <code>:118,160</code> per-repo prune; <code>:122–133</code> the external-label bridge.</li>
+      <li><code>build.py:1999</code> — <code>tag::&lt;id&gt;</code> relabelling.</li>
+      <li><code>security.py:32</code> — the 512 MiB default cap; <code>mise.toml:250</code> — this repo's 1 GiB override.</li>
+      <li><code>install.py</code> — 18 <code>Path.home()</code> call sites; <code>:637</code> the hardcoded <code>~/.claude/CLAUDE.md</code> write.</li>
+      <li><code>query.py</code> — zero <code>global</code> references; <code>graphify_env.clean_env()</code> applied at each <code>subprocess.run</code> in <code>artifacts.py</code>, <code>graph.py</code>, <code>graphify_ops.py</code>.</li>
+      <li><strong>Inherited, not re-derived:</strong> the 0-of-815,481 cross-namespace-edge figure.</li>
+      <li><strong>Unmeasured:</strong> the resident memory cost of a global add.</li>
+    </ul>
+  </div>
+
+</div>

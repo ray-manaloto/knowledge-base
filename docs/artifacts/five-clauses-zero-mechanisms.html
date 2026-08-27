@@ -1,0 +1,525 @@
+<title>Five Clauses, Zero Mechanisms</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground:     #FAFAFC;
+    --panel:      #FFFFFF;
+    --sunk:       #F2F1F7;
+    --ink:        #16141F;
+    --soft:       #565073;
+    --rule:       #DDDAE7;
+    --hair:       #EBE9F2;
+    --live:       #0B7A5C;   /* has a mechanism */
+    --prose:      #C2410C;   /* prose only */
+    --ruled:      #5B3FD6;   /* Ray's ruling */
+    --plate:      #FCFCFE;   /* stays light in BOTH themes */
+    --plate-ink:  #16141F;
+    --plate-rule: #DDDAE7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #111018;
+      --panel:  #191823;
+      --sunk:   #14131C;
+      --ink:    #EAE8F2;
+      --soft:   #9A93B5;
+      --rule:   #2F2C3E;
+      --hair:   #232130;
+      --live:   #3FBF97;
+      --prose:  #F0834F;
+      --ruled:  #9C86FF;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #111018;
+    --panel:  #191823;
+    --sunk:   #14131C;
+    --ink:    #EAE8F2;
+    --soft:   #9A93B5;
+    --rule:   #2F2C3E;
+    --hair:   #232130;
+    --live:   #3FBF97;
+    --prose:  #F0834F;
+    --ruled:  #9C86FF;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Sans 3", system-ui, -apple-system, sans-serif;
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.6rem;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--soft);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-weight: 800;
+    font-size: clamp(2.3rem, 7vw, 3.7rem);
+    line-height: 0.98;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+    margin: 0;
+  }
+  h2 {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 1.55rem;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 1.4rem 0 0;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--rule);
+  }
+  h3 {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 1.02rem;
+    margin: 0 0 0.3rem;
+  }
+  p { margin: 0; max-width: 41rem; }
+  .lede { font-size: 1.15rem; color: var(--soft); max-width: 39rem; }
+  .stack { display: flex; flex-direction: column; gap: 1rem; }
+
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.85em; }
+  code { background: var(--sunk); padding: 0.1em 0.34em; border-radius: 3px; }
+
+  /* --- the scorecard --- */
+  .score { display: flex; flex-direction: column; gap: 0; border: 2px solid var(--rule); border-radius: 8px; overflow: hidden; }
+  .score-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.15rem 1rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--hair);
+  }
+  @media (min-width: 40rem) { .score-row { grid-template-columns: 15rem 1fr auto; align-items: baseline; } }
+  .score-row:last-child { border-bottom: 0; }
+  .clause { font-weight: 600; }
+  .mech { font-size: 0.92rem; color: var(--soft); }
+  .stamp {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    white-space: nowrap;
+    justify-self: start;
+    border: 1px solid currentColor;
+    color: var(--prose);
+  }
+  .score-head {
+    background: var(--sunk);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--soft);
+    padding: 0.6rem 1.1rem;
+    border-bottom: 2px solid var(--rule);
+  }
+  .tally {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    padding: 0.85rem 1.1rem;
+    background: var(--sunk);
+    border-top: 2px solid var(--rule);
+    color: var(--prose);
+  }
+
+  /* --- figures --- */
+  figure { margin: 0; display: flex; flex-direction: column; gap: 0.65rem; }
+  .plate {
+    background: var(--plate);
+    border: 1px solid var(--plate-rule);
+    border-radius: 8px;
+    padding: 1.3rem 1rem;
+    overflow-x: auto;
+    color: var(--plate-ink);
+  }
+  .plate svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  .plate .mermaid { background: transparent; }
+  figcaption { font-size: 0.87rem; color: var(--soft); max-width: 41rem; }
+
+  /* --- decision cards --- */
+  .decided {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--ruled);
+    border-radius: 5px;
+    padding: 1.1rem 1.25rem;
+    display: flex; flex-direction: column; gap: 0.55rem;
+  }
+  .decided.win { border-left-color: var(--live); }
+  .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase;
+    font-weight: 600; color: var(--soft);
+  }
+  blockquote {
+    margin: 0; padding-left: 0.9rem;
+    border-left: 2px solid var(--rule);
+    color: var(--soft); font-style: italic;
+    max-width: 38rem;
+  }
+
+  pre.code {
+    background: var(--sunk);
+    border: 1px solid var(--hair);
+    border-radius: 5px;
+    padding: 0.85rem 1rem;
+    overflow-x: auto;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.79rem;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  ol.steps { margin: 0; padding-left: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 0.85rem; }
+  ol.steps li {
+    counter-increment: s;
+    display: grid; grid-template-columns: 2rem 1fr; gap: 0.9rem; align-items: start;
+  }
+  ol.steps li::before {
+    content: counter(s);
+    font-family: "IBM Plex Mono", monospace; font-size: 0.82rem; font-weight: 600;
+    color: var(--ruled);
+    border: 1.5px solid var(--ruled); border-radius: 50%;
+    width: 1.7rem; height: 1.7rem; display: grid; place-items: center;
+  }
+
+  .tablewrap { overflow-x: auto; }
+  table.data { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  table.data th, table.data td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  table.data th { font-family: "IBM Plex Mono", monospace; font-size: 0.66rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--soft); border-bottom: 2px solid var(--rule); }
+  td.n { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .foot { font-size: 0.83rem; color: var(--soft); border-top: 2px solid var(--rule); padding-top: 1.2rem; }
+  .foot ul { margin: 0.55rem 0 0; padding-left: 1.05rem; display: flex; flex-direction: column; gap: 0.3rem; }
+
+  a { color: inherit; text-decoration-color: var(--soft); text-underline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--ruled); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="stack">
+    <p class="eyebrow">knowledge-base · plan · 2026-08-26</p>
+    <h1>Five Clauses,<br>Zero Mechanisms</h1>
+    <p class="lede">You said the project's goal has been repeated over and over and is not being followed. It isn't a discipline problem. Every clause of the mandate is prose, the retrieval system reads only your most recent sentence, and the one door research actually walks through has no guard on it.</p>
+  </header>
+
+  <section class="stack">
+    <h2>The mandate, scored</h2>
+    <p>Your goal has four working clauses plus a delivery form. Here is what enforces each, today.</p>
+
+    <div class="score">
+      <div class="score-head">clause · what enforces it · verdict</div>
+
+      <div class="score-row">
+        <span class="clause">Research goes to the KB <em>first</em></span>
+        <span class="mech">The <code>graph_first</code> hook — matcher <code>Bash|Grep</code>. Web tools never reach it.</span>
+        <span class="stamp">unguarded</span>
+      </div>
+
+      <div class="score-row">
+        <span class="clause">Web research is <em>stored</em> into sources</span>
+        <span class="mech"><code>kb-add</code> is one line of shell into a gitignored directory, then six remembered commands.</span>
+        <span class="stamp">prose</span>
+      </div>
+
+      <div class="score-row">
+        <span class="clause">Never researched <em>again</em></span>
+        <span class="mech">Nothing. No URL index. <code>REGISTRY.md</code>'s 113 rows have zero tooling — no code reads it, no lint checks it.</span>
+        <span class="stamp">absent</span>
+      </div>
+
+      <div class="score-row">
+        <span class="clause">Staleness tracked &amp; auto-resynced</span>
+        <span class="mech">1 of 4 source classes has an upstream ref. <code>kb-update</code> is invoked by no hook, cron, gate or CI.</span>
+        <span class="stamp">manual</span>
+      </div>
+
+      <div class="score-row">
+        <span class="clause">Delivered as plugins + a CLI</span>
+        <span class="mech">No plugin manifest exists — 0 at repo root against 189 found under <code>sources/</code>, so the probe discriminates.</span>
+        <span class="stamp">absent</span>
+      </div>
+
+      <div class="tally">Five clauses. Zero mechanisms.</div>
+    </div>
+  </section>
+
+  <section class="stack">
+    <h2>Why it drifts — and it is mechanical</h2>
+    <p>The mandate isn't missing from the repo. It's been there, in your own words, since <strong>2026-08-02</strong>. The problem is where it lives.</p>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 780 330" role="img" aria-label="The mandate was written on 2026-08-02 into the direction log. The log grew to eleven files, and the resume skill reads only the newest, so the founding brief became invisible. Meanwhile the auto-loaded instruction files describe the graph rather than the purpose, so each session builds graph features.">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <!-- the mandate -->
+          <rect x="12" y="26" width="152" height="60" rx="5" fill="none" stroke="#5B3FD6" stroke-width="1.8"/>
+          <text x="88" y="49" font-size="12" text-anchor="middle" fill="#5B3FD6" font-weight="600">the mandate</text>
+          <text x="88" y="65" font-size="10.5" text-anchor="middle" fill="#5B3FD6">"this repo becomes</text>
+          <text x="88" y="78" font-size="10.5" text-anchor="middle" fill="#5B3FD6">the tool" · 2026-08-02</text>
+
+          <line x1="164" y1="56" x2="234" y2="56" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+          <text x="199" y="48" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.75">filed in</text>
+
+          <!-- the log -->
+          <rect x="238" y="18" width="176" height="76" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="326" y="38" font-size="11.5" text-anchor="middle" fill="currentColor" font-weight="600">docs/direction/</text>
+          <rect x="252" y="48" width="14" height="30" rx="2" fill="none" stroke="#5B3FD6" stroke-width="1.6"/>
+          <text x="259" y="90" font-size="8.5" text-anchor="middle" fill="#5B3FD6">1</text>
+          <rect x="270" y="48" width="10" height="30" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.4"/>
+          <rect x="284" y="48" width="10" height="30" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.4"/>
+          <rect x="298" y="48" width="10" height="30" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.4"/>
+          <rect x="312" y="48" width="10" height="30" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.4"/>
+          <rect x="326" y="48" width="10" height="30" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.4"/>
+          <rect x="340" y="48" width="10" height="30" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.4"/>
+          <rect x="354" y="48" width="10" height="30" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.4"/>
+          <rect x="368" y="48" width="10" height="30" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.4"/>
+          <rect x="382" y="48" width="10" height="30" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.4"/>
+          <rect x="396" y="48" width="10" height="30" rx="2" fill="none" stroke="#C2410C" stroke-width="1.8"/>
+          <text x="401" y="90" font-size="8.5" text-anchor="middle" fill="#C2410C">11</text>
+
+          <line x1="414" y1="56" x2="486" y2="56" stroke="#C2410C" stroke-width="1.6" marker-end="url(#a1)" color="#C2410C"/>
+          <text x="450" y="48" font-size="10" text-anchor="middle" fill="#C2410C">reads</text>
+          <text x="450" y="70" font-size="10" text-anchor="middle" fill="#C2410C">head -2</text>
+
+          <rect x="490" y="30" width="150" height="52" rx="5" fill="none" stroke="#C2410C" stroke-width="1.6"/>
+          <text x="565" y="51" font-size="11.5" text-anchor="middle" fill="#C2410C" font-weight="600">/kb-resume</text>
+          <text x="565" y="68" font-size="10.5" text-anchor="middle" fill="#C2410C">newest only</text>
+
+          <text x="660" y="50" font-size="11" fill="#C2410C" font-weight="600">file 1 of 11</text>
+          <text x="660" y="66" font-size="11" fill="#C2410C">= invisible</text>
+
+          <!-- second path -->
+          <line x1="12" y1="150" x2="768" y2="150" stroke="currentColor" stroke-opacity="0.2"/>
+
+          <rect x="12" y="172" width="152" height="60" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="88" y="195" font-size="11.5" text-anchor="middle" fill="currentColor" font-weight="600">a fresh session</text>
+          <text x="88" y="212" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">reads its</text>
+          <text x="88" y="225" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">instructions</text>
+
+          <line x1="164" y1="202" x2="234" y2="202" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+
+          <rect x="238" y="172" width="248" height="60" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="362" y="192" font-size="11" text-anchor="middle" fill="currentColor" font-weight="600">CLAUDE.md · AGENTS.md</text>
+          <text x="362" y="209" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.8">"a knowledge graph any agent</text>
+          <text x="362" y="222" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.8">connects to" — the ARTIFACT</text>
+
+          <line x1="486" y1="202" x2="556" y2="202" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+          <text x="521" y="194" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.75">so it</text>
+
+          <rect x="560" y="176" width="152" height="52" rx="5" fill="none" stroke="#C2410C" stroke-width="1.6"/>
+          <text x="636" y="197" font-size="11.5" text-anchor="middle" fill="#C2410C" font-weight="600">builds graph</text>
+          <text x="636" y="214" font-size="11.5" text-anchor="middle" fill="#C2410C">features</text>
+
+          <line x1="12" y1="264" x2="768" y2="264" stroke="currentColor" stroke-opacity="0.2"/>
+          <text x="12" y="288" font-size="12" fill="currentColor" font-weight="600">Neither file states the PURPOSE. Both state the ARTIFACT.</text>
+          <text x="12" y="308" font-size="11.5" fill="currentColor" opacity="0.85">So you have to keep repeating the goal — because the only thing the project ever reads is your most recent sentence.</text>
+        </svg>
+      </div>
+      <figcaption>Two paths, one outcome. The founding brief is <strong>file 1 of 11</strong> in an append-only log that <code>/kb-resume</code> reads newest-first (<code>ls -t … | head -2</code>). Meanwhile the two auto-loaded instruction files describe the graph, not the goal. <strong>A directive filed in <code>docs/direction/</code> is not adopted — it is archived.</strong></figcaption>
+    </figure>
+  </section>
+
+  <section class="stack">
+    <h2>The front door nobody guards</h2>
+    <p>The repo <em>does</em> enforce graph-first. On the wrong doors.</p>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 780 300" role="img" aria-label="Bash and Grep calls pass through the hook guard and can be denied. WebFetch, WebSearch and every MCP search tool bypass it entirely, because the settings matcher lists only Bash and Grep and the dispatcher hard-codes the same two names.">
+          <defs>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <!-- guarded lane -->
+          <text x="12" y="24" font-size="11" fill="#0B7A5C" font-weight="600" letter-spacing="1.2">GUARDED</text>
+
+          <rect x="12" y="36" width="120" height="42" rx="5" fill="none" stroke="#0B7A5C" stroke-width="1.6"/>
+          <text x="72" y="62" font-size="12" text-anchor="middle" fill="#0B7A5C">Bash · Grep</text>
+
+          <line x1="132" y1="57" x2="216" y2="57" stroke="#0B7A5C" stroke-width="1.6" marker-end="url(#a2)" color="#0B7A5C"/>
+
+          <rect x="220" y="30" width="164" height="54" rx="5" fill="none" stroke="#0B7A5C" stroke-width="1.8"/>
+          <text x="302" y="51" font-size="11.5" text-anchor="middle" fill="#0B7A5C" font-weight="600">hook_guard</text>
+          <text x="302" y="68" font-size="10" text-anchor="middle" fill="#0B7A5C">5 guards + graph_first</text>
+
+          <line x1="384" y1="57" x2="468" y2="57" stroke="#0B7A5C" stroke-width="1.6" marker-end="url(#a2)" color="#0B7A5C"/>
+          <text x="426" y="49" font-size="10" text-anchor="middle" fill="#0B7A5C">can DENY</text>
+
+          <rect x="472" y="36" width="130" height="42" rx="5" fill="none" stroke="#0B7A5C" stroke-width="1.6"/>
+          <text x="537" y="62" font-size="11.5" text-anchor="middle" fill="#0B7A5C">the corpus</text>
+
+          <text x="620" y="53" font-size="10.5" fill="#0B7A5C">measured effect</text>
+          <text x="620" y="68" font-size="10.5" fill="#0B7A5C" font-weight="600">62 → 0 violations</text>
+
+          <!-- divider -->
+          <line x1="12" y1="112" x2="768" y2="112" stroke="currentColor" stroke-opacity="0.2"/>
+
+          <!-- unguarded lane -->
+          <text x="12" y="140" font-size="11" fill="#C2410C" font-weight="600" letter-spacing="1.2">UNGUARDED — WHERE RESEARCH ACTUALLY GOES</text>
+
+          <rect x="12" y="152" width="120" height="30" rx="4" fill="none" stroke="#C2410C" stroke-width="1.5"/>
+          <text x="72" y="172" font-size="11" text-anchor="middle" fill="#C2410C">WebFetch</text>
+          <rect x="12" y="188" width="120" height="30" rx="4" fill="none" stroke="#C2410C" stroke-width="1.5"/>
+          <text x="72" y="208" font-size="11" text-anchor="middle" fill="#C2410C">WebSearch</text>
+          <rect x="12" y="224" width="120" height="30" rx="4" fill="none" stroke="#C2410C" stroke-width="1.5"/>
+          <text x="72" y="244" font-size="11" text-anchor="middle" fill="#C2410C">firecrawl · exa</text>
+
+          <!-- bypass arrow around the guard -->
+          <path d="M 132 203 L 190 203 L 190 268 L 500 268 L 500 218" fill="none" stroke="#C2410C" stroke-width="1.8" stroke-dasharray="6 3" marker-end="url(#a2)" color="#C2410C"/>
+          <text x="330" y="284" font-size="11" text-anchor="middle" fill="#C2410C">no matcher · no dispatcher entry · nothing to deny</text>
+
+          <rect x="220" y="164" width="164" height="54" rx="5" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="4 3"/>
+          <text x="302" y="186" font-size="11" text-anchor="middle" fill="currentColor" opacity="0.45">hook_guard</text>
+          <text x="302" y="203" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.45">never invoked</text>
+
+          <rect x="440" y="164" width="130" height="54" rx="5" fill="none" stroke="#C2410C" stroke-width="1.6"/>
+          <text x="505" y="186" font-size="11.5" text-anchor="middle" fill="#C2410C">the web</text>
+          <text x="505" y="203" font-size="10" text-anchor="middle" fill="#C2410C">nothing stored</text>
+        </svg>
+      </div>
+      <figcaption>Two mechanisms stop the web tools reaching the guard: <code>.claude/settings.json</code> lists only <code>Bash|Grep</code>, <em>and</em> <code>hook_guard.py:279</code> hard-codes <code>if tool_name not in {"Bash","Grep"}: return</code>. So widening the matcher alone is inert — the dispatcher filters again in code. The rule that covers this exists at <code>do-not.md:81</code> and is the only rule in that file citing no enforcement.</figcaption>
+    </figure>
+  </section>
+
+  <section class="stack">
+    <h2>Two things settled today</h2>
+
+    <div class="decided win">
+      <span class="tag">Resolved — #524 needed no fork change</span>
+      <p>The blocker on your immediate step was framed as <em>"graphify has no honest <code>_origin</code> tier for derived nodes"</em>. True of graphify's vocabulary — and irrelevant, because <strong>graphify never checks the vocabulary</strong>:</p>
+      <pre class="code">graphify build.py:48-50    o = item.get("_origin")
+                           if o is not None: return o == "ast"
+
+kb_setup  prose.py:97-99   def is_ast(n): return n.get("_origin") == "ast"
+                    :162   kept = [n for n in nodes if not is_ast(n)]</pre>
+      <p>Both are a <strong>pure inequality against one literal</strong>. No enum, no allowlist. A node stamped <code>_origin = "derived"</code> is trusted <em>because present</em>, is not <code>"ast"</code>, and survives both filters — on the pinned graphify, with <strong>zero fork delta</strong>. The only thing rejecting it is our own validator at <code>chunks.py:181</code>. Widening that is a small change in this repo, which is exactly where you want the work.</p>
+      <p><strong>That's the third time this round I read a thing's shape instead of its text</strong> — after the "6 invariant-banned verbs" and "project-Claude-only". It's a pattern now, not an incident.</p>
+    </div>
+
+    <div class="decided">
+      <span class="tag">Ruled — session-review gets one new lane</span>
+      <p>It has ten: <code>circles</code>, <code>forgotten</code>, <code>contradicted</code>, <code>unpinned</code>, <code>context</code>, <code>tooling-gap</code>, <code>bot-reviews</code>, <code>pending-work</code>, <code>extraction-readiness</code>, <code>telemetry</code>. <code>forgotten</code> catches requirements dropped <em>inside</em> a round. <strong>Nothing asks whether the round advanced the standing goal.</strong></p>
+      <p>The file already learned this lesson and wrote it down. From the comment on <code>extraction-readiness</code>:</p>
+      <blockquote>An <code>extraction-readiness</code> lane was dispatched AD HOC during the 2026-08-21 round and produced 13 findings… It was NEVER in this array… So the question became unaskable the moment that round ended, and FIVE of its thirteen findings were still unfiled a day later.</blockquote>
+      <p>That is exactly what happened to your 2026-08-02 mandate. Same failure, different artifact. Hence a <strong><code>mandate</code> lane</strong> that reads <em>all eleven</em> direction files — and <strong>no</strong> backend-toggle lane, because that is a sub-question of <code>extraction-readiness</code> and a lane per sub-question is how ten becomes twenty.</p>
+    </div>
+  </section>
+
+  <section class="stack">
+    <h2>Build order — and why guards land last</h2>
+    <p>My first draft wired the guard first. That was wrong: a guard that denies on session-state before the index exists blocks the first web action of every session, <em>including</em> the ones where the corpus genuinely has nothing. Maximum annoyance, minimum discrimination.</p>
+
+    <figure>
+      <div class="plate">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#FCFCFE','primaryColor':'#F2F1F7','primaryTextColor':'#16141F','primaryBorderColor':'#5B3FD6','lineColor':'#565073','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart LR
+  L0["0 · mandate into<br/>CLAUDE.md + AGENTS.md"]
+  L5a["5a · read-only plugin<br/>+ kb-serve in dotfiles"]
+  L1a["1a · tool-set lift<br/><i>pure refactor</i>"]
+  L3["3 · URL index<br/><i>wired to no hook</i>"]
+  L2["2 · kb-add as a module"]
+  L3b["3b · reconciliation<br/>detector"]
+  L1b["1b · wire the guard"]
+
+  L0 --> L1a
+  L1a -->|"tests pass<br/>UNMODIFIED"| L3
+  L3 -->|"measure false<br/>positives first"| L2
+  L2 -->|"deny needs a<br/>working remedy"| L3b
+  L3b --> L1b
+  L5a -.->|"parallel,<br/>packages nothing broken"| L1b
+</pre>
+      </div>
+      <figcaption>The index must be proven to <em>discriminate</em> against the ~300 committed URLs before anything is allowed to deny. <code>kb-add</code> comes before the guard because the deny message must name a working refresh path — <strong>a deny with no legitimate re-fetch path strands every stale source.</strong></figcaption>
+    </figure>
+
+    <div class="decided">
+      <span class="tag">The layer that decides everything — 3b</span>
+      <p>The advisor caught a hole that would have made all of this decorative. My guard unlocked after <strong>one</strong> graph query per session. So: run one <code>kb-query</code> at startup, then fetch freely and store nothing. Layer 2 ended in "prints the next command" — prose again. Layer 3 only fires on URLs that <em>were</em> stored. <strong>Nothing detected a fetch that never became a source.</strong></p>
+      <p>The cause: I copied <code>graph_first</code>'s shape without checking the semantics fit. <strong>Orientation is once-per-session. Ingestion is per-fetch.</strong> So the hook now logs every allowed fetch, and at session end <em>URLs fetched − URLs in the corpus must be empty</em>. The home already exists — <code>kb-session-reflect</code> already reads the transcript to count what the round did by hand.</p>
+    </div>
+  </section>
+
+  <section class="stack">
+    <h2>This round</h2>
+    <ol class="steps">
+      <li><div><h3>Ship the 11 commits</h3><p>Review → receipt → <code>kb-ship</code> → <code>kb-land</code>, and verify the land with <code>gh pr view</code> — <code>kb-land</code> reports what it did, not what happened (#495).</p></div></li>
+      <li><div><h3>Add the <code>mandate</code> lane</h3><p>Plus extend <code>extraction-readiness</code> to cover whether the claude-cli/openai-cli toggle would even produce a trustworthy comparison — #518's cache is backend-blind.</p></div></li>
+      <li><div><h3>Run the real session-review workflow</h3><p>Not a hand-run codex simulation: that puts every lane transcript back in the architect's context, which is the cost the workflow exists to avoid. Its output <em>is</em> the step-by-step plan, built from all eleven direction files rather than my reading of them.</p></div></li>
+      <li><div><h3>Close #524 and widen the validator</h3><p>One-line change, with its two-direction arm: stamp <code>"derived"</code> → survives; stamp <code>"ast"</code> → vanishes.</p></div></li>
+    </ol>
+  </section>
+
+  <section class="stack">
+    <h2>The corpus, measured</h2>
+    <div class="tablewrap">
+      <table class="data">
+        <thead><tr><th>what</th><th>count</th><th>has an upstream ref?</th></tr></thead>
+        <tbody>
+          <tr><td><code>sources/*.manifest</code> — pinned repos</td><td class="n">84</td><td>yes — pinned commit, compared only on a manual <code>kb-update</code></td></tr>
+          <tr><td><code>sources/media/**</code> — vendored docs</td><td class="n">27</td><td>no. 25 of 27 have no receipt; <code>captured_at</code> is inert</td></tr>
+          <tr><td><code>sources/extractions/*.json</code></td><td class="n">27</td><td>no — <code>captured_at</code> decides merge order only</td></tr>
+          <tr><td><code>REGISTRY.md</code> backlog rows</td><td class="n">113</td><td>no tooling of any kind reads or validates it</td></tr>
+          <tr><td><code>mise.toml</code> tasks</td><td class="n">78</td><td>≈30 are user-facing verbs a CLI would expose</td></tr>
+          <tr><td>plugin manifests at repo root</td><td class="n">0</td><td>against 189 under <code>sources/</code> — the probe discriminates</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="foot">
+    <strong>Provenance.</strong> Every figure was measured or read this session, against the pinned <code>graphifyy 0.9.50</code> and the current working tree. Three parallel read-only sweeps plus one design lane and one advisor pass; each lane's citations were spot-checked against the code before being carried here.
+    <ul>
+      <li><code>hook_guard.py:278-280</code> · <code>graph_first.py:449-452,73</code> · <code>.claude/settings.json:15,25,35</code> — the guard scope.</li>
+      <li><code>mise.toml:933-940</code> · <code>.gitignore:202-204</code> · <code>kb-curator/SKILL.md:148-214</code> — the seven-step store.</li>
+      <li><code>build.py:44-52</code> · <code>prose.py:63-99,162</code> · <code>chunks.py:181-184</code> — the <code>_origin</code> resolution.</li>
+      <li><code>session-review.js:524-548</code> — the ad-hoc-lane lesson, in the file's own words.</li>
+      <li><code>docs/direction/2026-08-02-ray-directives.md:94,96,102,114,124</code> — the mandate, verbatim.</li>
+      <li><strong>Inherited, not re-derived this session:</strong> the 62→0 and 0-of-19 guard-compliance figures, and the 0-of-815,481 cross-namespace-edge count.</li>
+      <li><strong>Unverified, and listed in the plan as dispatch-blockers:</strong> whether settings matchers accept <code>mcp__.*</code> in an alternation; whether MCP hook payloads carry <code>session_id</code>/<code>cwd</code>; per-call hook latency.</li>
+    </ul>
+  </div>
+
+</div>
