@@ -93,7 +93,9 @@
     "firecrawl@claude-plugins-official": false,
     "exa@exa": true,
     "context7@context7-marketplace": true,
-    "last30days@last30days-skill": true
+    "last30days@last30days-skill": true,
+    "i-have-adhd@i-have-adhd": true,
+    "ponytail@ponytail": true
   },
   "extraKnownMarketplaces": {
     "fable-orchestrator": {
@@ -151,6 +153,6 @@
       }
     }
   },
-  "teammateMode": "auto",
-  "outputStyle": "ELI5 Visual"
+  "outputStyle": "ELI5 Visual",
+  "teammateMode": "auto"
 }

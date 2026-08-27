@@ -108,13 +108,16 @@ context cost and names its biggest contributors, and the Skills row in
 actually received. An overflow also writes a warning to the `--debug` log.
 
 Calling the per-entry cap "the only real cliff" was wrong in the direction that
-matters here: with seven project skills plus **ten** enabled plugins' skills
-(2026-08-03; it was five when this paragraph was written, and PR #139 doubled it),
-the *listing* budget is the one this repo can plausibly hit — and no per-skill
-edit would ever explain the symptom. **Re-measure rather than trusting this
-number**: `/doctor` estimates the listing's cost and names its biggest
-contributors, and `/context`'s Skills row shows the size after the budget is
-applied. A count in prose is stale the moment someone enables a plugin.
+matters here: with seven project skills plus enabled-plugin skills stacked on
+top — **ten** on 2026-08-03 (it was five when this paragraph was written, and
+PR #139 doubled it), **18** declared / **16** effective as of 2026-08-27
+(`.claude/CLAUDE.md` § Cross-vendor orchestration carries the re-derive
+commands) — the *listing* budget is the one this repo can plausibly hit, and no
+per-skill edit would ever explain the symptom. **Re-measure rather than
+trusting this number**: `/doctor` estimates the listing's cost and names its
+biggest contributors, and `/context`'s Skills row shows the size after the
+budget is applied. A count in prose is stale the moment someone enables a
+plugin.
 
 **The byte ceilings are ours**, not Anthropic's — anti-gaming backstops (a line
 cap alone admits 200 × 400-char lines), sized never to bind before the
