@@ -6879,6 +6879,10 @@ checksum = "sha256:4ccf353e484997dd4975361b6433f3b2661f5db614f2b382cddcac7eaa74a
 url = "https://github.com/jdx/hk/releases/download/v1.56.1/hk-x86_64-pc-windows-msvc.zip"
 url_api = "https://api.github.com/repos/jdx/hk/releases/assets/525632118"
 
+[[tools."npm:@openai/codex"]]
+version = "0.150.1"
+backend = "npm:@openai/codex"
+
 [[tools."npm:ctx7"]]
 version = "0.5.8"
 backend = "npm:ctx7"

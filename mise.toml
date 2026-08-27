@@ -127,21 +127,37 @@ gh = "2.98.0"
 
 # Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
 # (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
-# (yuting0624/antigravity-for-claude-code). Canonical mise registry short names
-# (https://mise.jdx.dev/registry.html): `codex`=aqua:openai/codex,
-# `antigravity-cli`=aqua:google-antigravity/antigravity-cli (Google's current
-# agentic CLI, exposes Gemini 3.x; ships both `antigravity` and the `agy`
-# symlink the antigravity plugin drives). The Claude architect stays in the
-# chair; these are the executor lanes only. auth is per-user (codex login /
-# Google account) — mise manages the binaries, not the credentials.
+# (yuting0624/antigravity-for-claude-code). `antigravity-cli`'s canonical mise
+# registry short name (https://mise.jdx.dev/registry.html) is
+# `aqua:google-antigravity/antigravity-cli` (Google's current agentic CLI,
+# exposes Gemini 3.x; ships both `antigravity` and the `agy` symlink the
+# antigravity plugin drives). `codex` below is pinned by its EXPLICIT
+# `npm:@openai/codex` backend rather than the `codex` registry short name —
+# see why below. The Claude architect stays in the chair; these are the
+# executor lanes only. auth is per-user (codex login / Google account) — mise
+# manages the binaries, not the credentials.
 #
-# ⚠️ `mise ls-remote codex` is the WRONG instrument for "does this version
-# exist". It lists the aqua registry, which lags GitHub by a day or more:
-# 0.146.1 was Latest upstream for ~4h and absent from all 277 rows, while
-# rows for NEWER 0.147.0-alphas were present. The registry entry is
-# `aqua:openai/codex npm:@openai/codex`, and the npm fallback had it — so
-# `mise install codex@<v>` resolved fine. Verify a codex bump by attempting
-# the install, never by grepping `ls-remote` (probes-need-a-control-arm.md).
+# ⚠️ THE `codex` SHORT NAME IS PINNED BY A LAGGING LIST, NOT A LAGGING
+# REGISTRY — an earlier version of this note blamed the aqua registry and an
+# npm-fallback install; that story was MEASURED WRONG and is corrected here.
+# `mise latest codex` reads `https://mise-versions.jdx.dev/data/codex.toml`,
+# whose newest row was `"0.150.0-alpha.9"` on 2026-08-26 — control-armed, that
+# URL returns 200 while a bogus tool name 404s, so the probe discriminates.
+# A stale PER-TOOL cache compounds it (`~/.cache/mise/codex/remote_versions-
+# *.msgpack.z`, several ages coexisting): `mise latest codex` reported
+# `0.149.1` on this host, a full release behind, while **0.150.0 was already
+# installed via aqua itself** — `mise tool codex` names the backend, and there
+# was no npm fallback involved. Verify a bump by attempting the install, never
+# by grepping `ls-remote`/`latest` (probes-need-a-control-arm.md).
+#
+# ⚠️ THE PIN BELOW TRADES INTEGRITY VERIFICATION FOR CURRENCY, KNOWINGLY. The
+# `aqua:openai/codex` backend (the short name above) checksums every download
+# (`mise tool codex` → `Security: checksum (sha256)`); the `npm:@openai/codex`
+# backend below does not (`mise tool "npm:@openai/codex"` → `Security:
+# [none]`) and adds a `node` runtime dependency. The owner accepted that cost
+# on 2026-08-26, specifically to reach 0.150.1 past the lagging list above —
+# a stated ruling, not an oversight. Re-litigate it with the owner before
+# reverting to the short name, and update this note if you do.
 #
 # ⚠️ THIS PIN DOES NOT DECIDE WHICH `agy` RUNS. A hand-installed 143 MB
 # binary sits at `~/.local/bin/agy` (dated 2026-07-14, reports **1.1.2**), and
@@ -158,7 +174,7 @@ gh = "2.98.0"
 # `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
-codex = "0.149.1"
+"npm:@openai/codex" = "0.150.1"
 antigravity-cli = "1.1.20"
 "npm:ctx7" = { version = "0.5.8", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.1"

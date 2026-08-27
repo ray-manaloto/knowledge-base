@@ -1782,7 +1782,7 @@ version_pattern = '^ty (\d+\.\d+\.\d+)'
 manifest = "sources/ty.manifest"
 
 [tool.codex]
-mise_key = "codex"
+mise_key = "npm:@openai/codex"
 binary = "codex"
 github = "openai/codex"
 # ⚠️ codex tags releases `rust-v<version>`, NOT `v<version>` — so
@@ -1790,10 +1790,12 @@ github = "openai/codex"
 # would abort rather than mispin. Recorded here so that abort reads as a known
 # shape rather than a bug; advance `sources/codex.manifest` by hand.
 #
-# ⚠️ `mise ls-remote codex` is the WRONG instrument for "does this version
-# exist" — the aqua registry lags GitHub by a day or more (mise.toml records the
-# measurement: 0.146.1 was Latest upstream for ~4h and absent from all 277 rows).
-# Verify a codex bump by attempting the install.
+# ⚠️ The pin switched backend 2026-08-26: `npm:@openai/codex`, not the `codex`
+# short name (`aqua:openai/codex`) `mise_key` used to read. `mise.toml`'s own
+# comment above the pin carries the full mechanism — why the short name's
+# version list lags, the checksum trade this backend costs, and the owner's
+# ruling to accept it. Re-read it there rather than re-deriving it here, so
+# the story exists in exactly one place and cannot drift between two.
 version_pattern = '^(?:codex-cli )?(\d+\.\d+\.\d+)'
 # `manifest` is DELIBERATELY ABSENT, and this is the one row where that is the
 # correct answer rather than the #242 hole this whole section closes.
