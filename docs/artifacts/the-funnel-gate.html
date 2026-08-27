@@ -1,0 +1,412 @@
+<title>The Funnel Gate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<style>
+  :root{
+    --ground:#f1f4f3;
+    --panel:#ffffff;
+    --panel-2:#e6ecea;
+    --edge:#cfdad6;
+    --edge-soft:#e2e9e7;
+    --ink:#101f1c;
+    --ink-soft:#44605a;
+    --ink-faint:#7a908a;
+    --teal:#0e6a5b;
+    --teal-soft:#d8ece7;
+    --amber:#9c5410;
+    --amber-soft:#f6e6d2;
+    --plate:#f7faf9;          /* stays light in BOTH themes — mermaid draws its own palette */
+    --plate-edge:#d9e3e0;
+    --shadow:0 1px 2px rgba(16,31,28,.06), 0 8px 24px rgba(16,31,28,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0c1412;
+      --panel:#131e1b;
+      --panel-2:#1a2724;
+      --edge:#2a3b37;
+      --edge-soft:#1f2e2b;
+      --ink:#e6efec;
+      --ink-soft:#a3b8b3;
+      --ink-faint:#778d88;
+      --teal:#4fd0b4;
+      --teal-soft:#0f2f29;
+      --amber:#e0a44c;
+      --amber-soft:#33240f;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0c1412;
+    --panel:#131e1b;
+    --panel-2:#1a2724;
+    --edge:#2a3b37;
+    --edge-soft:#1f2e2b;
+    --ink:#e6efec;
+    --ink-soft:#a3b8b3;
+    --ink-faint:#778d88;
+    --teal:#4fd0b4;
+    --teal-soft:#0f2f29;
+    --amber:#e0a44c;
+    --amber-soft:#33240f;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:17px;
+    line-height:1.65;
+    margin:0;
+    padding:0 20px 96px;
+  }
+  .wrap{max-width:940px;margin:0 auto}
+  .col{max-width:66ch}
+
+  /* ---- masthead ---- */
+  header{padding:72px 0 40px;border-bottom:2px solid var(--ink);margin-bottom:44px}
+  .eyebrow{
+    font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--teal);margin:0 0 18px;
+  }
+  h1{
+    font-family:"Zilla Slab",Georgia,serif;
+    font-weight:700;font-size:clamp(2.6rem,7vw,4.2rem);
+    line-height:1.02;letter-spacing:-.02em;text-wrap:balance;
+    margin:0 0 20px;
+  }
+  .standfirst{font-size:1.24rem;line-height:1.5;color:var(--ink-soft);max-width:60ch;margin:0}
+  .standfirst strong{color:var(--ink);font-weight:600}
+
+  h2{
+    font-family:"Zilla Slab",Georgia,serif;
+    font-weight:600;font-size:1.85rem;line-height:1.15;letter-spacing:-.01em;
+    text-wrap:balance;margin:64px 0 6px;
+  }
+  h2 + .sub{color:var(--ink-faint);font-size:.98rem;margin:0 0 26px}
+  h3{
+    font-family:"Zilla Slab",Georgia,serif;
+    font-weight:600;font-size:1.12rem;margin:0 0 8px;
+  }
+  p{margin:0 0 18px}
+  a{color:var(--teal)}
+
+  code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.88em}
+  code{background:var(--panel-2);padding:.1em .34em;border-radius:3px}
+
+  /* ---- the two verdict slabs ---- */
+  .verdicts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin:30px 0 8px}
+  .verdict{
+    border:1px solid var(--edge);border-radius:8px;background:var(--panel);
+    box-shadow:var(--shadow);overflow:hidden;
+  }
+  .verdict .bar{height:4px}
+  .verdict.fail .bar{background:var(--amber)}
+  .verdict.pass .bar{background:var(--teal)}
+  .verdict .body{padding:20px 22px 22px}
+  .vlabel{
+    font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--ink-faint);margin:0 0 12px;
+  }
+  .vstate{
+    font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-weight:700;font-size:1.6rem;letter-spacing:-.01em;margin:0 0 4px;
+  }
+  .verdict.fail .vstate{color:var(--amber)}
+  .verdict.pass .vstate{color:var(--teal)}
+  .vrc{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.82rem;color:var(--ink-faint);margin:0 0 14px}
+  .vrow{
+    display:flex;justify-content:space-between;gap:14px;
+    padding:7px 0;border-top:1px solid var(--edge-soft);
+    font-size:.92rem;
+  }
+  .vrow span:last-child{
+    font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-variant-numeric:tabular-nums;color:var(--ink-soft);white-space:nowrap;
+  }
+
+  /* ---- figures ---- */
+  figure{margin:34px 0;padding:0}
+  figcaption{
+    font-size:.9rem;color:var(--ink-faint);line-height:1.5;
+    margin-top:12px;max-width:62ch;
+  }
+  .plate{
+    background:var(--plate);border:1px solid var(--plate-edge);border-radius:8px;
+    padding:22px 18px;overflow-x:auto;
+  }
+  .plate svg{display:block;margin:0 auto;max-width:100%;height:auto;color:#12211e}
+  pre.mermaid{
+    background:var(--plate);border:1px solid var(--plate-edge);border-radius:8px;
+    padding:22px 12px;margin:0;overflow-x:auto;text-align:center;
+  }
+
+  /* ---- ledger table ---- */
+  .scroll{overflow-x:auto;border:1px solid var(--edge);border-radius:8px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:.92rem}
+  th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--edge-soft);vertical-align:top}
+  th{
+    font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:400;background:var(--panel-2);
+  }
+  tr:last-child td{border-bottom:none}
+  td.num{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td.sha{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.8rem;color:var(--ink-faint)}
+
+  /* ---- state chips ---- */
+  .chip{
+    display:inline-block;font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:11px;letter-spacing:.04em;padding:2px 8px;border-radius:999px;
+    border:1px solid var(--edge);color:var(--ink-soft);white-space:nowrap;
+  }
+  .chip.pass{background:var(--teal-soft);border-color:transparent;color:var(--teal)}
+  .chip.fail{background:var(--amber-soft);border-color:transparent;color:var(--amber)}
+
+  /* ---- callout ---- */
+  .note{
+    border-left:3px solid var(--teal);background:var(--panel);
+    padding:18px 22px;border-radius:0 8px 8px 0;margin:26px 0;box-shadow:var(--shadow);
+  }
+  .note.warn{border-left-color:var(--amber)}
+  .note h3{margin-bottom:6px}
+  .note p:last-child{margin-bottom:0}
+
+  ul{margin:0 0 18px;padding-left:1.15em}
+  li{margin-bottom:9px}
+
+  footer{
+    margin-top:76px;padding-top:24px;border-top:1px solid var(--edge);
+    font-size:.86rem;color:var(--ink-faint);line-height:1.6;
+  }
+  footer strong{color:var(--ink-soft);font-weight:600}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">knowledge-base · ship gate · 2026-08-26</p>
+  <h1>The Funnel Gate</h1>
+  <p class="standfirst">This repo exists so research becomes corpus. A round convened to fix that
+  produced <strong>33 research files and zero lines of corpus</strong> — so the rule now has teeth:
+  a branch that researches and never funnels <strong>cannot ship</strong>.</p>
+</header>
+
+<div class="col">
+<p>Five clauses describe what this project is for. Until today, none of them had a mechanism —
+they were prose, and prose is advisory. The measurement that forced the change is uncomfortable
+and simple: the branch that was <em>about</em> the funnel problem did not funnel.</p>
+</div>
+
+<div class="verdicts">
+  <div class="verdict fail">
+    <div class="bar"></div>
+    <div class="body">
+      <p class="vlabel">before — at <span class="mono">ae9d9425</span></p>
+      <p class="vstate">DRIFT</p>
+      <p class="vrc">rc=1 · ship refused</p>
+      <div class="vrow"><span>research files added</span><span>33</span></div>
+      <div class="vrow"><span>lines reaching <code>sources/</code></span><span>0</span></div>
+      <div class="vrow"><span>exemption trailer</span><span>none</span></div>
+    </div>
+  </div>
+  <div class="verdict pass">
+    <div class="bar"></div>
+    <div class="body">
+      <p class="vlabel">after — at <span class="mono">06e5c615</span></p>
+      <p class="vstate">FUNNELLED</p>
+      <p class="vrc">rc=0 · ship allowed</p>
+      <div class="vrow"><span>research files added</span><span>33</span></div>
+      <div class="vrow"><span>files reaching <code>sources/</code></span><span>9</span></div>
+      <div class="vrow"><span>tool verdicts recorded</span><span>38</span></div>
+    </div>
+  </div>
+</div>
+<p class="figcaption" style="color:var(--ink-faint);font-size:.9rem;max-width:62ch">
+Both figures are from running <code>uv run kb-setup funnel</code> in this session, once before the
+funnel commit and once after — not from the lane's report.</p>
+
+<h2>How it decides</h2>
+<p class="sub">Four questions, five outcomes. The fifth exists so "we could not check" can never wear the colour of "clean".</p>
+
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#f7faf9','primaryColor':'#ffffff','primaryTextColor':'#12211e','primaryBorderColor':'#8fa8a2','lineColor':'#44605a','fontFamily':'Public Sans, sans-serif','fontSize':'14px','tertiaryColor':'#eef4f2'}}}%%
+flowchart TD
+    A["branch delta<br/><tt>main...HEAD</tt>"] --> B{"git resolved<br/>the base ref?"}
+    B -- "no · rev-parse failed" --> NB(["no_base<br/>rc 127"])
+    B -- yes --> C{"added or modified under<br/><tt>docs/research</tt> · <tt>docs/artifacts</tt>?"}
+    C -- "no · nothing researched" --> CL(["clean<br/>rc 0"])
+    C -- yes --> D{"added or modified<br/>under <tt>sources/</tt>?"}
+    D -- "yes · it reached the corpus" --> FU(["funnelled<br/>rc 0"])
+    D -- no --> E{"a commit carries<br/><tt>Funnel-exempt:</tt> + a reason?"}
+    E -- "yes · a human said why" --> EX(["exempt<br/>rc 0"])
+    E -- no --> DR(["drift<br/>rc 1 · ship refused"])
+
+    classDef good fill:#d8ece7,stroke:#0e6a5b,color:#0b3a32;
+    classDef bad fill:#f6e6d2,stroke:#9c5410,color:#5c3208;
+    classDef unknown fill:#e6ecea,stroke:#44605a,color:#22332f;
+    class CL,FU,EX good;
+    class DR bad;
+    class NB unknown;
+</pre>
+<p class="figcaption" style="color:var(--ink-faint);font-size:.9rem;max-width:62ch">
+Deleting a research file is not producing research, so only <em>added</em> and <em>modified</em>
+files reach question two. And a <code>sources/REGISTRY.md</code> edit counts as funnelling — research
+that touched no repository can still record what it learned.</p>
+
+<h2>Why the fifth state exists</h2>
+<div class="col">
+<p>A gate has two obvious answers and one dangerous one. If the git call fails — a detached HEAD,
+no <code>main</code>, not a repository — the honest answer is <em>we never asked the question</em>,
+and this repo has paid before for collapsing that into "fine".</p>
+<p>So the code keeps two empties apart that most code merges: <code>None</code> means the git command
+failed, <code>()</code> means it ran and found nothing. One becomes <code>no_base</code> and exits 127;
+the other becomes <code>clean</code> and exits 0. They are never the same value.</p>
+</div>
+
+<h2>The escape, and why it looks like that</h2>
+<div class="col">
+<p>Real work sometimes touches a research file without producing research — fixing a typo in a
+published page, for instance. There is exactly one way past the gate:</p>
+</div>
+
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 720 176" role="img" aria-label="Two escape designs compared: an environment variable that leaves no trace after the session ends, versus a commit trailer that remains readable in git history forever.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <!-- rejected: env var -->
+      <text x="18" y="22" font-size="11" letter-spacing="1.4" fill="#7a908a">REJECTED</text>
+      <rect x="18" y="34" width="150" height="44" rx="5" fill="#ffffff" stroke="#8fa8a2"/>
+      <text x="93" y="53" font-size="12" text-anchor="middle" fill="#12211e">FUNNEL_SKIP=1</text>
+      <text x="93" y="69" font-size="11" text-anchor="middle" fill="#7a908a">an env var</text>
+      <line x1="176" y1="56" x2="250" y2="56" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+      <text x="213" y="48" font-size="10.5" text-anchor="middle" fill="#44605a">session ends</text>
+      <rect x="258" y="34" width="150" height="44" rx="5" fill="#f6e6d2" stroke="#9c5410" stroke-dasharray="4 3"/>
+      <text x="333" y="60" font-size="12" text-anchor="middle" fill="#5c3208">no trace of who, or why</text>
+
+      <!-- chosen: trailer -->
+      <text x="18" y="112" font-size="11" letter-spacing="1.4" fill="#0e6a5b">CHOSEN</text>
+      <rect x="18" y="124" width="150" height="44" rx="5" fill="#ffffff" stroke="#8fa8a2"/>
+      <text x="93" y="143" font-size="11.5" text-anchor="middle" fill="#12211e">Funnel-exempt: …</text>
+      <text x="93" y="159" font-size="11" text-anchor="middle" fill="#7a908a">a commit trailer</text>
+      <line x1="176" y1="146" x2="250" y2="146" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+      <text x="213" y="138" font-size="10.5" text-anchor="middle" fill="#44605a">session ends</text>
+      <rect x="258" y="124" width="230" height="44" rx="5" fill="#d8ece7" stroke="#0e6a5b"/>
+      <text x="373" y="150" font-size="12" text-anchor="middle" fill="#0b3a32">still in git log, with its reason</text>
+
+      <line x1="510" y1="124" x2="510" y2="168" stroke="#cfdad6" stroke-width="1"/>
+      <text x="528" y="140" font-size="11.5" fill="#44605a">a reviewer can</text>
+      <text x="528" y="156" font-size="11.5" fill="#44605a">disagree with it later</text>
+    </svg>
+  </div>
+  <figcaption>The difference is not convenience, it is durability. An empty reason is not an
+  exemption — the gate reads that as <span class="chip fail">drift</span>.</figcaption>
+</figure>
+
+<h2>What actually reached the corpus</h2>
+<p class="sub">Nine files. Eight pinned repositories, and one ledger row per tool the survey judged.</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>pinned source</th><th>why it earned a pin</th><th>commit</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="mono">mermaid-trace</td><td>Ran clean in 0.02s; the shape the survey's own recommendation treats as viable</td><td class="sha">6c3a58dd</td></tr>
+    <tr><td class="mono">appmap-python</td><td>"The most serious engineering and the only live project" in its class</td><td class="sha">352c573a</td></tr>
+    <tr><td class="mono">griffe</td><td>Live; the survey recommends it as its own ticket</td><td class="sha">b450abb0</td></tr>
+    <tr><td class="mono">pdoc</td><td>Live; recommended for the separate doc-generation ask</td><td class="sha">00e18eb1</td></tr>
+    <tr><td class="mono">dependency-cruiser</td><td>"Best-designed gate in the whole survey" — JS/TS only, which is what our workflows are</td><td class="sha">1f28f44a</td></tr>
+    <tr><td class="mono">ast-grep</td><td>The maintained tree-sitter-layer tool, if that layer is ever wanted</td><td class="sha">40dab3c0</td></tr>
+    <tr><td class="mono">serena</td><td>The <code>python_ty</code> adapter an open issue says to evaluate first</td><td class="sha">7fcbca7e</td></tr>
+    <tr><td class="mono">pyan</td><td>Pushed four days ago, so live — its call resolution is the capability our graph measurably lacks</td><td class="sha">8522ca4f</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3 style="margin-top:34px">And 38 ledger rows, by verdict</h3>
+<div class="scroll" style="margin-top:14px">
+<table>
+  <thead><tr><th>status</th><th class="num">rows</th><th>meaning</th></tr></thead>
+  <tbody>
+    <tr><td><span class="chip fail">not recommended</span></td><td class="num">18</td><td>A verdict was reached against it — dormant, archived, a squatted stub, or superseded by what we already have</td></tr>
+    <tr><td><span class="chip pass">manifest</span></td><td class="num">9</td><td>Pinned in this change (the eight above, plus one catch-up)</td></tr>
+    <tr><td><span class="chip">candidate</span></td><td class="num">7</td><td>Assessed, never run — a weaker state than either verdict</td></tr>
+    <tr><td><span class="chip">pending</span></td><td class="num">3</td><td>No verdict at all</td></tr>
+    <tr><td><span class="chip">tool</span></td><td class="num">1</td><td>Already installed and in use, for a different job than the survey asked about</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <h3>The ledger <em>is</em> the mechanism</h3>
+  <p>Eighteen rows record a tool we will not use. That looks like waste and is the opposite: the
+  next session asking "did we already try <code>pyan3</code>?" now gets an answer instead of
+  re-running the evaluation. Every verdict is quoted <strong>verbatim</strong>, not paraphrased —
+  this survey's headline finding is a rejection whose stated reason was later contradicted by
+  measurement, and that was only discoverable because the reason had been quoted rather than
+  summarised.</p>
+</div>
+
+<h2>What this does not do</h2>
+<div class="col">
+<p>Three limits, stated because a gate that overstates itself is worse than none.</p>
+</div>
+
+<div class="note warn">
+  <h3>Pinned is not ingested</h3>
+  <p>The corpus build is currently <em>failing</em> — a detect preflight error across six sources —
+  so the eight new pins are registered and <strong>not extracted</strong>. Every new row's status
+  reads <code>manifest</code>, never <code>code</code>. A registry that claimed an ingestion that did
+  not happen would be worse than one with fewer rows.</p>
+</div>
+
+<div class="note warn">
+  <h3>It counts files, not value</h3>
+  <p>A one-line touch of <code>REGISTRY.md</code> satisfies the gate as fully as eight pins do.
+  This is deliberate — the alternative is a gate that judges quality, which it cannot do — but it
+  means the gate raises the floor rather than guaranteeing the work was good.</p>
+</div>
+
+<div class="note warn">
+  <h3>It watches two directories</h3>
+  <p>Only <code>docs/research/**</code> and <code>docs/artifacts/**</code>. Research that lands
+  anywhere else is invisible to it. That is a known bound, not an oversight — but it is a bound,
+  and a probe's bound is the first thing to check when it says everything is fine.</p>
+</div>
+
+<footer>
+  <p><strong>Provenance.</strong> The two verdicts, the 33/0 and 33/9 deltas, the eight commit SHAs,
+  the 38 row count and the per-status breakdown were all measured in this session by running the
+  commands directly, not read from a lane's report. The tool inventory behind the ledger
+  (45 distinct tools across 38 survey rows) comes from
+  <code>.agent/kb/reports/agents/tool-funnel-inventory-2026-08-26.md</code>, whose greps carried a
+  control arm. The "31 curl calls, zero writes to <code>sources/</code>" figure quoted in the round's
+  handoff is <strong>inherited</strong> from the prior session's own review and was not re-derived
+  here.</p>
+  <p><strong>Not yet reviewed.</strong> At the time of writing, a cold cross-family review of both
+  commits is still running. Nothing on this page should be read as review-cleared.</p>
+  <p><strong>Skills used:</strong> <code>eli5-visual</code> (this repo's house style),
+  <code>artifact-design</code>, <code>artifact-diagramming</code>, <code>artifact-capabilities</code>
+  (read; <strong>none declared</strong> — this is a static page, which also keeps it shareable).
+  <strong>Considered and not used:</strong> <code>dataviz</code> — the two figures are a decision
+  tree and a comparison of two designs, not charts of a dataset; <code>design</code> — a
+  multi-artboard canvas is the wrong deliverable for one explainer;
+  <code>mattpocock-skills:writing-for-agents</code> — it governs skills and AGENTS.md, not prose
+  written for a person.</p>
+</footer>
+
+</div>
