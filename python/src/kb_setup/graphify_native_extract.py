@@ -1,22 +1,22 @@
 # Copyright (c) 2026 Raymond Manaloto
 """Drive graphify's OWN native deep extraction over the pinned graphify clone.
 
-## PARKED — no entry point reaches this module (2026-08-24)
+## UNPARKED 2026-08-26 — the CLI subcommand and mise task are wired again
 
 The `graphify-native-extract` CLI subcommand and the `kb-graphify-native-extract`
-mise task were both REMOVED. The module and its 42 tests stay in the tree as
-groundwork; they are not dead code awaiting deletion, and they are not live code
-either.
+mise task were REMOVED on 2026-08-24 and RESTORED on 2026-08-26 (`cli.py::_run`,
+`mise.toml:711`), once the three blocking defects the park existed to contain
+(below) were closed. Both now reach this module: `uv run kb-setup
+graphify-native-extract [...]` dispatches straight to `native_extract_main`, and
+`mise run kb-graphify-native-extract` runs that same command. Neither exits with
+"unknown command" any more — a message elsewhere in this file that still claims
+otherwise is stale prose, not a description of the current wiring.
 
-**Scope of that claim, stated precisely because the loose version is false.** What
-is closed is every *invoked-command* surface: there is no `kb-setup` subcommand and
-no mise task, and `uv run kb-setup graphify-native-extract` now exits 2 with
-`unknown command`. What is NOT closed is a direct Python import — `from kb_setup
-import graphify_native_extract` still works and can call `native_extract_main`, or
-`_run_real`/`_run_cluster` directly, bypassing `_parse` and `_refuse_out` entirely.
-The test suite does exactly that, deliberately. So this is a park against
-*accidental invocation*, not a sandbox; a caller who imports this module is making
-a decision, and the defects below are what they are deciding to accept.
+While parked, a direct Python import — `from kb_setup import
+graphify_native_extract`, calling `native_extract_main`, or `_run_real`/
+`_run_cluster` directly, bypassing `_parse` and `_refuse_out` entirely — was the
+ONLY way in. The test suite does exactly that, deliberately, and still does: it
+remains a valid path, just no longer the sole one.
 
 The cold cross-family review of `fa4ed551ac7e` confirmed three blocking defects.
 **All three are CLOSED as of 2026-08-25**, each armed rather than argued —
@@ -41,11 +41,12 @@ The cold cross-family review of `fa4ed551ac7e` confirmed three blocking defects.
   the `--artifacts` tests already used one layer up, so the "NO provider call,
   ever" promise below is untouched. That probe is now arms B4/B5.
 
-**The park itself is a SEPARATE decision, and it has not been taken here.** The
-three defects were the stated precondition, not the reason: reviving this module
-at all is a decision rather than a repair, and the ranking below says the SDK path
-supersedes it. The question to ask before un-parking is whether the SDK route has
-arrived.
+**The park itself was a SEPARATE decision from closing the three defects, and it
+is the one that took two extra days.** The three defects being closed
+(2026-08-25) was the stated precondition for un-parking, not the reason to do
+it: reviving this module at all is a decision rather than a repair, and the
+ranking below says the SDK path supersedes it. The question that had to be
+answered first was whether the SDK route had arrived.
 
 **It has, for this verb.** `graphify.llm.extract_corpus_parallel` is pinned in
 `kb_setup.graphify_sdk._SEMANTIC_SYMBOLS` with a reviewed signature carrying
@@ -729,9 +730,12 @@ def _refuse_cluster_input(opts: Options) -> str | None:
     if not graph_json.is_file():
         return (
             f"[graphify-native-extract] refusing — {graph_json} does not exist. "
-            "This module is PARKED (see the module docstring): there is no CLI "
-            "subcommand and no mise task that produces an extraction tree, so the "
-            "only way here is a direct call. Point --out at an existing tree."
+            "`--cluster` reruns graphify's clustering step over an ALREADY "
+            "extracted `--out` tree; it does not perform an extraction itself. "
+            "Run `uv run kb-setup graphify-native-extract --out DIR [...]` (or "
+            "`mise run kb-graphify-native-extract`) WITHOUT `--cluster` first to "
+            "produce that tree, then rerun with `--cluster` pointed at the same "
+            "`--out`."
         )
     return None
 
@@ -935,20 +939,18 @@ def _dispatch_artifacts(repo_root: Path, opts: Options) -> int:
 
 
 def native_extract_main(repo_root: Path, argv: list[str]) -> int:
-    """The module's entry point — PARKED, reachable only by a direct import.
+    """The module's entry point — reachable via the CLI subcommand AND a direct import.
 
-    No `kb-setup` subcommand and no mise task dispatches here as of 2026-08-24;
-    see the module docstring for the exact scope of that claim, and #479/#480/#481
-    for the three confirmed defects a direct caller is accepting.
+    Parked 2026-08-24, unparked 2026-08-26 (`cli.py::_run`, `mise.toml:711`) —
+    see the module docstring for that history and for #479/#480/#481, the
+    three confirmed defects a caller of EITHER path was accepting while the
+    CLI subcommand was closed and the only way in was a direct import.
     """
     try:
         opts = _parse(repo_root, argv)
     except _UsageError as exc:
         print(
-            "[graphify-native-extract] "
-            f"{exc} — this module is PARKED: there is no `kb-setup "
-            "graphify-native-extract` subcommand and no `kb-graphify-native-extract` "
-            "mise task, so you reached this by importing it directly. Accepted argv: "
+            f"[graphify-native-extract] {exc}. Accepted argv: "
             "[--out DIR] [--target DIR] [--token-budget N] [--max-concurrency N] "
             "[--model NAME] [--backend NAME] [--allow-parallel-claude-cli] [--cluster] "
             "[--artifacts [VIEW...]] [--dry-run]"

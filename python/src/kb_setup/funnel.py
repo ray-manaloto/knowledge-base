@@ -31,6 +31,16 @@ funnelled source actually reached `graphify-out/graph.json` — this is a git-on
 gate, reading names and trailers, never graph content. It reads and prints; it
 never writes to the tree.
 
+**It also only sees COMMITTED history.** `verdict` diffs `base_commit` against
+`HEAD` (`_diff_added_or_modified`), so a doc dropped into `docs/research/**` but
+never `git add`-ed — or added but not yet committed — reads as `clean`: the
+same as a branch that touched nothing at all. This is the intended behaviour,
+not an oversight: a ship gate judges what is about to be PUSHED, and
+uncommitted content is by definition not that. It means a `FUNNELLED` verdict
+is not a promise that every file in the working tree has a home, only that
+everything already committed does — worth stating plainly, per
+`.claude/rules/probes-need-a-control-arm.md`'s "what this check cannot see".
+
 THE STATE SET, and why five and not fewer:
 
 * ``clean`` — no ADDED/MODIFIED file under either watched directory. The
@@ -303,7 +313,7 @@ def _drift(docs: tuple[str, ...]) -> FunnelVerdict:
     )
 
 
-def verdict(repo_root: Path, *, base: str = "main") -> FunnelVerdict:
+def verdict(repo_root: Path, *, base: str = review.DEFAULT_BASE_REF) -> FunnelVerdict:
     """Measure whether this branch's research reached the corpus.
 
     Resolves ``base`` to a merge-base via `review.base_sha` — three-dot
@@ -314,6 +324,17 @@ def verdict(repo_root: Path, *, base: str = "main") -> FunnelVerdict:
 
     See :func:`_no_base` for why its three underlying failure causes collapse
     into one state and one return point here rather than three.
+
+    ``base`` defaults to `review.DEFAULT_BASE_REF` ("origin/main"), NOT a bare
+    local `"main"` — this was the ONE `base_sha(` call site in the package
+    that passed a bare local ref (`review.py:974`, `review.py:1066` and
+    `cli.py:724` all use this same constant already). A bare `"main"` breaks
+    two ways: on a clone or worktree with no local `main` branch the gate
+    returns `no_base` for a reason unrelated to the branch's own delta, and
+    where local `main` has drifted from `origin/main` the delta measured is
+    not the delta being shipped. Imported rather than repeated as a literal,
+    so this default and `review`'s own definition can never name different
+    refs.
     """
     base_commit = review.base_sha(repo_root, base)
     docs_changed = (

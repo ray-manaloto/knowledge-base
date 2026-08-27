@@ -57,6 +57,7 @@ from kb_setup import skill_lint
 # quietly emitting an invalid chunk — the "a generated table drifts from its
 # generator" failure this repo already has a name for.
 from kb_setup.chunks import _EDGE_REQUIRED, _NODE_REQUIRED
+from kb_setup.result import Rc
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Callable, Sequence
@@ -104,6 +105,25 @@ def _relpath(repo_root: Path, path: Path) -> str:
         return path.as_posix()
 
 
+class LaneUnavailableError(Exception):
+    """A lane could not be RUN at all — its file, function, or tool is missing.
+
+    Distinct from a lane that ran and legitimately found zero edges (the
+    STUBBED `ty` lane, e.g.): `.claude/rules/probes-need-a-control-arm.md`
+    treats "could not check" as a THIRD state, never collapsed into "checked,
+    found nothing". `funnel.py` makes the identical distinction over the
+    identical kind of value (a list of edges) by returning `None` for "git
+    could not be read" and `()` for "read, and there is nothing here"
+    (`funnel.py:160-162`) — but a lane function here has a fixed
+    `(Path) -> list[Edge]` shape (this module's own spec §3), so there is no
+    third return value available to reuse that trick with. RAISING is the
+    equivalent move for that shape: a caller cannot forget to check a
+    `return None` it never received, and `run_lanes`/`code_intel_main` are
+    the ONE place that converts this into a worded refusal and `Rc.NOT_RUN` —
+    nothing between a `raise` here and that boundary is expected to catch it.
+    """
+
+
 # ---------------------------------------------------------------------------
 # Lane 1: MISE_TASK — `mise tasks --json`
 # ---------------------------------------------------------------------------
@@ -113,6 +133,17 @@ def _relpath(repo_root: Path, path: Path) -> str:
 #: at the SAME `cli:<cmd>` id `dispatch_edges` emits as its OWN source, so the
 #: two lanes chain into one traversable path instead of two disjoint islands.
 _TASK_CLI_RE = re.compile(r"^uv run kb-setup (\S+)")
+
+#: Mirrors `funnel._GIT_TIMEOUT`'s intent: this is a cheap metadata read about
+#: this repo's OWN tasks, and a wedged one must not become the reason this
+#: lane never reports (`.claude/rules/long-running-command-hangs.md` — a
+#: mise-family command once wedged for ~7 hours with no timeout to abort it).
+#: NOT imported from `funnel` — that name is private to its module, and the
+#: SLF001 grant in `pyproject.toml` is scoped to `graph_size.py`'s one
+#: documented reach into graphify's own resolver, not to every future module
+#: that wants a subprocess timeout (the same reasoning `funnel.py` itself
+#: gives for not importing `review`'s private git runner).
+_MISE_TASKS_TIMEOUT = 30
 
 
 def task_edges(repo_root: Path) -> list[Edge]:
@@ -126,14 +157,25 @@ def task_edges(repo_root: Path) -> list[Edge]:
     A task whose `run` is empty (a meta-task expressed only via `depends`,
     e.g. this repo's `check`) contributes no edge — there is no command to
     point at, and inventing one from `depends` is a different lane's job.
+
+    Bounded by `_MISE_TASKS_TIMEOUT` and wrapped: unbounded and unwrapped, a
+    wedged or missing `mise` binary either hangs this lane forever or raises
+    `CalledProcessError`/`TimeoutExpired` past `code_intel_main`'s own error
+    boundary (which only ever caught `ValueError`) as a bare traceback instead
+    of the worded refusal every other failure in this module produces.
     """
-    proc = subprocess.run(
-        ["mise", "tasks", "--json"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    try:
+        proc = subprocess.run(
+            ["mise", "tasks", "--json"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=_MISE_TASKS_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        msg = f"task lane: `mise tasks --json` could not be run — {exc}"
+        raise LaneUnavailableError(msg) from exc
     tasks = json.loads(proc.stdout)
     edges: list[Edge] = []
     for task in tasks:
@@ -246,7 +288,43 @@ def _cmd_literals(test: ast.expr) -> list[str]:
 
 
 def _first_call(stmts: list[ast.stmt]) -> tuple[str, int] | None:
-    """First called-function/method name (and its source line) in an arm's body.
+    """The arm's real dispatch call — the first call that is NOT `print`.
+
+    Walks the arm body exactly as before — `ast.walk`, depth-first, one
+    top-level statement at a time, in source order — with ONE change: a bare
+    `print(...)` call is SKIPPED rather than accepted as the answer, and the
+    walk continues past it looking for the next candidate. `print` is builtin
+    I/O, never a delegation to a real function this lane should trace as a
+    dispatch target.
+
+    This is the fix for the confirmed defect at `06e5c615`: FIVE emitted
+    edges targeted `fn:print`, `verified=True`. Two shapes, two different
+    reasons the old code (which accepted the very first `ast.Call` anywhere in
+    the body, full stop) got them wrong:
+
+    * `merge`'s and `transcribe`'s validation guard — `if not rest: print(...,
+      file=sys.stderr); return 2` — is a NESTED `if` whose `print(...)` sits
+      before the arm's own trailing `return graphify_ops.merge_chunk(...)` /
+      `return graphify_ops.transcribe(...)` in source order. Skipping the
+      guard's `print` and continuing the SAME depth-first walk is what lets it
+      reach the real target instead of stopping early — the guard is still
+      walked (so a real call sitting inside a DIFFERENT kind of guard is still
+      found), only `print` itself is excluded.
+    * The version arm (`cmd in {"-V", "--version", "version"}`) is `print(...);
+      return 0` — `print` genuinely is that arm's only call. Skipping it
+      leaves NO candidate, so this arm now contributes NO edge at all. That is
+      the honest answer: it does not dispatch anywhere, and naming a builtin
+      as if it were a real function this graph should trace would be exactly
+      the false-fact problem issue #276's own docstring warns `verified=True`
+      is a promise about.
+
+    A trade-off worth stating rather than hiding: this is a narrow, evidenced
+    fix for `print` specifically, not a general "skip every guard clause"
+    solution — an arm whose guard calls some OTHER function before its real
+    dispatch (none exist in `cli.py` at this commit) would still resolve to
+    that guard's call, unchanged from the pre-fix behaviour. Widening this
+    into a general guard-detector is a separate, larger change this fix does
+    not make.
 
     Qualifies `module.func(...)` as `"module.func"` when the receiver is a
     simple name — most arms end in `<module>.main(...)` after a lazy
@@ -259,6 +337,8 @@ def _first_call(stmts: list[ast.stmt]) -> tuple[str, int] | None:
                 continue
             func = node.func
             if isinstance(func, ast.Name):
+                if func.id == "print":
+                    continue
                 return func.id, node.lineno
             if isinstance(func, ast.Attribute):
                 if isinstance(func.value, ast.Name):
@@ -270,15 +350,21 @@ def _first_call(stmts: list[ast.stmt]) -> tuple[str, int] | None:
 def dispatch_edges(repo_root: Path) -> list[Edge]:
     """One edge per dispatch arm in `cli.py::_run`, depth-1 only.
 
-    The target is the first function an arm's body calls — even when that
-    target is itself a second-level dispatcher (`_dispatch_contract` and
-    friends). Tracing INTO those is a call-graph problem this repo already
-    assigns to a different mechanism (the `TY_LSP` lane, once built), not to
-    a single static AST walk of one function.
+    The target is the first NON-`print` function an arm's body calls — even
+    when that target is itself a second-level dispatcher (`_dispatch_contract`
+    and friends). Tracing INTO those is a call-graph problem this repo already
+    assigns to a different mechanism (the `TY_LSP` lane, once built), not to a
+    single static AST walk of one function. See `_first_call` for exactly why
+    `print` is excluded and what that does and does not fix.
+
+    Raises `LaneUnavailableError` — never returns `[]` — when `cli.py` itself is
+    missing or its `_run` function cannot be found: those are "could not
+    look", not "looked and found zero dispatch arms".
     """
     path = _repo_src(repo_root) / "kb_setup" / "cli.py"
     if not path.is_file():
-        return []
+        msg = f"dispatch lane: {_relpath(repo_root, path)} not found — cli.py is missing or moved"
+        raise LaneUnavailableError(msg)
     rel = _relpath(repo_root, path)
     tree = ast.parse(path.read_text(), filename=str(path))
     run_fn = next(
@@ -286,7 +372,8 @@ def dispatch_edges(repo_root: Path) -> list[Edge]:
         None,
     )
     if run_fn is None:
-        return []
+        msg = f"dispatch lane: {rel} has no top-level `_run` function — cli.py was refactored"
+        raise LaneUnavailableError(msg)
     edges: list[Edge] = []
     for node in run_fn.body:
         if not isinstance(node, ast.If):
@@ -339,15 +426,29 @@ def config_edges(repo_root: Path) -> list[Edge]:
     later passed to `json.load(f)` / similar. A path built from a loop
     variable, a function parameter, or returned from another function is
     invisible to this heuristic by design.
+
+    Raises `LaneUnavailableError` — never returns `[]` — when
+    `python/src/kb_setup/` itself is missing: "could not look" (the directory
+    is gone) must not read the same as "looked at every file and found no
+    config reads". A single file that fails to PARSE is a different judgement
+    call, made in-line below: skipped, counted, and reported on stderr, not
+    raised — one unparsable file among many is a skip, not a reason to fail
+    a lane that is legitimately reading the other N-1.
     """
     src = _repo_src(repo_root) / "kb_setup"
     if not src.is_dir():
-        return []
+        msg = (
+            f"config lane: {_relpath(repo_root, src)} is not a directory — "
+            "the kb_setup package is missing or moved"
+        )
+        raise LaneUnavailableError(msg)
     edges: list[Edge] = []
+    skipped: list[str] = []
     for path in sorted(src.glob("*.py")):
         try:
             tree = ast.parse(path.read_text(), filename=str(path))
         except SyntaxError:
+            skipped.append(_relpath(repo_root, path))
             continue
         rel = _relpath(repo_root, path)
         for func in ast.walk(tree):
@@ -365,6 +466,12 @@ def config_edges(repo_root: Path) -> list[Edge]:
                         evidence=f"{rel}:{lineno}",
                     )
                 )
+    if skipped:
+        print(
+            f"[code-intel] config lane: skipped {len(skipped)} unparsable file(s): "
+            f"{', '.join(skipped)}",
+            file=sys.stderr,
+        )
     return edges
 
 
@@ -513,6 +620,13 @@ def run_lanes(repo_root: Path, lanes: Sequence[str] | None = None) -> list[LaneR
     a real lane that ran and legitimately found nothing (`ty`, this change).
     An unrecognized name raises `ValueError` naming the known set — it never
     contributes zero edges as if it had run.
+
+    A lane that WAS a known name but could not be RUN (`dispatch`/`config`
+    over a missing file or directory, `task` over a wedged or missing `mise`)
+    raises `LaneUnavailableError` instead — propagated uncaught, deliberately: this
+    function's contract is one `LaneRun` per requested lane, and there is no
+    value to put in one for a lane that never ran. `code_intel_main` is where
+    both exceptions become a worded refusal and a non-zero rc.
     """
     names = list(lanes) if lanes is not None else list(_LANES)
     unknown = [n for n in names if n not in _LANES]
@@ -679,6 +793,20 @@ def _parse_args(
         if arg == "--lanes" and i + 1 < len(args):
             i += 1
             lanes = [x.strip() for x in args[i].split(",") if x.strip()]
+            if not lanes:
+                # An empty `--lanes` value splits to `[]`, which is NOT `None`
+                # — so without this check it skips the default-all branch in
+                # `run_lanes` (`lanes is not None`), `unknown` comes back
+                # empty (nothing to be unknown), and the refusal there never
+                # fires: `code_intel_main` would silently write
+                # `{"edges": []}` and return 0. An empty `--lanes` is a
+                # malformed REQUEST, not an empty result.
+                print(
+                    f"kb-setup code-intel: --lanes requires at least one lane "
+                    f"name, got {args[i]!r}\n\n{_USAGE}",
+                    file=sys.stderr,
+                )
+                return 2, None, None, fmt
         elif arg == "--out" and i + 1 < len(args):
             i += 1
             out_path = Path(args[i])
@@ -709,6 +837,13 @@ def code_intel_main(repo_root: Path, argv: Sequence[str]) -> int:
     the chunk (`--format chunk`, default) or the raw edge list
     (`--format json`) to `--out PATH` or stdout. An unrecognized `--lanes`
     name exits 2, naming the known set; it never silently runs an empty set.
+
+    A `LaneUnavailableError` from any lane (a missing `cli.py`, a missing
+    `kb_setup/` directory, a wedged or missing `mise` binary) is caught here
+    and converted into the SAME shape every other refusal in this module
+    takes: a worded message on stderr, `Rc.NOT_RUN` — "we did not look",
+    never a `{"edges": []}` payload that reads like "we looked and found
+    nothing".
     """
     rc, lanes, out_path, fmt = _parse_args(argv)
     if rc is not None:
@@ -719,6 +854,9 @@ def code_intel_main(repo_root: Path, argv: Sequence[str]) -> int:
     except ValueError as exc:
         print(f"kb-setup code-intel: {exc}", file=sys.stderr)
         return 2
+    except LaneUnavailableError as exc:
+        print(f"kb-setup code-intel: {exc}", file=sys.stderr)
+        return int(Rc.NOT_RUN)
 
     for run in runs:
         print(f"[code-intel] lane {run.name}: ran, found {len(run.edges)}")

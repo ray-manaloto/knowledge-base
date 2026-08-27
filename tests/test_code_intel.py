@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import chunks, code_intel
+from kb_setup.result import Rc
 
 # ---------------------------------------------------------------------------
 # Fixtures — an isolated fake repo, never the real one
@@ -73,7 +74,16 @@ def test_skill_lane_stamps_its_provenance_and_cites_a_file_line(fake_repo: Path)
 
 
 def test_every_edge_carries_a_namespaced_source_and_target(fake_repo: Path) -> None:
-    for edge in code_intel.skill_edges(fake_repo):
+    """Fails if `skill_edges` is reverted to `return []`.
+
+    The loop below executes ZERO assertions over an empty list — a revert to
+    `return []` left this green having checked nothing (A7). `assert edges`
+    up front is what makes an empty list a failure rather than a silent pass.
+    """
+    edges = code_intel.skill_edges(fake_repo)
+
+    assert edges, "the fixture has one fenced command; the lane found none"
+    for edge in edges:
         assert ":" in edge.source, f"{edge.source!r} is not namespaced"
         assert ":" in edge.target, f"{edge.target!r} is not namespaced"
 
@@ -90,6 +100,41 @@ def test_dispatch_lane_stamps_its_provenance_and_cites_a_file_line(fake_repo: Pa
     assert any(e.source == "cli:build" and e.target == "fn:build" for e in edges)
 
 
+def test_dispatch_lane_resolves_the_arms_trailing_call_not_a_guards_print(
+    tmp_path: Path,
+) -> None:
+    """Regression for the confirmed BLOCKING defect at `06e5c615` (A1).
+
+    `merge`'s real `_run` arm is a NESTED guard — `if not rest: print(...);
+    return 2` — followed by the arm's own top-level `return
+    graphify_ops.merge_chunk(rest[0])`. The previous `_first_call` walked the
+    WHOLE arm body and found the guard's `print(...)` first, so the lane
+    emitted `cli:merge -> fn:print`, `verified=True` — a false dispatch edge —
+    and never emitted the real target at all.
+    """
+    src = tmp_path / "python" / "src" / "kb_setup"
+    src.mkdir(parents=True)
+    (src / "cli.py").write_text(
+        "def _run(argv):\n"
+        "    cmd, rest = argv[0], argv[1:]\n"
+        '    if cmd == "merge":\n'
+        "        if not rest:\n"
+        '            print("kb-setup merge <chunk.json>")\n'
+        "            return 2\n"
+        "        return graphify_ops.merge_chunk(rest[0])\n"
+        "    return 1\n",
+        encoding="utf-8",
+    )
+
+    edges = code_intel.dispatch_edges(tmp_path)
+
+    targets = {e.target for e in edges if e.source == "cli:merge"}
+    assert targets == {"fn:graphify_ops.merge_chunk"}, (
+        f"expected only the real dispatch target, got {targets!r} — "
+        "fn:print means the guard clause's print() won again"
+    )
+
+
 def test_config_lane_stamps_its_provenance_and_cites_a_file_line(fake_repo: Path) -> None:
     """The fixture's `other.py` reads one config-shaped literal path."""
     edges = code_intel.config_edges(fake_repo)
@@ -100,6 +145,61 @@ def test_config_lane_stamps_its_provenance_and_cites_a_file_line(fake_repo: Path
         assert edge.evidence
         assert edge.evidence.startswith("python/src/kb_setup/other.py:")
     assert any(e.target == "config:config/settings.toml" for e in edges)
+
+
+# ---------------------------------------------------------------------------
+# 1c. "Could not look" raises LaneUnavailableError — never a silent []
+# ---------------------------------------------------------------------------
+
+
+def test_dispatch_lane_raises_lane_unavailable_when_cli_py_is_missing(
+    tmp_path: Path,
+) -> None:
+    """A3 regression: a missing `cli.py` must not read as 'ran, found 0'."""
+    (tmp_path / "python" / "src" / "kb_setup").mkdir(parents=True)
+
+    with pytest.raises(code_intel.LaneUnavailableError, match=r"cli\.py"):
+        code_intel.dispatch_edges(tmp_path)
+
+
+def test_dispatch_lane_raises_lane_unavailable_when_run_is_missing(
+    tmp_path: Path,
+) -> None:
+    """A3 regression: `cli.py` present but refactored away from `_run`."""
+    src = tmp_path / "python" / "src" / "kb_setup"
+    src.mkdir(parents=True)
+    (src / "cli.py").write_text("x = 1\n", encoding="utf-8")
+
+    with pytest.raises(code_intel.LaneUnavailableError, match="_run"):
+        code_intel.dispatch_edges(tmp_path)
+
+
+def test_config_lane_raises_lane_unavailable_when_kb_setup_dir_is_missing(
+    tmp_path: Path,
+) -> None:
+    """A3 regression: a missing `kb_setup/` must not read as 'ran, found 0'."""
+    with pytest.raises(code_intel.LaneUnavailableError, match="kb_setup"):
+        code_intel.config_edges(tmp_path)
+
+
+def test_config_lane_skips_and_reports_an_unparsable_file_without_raising(
+    fake_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The SyntaxError judgement call (A3): a skip, not a lane failure.
+
+    One bad file must be COUNTED and REPORTED, never silently `continue`d
+    past.
+    """
+    (fake_repo / "python" / "src" / "kb_setup" / "broken.py").write_text(
+        "def broken(:\n", encoding="utf-8"
+    )
+
+    edges = code_intel.config_edges(fake_repo)
+
+    assert edges, "the fixture's other.py still reads a config path"
+    err = capsys.readouterr().err
+    assert "skipped" in err, f"the skip was never reported: {err!r}"
+    assert "broken.py" in err, f"the skip did not name the file: {err!r}"
 
 
 def test_task_lane_stamps_its_provenance_and_cites_a_command(
@@ -338,6 +438,52 @@ def test_task_lane_runs_mise_from_the_repo_root_not_the_process_cwd(
 
 
 # ---------------------------------------------------------------------------
+# 4b. `mise tasks --json` is bounded and its failure becomes a worded refusal
+# ---------------------------------------------------------------------------
+
+
+def test_task_lane_passes_a_real_timeout(fake_repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A4 regression: `mise tasks --json` must never run unbounded.
+
+    `.claude/rules/long-running-command-hangs.md` exists because a
+    mise-family command once wedged for ~7 hours with no timeout to abort it.
+    """
+    seen_kwargs: dict[str, object] = {}
+
+    class _Result:
+        stdout = "[]"
+
+    def _fake_run(_argv: list[str], **kwargs: object) -> _Result:
+        seen_kwargs.update(kwargs)
+        return _Result()
+
+    monkeypatch.setattr(code_intel.subprocess, "run", _fake_run)
+    code_intel.task_edges(fake_repo)
+
+    timeout = seen_kwargs.get("timeout")
+    assert isinstance(timeout, (int, float)), f"no bound was passed: {seen_kwargs!r}"
+    assert timeout > 0
+
+
+def test_task_lane_raises_lane_unavailable_on_a_subprocess_failure(
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A4 regression: a wedged/missing `mise` must reach the user as a sentence.
+
+    Not escape as a bare traceback past `code_intel_main`'s error boundary,
+    which previously caught only `ValueError`.
+    """
+
+    def _fake_run(*_args: object, **_kwargs: object) -> object:
+        raise code_intel.subprocess.TimeoutExpired(cmd=["mise", "tasks", "--json"], timeout=30)
+
+    monkeypatch.setattr(code_intel.subprocess, "run", _fake_run)
+
+    with pytest.raises(code_intel.LaneUnavailableError, match="mise tasks"):
+        code_intel.task_edges(fake_repo)
+
+
+# ---------------------------------------------------------------------------
 # 5. A lane that ran and found nothing is distinguishable from one that did not
 # ---------------------------------------------------------------------------
 
@@ -383,9 +529,50 @@ def test_requesting_an_unknown_lane_raises_a_value_error_naming_the_known_lanes(
 
 
 def test_code_intel_main_writes_json_that_parses(fake_repo: Path, tmp_path: Path) -> None:
+    """Fails if `code_intel_main` emits an empty edge set.
+
+    `to_chunk([])` still returns a dict with `nodes`/`edges`/... keys, so
+    `assert payload` alone is truthy no matter how many edges were emitted —
+    it cannot fire on an empty extraction (A7). Asserting on `payload["edges"]`
+    and `payload["nodes"]` specifically is what makes a reverted/empty lane
+    visible.
+    """
     out = tmp_path / "edges.json"
     rc = code_intel.code_intel_main(fake_repo, ["--lanes", "skill", "--out", str(out)])
 
     assert rc == 0
     payload = json.loads(out.read_text(encoding="utf-8"))
-    assert payload, "wrote an empty document"
+    assert payload["edges"], "wrote a chunk with no edges"
+    assert payload["nodes"], "wrote a chunk with no nodes"
+
+
+# ---------------------------------------------------------------------------
+# 7. `--lanes ""` is a malformed REQUEST, not an empty result
+# ---------------------------------------------------------------------------
+
+
+def test_code_intel_main_rejects_an_empty_lanes_value(
+    fake_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A2 regression: an empty `--lanes` value must be refused, not run as zero lanes.
+
+    `"".split(",")` -> `[""]`, filtered to `[]` — NOT `None` — so without the
+    guard this skips `run_lanes`' default-all branch (`lanes is not None`)
+    and silently writes `{"edges": []}` with rc=0.
+    """
+    rc = code_intel.code_intel_main(fake_repo, ["--lanes", ""])
+
+    assert rc == 2, "an empty --lanes value must be refused, not run as zero lanes"
+    assert "at least one lane" in capsys.readouterr().err
+
+
+def test_code_intel_main_reports_not_run_when_a_lane_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    """A3/A4 boundary: `LaneUnavailableError` becomes `Rc.NOT_RUN`, never rc=0.
+
+    Never a 0 exit with an empty payload that reads as 'ran, found nothing'.
+    """
+    rc = code_intel.code_intel_main(tmp_path, ["--lanes", "dispatch"])
+
+    assert rc == int(Rc.NOT_RUN)

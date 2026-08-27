@@ -180,6 +180,61 @@ def test_an_unresolvable_base_is_no_base_and_never_clean(
     assert "could not" in v.note.lower()
 
 
+def test_verdict_default_base_follows_origin_main_when_it_diverges_from_local_main(
+    git: Callable[..., str], commit_file: Callable[..., str], tmp_path: Path
+) -> None:
+    """A6 regression: the DEFAULT `base` must be `origin/main`, never local `main`.
+
+    The two can disagree about what this branch's delta is. `origin/main` is
+    advanced (via `update-ref`, no checkout) to already
+    contain the SAME `docs/research/finding.md` that `work` has, while local
+    `main` is left at the original commit without it. Diffed against
+    `origin/main` the file is unchanged (no delta -> `clean`); diffed against
+    local `main` it is a new file (a docs delta with no sources -> `drift`).
+    The existing fixture (`main` and `origin/main` created identical, see the
+    `git` fixture's own docstring) cannot see this divergence at all — this
+    test builds it on purpose.
+
+    Calls `funnel.verdict(tmp_path)` with NO `base=` — the only way to
+    exercise the DEFAULT rather than an explicit argument, which is what
+    every other test in this file passes.
+    """
+    finding_sha = commit_file("docs/research/finding.md", "# a finding\n")
+    git("update-ref", "refs/remotes/origin/main", finding_sha)
+
+    v = funnel.verdict(tmp_path)
+
+    assert v.state == "clean", (
+        f"default base did not follow origin/main: got {v.state!r} "
+        f"(docs={v.docs_paths!r}) — a bare local 'main' would see this file "
+        "as newly added and report 'drift' instead"
+    )
+
+
+def test_verdict_default_base_works_with_no_local_main_branch(
+    git: Callable[..., str], commit_file: Callable[..., str], tmp_path: Path
+) -> None:
+    """A6 regression: the gate must not need a LOCAL `main` branch to exist.
+
+    A real clone or worktree can carry `origin/main` with no local `main` at
+    all — a DEFAULT of a bare `"main"` would make `review.base_sha` fail to
+    resolve on exactly that host, returning `no_base` for a reason that has
+    nothing to do with the branch's own delta (`review.base_sha` resolves via
+    `git merge-base -- <fixed_point> HEAD`, which needs `fixed_point` to
+    exist, not `head`'s counterpart on the other side).
+    """
+    commit_file("docs/research/finding.md", "# a finding\n")
+    git("branch", "-D", "main")  # local main GONE; origin/main untouched
+
+    v = funnel.verdict(tmp_path)
+
+    assert v.state == "drift", (
+        f"expected the gate to still resolve via origin/main with no local "
+        f"main branch, got {v.state!r}"
+    )
+    assert v.docs_paths == ("docs/research/finding.md",)
+
+
 def test_main_reports_not_run_on_an_unresolvable_default_base(tmp_path: Path) -> None:
     """The CLI boundary's `no_base` arm: not a git repo at all.
 
@@ -195,17 +250,33 @@ def test_main_refuses_unexpected_arguments(tmp_path: Path) -> None:
     assert funnel.main(tmp_path, ["--nonsense"]) == int(Rc.BAD_REQUEST)
 
 
-def test_render_never_prints_ok_for_a_could_not_check_state() -> None:
-    """`no_base` must read as a refusal in the printed line too, not just the rc."""
-    v = funnel.FunnelVerdict(
-        state="no_base",
-        docs_paths=(),
-        sources_paths=(),
-        exempt_reason=None,
-        note="could not resolve 'main' — the gate could not ask its question.",
-    )
+def test_render_of_a_real_no_base_verdict_reads_as_a_refusal(
+    git: Callable[..., str], commit_file: Callable[..., str], tmp_path: Path
+) -> None:
+    """`no_base` must read as a refusal in the printed line too, not just the rc.
+
+    A7 regression. The previous version built its own `FunnelVerdict` by hand, carrying the
+    exact note text it then asserted was present — so it exercised `render`'s
+    passthrough of `v.note` and NOTHING about `_no_base`/`verdict` themselves;
+    a regression in either of those functions' own wording would go
+    undetected. Its `assert "OK" not in rendered` was equally uninformative:
+    `CLEAN`/`DRIFT`/`FUNNELLED`/`EXEMPT` never spell "OK" either, so the
+    assertion holds for every OTHER state's rendering too and never actually
+    discriminated `no_base`.
+
+    This version reaches `render` through the REAL `verdict()` on a real repo
+    (an unresolvable base), so a wording regression in `_no_base` itself — not
+    just in `render`'s passthrough — makes this fail.
+    """
+    commit_file("docs/research/finding.md", "# a finding\n")
+
+    v = funnel.verdict(tmp_path, base="does-not-exist-anywhere")
     rendered = funnel.render(v)
-    assert "OK" not in rendered
+
+    assert v.state == "no_base"
+    assert rendered.splitlines()[0] == "funnel: NO_BASE", (
+        f"first line did not read as a refusal: {rendered.splitlines()[0]!r}"
+    )
     assert "could not ask its question" in rendered
 
 
