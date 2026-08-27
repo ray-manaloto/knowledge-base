@@ -78,24 +78,33 @@ receive anything is not evidence** — `jdx/hk` has issues DISABLED, so every
 Never `gh search issues`: it returns `[]` instead of failing, and its control
 query with 39 real results also returned `[]` (#507).
 
-### 4. Breadth — delegate to the bundled workflow
+### 4. Breadth — the developer index, and the one you must ASK for
 
-```text
-/deep-research <question>
-```
+**Run: Firecrawl `developer-index`, then the web.** It returns full issue bodies
+and comment threads inline, so the substantive maintainer comment arrives without
+a follow-up fetch. On the run that evaluated this skill it produced the decisive
+lead that plain web search did not.
 
-Claude Code ships this. It fans out across angles, cross-checks, **votes on each
-claim, and filters out the claims that did not survive**. Do not hand-roll a
-fan-out beside it (`use-tool-builtins.md`). It runs only when invoked, and needs
-WebSearch available.
+**Ask the user for: `/deep-research <question>`.** Claude Code ships it as a
+bundled workflow — it fans out across angles, cross-checks, **votes on each claim,
+and filters out the claims that did not survive** — and it is strictly better than
+hand-rolling a fan-out (`use-tool-builtins.md`). But it is **user-invoked only**:
+*"`/deep-research` runs only when you invoke it. Before v2.1.218, Claude could
+also start it on its own"*
+(`sources/agent-harness-docs/docs/claude-code/workflows.md:80`). A subagent cannot
+reach it at all — measured 2026-08-27, when a lane told to follow this skill
+reported it *"could not invoke it from this subagent"*.
 
-Then **verify its cited claims against primary sources** — it returns a cited
-report, not a verified one, and steps 1-2 above are what settles a citation.
+So when breadth is the crux, say so and hand the reader the command. Do not plan
+around running it yourself.
 
-Fall back to Firecrawl `developer-index` when WebSearch is unavailable, or when
-the question is specifically about a repo's issues and PRs: it returns full issue
-bodies and comment threads inline, so the maintainer comment arrives without a
-follow-up fetch.
+*(This step said "delegate to the bundled workflow" until 2026-08-27. That was
+adopted from the shipped doc without an execution — the skill's own P3 report
+flagged it as unverified — and the first attempt to run it refuted it. Corrected
+rather than overwritten, because the reasoning for preferring it still stands.)*
+
+Then **verify every cited claim against primary sources** — a cited report is not
+a verified one, and steps 1-2 above are what settles a citation.
 
 ### 5. Synthesis by a strong Claude lane that opens the URLs itself
 
@@ -136,7 +145,11 @@ Each of these was hit for real. Run the check, do not just know the trap.
 2. Tracker null → **`gh api repos/OWNER/REPO` first**, read `has_issues` /
    `has_discussions`.
 3. A citation can contradict what it annotates (#508) → **open the citation**.
-4. Version skew → **`mise exec --`**, never the bare shim.
+4. Version skew → **`mise exec --`**, never the bare shim. **And a `command -v`
+   hit is not an install** on a mise host: `command -v mkdocs` and
+   `command -v doxygen` both print FOUND here, and both are shims that die with
+   `No version is set for shim`. Probe the binary, not its name — measured
+   2026-08-27 on this skill's own evaluation run.
 5. A lane's factual claims → **spot-check against this repo** before quoting them.
 
 ## Output
