@@ -133,10 +133,22 @@ The report may not treat this as one problem. At minimum it separates:
 - **Context cost** — every lane report re-read at architect prices.
 
 **The evidence is already on disk and must be used rather than re-derived.**
-`.agent/kb/reports/agents/` holds ~260 lane reports from this repo's own history,
-including this session's four. That is the primary source on how this transport
-actually behaves; the published literature is the secondary source. A report that
-cites only the literature has skipped the cheaper and more specific half.
+Counted 2026-08-27: **235** lane reports directly in `.agent/kb/reports/agents/`
+(478 `.md` under `reports/` recursively), plus **159** cross-family review reports
+under `.agent/kb/review/reports/`. That is the primary source on how this transport
+actually behaves; the published literature is secondary. A report citing only the
+literature has skipped the cheaper and more specific half.
+
+**The 159 review reports are the sharpest slice and are easy to overlook.** They
+are named `review-<sha>-<lane>.md` — every one is a cross-family handoff that
+already happened, with its findings, its lane, and its commit. If the question is
+"is the Claude↔Codex exchange fragile", 159 recorded instances of exactly that
+exchange are better evidence than any article.
+
+*(This paragraph carried "~260" until 2026-08-27, which was the agents/ directory's
+hardlink count misread as a file count — corrected here rather than overwritten,
+because the wrong figure UNDERSTATED the evidence base and the correction
+strengthens the phase rather than weakening it.)*
 
 ### Banned answers
 
