@@ -329,6 +329,44 @@ def test_a_diverged_or_missing_mirror_is_named(tmp_path: Path) -> None:
     assert skill_lint.mirror_drift(tmp_path) == ()
 
 
+def test_a_non_skill_md_asset_is_mirrored_too(tmp_path: Path) -> None:
+    """`references/*.md` is checked, and transient dot-state is not.
+
+    The check globbed `*/SKILL.md` until 2026-08-27, so the two `SKILL.md`
+    copies were pinned against each other and every OTHER mirrored asset was
+    unchecked — found by the cold lane on `a61988b2454a`, the change that put
+    the first `references/` file into the mirrored tree.
+
+    Third arm is the one that keeps this usable: `graph_first` writes a session
+    marker under `.agent/state/` in whatever directory it runs from (#420), and
+    demanding a mirror for that would make the gate red in every session that
+    ran a query.
+    """
+    _skill(tmp_path, "good", _GOOD)
+    _mirror(tmp_path, "good", _GOOD)
+    (tmp_path / ".claude/skills/good/references").mkdir(parents=True)
+    (tmp_path / ".claude/skills/good/references/notes.md").write_text("x\n", encoding="utf-8")
+
+    missing = skill_lint.mirror_drift(tmp_path)
+    assert len(missing) == 1
+    assert "references/notes.md" in missing[0]
+
+    mirror_refs = tmp_path / ".agents/skills/good/references"
+    mirror_refs.mkdir(parents=True)
+    (mirror_refs / "notes.md").write_text("y\n", encoding="utf-8")
+    differ = skill_lint.mirror_drift(tmp_path)
+    assert len(differ) == 1
+    assert "differ" in differ[0]
+
+    (mirror_refs / "notes.md").write_text("x\n", encoding="utf-8")
+    assert skill_lint.mirror_drift(tmp_path) == ()
+
+    marker = tmp_path / ".claude/skills/good/.agent/state/graph-first"
+    marker.mkdir(parents=True)
+    (marker / "abc.queried").write_text("", encoding="utf-8")
+    assert skill_lint.mirror_drift(tmp_path) == ()
+
+
 def test_drift_reaches_the_exit_code_through_the_boundary(tmp_path: Path) -> None:
     """Drift must fail the gate, and must do so WITHOUT a second rc conversion.
 

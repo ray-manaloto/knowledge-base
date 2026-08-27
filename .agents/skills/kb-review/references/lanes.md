@@ -7,7 +7,7 @@ the receipt as `by-policy-one-lane` (see below). They are described here only so
 future reader knows what was given up and where to find it again:
 
 - **Standards** and **Spec** were two axes of `mattpocock-skills:code-review`,
-  handed this repo's two sources: the project rule files plus `AGENTS.md` for
+  handed this repo's two sources: the project rule files plus `CLAUDE.md` for
   standards, and the `docs/goals/` pair or newest session plan for spec. The
   spine still exists and can be invoked directly if a human wants those axes on
   a given diff.

@@ -252,15 +252,33 @@ def mirror_drift(root: Path) -> tuple[str, ...]:
     if not (root / _AGENT_SKILLS).is_dir():
         return ()
     drift: list[str] = []
-    for source in sorted((root / _CLAUDE_SKILLS).glob("*/SKILL.md")):
-        name = source.parent.name
+    for anchor in sorted((root / _CLAUDE_SKILLS).glob("*/SKILL.md")):
+        skill = anchor.parent
+        name = skill.name
         if f"{_CLAUDE_SKILLS.as_posix()}/{name}/".startswith(DEFAULT_EXCLUDED_PREFIXES):
             continue
-        mirror = root / _AGENT_SKILLS / name / "SKILL.md"
-        if not mirror.is_file():
-            drift.append(f"{name}: no mirror at {_AGENT_SKILLS / name / 'SKILL.md'}")
-        elif mirror.read_bytes() != source.read_bytes():
-            drift.append(f"{name}: {_CLAUDE_SKILLS / name / 'SKILL.md'} and its mirror differ")
+        # EVERY file under the skill, not just the `SKILL.md` anchor. Globbing
+        # the anchor alone pinned the two `SKILL.md` copies against each other
+        # and left every other mirrored asset unchecked — a `references/*.md` is
+        # read by the same reader as the skill body, so a divergent one is the
+        # same defect with none of the detection. Found by the cold lane on
+        # `a61988b2454a`, the change that introduced the first non-`SKILL.md`
+        # asset into the mirrored tree.
+        for source in sorted(p for p in skill.rglob("*") if p.is_file()):
+            rel = source.relative_to(skill)
+            # A dot-prefixed component is transient state, not a skill asset.
+            # `graph_first` writes its session marker to `.agent/state/…` under
+            # whatever directory it is invoked from, so a skill tree can acquire
+            # a `.queried` file that has no business being mirrored (#420). It
+            # is not authored, it is per-session, and demanding a mirror for it
+            # would make this gate red in every session that ran a query.
+            if any(part.startswith(".") for part in rel.parts):
+                continue
+            mirror = root / _AGENT_SKILLS / name / rel
+            if not mirror.is_file():
+                drift.append(f"{name}: no mirror at {_AGENT_SKILLS / name / rel}")
+            elif mirror.read_bytes() != source.read_bytes():
+                drift.append(f"{name}: {_CLAUDE_SKILLS / name / rel} and its mirror differ")
     return tuple(drift)
 
 
