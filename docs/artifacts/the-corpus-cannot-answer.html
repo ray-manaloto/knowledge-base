@@ -1,0 +1,392 @@
+<title>The Corpus Cannot Answer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --paper:   #F5F3EF;
+    --surface: #FFFFFF;
+    --ink:     #14161A;
+    --muted:   #5F6570;
+    --rule:    #DEDAD2;
+    --accent:  #7A2E4E;
+    --accent-b:#F3E4EA;
+    --ok:      #2C6E4E;
+    --warn:    #96601A;
+    --bad:     #A82E22;
+    --plate:   #FCFBF9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:   #121316;
+      --surface: #1B1D22;
+      --ink:     #E9E7E2;
+      --muted:   #9AA0AB;
+      --rule:    #2D3138;
+      --accent:  #E091AF;
+      --accent-b:#2A1620;
+      --ok:      #6BBE92;
+      --warn:    #D6A254;
+      --bad:     #E8776A;
+      --plate:   #F5F4F1;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:   #121316;
+    --surface: #1B1D22;
+    --ink:     #E9E7E2;
+    --muted:   #9AA0AB;
+    --rule:    #2D3138;
+    --accent:  #E091AF;
+    --accent-b:#2A1620;
+    --ok:      #6BBE92;
+    --warn:    #D6A254;
+    --bad:     #E8776A;
+    --plate:   #F5F4F1;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Newsreader, Georgia, serif;
+    font-size: 17.5px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.4rem;
+  }
+
+  h1, h2, h3, .kicker, th, .pill, .big { font-family: "Bricolage Grotesque", "Helvetica Neue", sans-serif; }
+
+  .kicker {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .72rem;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    font-size: clamp(2.2rem, 6.4vw, 3.4rem);
+    font-weight: 800;
+    line-height: 1.02;
+    letter-spacing: -.028em;
+    text-wrap: balance;
+    margin: .4rem 0 0;
+  }
+
+  .deck { font-size: 1.16rem; color: var(--muted); max-width: 36rem; margin: 0; }
+
+  h2 {
+    font-size: 1.45rem;
+    font-weight: 600;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+    margin: 0;
+    padding-top: 1.7rem;
+    border-top: 2px solid var(--accent);
+  }
+  h3 { font-size: 1.05rem; font-weight: 600; margin: 0; }
+
+  section { display: flex; flex-direction: column; gap: 1rem; }
+  p { margin: 0; max-width: 40rem; }
+
+  code, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: .83em;
+    font-variant-numeric: tabular-nums;
+  }
+  code { background: var(--accent-b); padding: .1em .34em; border-radius: 3px; }
+
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 6px solid var(--bad);
+    border-radius: 3px;
+    padding: 1.4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+  }
+  .verdict .big {
+    font-size: clamp(1.6rem, 4.5vw, 2.1rem);
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--bad);
+    line-height: 1.1;
+  }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: .7rem; }
+  figure .frame {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1.2rem;
+    overflow-x: auto;
+  }
+  figure svg { max-width: 100%; height: auto; display: block; }
+  figcaption { font-size: .87rem; color: var(--muted); max-width: 40rem; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  .mermaid { background: var(--plate); color: #14161A; border-radius: 3px; padding: .5rem; text-align: center; }
+
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th {
+    text-align: left;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--rule);
+    padding: 0 .75rem .45rem 0;
+    white-space: nowrap;
+  }
+  td { padding: .6rem .75rem .6rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td.num { text-align: right; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+  td:last-child, th:last-child { padding-right: 0; }
+
+  .pill {
+    display: inline-block;
+    font-size: .66rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: .18em .5em;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .pill.ok   { color: var(--ok);   background: color-mix(in srgb, var(--ok) 14%, transparent); }
+  .pill.bad  { color: var(--bad);  background: color-mix(in srgb, var(--bad) 14%, transparent); }
+  .pill.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+
+  .note { border-left: 3px solid var(--accent); padding-left: 1.05rem; color: var(--muted); font-size: .95rem; }
+  .note b { color: var(--ink); }
+  .note.alarm { border-left-color: var(--bad); }
+
+  ol, ul { margin: 0; padding-left: 1.2rem; max-width: 40rem; }
+  li { margin-bottom: .42rem; }
+  li::marker { color: var(--accent); }
+
+  footer { border-top: 1px solid var(--rule); padding-top: 1.4rem; font-size: .84rem; color: var(--muted); }
+  footer a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="kicker">Two measurement lanes · 2026-08-27 · session 14c497b3</p>
+    <h1>The Corpus Cannot Answer</h1>
+    <p class="deck">We asked the knowledge base one real architecture question, the way Ray specified. Then we counted the backlog that is supposed to be fixing it. Both answers were worse than expected, and they are the same answer.</p>
+  </header>
+
+  <div class="verdict">
+    <span class="big">Could an agent get a sourced answer from this corpus alone? <span style="color:var(--bad)">No.</span></span>
+    <p>Seven probes, control-armed. The graph contributed <b>exactly one</b> substantive fact — the 512 MiB cap, which is also the single most-documented line in graphify's own README. Every load-bearing citation in the answer came from <code>grep</code> and <code>sed</code> on files, not from the graph.</p>
+  </div>
+
+  <section>
+    <h2>Why it failed — and it is not staleness</h2>
+
+    <p>The lane named seven distinct causes. The structural one subsumes the rest:</p>
+
+    <p class="note alarm"><b>The corpus indexes the corpus's <i>dependencies</i>, not the corpus's <i>decisions</i>.</b> <code>mise.toml</code>, <code>.claude/rules/**</code>, <code>python/src/kb_setup/**</code>, <code>docs/direction/**</code> and the GitHub issues are <b>not ingested</b>. The strings <code>#130</code>, <code>#120</code>, <code>federate</code> and <code>shard</code> appear in <b>neither graph layer</b>. Every fact that decided the answer lives in the un-ingested half.</p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 740 268" role="img" aria-label="A question enters the query seeder, which matches English words against 492,654 code AST nodes and only 4,868 prose nodes, so code outranks prose 100 to 1 and the result truncates while still returning exit code zero.">
+          <defs>
+            <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <rect x="16" y="106" width="132" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="82" y="128" font-family="Newsreader, serif" font-size="12" fill="currentColor" text-anchor="middle">an architecture</text>
+          <text x="82" y="144" font-family="Newsreader, serif" font-size="12" fill="currentColor" text-anchor="middle">question, in English</text>
+
+          <line x1="148" y1="132" x2="196" y2="132" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+
+          <rect x="200" y="98" width="126" height="68" rx="3" fill="currentColor" opacity=".05"/>
+          <rect x="200" y="98" width="126" height="68" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="263" y="120" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" text-anchor="middle">seeder</text>
+          <text x="263" y="139" font-family="Newsreader, serif" font-size="11" fill="currentColor" text-anchor="middle" opacity=".75">matches words to</text>
+          <text x="263" y="153" font-family="Newsreader, serif" font-size="11" fill="currentColor" text-anchor="middle" opacity=".75">SYMBOLS</text>
+
+          <!-- code branch -->
+          <line x1="326" y1="118" x2="410" y2="66" stroke="#A82E22" stroke-width="3" marker-end="url(#ar3)"/>
+          <text x="356" y="84" font-family="Bricolage Grotesque, sans-serif" font-size="11.5" font-weight="600" fill="#A82E22">wins</text>
+
+          <rect x="416" y="34" width="308" height="62" rx="3" fill="#A82E22" opacity=".08"/>
+          <rect x="416" y="34" width="308" height="62" rx="3" fill="none" stroke="#A82E22" stroke-width="1.5"/>
+          <text x="430" y="55" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="#A82E22">492,654 code AST nodes</text>
+          <text x="430" y="73" font-family="Newsreader, serif" font-size="11.5" fill="currentColor">returns <tspan font-family="IBM Plex Mono, monospace">colibri.c</tspan>, <tspan font-family="IBM Plex Mono, monospace">ruff</tspan>, <tspan font-family="IBM Plex Mono, monospace">.before()</tspan></text>
+          <text x="430" y="88" font-family="Newsreader, serif" font-size="10.5" fill="currentColor" opacity=".65">“.before()” — a Rust token matched from the word “before”</text>
+
+          <!-- prose branch -->
+          <line x1="326" y1="148" x2="410" y2="196" stroke="currentColor" stroke-width="1" stroke-dasharray="4 4" opacity=".45" marker-end="url(#ar3)"/>
+          <text x="352" y="188" font-family="Bricolage Grotesque, sans-serif" font-size="11" fill="currentColor" opacity=".55">loses</text>
+
+          <rect x="416" y="168" width="308" height="58" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/>
+          <text x="430" y="189" font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor" opacity=".8">4,868 prose nodes</text>
+          <text x="430" y="207" font-family="Newsreader, serif" font-size="11.5" fill="currentColor" opacity=".8">where the answer would live</text>
+          <text x="430" y="221" font-family="Newsreader, serif" font-size="10.5" fill="currentColor" opacity=".55">reachable only with <tspan font-family="IBM Plex Mono, monospace">--prose --idf</tspan>, which nothing suggests</text>
+
+          <!-- ratio -->
+          <text x="570" y="130" font-family="Bricolage Grotesque, sans-serif" font-size="15" font-weight="800" fill="#A82E22" text-anchor="middle">101 : 1</text>
+          <text x="570" y="146" font-family="Newsreader, serif" font-size="10.5" fill="currentColor" opacity=".6" text-anchor="middle">code nodes per prose node</text>
+
+          <!-- truncation -->
+          <rect x="200" y="204" width="188" height="46" rx="3" fill="#96601A" opacity=".1"/>
+          <rect x="200" y="204" width="188" height="46" rx="3" fill="none" stroke="#96601A" stroke-width="1.5"/>
+          <text x="294" y="223" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#96601A" text-anchor="middle">TRUNCATED, rc = 0</text>
+          <text x="294" y="239" font-family="Newsreader, serif" font-size="10.5" fill="currentColor" text-anchor="middle" opacity=".75">a partial answer that exits clean</text>
+          <line x1="263" y1="166" x2="263" y2="200" stroke="#96601A" stroke-width="1.5" marker-end="url(#ar3)"/>
+        </svg>
+      </div>
+      <figcaption><b>Figure 1 — an English question loses to code symbols 101:1, and the miss exits zero.</b> Node counts from <code>graphify-out/.graph-counts.json</code> (492,654) and CLAUDE.md's prose-layer figure (4,868). The seed list is quoted verbatim from probe P1. The lane control-armed the misses: <code>kb-query "512 MiB graph.json cap" --prose --idf</code> scored <b>37.14</b> against a next-best of 10.34 — so the probe discriminates, and the failures are real absences, not a broken tool.</figcaption>
+    </figure>
+
+    <h3>The other six, briefly</h3>
+    <ol>
+      <li><b>The default query mode is the wrong arm and never says so.</b> <code>--prose --idf</code> is the only usable one.</li>
+      <li><b><code>--idf</code> only works if you already know the corpus's wording.</b> The control scored 37.14 using the node's own title; the same idea phrased as a question scored nothing. A spelling bound — you must know the answer to retrieve it.</li>
+      <li><b>Truncation is the default outcome</b> and the tool explicitly warns the prefix is not evidence of absence — under <code>rc=0</code>, which an agent will read as success.</li>
+      <li><b>Every query prints a node-ID collision warning</b>: the graph uses the pre-#1504 scheme, so same-stem files across 85 sources collide by construction.</li>
+      <li><b>The graph cannot be rebuilt anyway.</b> <code>graphify-out/.build-failure.json</code>, stamped 2026-08-27: extract failed closed. It is 6 days stale and #397 blocks the refresh.</li>
+      <li><b>The reflection layer was the one thing that worked.</b> <code>LESSONS.md:1417</code> records that a prior agent <i>fabricated a Ray ruling</i> on this exact topic and that it propagated through handoffs.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>A premise I gave you was wrong, and the lane caught it</h2>
+    <p class="note alarm">I told you <b>#120 (the duplicated <code>repo::</code> prefix) was open</b> and that federating was the durable fix. <b>#120 already shipped.</b> <code>graph.py:2552</code> is headed “THE FIX FOR #120”, it recovered <b>184 MB — 33% of the file</b>, and <code>graph_checks.py:52</code> gates it on every build (<code>_MAX_SEPARATORS = 1</code>). It landed 2026-08-05; today's graph was built 2026-08-21, so its bytes are real data.</p>
+    <p>I did not invent that — I read it off <code>mise.toml:911</code>, which still says <i>“Both open.”</i> <b>The comment is stale by three weeks</b>, and it is the exact shape of failure this repo keeps filing issues about: a correctly-cited fact that stopped being true.</p>
+    <p>What it changes: <b>#120 offers no remaining headroom — that lever is already spent.</b> Federation (#130) is the only one left, and the corpus argues it loses nothing, because the aggregate holds 85 sources with <b>zero cross-source edges</b>. It is a concatenation, not a join.</p>
+  </section>
+
+  <section>
+    <h2>The backlog: your duplication hypothesis was wrong, and the truth is worse</h2>
+
+    <p>You guessed <i>“probably a lot of duplication and some are stale.”</i> Measured across all 294:</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Your hypothesis</th><th>Measured</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>“a lot of duplication”</td><td class="num">4.8% confirmed · 6.8% incl. probable</td><td><span class="pill ok">Refuted</span> — collapsing every cluster removes <b>11 issues</b></td></tr>
+          <tr><td>“some are stale w drift”</td><td class="num">5% clearly · 26% suspect</td><td><span class="pill warn">Partly</span> — but <b>all 14 clearly-stale are OFF-PATH</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><b>Triage is not the lever.</b> Deleting every duplicate and every stale issue leaves ~269. The real finding is the rate.</p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 740 250" role="img" aria-label="Weekly opened versus closed issues. Every one of six weeks is net positive. The week of August 17 opened 125 and closed 9.">
+          <line x1="58" y1="206" x2="716" y2="206" stroke="currentColor" stroke-width="1.2"/>
+          <text x="30" y="42"  font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity=".55" text-anchor="end">125</text>
+          <line x1="58" y1="38" x2="716" y2="38" stroke="currentColor" stroke-width=".5" opacity=".18"/>
+          <text x="30" y="126" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity=".55" text-anchor="end">60</text>
+          <line x1="58" y1="122" x2="716" y2="122" stroke="currentColor" stroke-width=".5" opacity=".18"/>
+
+          <!-- bars: 6 weeks, x pitch 108, opened then closed -->
+          <!-- w1 12/1 --><rect x="76"  y="188" width="30" height="18"  fill="#A82E22"/><rect x="110" y="204.6" width="30" height="1.4" fill="#2C6E4E"/>
+          <text x="108" y="222" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity=".6" text-anchor="middle">07-20</text>
+          <text x="108" y="236" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#A82E22" text-anchor="middle">+11</text>
+
+          <!-- w2 56/31 --><rect x="184" y="123" width="30" height="83" fill="#A82E22"/><rect x="218" y="160" width="30" height="46" fill="#2C6E4E"/>
+          <text x="216" y="222" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity=".6" text-anchor="middle">07-27</text>
+          <text x="216" y="236" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#A82E22" text-anchor="middle">+25</text>
+
+          <!-- w3 93/34 --><rect x="292" y="68"  width="30" height="138" fill="#A82E22"/><rect x="326" y="156" width="30" height="50" fill="#2C6E4E"/>
+          <text x="324" y="222" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity=".6" text-anchor="middle">08-03</text>
+          <text x="324" y="236" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#A82E22" text-anchor="middle">+59</text>
+
+          <!-- w4 38/11 --><rect x="400" y="150" width="30" height="56" fill="#A82E22"/><rect x="434" y="190" width="30" height="16" fill="#2C6E4E"/>
+          <text x="432" y="222" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity=".6" text-anchor="middle">08-10</text>
+          <text x="432" y="236" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#A82E22" text-anchor="middle">+27</text>
+
+          <!-- w5 125/9 --><rect x="508" y="38"  width="30" height="168" fill="#A82E22"/><rect x="542" y="193" width="30" height="13" fill="#2C6E4E"/>
+          <text x="540" y="222" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity=".6" text-anchor="middle">08-17</text>
+          <text x="540" y="236" font-family="Bricolage Grotesque, sans-serif" font-size="11" font-weight="800" fill="#A82E22" text-anchor="middle">+116</text>
+
+          <!-- w6 65/9 --><rect x="616" y="119" width="30" height="87" fill="#A82E22"/><rect x="650" y="193" width="30" height="13" fill="#2C6E4E"/>
+          <text x="648" y="222" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity=".6" text-anchor="middle">08-24*</text>
+          <text x="648" y="236" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#A82E22" text-anchor="middle">+56</text>
+
+          <rect x="580" y="12" width="12" height="12" fill="#A82E22"/><text x="598" y="22" font-family="Newsreader, serif" font-size="11" fill="currentColor">opened</text>
+          <rect x="656" y="12" width="12" height="12" fill="#2C6E4E"/><text x="674" y="22" font-family="Newsreader, serif" font-size="11" fill="currentColor">closed</text>
+        </svg>
+      </div>
+      <figcaption><b>Figure 2 — the backlog has never once shrunk.</b> Zero of six weeks net-negative; only 3 of 34 active days. The close ratio fell from <b>0.39</b> over weeks 1–4 to <b>0.095</b> over weeks 5–6 while filing more than tripled. The two biggest filing days are both round-review days — <b>issue filing is a byproduct of the review rounds, and nothing consumes it at the rate it is produced.</b> *08-24 is a partial week (4 days).</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>The two findings are the same finding</h2>
+
+    <p>Of the 294, <b>89 are on the critical path</b> to the finish line you chose. Sorted by which capability they move:</p>
+
+    <figure>
+      <div class="frame">
+        <pre class="mermaid">%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#14161A','primaryBorderColor':'#7A2E4E','lineColor':'#5F6570','secondaryColor':'#F3E4EA','tertiaryColor':'#F5F3EF','fontFamily':'Bricolage Grotesque, sans-serif','fontSize':'13px'}}}%%
+flowchart LR
+  A["A · INGESTION<br/>getting content IN<br/><b>62 issues</b>"] --> B["B · RETRIEVAL<br/>getting an answer OUT<br/><b>19 issues</b>"]
+  B --> C["C · REACH<br/>from another repo<br/><b>7 issues</b>"]
+  C --> D["D · AUTONOMY<br/>no human in the loop<br/><b>1 issue</b>"]
+
+  X["the measured failure<br/>lives HERE"] -.-> B
+  X -.-> C
+
+  style A fill:#F6E7E5,stroke:#A82E22,color:#14161A
+  style B fill:#E4EFE9,stroke:#2C6E4E,color:#14161A
+  style C fill:#E4EFE9,stroke:#2C6E4E,color:#14161A
+  style D fill:#E4EFE9,stroke:#2C6E4E,color:#14161A
+  style X fill:#F3E4EA,stroke:#7A2E4E,color:#14161A
+</pre>
+      </div>
+      <figcaption><b>Figure 3 — the backlog is optimising the half that already works.</b> 62 issues push content <i>in</i>; 27 get an answer <i>out</i> and reach another repo; <b>one</b> addresses the no-human clause. The acid test failed on <b>retrieval and reach</b> — and the graph already holds 492,654 nodes. <b>Ingesting more is not the constraint.</b></figcaption>
+    </figure>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th class="num">count</th><th>meaning</th></tr></thead>
+        <tbody>
+          <tr><td><b>ON-PATH and LIVE</b></td><td class="num"><b>56</b></td><td>The real critical path, no staleness caveat. 19% of the backlog.</td></tr>
+          <tr><td>ON-PATH but SUSPECT-STALE</td><td class="num">33</td><td>Each needs one re-derivation before it can be worked (mostly claims read at graphify ≤0.9.48).</td></tr>
+          <tr><td>OFF-PATH</td><td class="num">190</td><td>65% of everything filed does not move the finish line you chose.</td></tr>
+          <tr><td>orphans — under no umbrella</td><td class="num">197</td><td>67%. Working every umbrella to completion closes at most 112 and leaves 182 untouched.</td></tr>
+          <tr><td>referenced by nothing at all</td><td class="num">146</td><td>Half the backlog is disconnected from every other issue.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>What this implies for the round you chose</h2>
+    <p>You picked <b>the substrate</b> — headline word <b>Reachable</b>. The measurement supports that and sharpens it in one way you should know before I draft the goal:</p>
+    <p class="note"><b>“Our code isn't in the graph” was too narrow a diagnosis.</b> Our <i>doctrine</i> isn't in it either — <code>mise.toml</code>, the rules, the issues, the directives. A corpus that indexes only its dependencies can never answer a question about its own decisions, and that is the class of question every round actually asks.</p>
+  </section>
+
+  <footer>
+    <p><b>Provenance.</b> Two lanes ran this session and both wrote incrementally: <code>.agent/kb/reports/agents/q4-federate-vs-extract.md</code> (262 lines, 7 control-armed probes) and <code>.agent/kb/reports/agents/backlog-audit.md</code> (508 lines, measurement-only). <b>These are those lanes' claims, read here but not independently re-derived</b> — with two exceptions I verified myself: the 294 open-issue count (two routes) and the <code>graph-size</code> figure. The lanes' own control arms are quoted where they carry a negative. The 4,868 prose-node figure is inherited from CLAUDE.md, which labels itself stale-on-sight.</p>
+    <p>Source: <code>docs/artifacts/the-corpus-cannot-answer.html</code> · companion: <a href="https://claude.ai/code/artifact/6553ad54-ce1a-4c03-aeba-cd4e27cb2c8e">Four Graphs and a Backlog</a></p>
+  </footer>
+
+</div>
