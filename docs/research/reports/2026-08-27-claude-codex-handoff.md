@@ -81,6 +81,48 @@ Hand-offs are data, not narration. Validate at the boundary; reject and re-ask o
 schema failure."* The installed `codex-cli 0.150.1` has `--output-schema <FILE>`
 and has had it all along.
 
+## 3a. AMENDED after publication — the lane's sections 2 and 3 landed late
+
+Sections 2 and 3 above were written from partial lane output; the full report
+(`.agent/kb/reports/agents/lane-evidence-transport.md`, 268 lines) landed
+afterwards. Nothing above is retracted. Four things are added, and the first is
+the cheapest fix in this document.
+
+**The prompt is the discriminator, and it is one sentence.** In one round,
+**8 of 20** subagents had to be told *"your final report has not reached me"* — and
+**12 were spawned and never nudged**, which is the control arm. The split is not
+the harness: cold-review prompts that say *"write the full report to <path> AND
+also return it as your final message"* produced **0 nudges in 12**; prompts saying
+only *"return the full report as your final message"* produced **8 in 8**. The
+resends cost **109,165 bytes ≈ 27k tokens** re-emitted into the architect's
+context, in a session Ray ended because context was full.
+
+That outranks recommendation 2 on cost: it is a prompt-template change, not a
+polling loop. **Both belong** — the sentence prevents the loss, polling the
+artifact makes the loss survivable.
+
+**The watchdog kill is worse than a timeout.** *"An empty FINAL from a killed lane
+is indistinguishable from a clean review if you only read FINAL"*
+(`review-870c020c…-cold.md:214`). **12 of 159** review reports name a watchdog
+kill; **6 of 159 (3.8%)** are batch-split retries of a lane that could not finish
+in one budget — which is what the `cold-batchA/B/C` filenames are.
+
+**One in five cold-review artifacts contains no review.** Ceremony measured by
+section is only **12.5% median** (range 0–28%), so the seven-part spec is not the
+weight. But **31 of 159 (19.5%) record no finding at all**, **17 (10.7%) are ≤25
+lines**, and only **59 (37%)** carry a P0/P1/P2 token. The artifact class is not
+over-ceremonious; a fifth of it is a receipt satisfying `kb-ship`.
+
+**Pre-dispatch premise verification yielded zero in the one round it was
+measured.** *"Six premise-verification passes ran BEFORE/BETWEEN the lanes and
+none of the 13 P1s was pre-empted by them"* — n=1, and it is the only direct
+measurement of that ceremony's yield on disk.
+
+**And one class is absent, stated plainly:** zero reports record an orphaned codex
+CLI process surviving a "completed" task. Control-armed — the same probe shape
+finds 15 files discussing process kills, so it can find such text; the class is
+simply not recorded.
+
 ## 4. What the literature says, and where it agrees with Ray
 
 Secondary, but it converges on Ray's own reframe rather than on the roster question.
@@ -168,10 +210,12 @@ divergence, but it was made after the fact and the swap itself is still unrecord
   literature, not on an execution in this repo.
 - **Whether `codex exec resume` recovers a watchdog-killed lane's partial state.**
   Untested. It is the recommendation most likely to be wrong.
-- **Contract-overhead attribution.** Whether reports carrying a `PREMISES` block
-  have fewer refuted claims than those without was not answered — the lane's
-  section 3 had not landed when this was written. Line-count discipline is
-  measured; correctness-per-ceremony is not.
+- **Whether ceremony buys correctness.** Answered as far as this corpus can: it
+  cannot be told. Only 3 top-level agent reports carry a `PREMISES` block and 0
+  review reports do. Their refutation ratio (62 confirmed / 4 refuted, 15.5:1
+  against a corpus-wide 2.1:1 and 2.8:1) looks like a strong effect and is not
+  one — n=3, and all three are premise-VERIFICATION reports whose job is emitting
+  verdicts, so the denominator is not comparable.
 - **Latency outside the one round** measured end to end (2026-08-21). Every
   delivery figure comes from that round. The 600 s / 900 s kills are from others.
 - **Any figure for `agy`.** One call was budgeted this round and none was spent.
