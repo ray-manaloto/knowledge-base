@@ -63,13 +63,10 @@ and the count next to it has now drifted stale three times** ("Nine" until
 2026-08-23 → stale by three → bolded as 12 → stale by six), each time by being
 quoted instead of measured. `.claude/settings.json` currently declares
 **18** plugins `true` in `enabledPlugins` — re-derive, never quote:
-`jq '.enabledPlugins | to_entries | map(select(.value)) | length'
-.claude/settings.json`. That is not the same as how many actually run:
+`jq '.enabledPlugins | to_entries | map(select(.value)) | length' .claude/settings.json`. That is not the same as how many actually run:
 `.claude/settings.local.json` overrides two of the 18 back to `false`
 (`claude-md-management@claude-plugins-official`, `mise@brentmitchell25`), so the
-**effective** count is **16** — `jq -s '(.[0].enabledPlugins +
-(.[1].enabledPlugins // {})) | to_entries | map(select(.value)) | length'
-.claude/settings.json .claude/settings.local.json`. Both numbers feed
+**effective** count is **16** — `jq -s '(.[0].enabledPlugins + (.[1].enabledPlugins // {})) | to_entries | map(select(.value)) | length' .claude/settings.json .claude/settings.local.json`. Both numbers feed
 `md-size-budgets.md` § the skill-listing budget, which scales with whichever a
 session actually loads.
 

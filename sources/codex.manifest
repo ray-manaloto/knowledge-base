@@ -4,7 +4,7 @@
 # TOOLCHAIN SOURCE — a tool this repo actually RUNS (#81, ingested 2026-08-02).
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
-#   version source: mise.toml `[tools] codex`
+#   version source: mise.toml `"npm:@openai/codex"` (line ~177)
 #   pinned here:    0.150.1
 # Note the tag prefix: releases are `rust-v<version>`, so `ref` is NOT the bare
 # version the two lines above name. Also: this manifest read 0.146.0 while
