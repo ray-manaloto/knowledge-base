@@ -1,0 +1,11 @@
+rc(ok)= 0
+rc(err)= 2
+traces:
+  kb_entrypoint_diagram_fixed.py->>bool:module()--build_and_report(True)
+  kb_entrypoint_diagram_fixed.py->>Ok:build_and_report()--exit_code(Ok)
+  Ok-->kb_entrypoint_diagram_fixed.py:0
+  bool-->kb_entrypoint_diagram_fixed.py:0
+  kb_entrypoint_diagram_fixed.py->>bool:module()--build_and_report(False)
+  kb_entrypoint_diagram_fixed.py->>Err:build_and_report()--exit_code(Err)
+  Err-->kb_entrypoint_diagram_fixed.py:2
+  bool-->kb_entrypoint_diagram_fixed.py:2

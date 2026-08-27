@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# SURVEY CANDIDATE - 2026-08-26 diagram/tool funnel (sources/REGISTRY.md row 114+). Pushed 2026-08-22, so LIVE (corrects an older dormant reading). Quoted verdict: REJECT: pydeps / pyan3 / py2puml - all alive-enough, all strict subsets of graphify's existing python edges. Eliminated as a diagram source, but its call resolution is the exact capability graphify's measured gap (_build_checked missing from .self-graph) is about. Default branch is master, not main. Source: .agent/kb/reports/agents/diagram-tool-status-2026-08-26.md. EXTRACTION DEFERRED: kb-build is currently FAILING (#397/#417 detect-preflight) - this manifest only pins the source; REGISTRY.md Status stays manifest until a build succeeds.
+url = https://github.com/Technologicat/pyan
+ref = master
+commit = 8522ca4f59b9a731e6a1685c77e8cf983813ceee
+kind = code

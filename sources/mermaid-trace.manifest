@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# SURVEY CANDIDATE - 2026-08-26 diagram/tool funnel (sources/REGISTRY.md row 114+). RUN-OK: the @trace decorator produced a real sequenceDiagram, 6 participants / 10 lines, 0.02s wall clock (diagram-tool-status-2026-08-26.md). Quoted verdict: the shape the diagram surveys Ranked Recommendation section treats as viable evidence, not rejected. Source: .agent/kb/reports/agents/diagram-tool-status-2026-08-26.md. EXTRACTION DEFERRED: kb-build is currently FAILING (#397/#417 detect-preflight) - this manifest only pins the source; REGISTRY.md Status stays manifest until a build succeeds.
+url = https://github.com/xt765/mermaid-trace
+ref = main
+commit = 6c3a58dd34ff9c3a650a4f34dd092275de951213
+kind = code

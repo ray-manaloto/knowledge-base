@@ -60,7 +60,9 @@ def _print_usage() -> int:
     """
     print(
         "kb-setup: build | update <name> | watch | prose | query <question> [--prose] | "
-        "affected <symbol> [--depth N] | insights [--top N] | graph-size | "
+        "affected <symbol> [--depth N] | "
+        "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
+        "insights [--top N] | graph-size | funnel | "
         "telemetry-prune | serve | "
         "merge <chunk> | label | "
         "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
@@ -85,6 +87,10 @@ def _print_usage() -> int:
         "goal-outcome <pair> --result R [--turns N] [--note ...] | "
         "cc | cc-doctor | eval [--live] [--slow] | "
         "graphify-contract | graphify-baseline build|controls|verify [PATH] | "
+        "graphify-native-extract [--out DIR] [--target DIR] [--token-budget N] "
+        "[--max-concurrency N] [--model NAME] [--backend NAME] "
+        "[--allow-parallel-claude-cli] [--cluster] "
+        "[--artifacts [VIEW...]] [--dry-run] | "
         "skillopt-contract | "
         "tool-sync <currency-tool-name> | "
         "skillopt-reviewed --packet P --target T --backend mock|handoff | "
@@ -171,6 +177,23 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_ops
 
         return graphify_ops.affected(repo_root, rest)
+    if cmd == "code-intel":
+        from kb_setup import code_intel
+
+        # Read-only, like `affected` just above: no graph write, so no
+        # `_GRAPH_WRITERS` membership and no pinned-graphify preflight (#276).
+        return code_intel.code_intel_main(repo_root, rest)
+    if cmd == "funnel":
+        from kb_setup import funnel
+
+        # A bare arm, not grouped into `_dispatch_graph_hygiene` below: that
+        # helper's members share "how big has this grown", and `funnel` asks a
+        # different question (did this branch's research reach `sources/**`).
+        # Left flat on the `pyproject.toml` per-file-ignore precedent this
+        # dispatcher already carries (`C901`/`PLR0911`/`PLR0912`/`PLR0915` for
+        # `cli.py`) — one more `if cmd == ...` arm is the intended shape here,
+        # not a ceiling to work around with a new grouping helper.
+        return funnel.main(repo_root, rest)
     if cmd in {"insights", "graph-size", "telemetry-prune"}:
         return _dispatch_graph_hygiene(repo_root, cmd, rest)
     if cmd == "serve":
@@ -215,6 +238,23 @@ def _run(argv: list[str] | None = None) -> int:
             print("kb-setup transcribe <audio-file>", file=sys.stderr)
             return 2
         return graphify_ops.transcribe(repo_root, rest[0])
+    # UNPARKED 2026-08-26. Removed 2026-08-24 so that three defects reachable
+    # ONLY through this branch and its mise task — `_parse`'s flag-swallowing
+    # (#479), the `GRAPHIFY_OUT` bypass of `_refuse_out` (#480), and the wholly
+    # untested `_run_real`/`_run_cluster` (#481) — could not be reached while
+    # they were fixed. All three are CLOSED; the module carries 70 tests, four
+    # of which drive `_run_real`/`_run_cluster` directly.
+    #
+    # It belongs HERE, in `_run`, and not beside the park's old comment: that
+    # comment had drifted into `_dispatch_contract`, which only ever receives
+    # `graphify-contract`/`graphify-baseline`/`skillopt-contract`. Restoring the
+    # branch where the comment sat produced code no caller could reach — caught
+    # by running `--help` against it, not by the type checker or the tests,
+    # both of which were green over the dead branch.
+    if cmd == "graphify-native-extract":
+        from kb_setup import graphify_native_extract
+
+        return graphify_native_extract.native_extract_main(repo_root, rest)
     return _dispatch_ops(repo_root, cmd, rest)
 
 
@@ -236,15 +276,12 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
             # `runtime_identity`; `verify` never runs Graphify.
             graphify_env.assert_pinned_graphify(repo_root)
         return graphify_baseline.baseline_main(repo_root, rest)
-    # `graphify-native-extract` was dispatched here until 2026-08-24 and is now
-    # PARKED: the module and its tests stay in the tree, but no CLI subcommand and
-    # no mise task reaches them, so `_parse`'s flag-swallowing (#479), the
-    # `GRAPHIFY_OUT` bypass of `_refuse_out` (#480), and the wholly untested
-    # `_run_real`/`_run_cluster` (#481) cannot be reached by a caller. All three
-    # were confirmed by the cold review of fa4ed551ac7e. Restore this branch and
-    # `[tasks.kb-graphify-native-extract]` together, and only once those three are
-    # closed — the module is a STOPGAP for the SDK path, not the destination
-    # (`docs/archive/README.md`), so reviving it is a decision, not a repair.
+    # `graphify-native-extract` was UNPARKED 2026-08-26 and its branch lives in
+    # `_run`, NOT here. The park's comment sat at this spot, which is misleading:
+    # this helper only ever receives `graphify-contract`, `graphify-baseline` and
+    # `skillopt-contract`, so a branch restored here would be unreachable — which
+    # is exactly what happened on the first attempt, green under ty and pytest
+    # alike, and caught only by running the command.
     from kb_setup import skillopt_contract
 
     return skillopt_contract.contract_main(repo_root)
@@ -525,7 +562,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | "
-        "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
+        "handoff-check [path] | gates [task...] [--stop] | check <path...> | funnel | "
         "session-state [--no-pr] | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
         "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "

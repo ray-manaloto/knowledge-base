@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# SURVEY CANDIDATE - 2026-08-26 diagram/tool funnel (sources/REGISTRY.md row 114+). Not a diagram tool - static API-surface diffing (griffe check ... -a <ref>). Quoted verdict: Recommend it, but as a separate ticket, not as part of the diagram work. Not run; proposed pin griffe==2.2.0 confirmed NOT present in pyproject.toml. Source: .agent/kb/reports/agents/diagram-tool-status-2026-08-26.md. EXTRACTION DEFERRED: kb-build is currently FAILING (#397/#417 detect-preflight) - this manifest only pins the source; REGISTRY.md Status stays manifest until a build succeeds.
+url = https://github.com/mkdocstrings/griffe
+ref = main
+commit = b450abb0b372f594271a017153a297c75651531a
+kind = code

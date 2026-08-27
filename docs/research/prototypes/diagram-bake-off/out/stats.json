@@ -1,0 +1,48 @@
+{
+  "code2flow": {
+    "wall_clock_s": 1.875,
+    "extra_edge_count": 109,
+    "total_edge_count": 113,
+    "code2flow_node_count": 1313,
+    "code2flow_edge_count": 1978,
+    "code2flow_skipped_call_sites": 51,
+    "code2flow_skipped_examples": [
+      "UNKNOWN_VAR.__init__()",
+      "UNKNOWN_VAR.render()",
+      "UNKNOWN_VAR.resolve()",
+      "_ESCAPES.format()",
+      "_REASON.format()",
+      "_REASON_BARE_PY.format()",
+      "_TEST_REQUIRED.format()",
+      "_run()"
+    ],
+    "code2flow_build_chain_edges": 109,
+    "bridge_note": "code2flow can't resolve graph.build() from _build_checked: the call crosses a function-LOCAL `from kb_setup import graph` (this codebase's deliberate lazy-import pattern), which defeats its static import resolution."
+  },
+  "mermaid-trace": {
+    "wall_clock_s": 0.096,
+    "extra_edge_count": 8,
+    "total_edge_count": 9,
+    "trace_real_command_rc": 127,
+    "trace_real_command_elapsed_s": 0.0216,
+    "trace_mmd_bytes": 525,
+    "trace_mmd_lines": 12,
+    "trace_is_sequence_diagram": true,
+    "bridge_note": "Shape B traces `kb-setup context`, not `kb-build` \u2014 running the real build arm would write graphify-out/graph.json, which this spike must never do (spec section 4)."
+  },
+  "graphify": {
+    "wall_clock_s": 7.541,
+    "extra_edge_count": 139,
+    "total_edge_count": 143,
+    "graphify_self_node_count": 7054,
+    "graphify_total_links_scanned": 1155720,
+    "graphify_calls_links_total": 299934,
+    "graphify_self_call_edges": 4364,
+    "graphify_self_nodes_with_call_edges": 2797,
+    "graphify_self_nodes_with_call_edges_pct": 39.7,
+    "graphify_pass1_node_scan_s": 3.68,
+    "graphify_pass2_link_scan_s": 3.7,
+    "graphify_build_chain_edges": 139,
+    "bridge_note": "_build_checked is ABSENT from `.self-graph` entirely (measured: 32 callable nodes extracted from cli.py total, not among them, despite existing at the graph's own built_at_commit) \u2014 a real extraction gap, not staleness."
+  }
+}

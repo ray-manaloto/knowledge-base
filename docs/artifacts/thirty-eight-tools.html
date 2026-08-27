@@ -1,0 +1,397 @@
+<title>Thirty-Eight Tools</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Spectral:ital,wght@0,400;0,500;1,400&family=Azeret+Mono:wght@400;500&display=swap">
+
+<style>
+  :root{
+    --ground:#eeedf1;
+    --panel:#ffffff;
+    --panel-2:#e2e0e8;
+    --edge:#cbc7d4;
+    --ink:#191622;
+    --ink-soft:#4f4a5e;
+    --ink-faint:#7d7789;
+    --plum:#6c3d84;
+    --plum-soft:#e9dff0;
+    --live:#186170;
+    --live-soft:#d5e8ec;
+    --gone:#6f6a7a;
+    --gone-soft:#dedbe4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#131019;
+      --panel:#1c1826;
+      --panel-2:#252032;
+      --edge:#372f47;
+      --ink:#e8e4ef;
+      --ink-soft:#aca5bc;
+      --ink-faint:#807a91;
+      --plum:#c08fd8;
+      --plum-soft:#2b1c37;
+      --live:#5cc0d4;
+      --live-soft:#0e2f36;
+      --gone:#8a8399;
+      --gone-soft:#262231;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#131019;
+    --panel:#1c1826;
+    --panel-2:#252032;
+    --edge:#372f47;
+    --ink:#e8e4ef;
+    --ink-soft:#aca5bc;
+    --ink-faint:#807a91;
+    --plum:#c08fd8;
+    --plum-soft:#2b1c37;
+    --live:#5cc0d4;
+    --live-soft:#0e2f36;
+    --gone:#8a8399;
+    --gone-soft:#262231;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Spectral",Georgia,serif; font-size:17px; line-height:1.63;
+    margin:0; padding:0 1.2rem 6rem;
+  }
+
+  .col{max-width:35rem; margin:0 auto; display:flex; flex-direction:column; gap:1.25rem}
+  .wide{max-width:60rem; margin:0 auto; width:100%}
+
+  h1,h2,h3{
+    font-family:"Familjen Grotesk",system-ui,sans-serif;
+    text-wrap:balance; margin:0; line-height:1.13;
+  }
+  h1{font-size:clamp(2.1rem,5.5vw,3.1rem); font-weight:700; letter-spacing:-.025em}
+  h2{font-size:1.45rem; font-weight:600; margin-top:1.8rem; letter-spacing:-.012em}
+  h3{font-size:1.02rem; font-weight:600}
+  p{margin:0}
+
+  .eyebrow{
+    font-family:"Azeret Mono",ui-monospace,monospace; font-size:.7rem;
+    letter-spacing:.15em; text-transform:uppercase; color:var(--plum); margin:0;
+  }
+  .lede{font-size:1.13rem; color:var(--ink-soft)}
+
+  code,.mono{font-family:"Azeret Mono",ui-monospace,monospace; font-size:.83em}
+  code{background:var(--panel-2); padding:.1em .34em; border-radius:2px}
+
+  header{padding:4rem 0 .4rem}
+  hr{border:0; border-top:1px solid var(--edge); margin:.3rem 0}
+
+  figure{margin:0; display:flex; flex-direction:column; gap:.8rem}
+  figure svg{width:100%; height:auto; display:block; color:var(--ink)}
+  figcaption{
+    font-size:.85rem; color:var(--ink-faint); max-width:35rem;
+    margin-inline:auto; text-align:center; text-wrap:balance;
+  }
+
+  .scroll{overflow-x:auto}
+
+  .panel{
+    background:var(--panel); border:1px solid var(--edge); border-radius:2px;
+    padding:1.05rem 1.15rem; display:flex; flex-direction:column; gap:.55rem;
+  }
+  .panel.plum{border-left:3px solid var(--plum)}
+  .panel.live{border-left:3px solid var(--live)}
+
+  table{border-collapse:collapse; width:100%; font-size:.87rem}
+  th,td{text-align:left; padding:.45rem .6rem; border-bottom:1px solid var(--edge); vertical-align:top}
+  th{
+    font-family:"Azeret Mono",ui-monospace,monospace; font-size:.67rem;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); font-weight:400;
+  }
+  td.num{font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap}
+  td.mono{font-family:"Azeret Mono",ui-monospace,monospace; font-size:.79rem}
+
+  .tag{
+    font-family:"Azeret Mono",ui-monospace,monospace; font-size:.66rem;
+    letter-spacing:.05em; text-transform:uppercase; padding:.14em .46em;
+    border-radius:2px; white-space:nowrap; font-weight:500;
+  }
+  .tag.proto{background:var(--live-soft); color:var(--live)}
+  .tag.pend{background:var(--plum-soft); color:var(--plum)}
+  .tag.gone{background:var(--gone-soft); color:var(--gone)}
+
+  .cite{font-size:.84rem; color:var(--ink-faint)}
+  blockquote{
+    margin:0; padding-left:.9rem; border-left:2px solid var(--plum);
+    font-style:italic; color:var(--ink-soft);
+  }
+
+  a{color:var(--plum)}
+  a:focus-visible,*:focus-visible{outline:2px solid var(--plum); outline-offset:2px}
+</style>
+
+<header class="col">
+  <p class="eyebrow">Tool survey &middot; measured 2026-08-26</p>
+  <h1>Thirty-eight tools</h1>
+  <p class="lede">Five were actually run. Sixteen were ruled out. And the reason
+  that ruled out the most promising survivor turns out to rest on something
+  later measurement refuted.</p>
+</header>
+
+<div class="col"><hr></div>
+
+<div class="col">
+  <p>The question was: <em>which of these have a real prototype, and which are
+  pending or eliminated?</em> Answering it meant reading four research reports,
+  two <code>/tmp</code> directories, a plan document and the open issue backlog
+  &mdash; because the answer had never been in one place.</p>
+
+  <p><strong>38 candidates.</strong> Here is where they sit.</p>
+</div>
+
+<div class="wide" style="margin:2rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 880 208" role="img" preserveAspectRatio="xMidYMid meet"
+       aria-label="Thirty-eight candidate tools divided by status: sixteen eliminated, ten evaluated but never run, six pending with no verdict, and six that were actually run. Of the six run, only three produced usable output on the real codebase; py2puml failed on the real target across seven attempts, and one library was disqualified on licensing.">
+    <g font-family="'Azeret Mono', ui-monospace, monospace">
+      <text x="10" y="20" font-size="10" fill="currentColor" opacity=".6">38 CANDIDATES &mdash; BY STATUS</text>
+
+      <!-- bar: 860px over 38 => 22.63px each -->
+      <rect x="10" y="36" width="362" height="34" fill="currentColor" opacity=".18"/>
+      <rect x="372" y="36" width="226" height="34" fill="currentColor" opacity=".30"/>
+      <rect x="598" y="36" width="136" height="34" fill="#6c3d84" opacity=".75"/>
+      <rect x="734" y="36" width="136" height="34" fill="#186170" opacity=".88"/>
+
+      <text x="191" y="58" text-anchor="middle" font-size="14" font-weight="500" fill="currentColor">16</text>
+      <text x="485" y="58" text-anchor="middle" font-size="14" font-weight="500" fill="currentColor">10</text>
+      <text x="666" y="58" text-anchor="middle" font-size="14" font-weight="500" fill="#ffffff">6</text>
+      <text x="802" y="58" text-anchor="middle" font-size="14" font-weight="500" fill="#ffffff">6</text>
+
+      <text x="191" y="87" text-anchor="middle" font-size="10" fill="currentColor" opacity=".75">ELIMINATED</text>
+      <text x="191" y="99" text-anchor="middle" font-size="9" fill="currentColor" opacity=".55">a verdict was reached</text>
+      <text x="485" y="87" text-anchor="middle" font-size="10" fill="currentColor" opacity=".75">EVALUATED ONLY</text>
+      <text x="485" y="99" text-anchor="middle" font-size="9" fill="currentColor" opacity=".55">never run</text>
+      <text x="666" y="87" text-anchor="middle" font-size="10" fill="#6c3d84">PENDING</text>
+      <text x="666" y="99" text-anchor="middle" font-size="9" fill="currentColor" opacity=".55">no verdict at all</text>
+      <text x="802" y="87" text-anchor="middle" font-size="10" fill="#186170">ACTUALLY RUN</text>
+
+      <!-- second row: what "actually run" really contains -->
+      <line x1="734" y1="112" x2="870" y2="112" stroke="#186170" stroke-width="1"/>
+      <path d="M 802 112 L 802 126 L 445 126 L 445 140" fill="none" stroke="#186170" stroke-width="1.2"/>
+
+      <text x="445" y="156" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7">and of those six &mdash;</text>
+
+      <rect x="120" y="166" width="200" height="30" rx="2" fill="none" stroke="#186170" stroke-width="1.4"/>
+      <text x="220" y="185" text-anchor="middle" font-size="10.5" fill="#186170">3 produced usable output</text>
+
+      <rect x="336" y="166" width="200" height="30" rx="2" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/>
+      <text x="436" y="185" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">1 failed on the real target</text>
+
+      <rect x="552" y="166" width="200" height="30" rx="2" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/>
+      <text x="652" y="185" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">2 disqualified after running</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption>Sixteen tools have a recorded verdict. Ten were assessed and never
+  run &mdash; a different and weaker state. Six have no verdict at all. Only six
+  were executed, and half of those did not survive contact with the real
+  codebase.</figcaption>
+</figure>
+</div>
+
+<div class="col">
+  <h2>The three that work</h2>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>tool</th><th>measured</th><th>the catch</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>code2flow</code> <span class="tag proto">runs</span></td>
+        <td>1,313 nodes / 1,978 edges in <strong>1.37 s</strong>; qualified <code>file::name</code> ids</td>
+        <td>no commit since <strong>2023-01-08</strong>; 51 call sites unresolvable through lazy imports</td>
+      </tr>
+      <tr>
+        <td><code>mermaid-trace</code> <span class="tag proto">runs</span></td>
+        <td><strong>0.02 s</strong></td>
+        <td>traces only what executed &mdash; blind to every path a run didn't take</td>
+      </tr>
+      <tr>
+        <td><code>graphify</code> <span class="tag proto">runs</span></td>
+        <td>7.5 s streaming 736 MB</td>
+        <td><strong>dropped a node</strong>; identity unqualified by default</td>
+      </tr>
+      <tr>
+        <td><code>py2puml</code> <span class="tag gone">fails</span></td>
+        <td>works on toy fixtures</td>
+        <td><strong>7 attempts, every one rc=1</strong> &mdash; its resolver can't follow <code>Result[T]</code>, and this codebase uses that everywhere</td>
+      </tr>
+      <tr>
+        <td><code>sequenceDiagram</code> <span class="tag gone">disqualified</span></td>
+        <td>real sequence traces + HTML</td>
+        <td><code>resetseq()</code> is a no-op; crashes on numeric args; <strong>0-byte LICENSE</strong></td>
+      </tr>
+      <tr>
+        <td><code>pydoctrace</code> <span class="tag proto">ran, rc=0</span></td>
+        <td>PlantUML sequence + component, both written</td>
+        <td>output landed outside both evidence directories &mdash; not re-verifiable here</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="cite">That <code>sequenceDiagram</code> row is worth pausing on: the
+  library was recalled from memory as a candidate, confirmed to exist, run
+  successfully &mdash; and then disqualified on a <strong>zero-byte
+  LICENSE</strong>. It works and cannot be used.</p>
+</div>
+
+<div class="col">
+  <h2>The reason that expired</h2>
+
+  <p>The most promising untried path is <strong>type-aware analysis via a
+  language server</strong> &mdash; the only approach that can follow a value
+  <em>across</em> a function boundary, which is the exact gap every AST tool
+  shares.</p>
+
+  <p>It was ruled out. The reason, verbatim:</p>
+
+  <blockquote>REJECT: LSP call-hierarchy &mdash; python-only, needs a live
+  server, <strong>strictly weaker than the AST graph we own</strong>.</blockquote>
+
+  <p>Two of those three clauses still hold. The third does not.</p>
+</div>
+
+<div class="wide" style="margin:1.9rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 880 250" role="img" preserveAspectRatio="xMidYMid meet"
+       aria-label="The rejection reason claimed the AST graph is a stronger baseline than a language server. Three measurements taken after that claim was written contradict it: the AST graph drops 43 percent of one package's functions, it dropped a specific node in the bake-off, and it resolves only 2 config-read edges across the whole tree. All three are failures that cross a function or scope boundary, which is the thing a language server is for.">
+    <g font-family="'Azeret Mono', ui-monospace, monospace">
+
+      <text x="10" y="20" font-size="10" fill="currentColor" opacity=".6">THE CLAIM, AND WHAT WAS MEASURED AFTER IT</text>
+
+      <!-- the claim -->
+      <rect x="10" y="34" width="330" height="52" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="175" y="55" text-anchor="middle" font-size="10.5" fill="currentColor">&ldquo;strictly weaker than</text>
+      <text x="175" y="70" text-anchor="middle" font-size="10.5" fill="currentColor">the AST graph we own&rdquo;</text>
+      <text x="175" y="100" text-anchor="middle" font-size="9" fill="currentColor" opacity=".6">written 2026-08-24</text>
+
+      <!-- arrow to the evidence -->
+      <line x1="340" y1="60" x2="378" y2="60" stroke="#6c3d84" stroke-width="1.4"/>
+      <text x="359" y="52" text-anchor="middle" font-size="8.5" fill="#6c3d84">rests on</text>
+
+      <!-- the baseline it assumes -->
+      <rect x="384" y="34" width="200" height="52" rx="2" fill="none" stroke="#6c3d84" stroke-width="1.4"/>
+      <text x="484" y="57" text-anchor="middle" font-size="10.5" fill="#6c3d84">the AST graph is</text>
+      <text x="484" y="72" text-anchor="middle" font-size="10.5" fill="#6c3d84">a strong baseline</text>
+
+      <!-- three refutations -->
+      <line x1="484" y1="86" x2="484" y2="106" stroke="currentColor" stroke-width="1.2" opacity=".5"/>
+      <text x="600" y="102" font-size="9.5" fill="currentColor" opacity=".7">measured AFTER that was written:</text>
+
+      <line x1="150" y1="120" x2="810" y2="120" stroke="currentColor" stroke-width="1" opacity=".25"/>
+
+      <rect x="26" y="136" width="252" height="58" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="152" y="156" text-anchor="middle" font-size="16" font-weight="500" fill="currentColor">43%</text>
+      <text x="152" y="172" text-anchor="middle" font-size="9.5" fill="currentColor">of one package's functions</text>
+      <text x="152" y="185" text-anchor="middle" font-size="9.5" fill="currentColor">absent from the graph</text>
+
+      <rect x="298" y="136" width="252" height="58" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="424" y="156" text-anchor="middle" font-size="13" font-weight="500" fill="currentColor">_build_checked</text>
+      <text x="424" y="172" text-anchor="middle" font-size="9.5" fill="currentColor">the node itself dropped,</text>
+      <text x="424" y="185" text-anchor="middle" font-size="9.5" fill="currentColor">not merely its edges</text>
+
+      <rect x="570" y="136" width="252" height="58" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="696" y="156" text-anchor="middle" font-size="16" font-weight="500" fill="currentColor">2</text>
+      <text x="696" y="172" text-anchor="middle" font-size="9.5" fill="currentColor">config-read edges resolved</text>
+      <text x="696" y="185" text-anchor="middle" font-size="9.5" fill="currentColor">across the whole tree</text>
+
+      <!-- the common cause -->
+      <line x1="152" y1="194" x2="152" y2="210" stroke="#6c3d84" stroke-width="1.2"/>
+      <line x1="424" y1="194" x2="424" y2="210" stroke="#6c3d84" stroke-width="1.2"/>
+      <line x1="696" y1="194" x2="696" y2="210" stroke="#6c3d84" stroke-width="1.2"/>
+      <line x1="152" y1="210" x2="696" y2="210" stroke="#6c3d84" stroke-width="1.2"/>
+      <line x1="424" y1="210" x2="424" y2="222" stroke="#6c3d84" stroke-width="1.2"/>
+
+      <text x="424" y="238" text-anchor="middle" font-size="11" font-weight="500" fill="#6c3d84">all three cross a scope or function boundary &mdash; the thing an LSP is for</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption>The rejection was sound reasoning from a premise that later
+  measurement contradicted. The AST graph is not the strong baseline the reason
+  assumed &mdash; and every one of its three measured holes is the kind of
+  boundary a type-aware language server exists to cross.</figcaption>
+</figure>
+</div>
+
+<div class="col">
+  <div class="panel plum">
+    <h3>And <code>ty</code> was never the thing that was rejected</h3>
+    <p style="color:var(--ink-soft)">The verdict covers the generic
+    <code>pylsp</code>/<code>pyright</code> category. <strong><code>ty</code> is
+    not named in any of the four research reports</strong> or the tool survey.
+    It is <span class="tag pend">pending</span> &mdash; never probed, and already
+    pinned in this repo.</p>
+    <p style="color:var(--ink-soft)">Meanwhile <strong>issue #276</strong>, open
+    since 2026-08-11 and filed <em>thirteen days before</em> that rejection,
+    specifies a full <code>ty</code>-based pipeline with twelve acceptance
+    criteria and eight control arms &mdash; and appears in none of the reports
+    that rejected the category it belongs to.</p>
+  </div>
+</div>
+
+<div class="col">
+  <h2>What the elimination list is actually made of</h2>
+
+  <p>Worth knowing, because "eliminated" reads as one thing and is several:</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>reason</th><th>tools</th></tr></thead>
+    <tbody>
+      <tr><td>a strict subset of edges graphify already produces</td>
+          <td><code>pydeps</code>, <code>pyan3</code>, <code>py2puml</code></td></tr>
+      <tr><td>dormant &mdash; no commits for years</td>
+          <td><code>documentation.js</code>, <code>madge</code></td></tr>
+      <tr><td>its principal consumer is archived</td>
+          <td><code>tree-sitter-graph</code></td></tr>
+      <tr><td>a squatted 0.0.0 stub on PyPI</td>
+          <td><code>pylint-pyreverse</code></td></tr>
+      <tr><td>collides with a standing project invariant</td>
+          <td><code>CodeBoarding</code></td></tr>
+      <tr><td>a silent-drop bug in the tool itself</td>
+          <td><code>pdgen</code></td></tr>
+      <tr><td><strong>a premise later refuted</strong></td>
+          <td><strong>LSP call-hierarchy</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p><strong>Nothing in the candidate set is pinned.</strong> Confirmed against
+  <code>pyproject.toml</code>, <code>mise.toml</code> and a per-name
+  <code>uv.lock</code> scan &mdash; so there is no dormant dependency quietly
+  carrying this capability. The 2026-08-24 research recommended building in-repo
+  with zero new dependencies, and nothing was built.</p>
+</div>
+
+<div class="col" style="margin-top:2.3rem">
+  <hr>
+  <p class="cite"><strong>Provenance.</strong> Statuses and counts come from
+  <code>.agent/kb/reports/agents/diagram-tool-status-2026-08-26.md</code> and
+  <code>tool-gap-sweep-2026-08-26.md</code>, both produced this session; the
+  38-row total was re-derived by the report from its own table rather than
+  retyped. Elimination reasons are quoted verbatim, because a paraphrased reason
+  cannot be re-examined later &mdash; which is precisely what this page's central
+  finding depends on. The 43% figure and the <code>_build_checked</code> drop are
+  <strong>inherited</strong> from issue #478 and the 2026-08-24 bake-off
+  respectively, and are labelled rather than re-measured here. The 2-config-edge
+  figure was re-derived this session from the promoted prototype.</p>
+
+  <p class="cite"><strong>Skills used:</strong> <code>artifact-design</code>,
+  <code>artifact-diagramming</code>, <code>artifact-capabilities</code> (read;
+  <strong>none declared</strong> &mdash; static page).
+  <strong>Considered and not used:</strong> <code>dataviz</code> &mdash; the two
+  figures are a taxonomy and an argument, not charts of a dataset;
+  <code>design</code> &mdash; multi-artboard canvas, wrong deliverable;
+  <code>eli5:eli5</code> &mdash; superseded here by this repo's own
+  <code>eli5-visual</code> skill, which carries the persistence and honesty rules
+  it lacks.</p>
+</div>

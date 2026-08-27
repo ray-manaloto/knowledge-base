@@ -1,0 +1,14 @@
+sequenceDiagram
+    title Log Flow
+    autonumber
+
+Unknown->>cli:  Run(['context'])
+cli->>context_usage: Main([], PosixPath('/private/tmp/diagram-proto'))
+context_usage->>PosixPath: Measure(PosixPath('/private/tmp/diagram-proto'))
+PosixPath->>PosixPath: Own Transcript(PosixPath('/private/tmp/diagram-proto'), None)
+PosixPath-->>PosixPath: Return: None
+PosixPath-->>context_usage: Return: None
+context_usage->>NoneType: Render(None)
+NoneType-->>context_usage: Return: (#34;context: NOT MEASURABL...uestion was not asked'....
+context_usage-->>cli: Return: 127
+cli-->>Unknown: Return: 127

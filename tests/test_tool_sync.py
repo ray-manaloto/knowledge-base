@@ -304,10 +304,19 @@ def test_live_eligibility_census_is_exactly_the_two_mise_only_pins() -> None:
     plugin and the CLI under different version series, so an upstream comparison
     there would be wrong rather than merely absent — and that omission does not
     disqualify it here.
+
+    **It grew again on 2026-08-26**, the same way: `[tool.coreutils]` was added
+    to `currency.toml` alongside `"conda:coreutils"` in `mise.toml` (a project
+    pin closing the macOS-BSD-vs-GNU gap, see
+    `.claude/rules/long-running-command-hangs.md` rule 3a), and it is a
+    mise-only, presence-only pin exactly like `ffmpeg` — no `python_package`,
+    no `manifest`, no `skill_dir`, an exact numeric pin. It qualifies for the
+    same reason `ffmpeg` does, and the tuple moves again rather than loosening.
     """
     repo_root = Path(__file__).parents[1]
     assert tool_sync.eligible_tools(repo_root) == (
         "antigravity-cli",
+        "coreutils",
         "ctx7",
         "ffmpeg",
         "firecrawl-cli",

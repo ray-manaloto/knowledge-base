@@ -1,0 +1,50 @@
+Traceback (most recent call last):
+  File "/Users/rmanaloto/Library/Caches/uv/builds-v0/.tmpNiErPt/bin/py2puml", line 10, in <module>
+    sys.exit(run())
+             ~~~^^
+  File "/Users/rmanaloto/Library/Caches/uv/archive-v0/WdCk3W-NpWoDxv2H/lib/python3.14/site-packages/py2puml/__main__.py", line 5, in run
+    InspectorController().inspect()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/rmanaloto/Library/Caches/uv/archive-v0/WdCk3W-NpWoDxv2H/lib/python3.14/site-packages/py2puml/controller.py", line 120, in inspect
+    for plantuml_line in Inspector(
+                         ~~~~~~~~~~
+        inspection_working_directory, root_domain_path, root_domain_namespace
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ).inspect(Inspection({}, [])):
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rmanaloto/Library/Caches/uv/archive-v0/WdCk3W-NpWoDxv2H/lib/python3.14/site-packages/py2puml/inspector.py", line 30, in inspect
+    self._inspect_package(self.root_domain_path, self.root_domain_namespace, inspection)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rmanaloto/Library/Caches/uv/archive-v0/WdCk3W-NpWoDxv2H/lib/python3.14/site-packages/py2puml/inspector.py", line 49, in _inspect_package
+    self._inspect_module(module_name, inspection)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rmanaloto/Library/Caches/uv/archive-v0/WdCk3W-NpWoDxv2H/lib/python3.14/site-packages/py2puml/inspector.py", line 54, in _inspect_module
+    inspect_domain_definition(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        definition, self.root_domain_namespace, inspection.items_by_fqn, inspection.relations
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rmanaloto/Library/Caches/uv/archive-v0/WdCk3W-NpWoDxv2H/lib/python3.14/site-packages/py2puml/inspection/inspectmodule.py", line 48, in inspect_domain_definition
+    inspect_class_type(
+    ~~~~~~~~~~~~~~~~~~^
+        definition_type, definition_type_fqn, root_module_name, domain_items_by_fqn, domain_relations
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rmanaloto/Library/Caches/uv/archive-v0/WdCk3W-NpWoDxv2H/lib/python3.14/site-packages/py2puml/inspection/inspectclass.py", line 97, in inspect_class_type
+    attributes = inspect_static_attributes(
+        class_type, class_type_fqn, root_module_name, domain_items_by_fqn, domain_relations
+    )
+  File "/Users/rmanaloto/Library/Caches/uv/archive-v0/WdCk3W-NpWoDxv2H/lib/python3.14/site-packages/py2puml/inspection/inspectclass.py", line 71, in inspect_static_attributes
+    attr_type, full_namespaced_definitions = shorten_compound_type_annotation(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        attr_raw_type, module_resolver
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rmanaloto/Library/Caches/uv/archive-v0/WdCk3W-NpWoDxv2H/lib/python3.14/site-packages/py2puml/parsing/astvisitors.py", line 220, in shorten_compound_type_annotation
+    raise ValueError(
+        f'Could not resolve type {compound_type_part} in module {module_resolver.module}: it needs to be imported explicitly.'
+    )
+ValueError: Could not resolve type 1 in module <module 'kb_setup.generated.source_groups' from '/private/tmp/tool-forensics/kb_setup_copy/kb_setup/generated/source_groups.py'>: it needs to be imported explicitly.

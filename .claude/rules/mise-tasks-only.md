@@ -27,6 +27,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | `gh pr create` (+ push + gates by hand) | `mise run kb-ship` |
 | `gh pr merge` (+ watch + validate by hand) | `mise run kb-land -- <PR#>` |
 | a manual version-drift check | `mise run kb-currency-check` (offline) / `mise run kb-currency` |
+| eyeballing whether a branch's research reached the corpus, or trusting the PR body's word for it | `mise run funnel` (`kb_setup.funnel`) — a SHIP GATE; `drift` means a `docs/research/**`/`docs/artifacts/**` delta with nothing under `sources/**` and no `Funnel-exempt: <reason>` commit trailer |
 | guessing which process rewrote a tracked file, then reproducing candidates one at a time | `mise run kb-attribute-write -- <path> [--window N]` — what the transcripts recorded around that file's mtime, nearest first. Built because guessing does not converge: `.codex/config.toml` was rewritten on 2026-08-18 (#399) and 2026-08-20, and **eleven** candidate writers were refuted by reproduction across the two, none of them the writer. Advisory, in no gate; it returns CANDIDATES, and it REFUSES rather than returning an empty list when nothing was *examined* |
 | hand-writing the same throwaway probe again, or eyeballing a transcript for "what should have been a task" | `mise run kb-distill` — proposes a `skill -> task -> module` triple for any script shape written twice (#219). The producing half of Ray's directive; `kb-skill-lint` is the policing half. Advisory, always rc 0, **never a gate** |
 | judging a skill by eye, or a raw `plugin-eval score` | `mise run kb-skill-score [-- [--write] <skill>...]` — advisory on findings (a score never fails a gate) but **rc 2 on a malformed request**, e.g. a skill name matching nothing; names WHICH plugin-eval copy scored you, since two scorers are not comparable |
@@ -110,16 +111,23 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
    See `research-doc-sources.md` step 0 for the scope.
 2c. **The SAME hook also denies a probe whose command word is not installed
    here** (`kb_setup.absent_binary`, Ray's ruling 2026-08-18). `timeout` /
-   `gtimeout` / `nproc` / `tac` are GNU coreutils and absent on macOS; a probe
-   using one dies with `command not found` (**rc 127**) and reads in a transcript
-   as the thing under test failing. It nearly produced a false *"codex
-   unavailable"*. Host-conditional via `shutil.which`, so it is inert where the
-   binary exists; `command -v` / `which` / `type` are never denied, being the
-   control arm. It runs LAST of the four stateless Bash guards — a command
-   tripping this AND a gate redirect reports the gate, which is about what the
-   author meant to do. Shares `check_first`'s tokeniser (`segments` /
-   `command_word`, promoted to public for exactly this) rather than carrying a
-   second copy to drift. See `long-running-command-hangs.md` rule 3a.
+   `gtimeout` / `nproc` / `tac` are GNU coreutils, absent from macOS's BSD
+   userland by default; a probe using one dies with `command not found`
+   (**rc 127**) and reads in a transcript as the thing under test failing. It
+   nearly produced a false *"codex unavailable"*. Host-conditional via
+   `shutil.which`, so it falls silent wherever the binary resolves AND runs —
+   which, since `"conda:coreutils"` was pinned in `mise.toml` 2026-08-26, is now
+   `timeout`/`nproc`/`tac` **in this project**. `gtimeout` still denies here
+   (coreutils never installs that Homebrew name), which is the control arm
+   proving the guard did not just go blind — a repo or a host with no such pin
+   still denies all four exactly as before. `command -v` / `which` / `type` are
+   never denied, being the other control arm. It runs LAST of the four stateless
+   Bash guards — a command tripping this AND a gate redirect reports the gate,
+   which is about what the author meant to do. Shares `check_first`'s tokeniser
+   (`segments` / `command_word`, promoted to public for exactly this) rather
+   than carrying a second copy to drift. See `long-running-command-hangs.md`
+   rule 3a for the full story, and why a resolvable `timeout` still is not the
+   first reach.
 2d. **The SAME hook also denies a command that would PRINT a credential value**
    (`kb_setup.secret_guard`, #441). `fnox get`/`export`, `fnox list --values`,
    `doppler secrets get`/`download`, bare `doppler secrets` (its default prints

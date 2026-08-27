@@ -26,7 +26,8 @@ mise task — never a command that lives only in someone's shell history. If you
 add a workflow step later, add its hk equivalent in the same change.
 
 `kb_setup.gates.GATE_TASKS` is the list `mise run kb-ship` actually enforces
-(`lint`, `test`, `brain-audit`, `eval`). The review receipt is checked BEFORE
+(`lint`, `test`, `brain-audit`, `eval`, `graph-size`, `hk-test`, `funnel`). The
+review receipt is checked BEFORE
 that list and again before the push; the handoff for the current branch is
 checked in between (#149, and it SKIPS out loud when no handoff records this
 branch). A gate that is not in that list, and not an hk step reached by `lint`,

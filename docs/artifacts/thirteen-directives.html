@@ -1,0 +1,255 @@
+<title>Thirteen Directives</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Sora:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap">
+
+<style>
+  :root{
+    --ground:#f4f3ef;
+    --panel:#ffffff;
+    --panel-2:#e8e6df;
+    --edge:#cfccc1;
+    --ink:#1d1c17;
+    --ink-soft:#54524a;
+    --ink-faint:#838075;
+    --done:#2d6b3f;
+    --done-soft:#dceadf;
+    --part:#96650f;
+    --part-soft:#f4e8d2;
+    --open:#7c7a70;
+    --open-soft:#e4e2da;
+    --accent:#2f4f7a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#16150f;
+      --panel:#1f1e17;
+      --panel-2:#292820;
+      --edge:#3b392e;
+      --ink:#eceade;
+      --ink-soft:#b0ad9d;
+      --ink-faint:#85826f;
+      --done:#69c184;
+      --done-soft:#14301c;
+      --part:#dda63f;
+      --part-soft:#332611;
+      --open:#8f8c7d;
+      --open-soft:#2a281f;
+      --accent:#88aede;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#16150f;
+    --panel:#1f1e17;
+    --panel-2:#292820;
+    --edge:#3b392e;
+    --ink:#eceade;
+    --ink-soft:#b0ad9d;
+    --ink-faint:#85826f;
+    --done:#69c184;
+    --done-soft:#14301c;
+    --part:#dda63f;
+    --part-soft:#332611;
+    --open:#8f8c7d;
+    --open-soft:#2a281f;
+    --accent:#88aede;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Sora",system-ui,sans-serif; font-size:16px; line-height:1.6;
+    margin:0; padding:0 1.2rem 6rem;
+  }
+
+  .col{max-width:38rem; margin:0 auto; display:flex; flex-direction:column; gap:1.2rem}
+  .wide{max-width:58rem; margin:0 auto; width:100%}
+
+  h1{font-family:"Archivo Black",system-ui,sans-serif; font-size:clamp(2rem,5.4vw,3rem);
+     letter-spacing:-.02em; line-height:1.05; margin:0; text-wrap:balance}
+  h2{font-family:"Archivo Black",system-ui,sans-serif; font-size:1.25rem; margin:1.7rem 0 0;
+     letter-spacing:-.01em; text-wrap:balance}
+  h3{font-family:"Sora",system-ui,sans-serif; font-size:.98rem; font-weight:600; margin:0}
+  p{margin:0}
+
+  .eyebrow{font-family:"Roboto Mono",ui-monospace,monospace; font-size:.7rem;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--accent); margin:0}
+  .lede{font-size:1.1rem; color:var(--ink-soft)}
+
+  code,.mono{font-family:"Roboto Mono",ui-monospace,monospace; font-size:.85em}
+  code{background:var(--panel-2); padding:.1em .34em; border-radius:2px}
+
+  header{padding:4rem 0 .4rem}
+  hr{border:0; border-top:1px solid var(--edge); margin:.3rem 0}
+
+  figure{margin:0; display:flex; flex-direction:column; gap:.8rem}
+  figure svg{width:100%; height:auto; display:block; color:var(--ink)}
+  figcaption{font-size:.84rem; color:var(--ink-faint); max-width:38rem;
+    margin-inline:auto; text-align:center; text-wrap:balance}
+
+  .scroll{overflow-x:auto}
+
+  .panel{background:var(--panel); border:1px solid var(--edge); border-radius:2px;
+    padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.5rem}
+  .panel.accent{border-left:3px solid var(--accent)}
+
+  ol.items{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.85rem}
+  ol.items li{
+    display:grid; grid-template-columns:2rem 1fr; gap:.7rem; align-items:start;
+    background:var(--panel); border:1px solid var(--edge); border-radius:2px;
+    padding:.7rem .85rem;
+  }
+  .box{font-family:"Roboto Mono",ui-monospace,monospace; font-weight:500; font-size:1rem; line-height:1.5}
+  .box.d{color:var(--done)}
+  .box.p{color:var(--part)}
+  .box.o{color:var(--open)}
+  .ask{font-weight:500}
+  .out{display:block; color:var(--ink-soft); font-size:.9rem; margin-top:.25rem}
+  .ref{
+    display:inline-block; font-family:"Roboto Mono",ui-monospace,monospace;
+    font-size:.7rem; letter-spacing:.03em; padding:.1em .42em; border-radius:2px;
+    margin-top:.35rem; margin-right:.3rem;
+  }
+  .ref.d{background:var(--done-soft); color:var(--done)}
+  .ref.p{background:var(--part-soft); color:var(--part)}
+  .ref.o{background:var(--open-soft); color:var(--open)}
+
+  .cite{font-size:.83rem; color:var(--ink-faint)}
+  a{color:var(--accent)}
+  a:focus-visible,*:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+</style>
+
+<header class="col">
+  <p class="eyebrow">Directive tracking &middot; 2026-08-26</p>
+  <h1>Thirteen directives</h1>
+  <p class="lede">Every item asked for on 2026-08-26, what became of it, and
+  where the work now lives. Four are done, four partly, five are filed and
+  waiting.</p>
+</header>
+
+<div class="col"><hr></div>
+
+<div class="wide" style="margin:1.6rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 860 122" role="img" preserveAspectRatio="xMidYMid meet"
+       aria-label="Thirteen directive items divided by outcome: four answered in full, four partly answered, and five filed as tracked issues awaiting a round of their own. Nothing was dropped.">
+    <g font-family="'Roboto Mono', ui-monospace, monospace">
+      <text x="8" y="18" font-size="10" fill="currentColor" opacity=".6">13 ITEMS &mdash; WHERE EACH ONE LANDED</text>
+
+      <rect x="8" y="32" width="262" height="32" fill="#2d6b3f" opacity=".85"/>
+      <rect x="270" y="32" width="262" height="32" fill="#96650f" opacity=".8"/>
+      <rect x="532" y="32" width="320" height="32" fill="currentColor" opacity=".2"/>
+
+      <text x="139" y="53" text-anchor="middle" font-size="13" font-weight="500" fill="#ffffff">4</text>
+      <text x="401" y="53" text-anchor="middle" font-size="13" font-weight="500" fill="#ffffff">4</text>
+      <text x="692" y="53" text-anchor="middle" font-size="13" font-weight="500" fill="currentColor">5</text>
+
+      <text x="139" y="82" text-anchor="middle" font-size="10" fill="#2d6b3f">ANSWERED IN FULL</text>
+      <text x="401" y="82" text-anchor="middle" font-size="10" fill="#96650f">PARTLY &mdash; the rest is filed</text>
+      <text x="692" y="82" text-anchor="middle" font-size="10" fill="currentColor" opacity=".75">FILED, AWAITING A ROUND</text>
+
+      <line x1="8" y1="100" x2="852" y2="100" stroke="currentColor" stroke-width="1" opacity=".25"/>
+      <text x="430" y="116" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">nothing was dropped &mdash; every item is either answered or has an issue number</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption>The split. &ldquo;Filed&rdquo; is not a euphemism for dropped:
+  each of the five carries a written issue with the measured context needed to
+  pick it up cold.</figcaption>
+</figure>
+</div>
+
+<div class="col">
+  <h2>The thirteen</h2>
+  <p class="cite">✓ answered &middot; ◐ partly &middot; ○ filed</p>
+
+  <ol class="items">
+    <li><span class="box o">○</span><span class="ask">1 &mdash; Build a true doctor command
+      <span class="out">Dependency doctors (<code>mise doctor</code>, <code>uv check</code>…), task-per-graphify-command coverage, currency map status, hk, branch-not-main, and <strong>structured output our code can act on</strong>. Specced in full, including the three-state verdict rule and the session-review lane that keeps adding checks. Not built &mdash; it is round-sized.</span>
+      <span class="ref o">#525</span></span></li>
+
+    <li><span class="box d">✓</span><span class="ask">2 &mdash; &ldquo;project-Claude-only&rdquo; is incorrect
+      <span class="out">Correct, and it was mine. This repo runs codex lanes, antigravity reviews, and an <code>openai-cli</code> backend. Corrected in public. The antigravity skill genuinely is not installed anywhere &mdash; <code>~/.gemini/config/skills/graphify</code> does not exist &mdash; and automating it alongside the two existing <code>.graphify_version</code> stamps is filed.</span>
+      <span class="ref d">#522 corrected</span><span class="ref d">#526</span></span></li>
+
+    <li><span class="box d">✓</span><span class="ask">3 &mdash; What are the &ldquo;6 invariant-banned verbs&rdquo;?
+      <span class="out"><strong>There are 2.</strong> <code>global list</code> and <code>global path</code> are read-only calls the rules explicitly permit; <code>global remove</code> is not named; and <code>watch</code> is a verb <code>do-not.md</code> <em>already corrected itself about</em> in the very entry that was misread. Your instinct that the rules need revisiting is filed with both worked examples.</span>
+      <span class="ref d">#527</span></span></li>
+
+    <li><span class="box o">○</span><span class="ask">4 &mdash; Evaluate Pyrefly beside <code>ty</code>
+      <span class="out">Filed, including the request that the two blog posts be <strong>deep-extracted and reflected on</strong> rather than hand-read. Live context: <code>ty</code> is pinned at 0.0.74 and its server already ships call and type hierarchy natively.</span>
+      <span class="ref o">#528 · A</span></span></li>
+
+    <li><span class="box o">○</span><span class="ask">5 &mdash; Implement #509 + a daily research brief
+      <span class="out">Filed. The recurring agent-team brief is the harder half &mdash; it needs a schedule, a synthesis step, and a durable home for its output.</span>
+      <span class="ref o">#528 · B</span></span></li>
+
+    <li><span class="box o">○</span><span class="ask">6 &mdash; Research graphify's issues/PRs/discussions, automated
+      <span class="out">Filed with your &ldquo;report every command run&rdquo; requirement carried verbatim, plus the trap that <code>gh search</code> returns <code>[]</code> instead of erroring. Two findings from today are already upstream candidates.</span>
+      <span class="ref o">#528 · C</span></span></li>
+
+    <li><span class="box d">✓</span><span class="ask">7 &mdash; Are we properly using the deep extraction, reflection and artifacts?
+      <span class="out"><strong>No, and it is quantified.</strong> The 13,442-node extraction of graphify's own source was used <strong>zero times</strong> &mdash; while three separate lanes were dispatched to read graphify source by hand. Its wiki, report, callflow and 14,125 Obsidian notes: zero. One graph query all round, malformed.</span>
+      <span class="ref d">answered</span></span></li>
+
+    <li><span class="box d">✓</span><span class="ask">8 &mdash; Are the communities/nodes/edges properly connected?
+      <span class="out"><strong>Structurally, no.</strong> 0 edges between the AST and semantic layers; 0 cross-source edges across 40 namespaces. It works as a retrieval index and not as a traversable graph. <code>code_intel</code> now produces 449 edges that <em>would</em> span layers &mdash; and they cannot enter, because no honest <code>_origin</code> tier exists for them.</span>
+      <span class="ref d">answered</span><span class="ref d">#524</span></span></li>
+
+    <li><span class="box o">○</span><span class="ask">9 &mdash; AST/LSP tooling for config files
+      <span class="out">Filed. The live gap is concrete: the config lane finds <strong>2</strong> edges tree-wide because paths are parameterised. Wider than <code>ty</code> &mdash; TOML and PKL have their own tooling.</span>
+      <span class="ref o">#528 · D</span></span></li>
+
+    <li><span class="box p">◐</span><span class="ask">10 &mdash; Generate and keep in sync the table and the diagrams
+      <span class="out"><strong>The data now exists</strong> &mdash; <code>kb_setup.code_intel</code>, five lanes, 449 provenance-tagged edges, 7/7 mutation arms. What does not exist is the rendering and, harder, the <strong>sync</strong>: what makes a published diagram regenerate when code moves.</span>
+      <span class="ref p">shipped</span><span class="ref o">#523</span></span></li>
+
+    <li><span class="box p">◐</span><span class="ask">11 &mdash; Use graphify's PR capabilities
+      <span class="out"><code>graphify prs --triage</code> found documented in graphify's own README &mdash; by querying the corpus, which is also how we learned one of #522's &ldquo;undocumented&rdquo; verbs isn't.</span>
+      <span class="ref p">#522 updated</span><span class="ref o">#528 · F</span></span></li>
+
+    <li><span class="box p">◐</span><span class="ask">12 &mdash; Coin verbs to stop retyping the long chain
+      <span class="out"><strong>Proposed: <code>rail</code>.</strong> On the rail = all four links exist; off the rail = a hand-run command that bypasses it. <code>lane</code>, <code>seam</code> and <code>gate</code> are all taken here. <strong>Awaiting your agreement</strong> &mdash; a term only works if both of us use it. It would be this repo's first <code>CONTEXT.md</code> entry.</span>
+      <span class="ref p">needs you</span><span class="ref o">#528 · G</span></span></li>
+
+    <li><span class="box p">◐</span><span class="ask">13 &mdash; A checkbox list the codex lane reviews
+      <span class="out">This page is the list. The <strong>codex compliance review has not run</strong> &mdash; the one item on your list that has not moved at all, and it is scoped and ready: your prompt verbatim + the full diff + these artifact URLs, three numbered lists, tracked at <code>docs/review/</code>.</span>
+      <span class="ref p">this page</span><span class="ref o">review pending</span></span></li>
+  </ol>
+</div>
+
+<div class="col">
+  <div class="panel accent">
+    <h3>The honest summary of the two answered questions</h3>
+    <p style="color:var(--ink-soft)">Items 7 and 8 were the ones that asked
+    whether the project is working, and both answers are uncomfortable. The
+    corpus paid for itself once, in August, and has been idle since &mdash;
+    including in a round that dispatched three agents to read the exact source
+    it already indexes. And the graph has no edges crossing its own layers, so
+    the connections most worth traversing to <em>are not there to traverse</em>.</p>
+    <p style="color:var(--ink-soft)">Both are fixable and both now have a
+    specific first move: learn to query it properly (one <code>--prose --idf</code>
+    query this round returned 16 sharp hits where an unflagged one returned 2,204
+    nodes of noise), and give the cross-layer edges an honest way in.</p>
+  </div>
+</div>
+
+<div class="col" style="margin-top:2.2rem">
+  <hr>
+  <p class="cite"><strong>Provenance.</strong> Every count on this page was
+  measured this session on branch
+  <code>round/2026-08-26-a-graphify-coverage</code>. The edge counts come from
+  running <code>kb-setup code-intel</code>; the 7/7 arm result from
+  <code>mise run kb-arms</code>; the layer-connectivity figures (0 AST↔semantic
+  edges, 0 cross-source edges) are <strong>inherited</strong> from prior
+  control-armed measurements and are labelled rather than re-derived here. Issue
+  states were read from the GitHub API.</p>
+
+  <p class="cite"><strong>Skills used:</strong> <code>artifact-design</code>,
+  <code>artifact-diagramming</code>, <code>artifact-capabilities</code> (read;
+  <strong>none declared</strong>). <strong>Considered and not used:</strong>
+  <code>dataviz</code> &mdash; the single figure is a proportion, not a dataset;
+  <code>design</code> &mdash; wrong deliverable; <code>goal-engineering</code>
+  &mdash; it audits completion conditions for agent loops, and this is a record
+  of work done rather than a goal to be met.</p>
+</div>

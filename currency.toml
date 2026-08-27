@@ -620,6 +620,24 @@ version_pattern = '^ffmpeg version (\d+\.\d+(?:\.\d+)?)'
 # rather than failing, since the conda install lives on the Mac host.
 os = ["macos"]
 
+# ---- coreutils: GNU behaviour this repo's own rules/probes depend on ---------
+#
+# macOS ships BSD userland. `.claude/rules/long-running-command-hangs.md` rule
+# 3a and several probes across this repo want GNU semantics specifically —
+# `timeout`'s rc 124 on expiry, `nproc`, `tac` — none of which the BSD builtins
+# provide (BSD has no `timeout`/`nproc`/`tac` at all). Same shape as ffmpeg
+# above: no `pypi`/`github`, so this is PRESENCE-ONLY — step 1 checks the pin
+# resolves and `timeout` is reachable, and the upstream probe reports
+# "not version-tracked" rather than manufacturing a permanent ambiguity.
+[tool.coreutils]
+mise_key = "conda:coreutils"
+binary = "timeout"
+version_args = ["--version"]
+version_pattern = '^timeout \(GNU coreutils\) (\d+\.\d+(?:\.\d+)?)'
+# Host-only, like ffmpeg: a Linux CI runner already has GNU coreutils as its
+# native userland, so this pin exists to fix a macOS-only gap.
+os = ["macos"]
+
 # ---- mise itself: the one dependency that gates every other one --------------
 #
 # Every workflow here is a `mise run` task, and mise is installed standalone at
@@ -1764,7 +1782,7 @@ version_pattern = '^ty (\d+\.\d+\.\d+)'
 manifest = "sources/ty.manifest"
 
 [tool.codex]
-mise_key = "codex"
+mise_key = "npm:@openai/codex"
 binary = "codex"
 github = "openai/codex"
 # ⚠️ codex tags releases `rust-v<version>`, NOT `v<version>` — so
@@ -1772,10 +1790,12 @@ github = "openai/codex"
 # would abort rather than mispin. Recorded here so that abort reads as a known
 # shape rather than a bug; advance `sources/codex.manifest` by hand.
 #
-# ⚠️ `mise ls-remote codex` is the WRONG instrument for "does this version
-# exist" — the aqua registry lags GitHub by a day or more (mise.toml records the
-# measurement: 0.146.1 was Latest upstream for ~4h and absent from all 277 rows).
-# Verify a codex bump by attempting the install.
+# ⚠️ The pin switched backend 2026-08-26: `npm:@openai/codex`, not the `codex`
+# short name (`aqua:openai/codex`) `mise_key` used to read. `mise.toml`'s own
+# comment above the pin carries the full mechanism — why the short name's
+# version list lags, the checksum trade this backend costs, and the owner's
+# ruling to accept it. Re-read it there rather than re-deriving it here, so
+# the story exists in exactly one place and cannot drift between two.
 version_pattern = '^(?:codex-cli )?(\d+\.\d+\.\d+)'
 # `manifest` is DELIBERATELY ABSENT, and this is the one row where that is the
 # correct answer rather than the #242 hole this whole section closes.

@@ -1,0 +1,186 @@
+---
+title: kb-build — code2flow
+---
+flowchart LR
+    n18589708ea["skill:clear-prep"]
+    nf24f9e806a["mise task:kb-build"]
+    n18589708ea --> nf24f9e806a
+    n846df3a430["cli.py: uv run kb-setup build"]
+    nf24f9e806a --> n846df3a430
+    n61d3b97a85["fn:_build_checked"]
+    n846df3a430 --> n61d3b97a85
+    n6f2e682316["graph::build"]
+    n61d3b97a85 --> n6f2e682316
+    nd162a6cd07["build_outcome::clear"]
+    n61fda49b41["build_outcome::_warn"]
+    nd162a6cd07 --> n61fda49b41
+    nc98db55f43["build_outcome::record_path"]
+    nd162a6cd07 --> nc98db55f43
+    n02352334cb["graph::_advance_docs_pin"]
+    ne062e874e1["graph::_ensure_clone"]
+    n02352334cb --> ne062e874e1
+    nf04b722e3c["graph::_print_doc_worklist"]
+    n02352334cb --> nf04b722e3c
+    naa18958eb2["graph::_assert_disposable_clone_identity"]
+    n332ae179ad["graph::_is_detector_sidecar"]
+    naa18958eb2 --> n332ae179ad
+    nb386d9a4cc["graph::_rev_parse"]
+    naa18958eb2 --> nb386d9a4cc
+    naa18958eb2 --> nb386d9a4cc
+    n43a64e75ab["graph::_bind_detection_receipts"]
+    n9594f785fd["graph::_bounded_identity"]
+    n43a64e75ab --> n9594f785fd
+    n43a64e75ab --> n9594f785fd
+    n43a64e75ab --> n9594f785fd
+    ncb31d4e7ab["graph::_build_study_graph"]
+    nb5c7ea877c["graph::_merge_sources_into"]
+    ncb31d4e7ab --> nb5c7ea877c
+    n9fbcaa552b["graph::_classify_change"]
+    n15b9ed96e9["graph::_is_doc"]
+    n9fbcaa552b --> n15b9ed96e9
+    n9fbcaa552b --> n15b9ed96e9
+    n9fbcaa552b --> n15b9ed96e9
+    n9fbcaa552b --> n15b9ed96e9
+    n9fbcaa552b --> n15b9ed96e9
+    n80344770a1["graph::_clear_stamp"]
+    nc2d5ca022d["graph::_currency_spec"]
+    n80344770a1 --> nc2d5ca022d
+    n445592a850["graph::_cluster_study_graph"]
+    n72c6cda7d6["graph::_run"]
+    n445592a850 --> n72c6cda7d6
+    nffffd944e3["graphify_env::graphify_exe"]
+    n445592a850 --> nffffd944e3
+    n21a084f444["graph::_create_source_snapshot"]
+    n21a084f444 --> naa18958eb2
+    n21a084f444 --> n9594f785fd
+    n36ed6c25a1["graph::_detect_preflight"]
+    n7723f89333["graph::_detect_failure_categories"]
+    n36ed6c25a1 --> n7723f89333
+    n70858846c8["graph::_report_unsupported_languages"]
+    n36ed6c25a1 --> n70858846c8
+    n38ad0ef7d1["graph::_source_census_failure_detail"]
+    n36ed6c25a1 --> n38ad0ef7d1
+    n6c7b50c19f["graph::detection_census"]
+    n36ed6c25a1 --> n6c7b50c19f
+    n5ab10c4229["graph::_detection_census_from_snapshots"]
+    n5ab10c4229 --> n43a64e75ab
+    n5ab10c4229 --> n9594f785fd
+    n5ab10c4229 --> n9594f785fd
+    n5ab10c4229 --> n9594f785fd
+    n5ab10c4229 --> n9594f785fd
+    n5ab10c4229 --> n9594f785fd
+    n5ab10c4229 --> n9594f785fd
+    n5ab10c4229 --> n21a084f444
+    n9dfc4acd6b["graph::_require_post_detection_clone_identity"]
+    n5ab10c4229 --> n9dfc4acd6b
+    n81bca9906f["graph::_run_detection_census_receipts"]
+    n5ab10c4229 --> n81bca9906f
+    neb8e31c16c["graph::_verify_source_provenance"]
+    n5ab10c4229 --> neb8e31c16c
+    ne062e874e1 --> nb386d9a4cc
+    ne062e874e1 --> nb386d9a4cc
+    ne062e874e1 --> nb386d9a4cc
+    ne062e874e1 --> nb386d9a4cc
+    n6388fe034f["graph::_extract_code"]
+    n4f87ec810e["graph::_nodes_by_source_file"]
+    n6388fe034f --> n4f87ec810e
+    n4181805a0a["graphify_env::clean_env"]
+    n6388fe034f --> n4181805a0a
+    n6388fe034f --> nffffd944e3
+    nfced24d7e8["graph::_extract_self"]
+    nfced24d7e8 --> n72c6cda7d6
+    na43094a371["graph::_self_extract_argv"]
+    nfced24d7e8 --> na43094a371
+    n8d38c03155["graph::_self_subgraph"]
+    nfced24d7e8 --> n8d38c03155
+    ne34ed5e5fc["graph::_finalize_build_receipts"]
+    n50ce42e153["graph::_stamp_build"]
+    ne34ed5e5fc --> n50ce42e153
+    nbbe4c77b69["graph::_write_build_receipt"]
+    ne34ed5e5fc --> nbbe4c77b69
+    nc2a2eb4648["graph::_input_fingerprints"]
+    nc2a2eb4648 --> nc2d5ca022d
+    nb5c7ea877c --> n72c6cda7d6
+    nb5c7ea877c --> nffffd944e3
+    nf04b722e3c --> n9fbcaa552b
+    n82e20e314b["graph::_reap_detection_processes"]
+    n5c9a8d3eee["graph::_ResultQueue.get_nowait"]
+    n82e20e314b --> n5c9a8d3eee
+    n360e2b8c01["graph::_replay_doc_chunks"]
+    na60557c6a7["graph::_derived_root"]
+    n360e2b8c01 --> na60557c6a7
+    n281c419011["graph::_replay_pairs"]
+    n360e2b8c01 --> n281c419011
+    n84c85390ef["graph::_handoff_counts"]
+    n281c419011 --> n84c85390ef
+    n281c419011 --> n72c6cda7d6
+    n9dfc4acd6b --> naa18958eb2
+    n9dfc4acd6b --> n9594f785fd
+    n4e4ad894d4["graph::_required_input_fingerprints"]
+    n4e4ad894d4 --> nc2a2eb4648
+    na5090a0b44["graph::_reset_merged_chunks"]
+    n6bef8d89ed["graph::_write_merged_chunks"]
+    na5090a0b44 --> n6bef8d89ed
+    n72c6cda7d6 --> n4181805a0a
+    n81bca9906f --> nd162a6cd07
+    n81bca9906f --> n82e20e314b
+    na43094a371 --> nffffd944e3
+    n50ce42e153 --> nc2d5ca022d
+    nb23a0bb5e3["graph::_strict_graphify_version"]
+    n50ce42e153 --> nb23a0bb5e3
+    nb23a0bb5e3 --> n4181805a0a
+    nb23a0bb5e3 --> nffffd944e3
+    neb8e31c16c --> n9594f785fd
+    neb8e31c16c --> nb386d9a4cc
+    neb8e31c16c --> nb386d9a4cc
+    n2851cd5612["graph::_input_map_sha256"]
+    nbbe4c77b69 --> n2851cd5612
+    nf61383e8ab["graphify_env::pinned_graphify_version"]
+    nbbe4c77b69 --> nf61383e8ab
+    n5233cb4b82["graph::_write_compose_manifest"]
+    n645d13162f["graph::_compose_manifest_path"]
+    n5233cb4b82 --> n645d13162f
+    nf7e2fe4178["graph::_merged_chunks_path"]
+    n6bef8d89ed --> nf7e2fe4178
+    n6f2e682316 --> ncb31d4e7ab
+    n6f2e682316 --> n80344770a1
+    n6f2e682316 --> n445592a850
+    n6f2e682316 --> n36ed6c25a1
+    n228772a493["graph::_drop_skipped_builds"]
+    n6f2e682316 --> n228772a493
+    n6f2e682316 --> ne062e874e1
+    n6f2e682316 --> n6388fe034f
+    n6f2e682316 --> nfced24d7e8
+    n6f2e682316 --> ne34ed5e5fc
+    n6f2e682316 --> nb5c7ea877c
+    n6f2e682316 --> n360e2b8c01
+    n6f2e682316 --> n4e4ad894d4
+    n6f2e682316 --> na5090a0b44
+    n6f2e682316 --> n8d38c03155
+    n6f2e682316 --> n5233cb4b82
+    n9d903128ac["graphify_env::graphify_python"]
+    n6f2e682316 --> n9d903128ac
+    n6c7b50c19f --> n9594f785fd
+    n6c7b50c19f --> n5ab10c4229
+    n95718601db["graph::update"]
+    n95718601db --> n02352334cb
+    n95718601db --> ne062e874e1
+    n95718601db --> n72c6cda7d6
+    n8dfaf77a2c["graphify_env::assert_pinned_graphify"]
+    n95718601db --> n8dfaf77a2c
+    n95718601db --> nffffd944e3
+    n8dfaf77a2c --> nffffd944e3
+    n8dfaf77a2c --> nf61383e8ab
+    n957aec4c57["graphify_env::running_graphify_version"]
+    n8dfaf77a2c --> n957aec4c57
+    ne3d1c89812["graphify_sdk::assert_public_sdk"]
+    n8dfaf77a2c --> ne3d1c89812
+    n4181805a0a --> n95718601db
+    nfa3d78d98d["graphify_env::_imports_graphify"]
+    n9d903128ac --> nfa3d78d98d
+    n9d903128ac --> nfa3d78d98d
+    n957aec4c57 --> n4181805a0a
+    n7d2ae40bbc["graphify_sdk::contract_errors"]
+    ne3d1c89812 --> n7d2ae40bbc
+    n956da6fd63["graphify_sdk::running_sdk_version"]
+    n7d2ae40bbc --> n956da6fd63

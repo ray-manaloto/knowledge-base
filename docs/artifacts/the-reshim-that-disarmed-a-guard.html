@@ -1,0 +1,281 @@
+<title>The Reshim That Disarmed a Guard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<style>
+  :root{
+    --ground:#f4f2ee;
+    --panel:#ffffff;
+    --panel-2:#e9e5dd;
+    --edge:#d6cfc2;
+    --edge-soft:#e6e1d7;
+    --ink:#1f1a12;
+    --ink-soft:#5c5445;
+    --ink-faint:#8b8171;
+    --alarm:#a3320f;
+    --alarm-soft:#f7ddd3;
+    --safe:#3d6b2f;
+    --safe-soft:#dfeed8;
+    --plate:#faf8f5;
+    --plate-edge:#e0d9cc;
+    --shadow:0 1px 2px rgba(31,26,18,.06), 0 8px 24px rgba(31,26,18,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#14110c;
+      --panel:#1d1913;
+      --panel-2:#26211a;
+      --edge:#3a3227;
+      --edge-soft:#2b251d;
+      --ink:#efe9df;
+      --ink-soft:#b6ac9a;
+      --ink-faint:#8b8171;
+      --alarm:#eb8560;
+      --alarm-soft:#3a1a0e;
+      --safe:#8fc47b;
+      --safe-soft:#1b2b15;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#14110c;
+    --panel:#1d1913;
+    --panel-2:#26211a;
+    --edge:#3a3227;
+    --edge-soft:#2b251d;
+    --ink:#efe9df;
+    --ink-soft:#b6ac9a;
+    --ink-faint:#8b8171;
+    --alarm:#eb8560;
+    --alarm-soft:#3a1a0e;
+    --safe:#8fc47b;
+    --safe-soft:#1b2b15;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);color:var(--ink);
+    font-family:"Public Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+    font-size:17px;line-height:1.65;margin:0;padding:0 20px 90px;
+  }
+  .wrap{max-width:900px;margin:0 auto}
+  .col{max-width:66ch}
+  header{padding:64px 0 34px;border-bottom:3px solid var(--alarm);margin-bottom:40px}
+  .eyebrow{
+    font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--alarm);margin:0 0 16px;
+  }
+  h1{
+    font-family:"Zilla Slab",Georgia,serif;font-weight:700;
+    font-size:clamp(2.4rem,6.4vw,3.9rem);line-height:1.04;letter-spacing:-.02em;
+    text-wrap:balance;margin:0 0 18px;
+  }
+  .standfirst{font-size:1.22rem;line-height:1.5;color:var(--ink-soft);max-width:60ch;margin:0}
+  .standfirst strong{color:var(--ink);font-weight:600}
+  h2{
+    font-family:"Zilla Slab",Georgia,serif;font-weight:600;font-size:1.8rem;
+    line-height:1.15;text-wrap:balance;margin:58px 0 6px;
+  }
+  h2 + .sub{color:var(--ink-faint);font-size:.97rem;margin:0 0 24px}
+  h3{font-family:"Zilla Slab",Georgia,serif;font-weight:600;font-size:1.1rem;margin:0 0 8px}
+  p{margin:0 0 18px}
+  code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.88em}
+  code{background:var(--panel-2);padding:.1em .34em;border-radius:3px}
+  figure{margin:32px 0;padding:0}
+  figcaption{font-size:.9rem;color:var(--ink-faint);line-height:1.5;margin-top:12px;max-width:62ch}
+  .plate{background:var(--plate);border:1px solid var(--plate-edge);border-radius:8px;padding:22px 18px;overflow-x:auto}
+  .plate svg{display:block;margin:0 auto;max-width:100%;height:auto;color:#1f1a12}
+  .scroll{overflow-x:auto;border:1px solid var(--edge);border-radius:8px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:.92rem}
+  th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--edge-soft);vertical-align:top}
+  th{
+    font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10.5px;
+    letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);
+    font-weight:400;background:var(--panel-2);
+  }
+  tr:last-child td{border-bottom:none}
+  td.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  .chip{
+    display:inline-block;font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:11px;padding:2px 8px;border-radius:999px;white-space:nowrap;
+  }
+  .chip.dead{background:var(--alarm-soft);color:var(--alarm)}
+  .chip.live{background:var(--safe-soft);color:var(--safe)}
+  .note{
+    border-left:3px solid var(--alarm);background:var(--panel);padding:18px 22px;
+    border-radius:0 8px 8px 0;margin:26px 0;box-shadow:var(--shadow);
+  }
+  .note.ok{border-left-color:var(--safe)}
+  .note p:last-child{margin-bottom:0}
+  pre.term{
+    background:var(--panel);border:1px solid var(--edge);border-radius:8px;
+    padding:16px 18px;overflow-x:auto;font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:.83rem;line-height:1.6;margin:20px 0;color:var(--ink-soft);
+  }
+  pre.term b{color:var(--alarm);font-weight:700}
+  ul{margin:0 0 18px;padding-left:1.15em}
+  li{margin-bottom:9px}
+  footer{margin-top:70px;padding-top:22px;border-top:1px solid var(--edge);font-size:.86rem;color:var(--ink-faint);line-height:1.6}
+  footer strong{color:var(--ink-soft);font-weight:600}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">machine state · found 2026-08-26 · outside this repo</p>
+  <h1>The Reshim That Disarmed a Guard</h1>
+  <p class="standfirst">A mise reshim wrote <strong>836 shims</strong> at 21:28 today. Three of them
+  are named after binaries a guard exists to say are <em>missing</em> — so the guard now finds them,
+  falls silent, and <strong>denies nothing</strong>.</p>
+</header>
+
+<div class="col">
+<p>The suite went red on a test nothing in this branch touched. The test is right. The guard is
+broken. The machine changed underneath both.</p>
+</div>
+
+<h2>The chain</h2>
+<p class="sub">Four hops, and the damage is at the last one — where a probe answers a question next to the one it was asked.</p>
+
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 860 250" role="img" aria-label="A four-step chain: a mise reshim creates 836 shims including timeout, nproc and tac; the guard asks shutil.which whether the binary exists; which finds the shim and answers yes; so the guard falls silent, while actually running the shim still fails.">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <!-- 1 -->
+      <rect x="14" y="46" width="176" height="66" rx="6" fill="#ffffff" stroke="#a89e8c"/>
+      <text x="102" y="70" font-size="12.5" text-anchor="middle" fill="#1f1a12">a mise reshim runs</text>
+      <text x="102" y="88" font-size="11.5" text-anchor="middle" fill="#8b8171">21:28 today</text>
+      <text x="102" y="104" font-size="11.5" text-anchor="middle" fill="#8b8171">836 shims written</text>
+
+      <line x1="196" y1="79" x2="238" y2="79" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+
+      <!-- 2 -->
+      <rect x="244" y="46" width="176" height="66" rx="6" fill="#ffffff" stroke="#a89e8c"/>
+      <text x="332" y="70" font-size="12.5" text-anchor="middle" fill="#1f1a12">three are coreutils</text>
+      <text x="332" y="90" font-size="12" text-anchor="middle" fill="#1f1a12" font-family="JetBrains Mono, monospace">timeout · nproc · tac</text>
+      <text x="332" y="106" font-size="11" text-anchor="middle" fill="#8b8171">no version set for any</text>
+
+      <line x1="426" y1="79" x2="468" y2="79" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+
+      <!-- 3 -->
+      <rect x="474" y="46" width="182" height="66" rx="6" fill="#ffffff" stroke="#a89e8c"/>
+      <text x="565" y="70" font-size="12" text-anchor="middle" fill="#1f1a12" font-family="JetBrains Mono, monospace">shutil.which("timeout")</text>
+      <text x="565" y="90" font-size="11.5" text-anchor="middle" fill="#8b8171">asks: does a FILE exist?</text>
+      <text x="565" y="106" font-size="11.5" text-anchor="middle" fill="#3d6b2f">answers: yes</text>
+
+      <line x1="662" y1="79" x2="704" y2="79" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+
+      <!-- 4 -->
+      <rect x="710" y="46" width="136" height="66" rx="6" fill="#f7ddd3" stroke="#a3320f"/>
+      <text x="778" y="72" font-size="12.5" text-anchor="middle" fill="#7a2409">guard goes</text>
+      <text x="778" y="92" font-size="14" text-anchor="middle" fill="#7a2409" font-weight="700">INERT</text>
+
+      <!-- the question that was never asked -->
+      <line x1="565" y1="118" x2="565" y2="160" stroke="#a3320f" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#a2)"/>
+      <text x="583" y="140" font-size="11.5" fill="#a3320f">but the real question was:</text>
+
+      <rect x="392" y="166" width="346" height="62" rx="6" fill="#ffffff" stroke="#a3320f"/>
+      <text x="565" y="188" font-size="12" text-anchor="middle" fill="#1f1a12" font-family="JetBrains Mono, monospace">does it RUN?</text>
+      <text x="565" y="208" font-size="11.5" text-anchor="middle" fill="#a3320f">mise ERROR: No version is set for shim — rc 1</text>
+      <text x="565" y="222" font-size="11" text-anchor="middle" fill="#8b8171">it does not</text>
+    </svg>
+  </div>
+  <figcaption>The guard is host-conditional by design — it should fall silent where the binary is
+  genuinely present. It is asking the wrong question: <em>a file exists at that name</em> is not
+  <em>that name works</em>.</figcaption>
+</figure>
+
+<h2>What the guard denies now</h2>
+<p class="sub">Measured this session, by calling <code>decide()</code> on each.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>probe</th><th>guard verdict</th><th>what actually happens if you run it</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">timeout 5 ls</td><td><span class="chip dead">silent</span></td><td>mise error, rc 1</td></tr>
+    <tr><td class="mono">nproc</td><td><span class="chip dead">silent</span></td><td>mise error, rc 1</td></tr>
+    <tr><td class="mono">tac file</td><td><span class="chip dead">silent</span></td><td>mise error, rc 1</td></tr>
+    <tr><td class="mono">gtimeout 5 ls</td><td><span class="chip live">denied</span></td><td>truly absent — no shim was written for it</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <h3>The failure mode got worse, not just unguarded</h3>
+  <p>Before, an accidental <code>timeout …</code> died with <em>command not found</em> and
+  <strong>rc 127</strong> — an unusual code that reads as "the probe never ran". Now it dies with
+  a mise error and <strong>rc 1</strong>, which is the single most common way for a real command to
+  fail. The signature that used to distinguish <em>the probe broke</em> from <em>the thing under
+  test failed</em> is gone.</p>
+  <p>That distinction is the entire reason this guard exists: it was built after a probe using
+  <code>timeout</code> nearly produced a false <em>"codex unavailable"</em> conclusion about a paid
+  external service.</p>
+</div>
+
+<h2>Why the red test is the honest one</h2>
+<div class="col">
+<p>Neither the guard nor its test has been touched on this branch — both last changed on
+2026-08-18, in a commit that is an ancestor of <code>origin/main</code>. So the suite is red on
+<code>main</code> too, and has been since the reshim, not since this work.</p>
+</div>
+
+<pre class="term">tests/test_absent_binary.py::test_an_introspector_behind_a_transparent_prefix_is_not_denied
+<b>AssertionError: an introspector LATER in the line must not exempt the absent binary</b>
+    assert None is not None</pre>
+
+<div class="col">
+<p>The test asserts that <code>timeout 5 which foo</code> is denied. It is not — but not for the
+reason the test's own comment predicts. The comment worries about the <em>parser</em> widening too
+far. The parser is fine: <code>command_word</code> returns all four tokens and <code>timeout</code>
+is the command word. The guard reaches its final check and finds the binary present.</p>
+<p>A test that names one failure mode and fails from a different one is still doing its job.
+It is the only thing on the machine that noticed.</p>
+</div>
+
+<h2>The blast radius is not this repo</h2>
+<div class="col">
+<p>836 shims now sit on <code>PATH</code>. Every one is a symlink to <code>mise</code>, and every
+one whose tool has no version set errors instead of running. Three are coreutils names this repo
+guards; the rest are not inventoried here.</p>
+<p>This machine has been here before. A stale install once shimmed <code>git</code>, so every
+editor git call took a lock that never released; a shimmed <code>node-gyp</code> once made an
+install its own descendant and hung for hours at 0% CPU. Both were recorded, and both were
+re-armed by the same thing: <strong>a reshim that swept in a tool nobody had set a version for.</strong></p>
+</div>
+
+<div class="note ok">
+  <h3>Nothing here was changed</h3>
+  <p>This repo edits project settings only, never <code>~/.config</code>, never global mise state.
+  So this page reports and stops. The two shim-clearing commands the situation suggests —
+  setting a version, or pruning the orphan — are the machine owner's call, not an agent's.</p>
+</div>
+
+<footer>
+  <p><strong>Provenance.</strong> Every figure was measured in this session: the 836 count from
+  <code>find … -newermt</code> over the shim directory, the 21:28 timestamp from <code>ls -la</code>
+  on two of the shims, the four <code>decide()</code> verdicts by calling the function directly, and
+  the rc 1 by running the shim under a <code>perl</code> alarm rather than under <code>timeout</code>
+  itself. The claim that the guard and its test are untouched on this branch comes from
+  <code>git diff --name-only</code> across the full branch range plus
+  <code>git merge-base --is-ancestor</code> against <code>origin/main</code> — that is an argument
+  from identical bytes, not from re-running the test at the older commit.</p>
+  <p><strong>Correction owed.</strong> Three delegation prompts earlier in this session told
+  implementer lanes that <code>timeout</code> "does not exist on this machine" and that using it
+  "dies rc=127". The first half is still practically true — it does not run — but the second is now
+  wrong: it dies rc 1. No lane appears to have relied on it.</p>
+  <p><strong>Skills used:</strong> <code>eli5-visual</code>, <code>artifact-design</code>,
+  <code>artifact-diagramming</code>, <code>artifact-capabilities</code> (read; none declared).
+  <strong>Considered and not used:</strong> <code>dataviz</code> — one causal chain and one
+  four-row table, not a dataset; <code>mattpocock-skills:diagnosing-bugs</code> — the diagnosis was
+  already complete when the page was written, so its loop had nothing left to drive.</p>
+</footer>
+
+</div>

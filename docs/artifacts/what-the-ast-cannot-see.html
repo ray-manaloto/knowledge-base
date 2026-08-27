@@ -1,0 +1,325 @@
+<title>What the AST Cannot See</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Karla:ital,wght@0,400;0,500;0,600;1,400&family=Fira+Code:wght@400;500&display=swap">
+
+<style>
+  :root{
+    --ground:#edf1f4;
+    --panel:#ffffff;
+    --panel-2:#dfe6ec;
+    --edge:#c2ceda;
+    --ink:#0f1f2b;
+    --ink-soft:#465768;
+    --ink-faint:#75868f;
+    --signal:#0a6a8d;
+    --signal-soft:#d3e9f1;
+    --warm:#ab5019;
+    --warm-soft:#f6e3d5;
+    --blind:#8d9aa5;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0a151e;
+      --panel:#122029;
+      --panel-2:#1a2c37;
+      --edge:#283d4b;
+      --ink:#deeaf1;
+      --ink-soft:#a2b4c0;
+      --ink-faint:#75868f;
+      --signal:#54bcdd;
+      --signal-soft:#0d2f3d;
+      --warm:#e59054;
+      --warm-soft:#3a2314;
+      --blind:#6b7a86;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0a151e;
+    --panel:#122029;
+    --panel-2:#1a2c37;
+    --edge:#283d4b;
+    --ink:#deeaf1;
+    --ink-soft:#a2b4c0;
+    --ink-faint:#75868f;
+    --signal:#54bcdd;
+    --signal-soft:#0d2f3d;
+    --warm:#e59054;
+    --warm-soft:#3a2314;
+    --blind:#6b7a86;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Karla",system-ui,sans-serif; font-size:17px; line-height:1.62;
+    margin:0; padding:0 1.2rem 6rem;
+  }
+
+  .col{max-width:35rem; margin:0 auto; display:flex; flex-direction:column; gap:1.2rem}
+  .wide{max-width:60rem; margin:0 auto; width:100%}
+
+  h1,h2,h3{
+    font-family:"Syne",system-ui,sans-serif;
+    text-wrap:balance; margin:0; line-height:1.12;
+  }
+  h1{font-size:clamp(2.1rem,5.6vw,3.2rem); font-weight:800; letter-spacing:-.02em}
+  h2{font-size:1.45rem; font-weight:700; margin-top:1.8rem; letter-spacing:-.01em}
+  h3{font-size:1.02rem; font-weight:600}
+  p{margin:0}
+
+  .eyebrow{
+    font-family:"Fira Code",ui-monospace,monospace; font-size:.71rem;
+    letter-spacing:.15em; text-transform:uppercase; color:var(--signal); margin:0;
+  }
+  .lede{font-size:1.13rem; color:var(--ink-soft)}
+
+  code,.mono{font-family:"Fira Code",ui-monospace,monospace; font-size:.84em}
+  code{background:var(--panel-2); padding:.1em .34em; border-radius:2px}
+
+  header{padding:4rem 0 .4rem}
+  hr{border:0; border-top:1px solid var(--edge); margin:.3rem 0}
+
+  figure{margin:0; display:flex; flex-direction:column; gap:.8rem}
+  figure svg{width:100%; height:auto; display:block; color:var(--ink)}
+  figcaption{
+    font-size:.85rem; color:var(--ink-faint); max-width:35rem;
+    margin-inline:auto; text-align:center; text-wrap:balance;
+  }
+
+  .scroll{overflow-x:auto}
+
+  .panel{
+    background:var(--panel); border:1px solid var(--edge); border-radius:2px;
+    padding:1.05rem 1.15rem; display:flex; flex-direction:column; gap:.55rem;
+  }
+  .panel.signal{border-left:3px solid var(--signal)}
+  .panel.warm{border-left:3px solid var(--warm)}
+
+  pre.code{
+    background:var(--panel); border:1px solid var(--edge); border-radius:2px;
+    padding:.85rem 1rem; overflow-x:auto; margin:0;
+    font-family:"Fira Code",ui-monospace,monospace; font-size:.82rem; line-height:1.65;
+  }
+
+  table{border-collapse:collapse; width:100%; font-size:.87rem}
+  th,td{text-align:left; padding:.45rem .6rem; border-bottom:1px solid var(--edge); vertical-align:top}
+  th{
+    font-family:"Fira Code",ui-monospace,monospace; font-size:.67rem;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); font-weight:400;
+  }
+
+  .cite{font-size:.84rem; color:var(--ink-faint)}
+  a{color:var(--signal)}
+  a:focus-visible,*:focus-visible{outline:2px solid var(--signal); outline-offset:2px}
+</style>
+
+<header class="col">
+  <p class="eyebrow">Mechanism &middot; 2026-08-26</p>
+  <h1>What the AST cannot see</h1>
+  <p class="lede">Why scanning this codebase for &ldquo;which function reads which
+  config file&rdquo; finds <strong>two</strong> answers, and what a type-aware
+  language server would do differently.</p>
+</header>
+
+<div class="col"><hr></div>
+
+<div class="col">
+  <p>A tool ran over the whole <code>kb_setup</code> tree looking for edges of the
+  form <em>this function reads that file</em>. It found <strong>2</strong>.</p>
+
+  <p>Not two hundred. Two. And that is not a bug &mdash; it is the precise shape
+  of what a syntax tree can and cannot know.</p>
+</div>
+
+<div class="col">
+  <h2>The code it was looking at</h2>
+  <p>This pattern, or something like it, is everywhere in this repo:</p>
+
+<pre class="code">def load_all(root: Path) -> list[Manifest]:
+    out = []
+    for <span style="color:var(--warm)">p</span> in root.glob(<span style="color:var(--signal)">"sources/*.manifest"</span>):   <span style="color:var(--ink-faint)"># the filename lives HERE</span>
+        out.append(load(<span style="color:var(--warm)">p</span>))
+    return out
+
+
+def load(<span style="color:var(--warm)">path</span>: Path) -> Manifest:
+    raw = <span style="color:var(--warm)">path</span>.read_text()               <span style="color:var(--ink-faint)"># the READ happens HERE</span>
+    return parse(raw)</pre>
+
+  <p>The filename and the read are in <strong>different functions</strong>. Nothing
+  is wrong with that &mdash; it is good design. But it is what makes the edge
+  invisible.</p>
+</div>
+
+<div class="wide" style="margin:2.1rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 880 280" role="img" preserveAspectRatio="xMidYMid meet"
+       aria-label="The same two functions analysed twice. A syntax tree parses each function separately: it sees a string literal in one and a read call in the other, and because it never leaves a single function it cannot connect them, so no edge is produced. A language server resolves the parameter to the argument passed at the call site, follows the value across the function boundary, and produces the edge.">
+    <defs>
+      <marker id="ac-s" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <polygon points="0,1 10,5 0,9" fill="#0a6a8d"/>
+      </marker>
+    </defs>
+    <g font-family="'Fira Code', ui-monospace, monospace">
+
+      <!-- ===== TOP: what tree-sitter sees ===== -->
+      <text x="10" y="20" font-size="10.5" font-weight="500" fill="currentColor">TREE-SITTER / AST &mdash; parses each function on its own</text>
+
+      <rect x="16" y="34" width="330" height="72" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="30" y="54" font-size="10.5" fill="currentColor">load_all()</text>
+      <text x="30" y="74" font-size="10" fill="#0a6a8d">sees the literal</text>
+      <text x="30" y="90" font-size="9.5" fill="currentColor" opacity=".7">"sources/*.manifest"</text>
+
+      <rect x="534" y="34" width="330" height="72" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="548" y="54" font-size="10.5" fill="currentColor">load()</text>
+      <text x="548" y="74" font-size="10" fill="#0a6a8d">sees the read</text>
+      <text x="548" y="90" font-size="9.5" fill="currentColor" opacity=".7">path.read_text()</text>
+
+      <!-- the gap it cannot cross -->
+      <line x1="346" y1="70" x2="396" y2="70" stroke="#8d9aa5" stroke-width="1.3" stroke-dasharray="4 4"/>
+      <line x1="484" y1="70" x2="534" y2="70" stroke="#8d9aa5" stroke-width="1.3" stroke-dasharray="4 4"/>
+      <rect x="400" y="52" width="80" height="36" rx="2" fill="none" stroke="#8d9aa5" stroke-width="1.4"/>
+      <text x="440" y="68" text-anchor="middle" font-size="10" fill="#8d9aa5">function</text>
+      <text x="440" y="81" text-anchor="middle" font-size="10" fill="#8d9aa5">boundary</text>
+
+      <text x="440" y="122" text-anchor="middle" font-size="10.5" font-weight="500" fill="#8d9aa5">no edge produced &mdash; it never leaves one function</text>
+
+      <line x1="16" y1="140" x2="864" y2="140" stroke="currentColor" stroke-width="1" opacity=".22"/>
+
+      <!-- ===== BOTTOM: what an LSP sees ===== -->
+      <text x="10" y="166" font-size="10.5" font-weight="500" fill="currentColor">ty LSP &mdash; resolves the symbol across the call</text>
+
+      <rect x="16" y="180" width="330" height="72" rx="2" fill="none" stroke="#0a6a8d" stroke-width="1.4"/>
+      <text x="30" y="200" font-size="10.5" fill="currentColor">load_all()</text>
+      <text x="30" y="220" font-size="9.5" fill="currentColor" opacity=".75">p = glob("sources/*.manifest")</text>
+      <text x="30" y="236" font-size="9.5" fill="currentColor" opacity=".75">load(p)</text>
+
+      <rect x="534" y="180" width="330" height="72" rx="2" fill="none" stroke="#0a6a8d" stroke-width="1.4"/>
+      <text x="548" y="200" font-size="10.5" fill="currentColor">load(path)</text>
+      <text x="548" y="220" font-size="9.5" fill="currentColor" opacity=".75">path.read_text()</text>
+      <text x="548" y="236" font-size="9.5" fill="#0a6a8d">path IS p</text>
+
+      <!-- the crossing -->
+      <line x1="346" y1="216" x2="528" y2="216" stroke="#0a6a8d" stroke-width="1.6" marker-end="url(#ac-s)"/>
+      <text x="437" y="206" text-anchor="middle" font-size="9.5" fill="#0a6a8d">callHierarchy + definition</text>
+      <text x="437" y="232" text-anchor="middle" font-size="9.5" fill="#0a6a8d">resolve the parameter</text>
+
+      <text x="440" y="270" text-anchor="middle" font-size="10.5" font-weight="500" fill="#0a6a8d">edge produced: load_all &rarr; reads &rarr; sources/*.manifest</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption>The same two functions, analysed twice. A syntax tree is a
+  <em>per-file, per-scope</em> structure &mdash; it can tell you a read happened
+  and that a literal exists, but not that they are the same file. A language
+  server resolves the parameter back to the argument, and the edge appears.</figcaption>
+</figure>
+</div>
+
+<div class="col">
+  <h2>So they are not competitors</h2>
+
+  <p>The instinct is to ask which one to use. That is the wrong question: they
+  answer different questions and fail in different directions.</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th></th><th>tree-sitter AST</th><th>ty LSP</th></tr></thead>
+    <tbody>
+      <tr><td>unit of analysis</td><td>one file, one scope</td><td>the resolved program</td></tr>
+      <tr><td>languages</td><td><strong>many</strong></td><td>Python only</td></tr>
+      <tr><td>needs the code to run?</td><td>no</td><td>no &mdash; but it needs a live server process</td></tr>
+      <tr><td>cost</td><td>cheap, already paid for</td><td>a process per session</td></tr>
+      <tr><td>crosses a function boundary</td><td><strong>no</strong></td><td><strong>yes</strong></td></tr>
+      <tr><td>knows types</td><td>no</td><td>yes</td></tr>
+      <tr><td>fails by</td><td>silently omitting an edge</td><td>refusing to answer</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>That last row is the one that matters. <strong>An AST pass that cannot resolve
+  something produces no edge and says nothing.</strong> A language server asked a
+  question it cannot answer returns an empty result you can see. One failure mode
+  is invisible; the other is a data point.</p>
+</div>
+
+<div class="col">
+  <div class="panel warm">
+    <h3>The AST layer is not just incomplete &mdash; it is measurably lossy here</h3>
+    <p style="color:var(--ink-soft)">Three separate measurements, all of them
+    boundary failures:</p>
+    <p style="color:var(--ink-soft)"><strong>43%</strong> of <code>kb_setup</code>'s
+    functions are absent from the graph entirely, because a private
+    <code>_foo</code> and a public <code>foo</code> normalise to the same id and
+    every one after the first is silently dropped. <strong>A specific node</strong>
+    &mdash; <code>_build_checked</code> &mdash; vanished from a generated diagram,
+    the node itself, not merely its edges. And <strong>2</strong> config-read
+    edges across the whole tree, for the reason drawn above.</p>
+    <p style="color:var(--ink-soft)">All three are the same class: something that
+    needed a wider scope than one file, one function, or one name.</p>
+  </div>
+</div>
+
+<div class="col">
+  <h2>What makes this newly practical</h2>
+
+  <p><code>ty</code> is Astral's Python type checker. It is <strong>already pinned
+  in this repo</strong> at 0.0.74, and it already runs here every time
+  <code>mise run lint</code> does.</p>
+
+  <p>What was not known until today is that <code>ty server</code> ships the two
+  capabilities this needs, natively &mdash; read from its own shipped source, not
+  from a docs page:</p>
+
+  <div class="panel signal">
+    <p style="color:var(--ink-soft)"><code>call_hierarchy_provider</code> &middot;
+    <code>type_hierarchy_provider</code> &middot;
+    <code>workspace_symbol_provider</code></p>
+    <p class="cite">Call hierarchy landed in <code>ty</code> 0.0.41; type hierarchy
+    in 0.0.20. The pin here is <strong>0.0.74</strong> &mdash; both are already
+    present in the binary this repo installs.</p>
+  </div>
+
+  <p>So the missing capability is not a dependency to add or a tool to evaluate.
+  It is a <strong>client</strong>: something that starts the server, asks it
+  those questions, and turns the answers into edges. That is the only piece that
+  does not exist.</p>
+</div>
+
+<div class="col">
+  <div class="panel">
+    <h3>One correction to a decision already recorded</h3>
+    <p style="color:var(--ink-soft)">A 2026-08-24 review rejected the LSP path
+    with this reason: <em>&ldquo;python-only, needs a live server, strictly weaker
+    than the AST graph we own.&rdquo;</em></p>
+    <p style="color:var(--ink-soft)">The first two clauses are still true and are
+    real costs. <strong>The third is refuted by the three measurements above</strong>
+    &mdash; the AST graph is not the strong baseline that reason assumed. And the
+    rejection covered generic <code>pylsp</code>/<code>pyright</code>;
+    <code>ty</code> itself was never assessed, by anyone, until today.</p>
+  </div>
+</div>
+
+<div class="col" style="margin-top:2.3rem">
+  <hr>
+  <p class="cite"><strong>Provenance.</strong> The <code>ty</code> capability list
+  was read this session from <code>ty</code>'s shipped Rust source
+  (<code>crates/ty_server/src/capabilities.rs</code>), not inferred from
+  documentation; the pinned version was read from <code>pyproject.toml:81</code>.
+  The 2-config-edge figure was re-derived this session from the promoted
+  prototype. The <strong>43%</strong> figure and the <code>_build_checked</code>
+  drop are <strong>inherited</strong> &mdash; from open issue #478 and the
+  2026-08-24 bake-off respectively &mdash; and are labelled rather than
+  re-measured here. The code sample is illustrative of the pattern the prototype
+  identified; it is not a verbatim quotation of any single function.</p>
+
+  <p class="cite"><strong>Skills used:</strong> <code>artifact-design</code>,
+  <code>artifact-diagramming</code>, <code>artifact-capabilities</code> (read;
+  <strong>none declared</strong> &mdash; static page).
+  <strong>Considered and not used:</strong> <code>dataviz</code> &mdash; the
+  figure is a mechanism, not a chart; <code>design</code> &mdash; wrong
+  deliverable; <code>mattpocock-skills:codebase-design</code> &mdash; it supplies
+  vocabulary for designing modules, and this page explains an analysis technique
+  rather than proposing an interface.</p>
+</div>

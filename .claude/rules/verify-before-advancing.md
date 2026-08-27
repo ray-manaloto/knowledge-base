@@ -35,6 +35,7 @@ claim about them gets checked against. It does not stop at the first failure.
 | `CLAUDE.md`, `.claude/**` (rules, skills, settings.json) | `mise run lint-docs` (agnix `--strict`) **and** the per-load-class budget holds (`md_size_budget`; see `md-size-budgets.md`) |
 | `sources/*.manifest`, `sources/extractions/**`, `sources/media/**` | `mise run kb-build` reproduces from committed inputs alone, then `mise run kb-query` returns the new material |
 | a new extraction chunk | `mise run kb-validate-chunks -- <chunk.json>` BEFORE `kb-merge` |
+| `docs/research/**`, `docs/artifacts/**` | `mise run funnel` (`kb_setup.funnel`) reports `funnelled`/`exempt`, never `drift` — a docs delta with nothing under `sources/**` and no `Funnel-exempt: <reason>` commit trailer fails this ship gate |
 | `python/src/kb_setup/**` | the module's own tests, not just the suite total — a new module with no test file is not covered by a green suite |
 | `mise.toml` tool pins | `mise run kb-currency-check` (offline drift check) |
 | `hk.pkl` | `hk validate`, then the FAIL direction of the new step (below) |

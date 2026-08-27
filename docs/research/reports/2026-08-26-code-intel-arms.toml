@@ -1,0 +1,135 @@
+# Mutation arms for `kb_setup.code_intel` and its new test suite.
+#
+# WHY THIS SPEC EXISTS. The module was written by a delegated codex lane that
+# died before writing any tests; the suite is mine, written afterwards against
+# code I did not author. That is the worst possible arrangement for a test file
+# — I could easily have written twelve assertions that pass on this code and
+# would pass on almost any code — so every one of them is armed here.
+#
+# Two arms exist specifically because the property they pin is INVISIBLE in the
+# output, which is how the original prototype shipped a wrong number:
+#
+#   A2  a mirrored skill double-counted. The edge list still looks plausible;
+#       it just has twice as many entries as there are skills, and nothing in
+#       the shape of the data says which is right. This is not hypothetical:
+#       the prototype reported 395 skill edges and the real unique count is
+#       roughly half that.
+#
+#   A5  `mise tasks --json` run from the wrong cwd. It returns mise's OWN five
+#       bootstrap tasks instead of this repo's ~81 — a perfectly well-formed
+#       answer to a different question. An output-shaped assertion cannot see
+#       this at all, which is why A5 mutates the cwd and the test asserts on
+#       the subprocess call rather than on what came back.
+#
+# A3 is the schema arm. `to_chunk` maps onto `chunks._NODE_REQUIRED` /
+# `_EDGE_REQUIRED` IMPORTED, never retyped, and `_schema_dict` raises if the
+# real schema grows a field the mapping cannot fill. A3 removes that guard: the
+# failure must move to the mapping, not to a chunk that emits one field short
+# and fails later at `kb-merge`, far from its cause.
+#
+# A4 is the honesty arm. An edge a lane could not verify has to round-trip AS
+# unverified — not merely as a lower confidence_score, which a reader can
+# mistake for a ranking rather than a claim about evidence.
+#
+# WHAT A CLEAN SWEEP HERE WOULD NOT MEAN.
+#
+#   * It says nothing about whether `to_chunk`'s PREMISE is right. The chunk it
+#     emits is deliberately NOT mergeable — it omits `_origin="semantic"`
+#     because that would be a false provenance claim for deterministically
+#     derived nodes (#524). No mutation can test a design decision.
+#   * It says nothing about `config_edges` finding only 2 edges. That is
+#     correct behaviour for an AST pass over a codebase that parameterises its
+#     config paths, and a version returning hundreds has become wrong, not
+#     better. There is deliberately no arm asserting a config-edge count.
+#   * The `ty` lane is a stub returning []. A6 pins that a stubbed lane still
+#     REPORTS as having run — the thing that separates "ran, found nothing"
+#     from "never ran" — and nothing more.
+
+suites = ["tests/test_code_intel.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/code_intel.py"
+old = '''    edges: list[Edge] = []
+    seen: set[str] = set()'''
+new = '''    edges: list[Edge] = []  # control
+    seen: set[str] = set()'''
+
+# ── A2: the dedup — a mirrored skill must be ONE skill ─────────────────────
+# The realistic break: delete the guard, keep the bookkeeping. Renaming `seen`
+# would not be a real failure; skipping the check is exactly what a careless
+# refactor does.
+[[arm]]
+id = "A2"
+test = "test_a_skill_mirrored_into_both_trees_yields_one_source_not_two"
+file = "python/src/kb_setup/code_intel.py"
+old = '''            if name in seen:
+                continue
+            seen.add(name)'''
+new = '''            seen.add(name)'''
+
+# ── A2b: ...and the tree kept must be the authoritative one ────────────────
+# The over-correction arm for A2. Deduping is not enough if it keeps whichever
+# mirror the glob happened to yield first: `skill_lint` names `.claude/`
+# authoritative, and the evidence string must cite it.
+[[arm]]
+id = "A2b"
+test = "test_dedup_keeps_the_claude_tree_which_skill_lint_calls_authoritative"
+file = "python/src/kb_setup/code_intel.py"
+old = '''    for pattern in skill_lint.DEFAULT_SKILL_GLOBS:'''
+new = '''    for pattern in tuple(reversed(skill_lint.DEFAULT_SKILL_GLOBS)):'''
+
+# ── A3: the schema guard must fail AT THE MAPPING ──────────────────────────
+# Realistic break: someone "simplifies" the strict mapping into a pass-through.
+# It works today and silently emits a short chunk the day the schema moves.
+[[arm]]
+id = "A3"
+test = "test_to_chunk_raises_loudly_if_the_real_schema_grows_a_field"
+file = "python/src/kb_setup/code_intel.py"
+old = '''    missing = [k for k in required if k not in values]
+    if missing:'''
+new = '''    missing = [k for k in required if k not in values]
+    if False:'''
+
+# ── A4: an unverified edge round-trips AS unverified ───────────────────────
+# Realistic break: dropping the extra keys as "redundant with confidence_score".
+[[arm]]
+id = "A4"
+test = "test_an_unverified_edge_survives_to_chunk_still_marked_unverified"
+file = "python/src/kb_setup/code_intel.py"
+old = '''        edge_dict["verified"] = edge.verified'''
+new = '''        edge_dict["verified"] = True'''
+
+# ── A5: `mise tasks --json` must run from the REPO ROOT ────────────────────
+# The invisible one. Run anywhere else it returns mise's own bootstrap tasks —
+# a well-formed answer to a different question.
+[[arm]]
+id = "A5"
+test = "test_task_lane_runs_mise_from_the_repo_root_not_the_process_cwd"
+file = "python/src/kb_setup/code_intel.py"
+old = '''        cwd=repo_root,'''
+new = '''        cwd=None,'''
+
+# ── A6: a lane that ran and found nothing still REPORTS ────────────────────
+# Realistic break: filtering empty lanes out of the report as noise. That is
+# precisely the conflation this repo files as a defect — a silent zero and an
+# absent lane are the same shape in a flat list.
+[[arm]]
+id = "A6"
+test = "test_run_lanes_reports_a_lane_that_ran_and_found_nothing"
+file = "python/src/kb_setup/code_intel.py"
+old = '''    return [LaneRun(name=name, edges=tuple(_LANES[name](repo_root))) for name in names]'''
+new = '''    _runs = [LaneRun(name=name, edges=tuple(_LANES[name](repo_root))) for name in names]
+    return [r for r in _runs if r.edges]'''
+
+# ── A7: an unknown lane is an ERROR, never an empty result ─────────────────
+[[arm]]
+id = "A7"
+test = "test_requesting_an_unknown_lane_raises_a_value_error_naming_the_known_lanes"
+file = "python/src/kb_setup/code_intel.py"
+old = '''    unknown = [n for n in names if n not in _LANES]
+    if unknown:'''
+new = '''    unknown = [n for n in names if n not in _LANES]
+    if False:'''

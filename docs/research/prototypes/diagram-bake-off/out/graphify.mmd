@@ -1,0 +1,257 @@
+---
+title: kb-build — graphify
+---
+flowchart LR
+    n18589708ea["skill:clear-prep"]
+    nf24f9e806a["mise task:kb-build"]
+    n18589708ea --> nf24f9e806a
+    n846df3a430["cli.py: uv run kb-setup build"]
+    nf24f9e806a --> n846df3a430
+    n61d3b97a85["fn:_build_checked"]
+    n846df3a430 --> n61d3b97a85
+    nde969ae161["python/src/kb_setup/graph.py::build()"]
+    n61d3b97a85 --> nde969ae161
+    nf174ae7744["python/src/kb_setup/chunks.py::chunk_claims()"]
+    n549c01a293["python/src/kb_setup/chunks.py::normalise_source_file()"]
+    nf174ae7744 --> n549c01a293
+    nddfa2ba15f["python/src/kb_setup/chunks.py::collision_issues()"]
+    n1fcc066818["python/src/kb_setup/chunks.py::replay_order()"]
+    nddfa2ba15f --> n1fcc066818
+    nddfa2ba15f --> nf174ae7744
+    n7b2cc2ef38["python/src/kb_setup/chunks.py::_hyperedge_issues()"]
+    ne1473f883d["python/src/kb_setup/chunks.py::_hyperedge_member_issues()"]
+    n7b2cc2ef38 --> ne1473f883d
+    neddebcc519["python/src/kb_setup/chunks.py::replay_key()"]
+    n2464590fd5["python/src/kb_setup/chunks.py::chunk_captured_at()"]
+    neddebcc519 --> n2464590fd5
+    n7cc2b85377["python/src/kb_setup/chunks.py::validate()"]
+    n0c1742bffb["python/src/kb_setup/chunks.py::_node_issues()"]
+    n7cc2b85377 --> n0c1742bffb
+    n347075a136["python/src/kb_setup/chunks.py::_edge_issues()"]
+    n7cc2b85377 --> n347075a136
+    n7cc2b85377 --> n7b2cc2ef38
+    n54950060d6["python/src/kb_setup/chunks.py::_supersedes_issues()"]
+    n7cc2b85377 --> n54950060d6
+    n346cc44a88["python/src/kb_setup/chunks.py::validate_files()"]
+    nc16eb98067["python/src/kb_setup/chunks.py::_collect_ids()"]
+    n346cc44a88 --> nc16eb98067
+    n346cc44a88 --> n7cc2b85377
+    n9c56b632f3["python/src/kb_setup/currency/config.py::load()"]
+    n1fc24beac0["python/src/kb_setup/currency/config.py::_tool_spec()"]
+    n9c56b632f3 --> n1fc24beac0
+    n981f9d60e2["python/src/kb_setup/currency/config.py::_skill_targets()"]
+    n1fc24beac0 --> n981f9d60e2
+    n6ce243dc3e["python/src/kb_setup/currency/config.py::_watch_items()"]
+    n1fc24beac0 --> n6ce243dc3e
+    na452f62334["python/src/kb_setup/currency/sync.py::artifact_fingerprints()"]
+    nc6e4be6faf["python/src/kb_setup/currency/sync.py::artifact_fingerprint()"]
+    na452f62334 --> nc6e4be6faf
+    n8734b8e31c["python/src/kb_setup/currency/sync.py::_certify_views()"]
+    n8eb78605e0["python/src/kb_setup/currency/sync.py::view_records()"]
+    n8734b8e31c --> n8eb78605e0
+    n3e43d6d4da["python/src/kb_setup/currency/sync.py::stamped_views()"]
+    n8734b8e31c --> n3e43d6d4da
+    nce1f92f4bf["python/src/kb_setup/currency/sync.py::deep_artifact_fingerprint()"]
+    nce1f92f4bf --> nc6e4be6faf
+    nd46b885d18["python/src/kb_setup/currency/sync.py::input_fingerprints()"]
+    n8ed578bc9a["python/src/kb_setup/currency/sync.py::input_fingerprint()"]
+    nd46b885d18 --> n8ed578bc9a
+    n1124e0d571["python/src/kb_setup/currency/sync.py::read_stamp()"]
+    ne01b6135e1["python/src/kb_setup/currency/sync.py::stamp_path()"]
+    n1124e0d571 --> ne01b6135e1
+    n9203e68652["python/src/kb_setup/currency/sync.py::restamp_artifacts()"]
+    n9203e68652 --> ne01b6135e1
+    n9203e68652 --> n1124e0d571
+    n587b40e1fd["python/src/kb_setup/currency/sync.py::write_stamp()"]
+    n9203e68652 --> n587b40e1fd
+    n5398774974["python/src/kb_setup/currency/sync.py::stamped_input_fingerprints()"]
+    n9203e68652 --> n5398774974
+    n9203e68652 --> n8734b8e31c
+    nb379e5b1bf["python/src/kb_setup/currency/sync.py::view_identities()"]
+    nb379e5b1bf --> nce1f92f4bf
+    n8eb78605e0 --> nc6e4be6faf
+    n8eb78605e0 --> nce1f92f4bf
+    n587b40e1fd --> ne01b6135e1
+    n587b40e1fd --> n1124e0d571
+    n587b40e1fd --> n3e43d6d4da
+    n105622ce8b["python/src/kb_setup/currency/sync.py::_artifact_commit()"]
+    n587b40e1fd --> n105622ce8b
+    n587b40e1fd --> na452f62334
+    n587b40e1fd --> n8eb78605e0
+    n8a8621de4e["python/src/kb_setup/events.py::configure()"]
+    n2ad8ec3fa2["python/src/kb_setup/events.py::_processors()"]
+    n8a8621de4e --> n2ad8ec3fa2
+    n9107669d0f["python/src/kb_setup/events.py::emit()"]
+    nb4f962551b["python/src/kb_setup/events.py::_ensure_sink()"]
+    n9107669d0f --> nb4f962551b
+    n3f3def5676["python/src/kb_setup/events.py::worker_id()"]
+    n9107669d0f --> n3f3def5676
+    nb4f962551b --> n8a8621de4e
+    nb4116bb618["python/src/kb_setup/sinks.py::is_sink()"]
+    nb4f962551b --> nb4116bb618
+    na290781edc["python/src/kb_setup/sinks.py::default_handlers()"]
+    nb4f962551b --> na290781edc
+    n20ac291612["python/src/kb_setup/events.py::fail()"]
+    n20ac291612 --> n9107669d0f
+    n986ee41065["python/src/kb_setup/events.py::_TallyProcessor"]
+    n2ad8ec3fa2 --> n986ee41065
+    n6f7e2a4f22["python/src/kb_setup/events.py::say()"]
+    n6f7e2a4f22 --> n9107669d0f
+    nf8d48ae73b["python/src/kb_setup/events.py::warn()"]
+    nf8d48ae73b --> n9107669d0f
+    nb3b9737ba9["python/src/kb_setup/graph.py::_input_fingerprints()"]
+    nde969ae161 --> nb3b9737ba9
+    n60dcd304bf["python/src/kb_setup/manifest.py::load_all()"]
+    nde969ae161 --> n60dcd304bf
+    nde969ae161 --> n346cc44a88
+    nde969ae161 --> nddfa2ba15f
+    n8abe7aa775["python/src/kb_setup/graph.py::_clear_stamp()"]
+    nde969ae161 --> n8abe7aa775
+    n565dadc9dc["python/src/kb_setup/graph.py::_ensure_clone()"]
+    nde969ae161 --> n565dadc9dc
+    ne7dced2af3["python/src/kb_setup/graph.py::_extract_code()"]
+    nde969ae161 --> ne7dced2af3
+    n1285de27d7["python/src/kb_setup/graph.py::_extract_self()"]
+    nde969ae161 --> n1285de27d7
+    n0b65cd2c4a["python/src/kb_setup/graph.py::_merge_sources_into()"]
+    nde969ae161 --> n0b65cd2c4a
+    n99a3147c97["python/src/kb_setup/graph.py::_build_study_graph()"]
+    nde969ae161 --> n99a3147c97
+    nd232727bfc["python/src/kb_setup/graph.py::_cluster_study_graph()"]
+    nde969ae161 --> nd232727bfc
+    nf9d7f87670["python/src/kb_setup/graphify_env.py::graphify_python()"]
+    nde969ae161 --> nf9d7f87670
+    n63a198f8fd["python/src/kb_setup/graph.py::_replay_doc_chunks()"]
+    nde969ae161 --> n63a198f8fd
+    ne10970a551["python/src/kb_setup/graphify_ops.py::label()"]
+    nde969ae161 --> ne10970a551
+    na1eb54e150["python/src/kb_setup/graph_checks.py::assert_composition()"]
+    nde969ae161 --> na1eb54e150
+    n3f62beb189["python/src/kb_setup/graph.py::_write_compose_manifest()"]
+    nde969ae161 --> n3f62beb189
+    n4a1bf8f3b6["python/src/kb_setup/graph.py::ComposeManifest"]
+    nde969ae161 --> n4a1bf8f3b6
+    n464e31298a["python/src/kb_setup/graph.py::_self_subgraph()"]
+    nde969ae161 --> n464e31298a
+    n9d9e6692b2["python/src/kb_setup/graph.py::_reset_merged_chunks()"]
+    nde969ae161 --> n9d9e6692b2
+    nd7f7b5be6a["python/src/kb_setup/graph.py::_stamp_build()"]
+    nde969ae161 --> nd7f7b5be6a
+    n99a3147c97 --> n0b65cd2c4a
+    nc4ac6da10c["python/src/kb_setup/hyperedges.py::capture_from_data()"]
+    na1eb54e150 --> nc4ac6da10c
+    n6c28362f22["python/src/kb_setup/graph_checks.py::_record_counts()"]
+    na1eb54e150 --> n6c28362f22
+    nd6cf157703["python/src/kb_setup/graph_counts.py::record()"]
+    n6c28362f22 --> nd6cf157703
+    n0b24cfda06["python/src/kb_setup/graph.py::_currency_spec()"]
+    n8abe7aa775 --> n0b24cfda06
+    n8abe7aa775 --> ne01b6135e1
+    n791e57a3d2["python/src/kb_setup/graph.py::_run()"]
+    nd232727bfc --> n791e57a3d2
+    n27c593cedd["python/src/kb_setup/graphify_env.py::graphify_exe()"]
+    nd232727bfc --> n27c593cedd
+    nc0a4b3a86f["python/src/kb_setup/graph_counts.py::_fingerprint()"]
+    nc0a4b3a86f --> nc6e4be6faf
+    nd6cf157703 --> nc0a4b3a86f
+    n570f1e78a4["python/src/kb_setup/atomic.py::write_text()"]
+    nd6cf157703 --> n570f1e78a4
+    n796c36efef["python/src/kb_setup/graph_counts.py::ledger_path()"]
+    nd6cf157703 --> n796c36efef
+    nd6cf157703 --> n6f7e2a4f22
+    n0b24cfda06 --> n9c56b632f3
+    ne7dced2af3 --> n27c593cedd
+    nf8caab3d20["python/src/kb_setup/graphify_env.py::clean_env()"]
+    ne7dced2af3 --> nf8caab3d20
+    n1285de27d7 --> n791e57a3d2
+    n571e4f93f9["python/src/kb_setup/graph.py::_self_extract_argv()"]
+    n1285de27d7 --> n571e4f93f9
+    n1285de27d7 --> n464e31298a
+    nb3b9737ba9 --> n0b24cfda06
+    nb3b9737ba9 --> nd46b885d18
+    n0b65cd2c4a --> n791e57a3d2
+    n0b65cd2c4a --> n27c593cedd
+    ndb8cbb972a["python/src/kb_setup/graph.py::_derived_root()"]
+    n63a198f8fd --> ndb8cbb972a
+    ne0389164b6["python/src/kb_setup/graph.py::_replay_pairs()"]
+    n63a198f8fd --> ne0389164b6
+    ne0389164b6 --> neddebcc519
+    ne0389164b6 --> n791e57a3d2
+    n0abf8bfce5["python/src/kb_setup/graph.py::_handoff_counts()"]
+    ne0389164b6 --> n0abf8bfce5
+    n83605d9691["python/src/kb_setup/graph.py::_write_merged_chunks()"]
+    n9d9e6692b2 --> n83605d9691
+    n791e57a3d2 --> nf8caab3d20
+    n571e4f93f9 --> n27c593cedd
+    nd7f7b5be6a --> n0b24cfda06
+    nc7a314f4b2["python/src/kb_setup/currency/sync.py::observed_version()"]
+    nd7f7b5be6a --> nc7a314f4b2
+    nd7f7b5be6a --> n27c593cedd
+    n745a6139be["python/src/kb_setup/currency/sync.py::manifest_ref()"]
+    nd7f7b5be6a --> n745a6139be
+    nd7f7b5be6a --> n587b40e1fd
+    n798d10b4fd["python/src/kb_setup/graph.py::_compose_manifest_path()"]
+    n3f62beb189 --> n798d10b4fd
+    n3f62beb189 --> n570f1e78a4
+    nefd9a8f13e["python/src/kb_setup/graph.py::_merged_chunks_path()"]
+    n83605d9691 --> nefd9a8f13e
+    n83605d9691 --> n570f1e78a4
+    n887e6c2ff4["python/src/kb_setup/graphify_env.py::pinned_graphify_version()"]
+    nf9d7f87670 --> n887e6c2ff4
+    na5301a29d7["python/src/kb_setup/graphify_env.py::_python_graphify_version()"]
+    nf9d7f87670 --> na5301a29d7
+    n8083be00ec["python/src/kb_setup/graphify_env.py::_imports_graphify()"]
+    nf9d7f87670 --> n8083be00ec
+    n9889c5bd68["python/src/kb_setup/graphify_ops.py::_derive_prose()"]
+    nd0253e3f54["python/src/kb_setup/prose.py::derive_for()"]
+    n9889c5bd68 --> nd0253e3f54
+    n9889c5bd68 --> n20ac291612
+    n9889c5bd68 --> nd6cf157703
+    ne10970a551 --> n27c593cedd
+    ne10970a551 --> n20ac291612
+    n497a07a94c["python/src/kb_setup/stamps.py::snapshot_views()"]
+    ne10970a551 --> n497a07a94c
+    ne10970a551 --> nf8caab3d20
+    n3772b8e71e["python/src/kb_setup/graphify_ops.py::_labelled()"]
+    ne10970a551 --> n3772b8e71e
+    ne10970a551 --> n791e57a3d2
+    ne10970a551 --> nf8d48ae73b
+    n7ab2bdcd3e["python/src/kb_setup/stamps.py::refresh_after_regen()"]
+    n3772b8e71e --> n7ab2bdcd3e
+    n3772b8e71e --> n9889c5bd68
+    n44327957d5["python/src/kb_setup/hyperedges.py::_coalesce()"]
+    nc4ac6da10c --> n44327957d5
+    ne6a61b6ff1["python/src/kb_setup/hyperedges.py::_nested()"]
+    nc4ac6da10c --> ne6a61b6ff1
+    n4d7eac4e8b["python/src/kb_setup/hyperedges.py::_top()"]
+    nc4ac6da10c --> n4d7eac4e8b
+    n282e445cb2["python/src/kb_setup/manifest.py::load()"]
+    n6638116486["python/src/kb_setup/manifest.py::_parse()"]
+    n282e445cb2 --> n6638116486
+    n60dcd304bf --> n282e445cb2
+    nc227c64e00["python/src/kb_setup/prose.py::derive()"]
+    n1ddff33e6d["python/src/kb_setup/prose.py::is_ast()"]
+    nc227c64e00 --> n1ddff33e6d
+    n33dfe83361["python/src/kb_setup/prose.py::_surviving_hyperedges()"]
+    nc227c64e00 --> n33dfe83361
+    nc57fa48deb["python/src/kb_setup/prose.py::prose_graph_path()"]
+    nd0253e3f54 --> nc57fa48deb
+    nd0253e3f54 --> nc227c64e00
+    n4ce3e73a61["python/src/kb_setup/prose.py::_members()"]
+    n33dfe83361 --> n4ce3e73a61
+    nd4c300b7e7["python/src/kb_setup/sinks.py::_human_handlers()"]
+    na290781edc --> nd4c300b7e7
+    n260b462f5d["python/src/kb_setup/sinks.py::HumanSink"]
+    nd4c300b7e7 --> n260b462f5d
+    n83d9b67091["python/src/kb_setup/sinks.py::_StdStreamHandler"]
+    nd4c300b7e7 --> n83d9b67091
+    nc0e8c2a4b6["python/src/kb_setup/sinks.py::_wire()"]
+    nd4c300b7e7 --> nc0e8c2a4b6
+    n22254967d5["python/src/kb_setup/sinks.py::_MaxLevel"]
+    nd4c300b7e7 --> n22254967d5
+    na2798afc41["python/src/kb_setup/sinks.py::_render_with()"]
+    nc0e8c2a4b6 --> na2798afc41
+    n7ab2bdcd3e --> n9203e68652
+    n7ab2bdcd3e --> n9c56b632f3
+    n497a07a94c --> nb379e5b1bf
+    n497a07a94c --> n9c56b632f3

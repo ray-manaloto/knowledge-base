@@ -1,0 +1,570 @@
+<title>What Reaches What</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+
+<style>
+  :root{
+    --ground:#f2f5f9;
+    --panel:#ffffff;
+    --panel-2:#e5eaf3;
+    --edge:#c8d2e2;
+    --ink:#141922;
+    --ink-soft:#4b5567;
+    --ink-faint:#788395;
+    --signal:#3550c4;
+    --signal-soft:#dde3fa;
+    --warn:#9c5f0c;
+    --warn-soft:#f6e8d2;
+    --good:#116b52;
+    --good-soft:#d5ece4;
+    --plate:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0e131b;
+      --panel:#161d28;
+      --panel-2:#1e2735;
+      --edge:#2b3648;
+      --ink:#e3e9f3;
+      --ink-soft:#a4b0c2;
+      --ink-faint:#78849a;
+      --signal:#8aa2ff;
+      --signal-soft:#1a2450;
+      --warn:#e0a34e;
+      --warn-soft:#3a2a10;
+      --good:#4ecfa4;
+      --good-soft:#0f3329;
+      --plate:#f4f6fa;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0e131b;
+    --panel:#161d28;
+    --panel-2:#1e2735;
+    --edge:#2b3648;
+    --ink:#e3e9f3;
+    --ink-soft:#a4b0c2;
+    --ink-faint:#78849a;
+    --signal:#8aa2ff;
+    --signal-soft:#1a2450;
+    --warn:#e0a34e;
+    --warn-soft:#3a2a10;
+    --good:#4ecfa4;
+    --good-soft:#0f3329;
+    --plate:#f4f6fa;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:"Public Sans",system-ui,-apple-system,sans-serif;
+    font-size:16.5px;
+    line-height:1.65;
+    margin:0;
+    padding:0 1.2rem 6rem;
+  }
+
+  .col{max-width:36rem; margin:0 auto; display:flex; flex-direction:column; gap:1.25rem}
+  .wide{max-width:62rem; margin:0 auto; width:100%}
+
+  h1,h2,h3{
+    font-family:"Fraunces",Georgia,serif;
+    text-wrap:balance; margin:0; line-height:1.12;
+    font-variation-settings:"opsz" 40;
+  }
+  h1{font-size:clamp(2.1rem,5.6vw,3.2rem); font-weight:700; letter-spacing:-.02em}
+  h2{font-size:1.5rem; font-weight:700; margin-top:1.9rem; letter-spacing:-.01em}
+  h3{font-size:1.06rem; font-weight:500}
+  p{margin:0}
+
+  .eyebrow{
+    font-family:"DM Mono",ui-monospace,monospace; font-size:.71rem;
+    letter-spacing:.15em; text-transform:uppercase; color:var(--signal); margin:0;
+  }
+  .lede{font-size:1.13rem; color:var(--ink-soft)}
+
+  code,.mono{font-family:"DM Mono",ui-monospace,monospace; font-size:.86em}
+  code{background:var(--panel-2); padding:.1em .35em; border-radius:3px}
+
+  header{padding:4rem 0 .4rem}
+  hr{border:0; border-top:1px solid var(--edge); margin:.3rem 0}
+
+  figure{margin:0; display:flex; flex-direction:column; gap:.8rem}
+  figure svg{width:100%; height:auto; display:block; color:var(--ink)}
+  figcaption{
+    font-size:.85rem; color:var(--ink-faint); max-width:36rem;
+    margin-inline:auto; text-align:center; text-wrap:balance;
+  }
+
+  .scroll{overflow-x:auto}
+
+  .panel{
+    background:var(--panel); border:1px solid var(--edge); border-radius:3px;
+    padding:1.05rem 1.15rem; display:flex; flex-direction:column; gap:.55rem;
+  }
+  .panel.signal{border-left:3px solid var(--signal)}
+  .panel.warn{border-left:3px solid var(--warn)}
+  .panel.good{border-left:3px solid var(--good)}
+
+  table{border-collapse:collapse; width:100%; font-size:.87rem}
+  th,td{text-align:left; padding:.46rem .6rem; border-bottom:1px solid var(--edge); vertical-align:top}
+  th{
+    font-family:"DM Mono",ui-monospace,monospace; font-size:.68rem;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); font-weight:400;
+  }
+  td.num{font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap}
+  td.mono{font-family:"DM Mono",ui-monospace,monospace; font-size:.79rem}
+
+  .tag{
+    font-family:"DM Mono",ui-monospace,monospace; font-size:.67rem;
+    letter-spacing:.05em; text-transform:uppercase; padding:.15em .48em;
+    border-radius:2px; white-space:nowrap; font-weight:500;
+  }
+  .tag.ok{background:var(--good-soft); color:var(--good)}
+  .tag.no{background:var(--warn-soft); color:var(--warn)}
+  .tag.info{background:var(--signal-soft); color:var(--signal)}
+
+  .cite{font-size:.84rem; color:var(--ink-faint)}
+
+  ul.check{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.55rem}
+  ul.check li{display:grid; grid-template-columns:1.5rem 1fr; gap:.6rem; align-items:start; font-size:.94rem}
+  ul.check .box{
+    font-family:"DM Mono",ui-monospace,monospace; font-weight:500;
+    font-size:.95rem; line-height:1.5;
+  }
+  ul.check .box.done{color:var(--good)}
+  ul.check .box.part{color:var(--warn)}
+  ul.check .box.open{color:var(--ink-faint)}
+  ul.check .what{color:var(--ink)}
+  ul.check .where{display:block; color:var(--ink-faint); font-size:.83rem; margin-top:.1rem}
+
+  a{color:var(--signal)}
+  a:focus-visible,*:focus-visible{outline:2px solid var(--signal); outline-offset:2px}
+</style>
+
+<header class="col">
+  <p class="eyebrow">Coverage audit &middot; measured 2026-08-26</p>
+  <h1>What reaches what</h1>
+  <p class="lede">Every graphify command, traced to the mise task and the Python
+  function that reach it &mdash; and the ones nothing reaches at all.</p>
+  <p class="cite">⚠️ <strong>Two figures on this page were retracted on
+  2026-08-26</strong>, after publication. The correction is inline, beside the
+  figure it affects. The chain itself, and the <code>query</code> finding, are
+  unaffected.</p>
+</header>
+
+<div class="col"><hr></div>
+
+<div class="col">
+  <p>The question was simple to ask and had never been answered: <strong>for each
+  thing graphify can do, what in this repo actually calls it?</strong> Nobody could
+  answer it, because the answer lives across three files that don't reference each
+  other &mdash; <code>mise.toml</code>, <code>cli.py</code>, and graphify's own
+  command table.</p>
+
+  <p>So it got traced. <strong>83 literal commands</strong>, every one followed
+  through the chain.</p>
+</div>
+
+<div class="wide" style="margin:2.1rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 880 246" role="img" preserveAspectRatio="xMidYMid meet"
+       aria-label="The four-link chain from a graphify command to its implementation, shown twice. The top row traces kb-query, which is complete: the graphify query command is reached by the kb-query mise task, which calls graphify_ops.run_query, which spawns the CLI as a subprocess. The bottom row traces graphify clone, where the first two links do not exist, so nothing in the repo reaches the command.">
+    <defs>
+      <marker id="wrw-a" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <polygon points="0,1 10,5 0,9" fill="currentColor"/>
+      </marker>
+    </defs>
+    <g font-family="'DM Mono', ui-monospace, monospace">
+
+      <text x="10" y="18" font-size="10" fill="currentColor" opacity=".6">THE CHAIN</text>
+
+      <!-- column headers -->
+      <text x="98"  y="40" text-anchor="middle" font-size="9" fill="currentColor" opacity=".55">graphify command</text>
+      <text x="300" y="40" text-anchor="middle" font-size="9" fill="currentColor" opacity=".55">mise task</text>
+      <text x="502" y="40" text-anchor="middle" font-size="9" fill="currentColor" opacity=".55">our python function</text>
+      <text x="720" y="40" text-anchor="middle" font-size="9" fill="currentColor" opacity=".55">how it reaches graphify</text>
+
+      <!-- ============ ROW 1: COVERED ============ -->
+      <text x="10" y="70" font-size="9.5" font-weight="500" fill="#116b52">COVERED &mdash; 19 of 83</text>
+
+      <rect x="16" y="80" width="164" height="40" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="98" y="105" text-anchor="middle" font-size="11" fill="currentColor">graphify query</text>
+
+      <line x1="180" y1="100" x2="212" y2="100" stroke="#116b52" stroke-width="1.4" marker-end="url(#wrw-a)"/>
+
+      <rect x="218" y="80" width="164" height="40" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="300" y="105" text-anchor="middle" font-size="11" fill="currentColor">kb-query</text>
+
+      <line x1="382" y1="100" x2="414" y2="100" stroke="#116b52" stroke-width="1.4" marker-end="url(#wrw-a)"/>
+
+      <rect x="420" y="80" width="164" height="40" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="502" y="99" text-anchor="middle" font-size="10.5" fill="currentColor">graphify_ops</text>
+      <text x="502" y="112" text-anchor="middle" font-size="9" fill="currentColor" opacity=".65">:663</text>
+
+      <line x1="584" y1="100" x2="616" y2="100" stroke="#116b52" stroke-width="1.4" marker-end="url(#wrw-a)"/>
+
+      <rect x="622" y="80" width="164" height="40" rx="2" fill="none" stroke="#9c5f0c" stroke-width="1.3"/>
+      <text x="704" y="99" text-anchor="middle" font-size="10.5" font-weight="500" fill="#9c5f0c">CLI subprocess</text>
+      <text x="704" y="112" text-anchor="middle" font-size="8.5" fill="currentColor" opacity=".65">SDK path is private</text>
+
+      <!-- ============ ROW 2: MISSING ============ -->
+      <text x="10" y="164" font-size="9.5" font-weight="500" fill="#9c5f0c">GENUINELY UNCOVERED — 16 (RETRACTED, see below)</text>
+
+      <rect x="16" y="174" width="164" height="40" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="98" y="199" text-anchor="middle" font-size="11" fill="currentColor">graphify clone</text>
+
+      <!-- broken link 1 -->
+      <line x1="180" y1="194" x2="190" y2="194" stroke="#9c5f0c" stroke-width="1.4"/>
+      <line x1="202" y1="194" x2="212" y2="194" stroke="#9c5f0c" stroke-width="1.4"/>
+      <line x1="191" y1="187" x2="201" y2="201" stroke="#9c5f0c" stroke-width="2"/>
+      <line x1="201" y1="187" x2="191" y2="201" stroke="#9c5f0c" stroke-width="2"/>
+
+      <rect x="218" y="174" width="164" height="40" rx="2" fill="none"
+            stroke="#9c5f0c" stroke-width="1.3" stroke-dasharray="5 4"/>
+      <text x="300" y="199" text-anchor="middle" font-size="10.5" fill="#9c5f0c">no task</text>
+
+      <!-- broken link 2 -->
+      <line x1="382" y1="194" x2="392" y2="194" stroke="#9c5f0c" stroke-width="1.4"/>
+      <line x1="404" y1="194" x2="414" y2="194" stroke="#9c5f0c" stroke-width="1.4"/>
+      <line x1="393" y1="187" x2="403" y2="201" stroke="#9c5f0c" stroke-width="2"/>
+      <line x1="403" y1="187" x2="393" y2="201" stroke="#9c5f0c" stroke-width="2"/>
+
+      <rect x="420" y="174" width="164" height="40" rx="2" fill="none"
+            stroke="#9c5f0c" stroke-width="1.3" stroke-dasharray="5 4"/>
+      <text x="502" y="199" text-anchor="middle" font-size="10.5" fill="#9c5f0c">no function</text>
+
+      <line x1="584" y1="194" x2="616" y2="194" stroke="currentColor" stroke-width="1" opacity=".3" stroke-dasharray="3 3"/>
+
+      <rect x="622" y="174" width="164" height="40" rx="2" fill="none"
+            stroke="currentColor" stroke-width="1" opacity=".35"/>
+      <text x="704" y="199" text-anchor="middle" font-size="10" fill="currentColor" opacity=".55">unreachable</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption>The chain, traced twice. <code>query</code> is complete end to end
+  &mdash; and lands on a CLI subprocess because its SDK function is private.
+  <code>clone</code> breaks at the first link: no task names it, so no function
+  calls it, so nothing in this repo can run it.</figcaption>
+</figure>
+</div>
+
+<div class="col">
+  <h2>Where the 83 commands actually land</h2>
+
+  <p>The raw split looks alarming &mdash; <strong>41 MISSING</strong> &mdash; and
+  most of it is not a gap. Two thirds of the missing surface is missing
+  <em>because a standing invariant forbids it</em>.</p>
+</div>
+
+<div class="wide" style="margin:1.7rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 880 190" role="img" preserveAspectRatio="xMidYMid meet"
+       aria-label="A stacked bar dividing 64 traced command rows into four groups: 19 covered by a mise task, 4 allowed as read-only direct calls, 19 platform installers, 6 counted as banned, and 16 counted as genuinely uncovered. NOTE: the last two figures were retracted after publication — the real ban count is 2, and the platform rows are not out of scope. See the correction beside this figure.">
+    <g font-family="'DM Mono', ui-monospace, monospace">
+      <text x="10" y="20" font-size="10" fill="currentColor" opacity=".6">64 TRACED ROWS &mdash; WHERE THEY LAND</text>
+
+      <!-- bar: total width 860 over 64 rows => 13.44 px per row -->
+      <!-- 19 covered -->
+      <rect x="10" y="38" width="255" height="34" fill="#116b52" opacity=".85"/>
+      <!-- 4 read-only -->
+      <rect x="265" y="38" width="54" height="34" fill="#3550c4" opacity=".8"/>
+      <!-- 19 platform -->
+      <rect x="319" y="38" width="255" height="34" fill="currentColor" opacity=".22"/>
+      <!-- 6 banned -->
+      <rect x="574" y="38" width="81" height="34" fill="currentColor" opacity=".13"/>
+      <!-- 16 genuine gap -->
+      <rect x="655" y="38" width="215" height="34" fill="#9c5f0c" opacity=".9"/>
+
+      <!-- counts inside -->
+      <text x="137" y="60" text-anchor="middle" font-size="13" font-weight="500" fill="#ffffff">19</text>
+      <text x="292" y="60" text-anchor="middle" font-size="12" font-weight="500" fill="#ffffff">4</text>
+      <text x="446" y="60" text-anchor="middle" font-size="13" font-weight="500" fill="currentColor">19</text>
+      <text x="614" y="60" text-anchor="middle" font-size="12" font-weight="500" fill="currentColor">6</text>
+      <text x="762" y="60" text-anchor="middle" font-size="13" font-weight="500" fill="#ffffff">16</text>
+
+      <!-- labels -->
+      <text x="137" y="90" text-anchor="middle" font-size="9.5" fill="#116b52">covered by a task</text>
+      <text x="292" y="90" text-anchor="middle" font-size="9.5" fill="#3550c4">read-only</text>
+      <text x="292" y="101" text-anchor="middle" font-size="9.5" fill="#3550c4">allowed</text>
+      <text x="446" y="90" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".7">platform installers</text>
+      <text x="446" y="101" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".7">&mdash; unused by design</text>
+      <text x="614" y="90" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".7">banned</text>
+      <text x="614" y="101" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".7">outright</text>
+      <text x="762" y="90" text-anchor="middle" font-size="9.5" font-weight="500" fill="#9c5f0c">THE REAL GAP</text>
+
+      <!-- bracket over the not-a-gap region -->
+      <line x1="319" y1="122" x2="655" y2="122" stroke="currentColor" stroke-width="1" opacity=".45"/>
+      <line x1="319" y1="122" x2="319" y2="116" stroke="currentColor" stroke-width="1" opacity=".45"/>
+      <line x1="655" y1="122" x2="655" y2="116" stroke="currentColor" stroke-width="1" opacity=".45"/>
+      <text x="487" y="137" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7">25 rows missing BECAUSE AN INVARIANT SAYS SO &mdash; not a gap</text>
+
+      <line x1="655" y1="152" x2="870" y2="152" stroke="#9c5f0c" stroke-width="1"/>
+      <line x1="655" y1="152" x2="655" y2="146" stroke="#9c5f0c" stroke-width="1"/>
+      <line x1="870" y1="152" x2="870" y2="146" stroke="#9c5f0c" stroke-width="1"/>
+      <text x="762" y="167" text-anchor="middle" font-size="10" fill="#9c5f0c">clone &middot; merge-driver &middot; benchmark &middot; provider&times;4 &middot; prs &middot; 8 more</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption><strong>⚠️ Both numbers in this figure are RETRACTED &mdash; see the
+  correction below.</strong> As originally published: &ldquo;41 MISSING collapses
+  to 16 once the 19 platform-installer rows (this repo is project-Claude-only) and
+  the 6 invariant-banned verbs are set aside.&rdquo;</figcaption>
+</figure>
+</div>
+
+<div class="col">
+  <div class="panel" style="border-left:3px solid var(--warn)">
+    <h3>⚠️ Corrected after publication &mdash; 2026-08-26</h3>
+    <p style="color:var(--ink-soft)"><strong>The figure above is wrong in two
+    places, and both errors are the same mistake: reading a rule's shape instead
+    of its text.</strong> The bar is left standing rather than redrawn, because it
+    was published and may already have been cited.</p>
+    <p style="color:var(--ink-soft)"><strong>&ldquo;6 invariant-banned verbs&rdquo;
+    &mdash; the real number is 2.</strong> <code>do-not.md</code> #2 bans
+    <code>hook install</code>, <code>extract --global</code> and
+    <code>global add</code>. Counted wrongly: <code>global list</code> and
+    <code>global path</code> are <strong>read-only calls rule 3 explicitly
+    allows</strong>; <code>global remove</code> is not named; and
+    <code>watch</code> is <strong>explicitly NOT banned</strong> &mdash;
+    <code>do-not.md</code> had <em>already corrected itself</em> about
+    <code>watch</code> in the very entry that was misread.</p>
+    <p style="color:var(--ink-soft)"><strong>&ldquo;this repo is
+    project-Claude-only&rdquo; &mdash; false.</strong> It runs codex lanes,
+    antigravity cold reviews, an <code>openai-cli</code> graphify backend, and
+    already maintains two platform skill trees. <code>do-not.md</code> #1 is about
+    <code>--project</code> scope, not platform exclusivity. So the 19
+    platform-installer rows are <strong>not uniformly out of scope</strong> and
+    need re-triage.</p>
+    <p style="color:var(--ink-soft)"><strong>Revised: ~20 genuinely uncovered, 2
+    banned, and the platform rows unresolved.</strong> Filed as <strong>#527</strong>;
+    the arithmetic is corrected in <strong>#522</strong>'s comments.</p>
+  </div>
+</div>
+
+<div class="col">
+  <div class="panel signal">
+    <h3>The most useful row is the one that isn't a gap</h3>
+    <p class="cite">(This panel is unaffected by the correction above &mdash; the
+    <code>query</code> finding was measured directly, not derived from a rule.)</p>
+    <p style="color:var(--ink-soft)"><code>query</code> is <strong>covered</strong>
+    &mdash; a task reaches it, a function calls it &mdash; and it still lands on a
+    CLI subprocess, because <code>graphify.serve._query_graph_text</code> is
+    <strong>private</strong> and has no public alternative anywhere. That's the
+    single fact that decides the SDK question for the whole repo: the heaviest-used
+    verb cannot move to the SDK without importing an underscore, which is the
+    violation that got an entire layer deleted on 2026-08-24.</p>
+  </div>
+</div>
+
+<div class="col">
+  <h2>The extractor that already exists</h2>
+
+  <p>A prototype from 2026-08-24 &mdash; declared throwaway, left in
+  <code>/tmp</code> &mdash; already extracts the four layers this map needs. It
+  works. Three of its four layers work well.</p>
+</div>
+
+<div class="wide" style="margin:1.7rem auto">
+<figure>
+  <div class="scroll">
+  <svg viewBox="0 0 880 214" role="img" preserveAspectRatio="xMidYMid meet"
+       aria-label="Four extraction layers with their measured edge counts: skill edges found 395, task edges found 82, dispatch edges found 13, and config edges found only 2. The fourth layer is broken not because of a bug but because config file paths are passed as parameters rather than written at the point where the file is read, so a single-function analysis cannot connect them.">
+    <g font-family="'DM Mono', ui-monospace, monospace">
+      <text x="10" y="18" font-size="10" fill="currentColor" opacity=".6">emit.py &mdash; FOUR LAYERS, MEASURED</text>
+
+      <!-- layer 1 -->
+      <rect x="10" y="34" width="200" height="58" rx="2" fill="none" stroke="#116b52" stroke-width="1.4"/>
+      <text x="110" y="55" text-anchor="middle" font-size="11" fill="currentColor">skill_edges</text>
+      <text x="110" y="76" text-anchor="middle" font-size="19" font-weight="500" fill="#116b52">395</text>
+
+      <!-- layer 2 -->
+      <rect x="226" y="34" width="200" height="58" rx="2" fill="none" stroke="#116b52" stroke-width="1.4"/>
+      <text x="326" y="55" text-anchor="middle" font-size="11" fill="currentColor">task_edges</text>
+      <text x="326" y="76" text-anchor="middle" font-size="19" font-weight="500" fill="#116b52">82</text>
+
+      <!-- layer 3 -->
+      <rect x="442" y="34" width="200" height="58" rx="2" fill="none" stroke="#116b52" stroke-width="1.4"/>
+      <text x="542" y="55" text-anchor="middle" font-size="11" fill="currentColor">dispatch_edges</text>
+      <text x="542" y="76" text-anchor="middle" font-size="19" font-weight="500" fill="#116b52">13</text>
+
+      <!-- layer 4 - broken -->
+      <rect x="658" y="34" width="200" height="58" rx="2" fill="none"
+            stroke="#9c5f0c" stroke-width="1.6" stroke-dasharray="6 4"/>
+      <text x="758" y="55" text-anchor="middle" font-size="11" fill="currentColor">config_edges</text>
+      <text x="758" y="76" text-anchor="middle" font-size="19" font-weight="500" fill="#9c5f0c">2</text>
+
+      <!-- why -->
+      <line x1="758" y1="92" x2="758" y2="116" stroke="#9c5f0c" stroke-width="1.2"/>
+      <text x="858" y="132" text-anchor="end" font-size="10" fill="#9c5f0c">why 2 and not 200:</text>
+
+      <!-- the mechanism, drawn -->
+      <rect x="330" y="140" width="230" height="30" rx="2" fill="none" stroke="currentColor" stroke-width="1"/>
+      <text x="445" y="159" text-anchor="middle" font-size="10" fill="currentColor">manifest.load_all() globs the path</text>
+
+      <line x1="560" y1="155" x2="596" y2="155" stroke="#9c5f0c" stroke-width="1.3" stroke-dasharray="4 3"/>
+      <text x="578" y="147" text-anchor="middle" font-size="8" fill="#9c5f0c">passes a</text>
+      <text x="578" y="176" text-anchor="middle" font-size="8" fill="#9c5f0c">variable</text>
+
+      <rect x="602" y="140" width="230" height="30" rx="2" fill="none" stroke="currentColor" stroke-width="1"/>
+      <text x="717" y="159" text-anchor="middle" font-size="10" fill="currentColor">load(p) does the read</text>
+
+      <text x="10" y="159" font-size="10" fill="currentColor" opacity=".7">the literal filename</text>
+      <text x="10" y="172" font-size="10" fill="currentColor" opacity=".7">and the actual read</text>
+      <text x="10" y="185" font-size="10" font-weight="500" fill="#9c5f0c">are a FUNCTION APART</text>
+
+      <line x1="140" y1="163" x2="324" y2="157" stroke="currentColor" stroke-width="1" opacity=".4"/>
+    </g>
+  </svg>
+  </div>
+  <figcaption>Three layers found hundreds of edges; the fourth found two. Not a
+  bug &mdash; this codebase passes config paths as parameters, so the filename and
+  the read sit in different functions. Closing that needs analysis that follows a
+  value <em>across</em> a function boundary, which is exactly what a language
+  server does and no AST pass can.</figcaption>
+</figure>
+</div>
+
+<div class="col">
+  <h2>Answers to the rest</h2>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>question</th><th>answer</th></tr></thead>
+    <tbody>
+      <tr><td>Did the prior deep extraction complete?</td>
+          <td><span class="tag ok">yes</span> 13,442 nodes / 26,791 edges, 19/19 chunks, rc=0</td></tr>
+      <tr><td>What did it cost?</td>
+          <td><strong>$0.00</strong> &mdash; Max-plan billed. The $41.78 belongs to a different, deleted layer</td></tr>
+      <tr><td>Was a reflection run?</td>
+          <td><span class="tag ok">yes</span> a <code>corrected</code> work-memory record, propagated to <code>LESSONS.md</code></td></tr>
+      <tr><td>Every artifact generated?</td>
+          <td><span class="tag ok">7 of 8</span> the 8th (<code>svg</code>) is a designed skip above 5,000 nodes</td></tr>
+      <tr><td>Was it merged into the graph?</td>
+          <td><span class="tag no">no</span> 138 MB, machine-local, never committed</td></tr>
+      <tr><td>Can the SDK replace the CLI?</td>
+          <td><span class="tag no">no</span> 5 parity &middot; 5 partial &middot; <strong>1 private-only</strong> &mdash; and that one is <code>query</code></td></tr>
+      <tr><td>Can extraction pick its backend?</td>
+          <td><span class="tag ok">yes</span> <code>extract_corpus_parallel(backend=…)</code>, public and pinned</td></tr>
+      <tr><td>Can token depletion be detected?</td>
+          <td><span class="tag ok">yes, asymmetrically</span> codex proactively from on-disk rate limits; claude reactively from its error text</td></tr>
+      <tr><td>Does the cache survive a backend switch?</td>
+          <td><span class="tag no">it survives too well</span> the key is <strong>backend-blind</strong> &mdash; see below</td></tr>
+      <tr><td>Graph size vs its gate</td>
+          <td>736.28 MiB &middot; 492,461 nodes &middot; 1,155,475 edges</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="col">
+  <div class="panel warn">
+    <h3>The finding that needs a decision, not just a note</h3>
+    <p style="color:var(--ink-soft)">graphify's semantic cache is keyed on
+    <strong>(mode, prompt fingerprint, content hash)</strong> &mdash; and nothing
+    else. The word <em>backend</em> appears <strong>zero times</strong> in
+    <code>cache.py</code>.</p>
+    <p style="color:var(--ink-soft)">So if Claude's tokens run out and the same
+    files are re-extracted on <code>openai-cli</code>, the cache returns a
+    <strong>silent hit carrying Claude's output</strong>, labelled as an OpenAI
+    run. No provenance is recorded in the cache entry or in the graph. The only
+    existing lever is <code>--force</code>, which discards the entire cache rather
+    than partitioning it.</p>
+    <p style="color:var(--ink-soft)">This matters precisely because backend
+    failover was asked for: the failover works, and it would quietly launder one
+    model's output as another's.</p>
+  </div>
+
+  <div class="panel good">
+    <h3>And one thing already exists that nobody used</h3>
+    <p style="color:var(--ink-soft)">graphify ships <code>--fallback-backend</code>.
+    It fires only on a <em>total</em> zero-success run, not on mid-run depletion
+    &mdash; so it is not the feature that was wanted, but it is the hook the wanted
+    feature should be built on rather than beside.</p>
+  </div>
+</div>
+
+<div class="col">
+  <h2>Every question asked, and where it stands</h2>
+  <p class="cite">✓ answered &middot; ◐ partly &middot; ○ open</p>
+
+  <ul class="check">
+    <li><span class="box done">✓</span><span class="what">1 &mdash; Did we run a reflection from the prior deep extraction?
+      <span class="where">Yes — a <code>corrected</code> memory record, 2026-08-24, reaching LESSONS.md</span></span></li>
+    <li><span class="box part">◐</span><span class="what">2 &mdash; Did we run every step needing agent work?
+      <span class="where">All but one; <code>kb-query</code> verification leaves no artifact, so it is UNKNOWN rather than done</span></span></li>
+    <li><span class="box done">✓</span><span class="what">3 &mdash; Did we generate every artifact?
+      <span class="where">7 of 8; <code>svg</code> is a designed skip, control-armed against the aggregate graph</span></span></li>
+    <li><span class="box done">✓</span><span class="what">4 &mdash; How could tree-sitter AST and the ty LSP help?
+      <span class="where">Answered on its own page, <em>What the AST Cannot See</em> — and <code>ty</code> ships call &amp; type hierarchy natively at the version already pinned here</span></span></li>
+    <li><span class="box done">✓</span><span class="what">5 &mdash; Name every use of the /graphify skill, SDK, CLI, and our modules
+      <span class="where">Ledger reported each turn. Skill: 1 · CLI: 1 · SDK: 0 · our modules: ~15 task invocations</span></span></li>
+    <li><span class="box part">◐</span><span class="what">6 &mdash; Artifact mapping each graphify command through the chain
+      <span class="where">This page. Generated-from-graph version pending the extractor</span></span></li>
+    <li><span class="box done">✓</span><span class="what">7 &mdash; Find the history of the earlier diagram work
+      <span class="where">Found: three prototypes, 11 research reports, 3 open epics, 5 handoffs carrying it</span></span></li>
+    <li><span class="box done">✓</span><span class="what">8 &mdash; File issues for anything discovered without one
+      <span class="where">Six filed — #518 #519 #520 #521 #522 #523 — plus #478 connected to its fix, #436 closed, #370 and #435 commented</span></span></li>
+    <li><span class="box done">✓</span><span class="what">9 &mdash; A numbered checkbox list of every question
+      <span class="where">This list</span></span></li>
+    <li><span class="box open">○</span><span class="what">10 &mdash; A codex lane reviewing instruction compliance
+      <span class="where">Scoped: prompt + diff + artifacts → docs/review/, three numbered lists</span></span></li>
+    <li><span class="box done">✓</span><span class="what">11 &mdash; Run /grilling until shared understanding
+      <span class="where">Five rounds, 20 decisions settled</span></span></li>
+    <li><span class="box done">✓</span><span class="what">12 &mdash; Which diagram tools are prototyped, pending, eliminated?
+      <span class="where">38 candidates surveyed on its own page — 16 eliminated, 10 evaluated only, 6 pending, 6 actually run</span></span></li>
+    <li><span class="box done">✓</span><span class="what">13 &mdash; Is the output style working? Build a skill for it
+      <span class="where">Style works; compliance was 1 in 5. Skill built, linted, mirrored, live</span></span></li>
+    <li><span class="box done">✓</span><span class="what">14 &mdash; Research how to get past the size gate
+      <span class="where">Measured; 3 of 5 candidate options refuted, telemetry sized from a real 2,610-byte record</span></span></li>
+    <li><span class="box part">◐</span><span class="what">15 &mdash; Re-run deep extraction on another backend when tokens deplete
+      <span class="where">The vehicle is live and armed on both backends; graphify ships <code>--fallback-backend</code>. Blocked on #518 — the cache is backend-blind</span></span></li>
+  </ul>
+
+  <div class="panel" style="margin-top:1.4rem">
+    <h3>Updated after publication &mdash; 2026-08-26</h3>
+    <p style="color:var(--ink-soft)">Items <strong>4</strong>, <strong>8</strong>
+    and <strong>12</strong> were open when this page first went up and are now
+    answered; <strong>15</strong> moved from feasible-in-principle to
+    vehicle-live-but-blocked. Recorded rather than silently overwritten, because
+    a checklist someone has already read is a claim they may have acted on.</p>
+    <p style="color:var(--ink-soft)">Item <strong>10</strong> is the one that
+    genuinely has not moved.</p>
+    <p style="color:var(--ink-soft)">Item <strong>5</strong> closed, and it cost
+    something to leave open. The <code>/graphify</code> skill says to
+    <em>expand a question against the graph's own vocabulary before
+    querying</em>. The one graph query this round skipped that step, asked about
+    &ldquo;the extraction backend&rdquo;, and came back with 2,204 nodes of
+    vendored Rust &mdash; because <code>backend</code> is a word the corpus uses
+    constantly and the question never met the graph's actual terms. That was read
+    as the graph being unhelpful. It was the query.</p>
+  </div>
+</div>
+
+<div class="col" style="margin-top:2.4rem">
+  <hr>
+  <p class="cite"><strong>Provenance.</strong> Every figure measured this session
+  against <code>1d03e461</code>, on branch
+  <code>round/2026-08-26-a-graphify-coverage</code>. Command counts re-derived from
+  the coverage table by counting rows, not retyped. Graph size read with
+  <code>stat</code>; node and edge counts read from the generated
+  <code>GRAPH_REPORT.md</code> rather than by re-parsing 736 MiB. The
+  <em>374 units</em> figure quoted elsewhere for the prior extraction is
+  <strong>inherited and not re-derived</strong> — it is labelled here rather than
+  repeated as measured. Negative claims on this page carry their control arm in the
+  underlying reports under
+  <code>.agent/kb/reports/agents/*-2026-08-26.md</code>.</p>
+
+  <p class="cite"><strong>Skills used:</strong> <code>artifact-design</code>,
+  <code>artifact-diagramming</code>, <code>artifact-capabilities</code> (read;
+  <strong>no capabilities declared</strong> — this page is static, and declaring
+  any would block sharing). <strong>Considered and not used:</strong>
+  <code>dataviz</code> — its subject is charts of data, and every figure here is a
+  mechanism; <code>design</code> — multi-artboard canvas, a different deliverable;
+  <code>writing-for-agents</code> — governs skills and AGENTS.md, not reader prose
+  (it was used for the new skill, not for this page).</p>
+</div>

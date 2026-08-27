@@ -127,21 +127,37 @@ gh = "2.98.0"
 
 # Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
 # (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
-# (yuting0624/antigravity-for-claude-code). Canonical mise registry short names
-# (https://mise.jdx.dev/registry.html): `codex`=aqua:openai/codex,
-# `antigravity-cli`=aqua:google-antigravity/antigravity-cli (Google's current
-# agentic CLI, exposes Gemini 3.x; ships both `antigravity` and the `agy`
-# symlink the antigravity plugin drives). The Claude architect stays in the
-# chair; these are the executor lanes only. auth is per-user (codex login /
-# Google account) — mise manages the binaries, not the credentials.
+# (yuting0624/antigravity-for-claude-code). `antigravity-cli`'s canonical mise
+# registry short name (https://mise.jdx.dev/registry.html) is
+# `aqua:google-antigravity/antigravity-cli` (Google's current agentic CLI,
+# exposes Gemini 3.x; ships both `antigravity` and the `agy` symlink the
+# antigravity plugin drives). `codex` below is pinned by its EXPLICIT
+# `npm:@openai/codex` backend rather than the `codex` registry short name —
+# see why below. The Claude architect stays in the chair; these are the
+# executor lanes only. auth is per-user (codex login / Google account) — mise
+# manages the binaries, not the credentials.
 #
-# ⚠️ `mise ls-remote codex` is the WRONG instrument for "does this version
-# exist". It lists the aqua registry, which lags GitHub by a day or more:
-# 0.146.1 was Latest upstream for ~4h and absent from all 277 rows, while
-# rows for NEWER 0.147.0-alphas were present. The registry entry is
-# `aqua:openai/codex npm:@openai/codex`, and the npm fallback had it — so
-# `mise install codex@<v>` resolved fine. Verify a codex bump by attempting
-# the install, never by grepping `ls-remote` (probes-need-a-control-arm.md).
+# ⚠️ THE `codex` SHORT NAME IS PINNED BY A LAGGING LIST, NOT A LAGGING
+# REGISTRY — an earlier version of this note blamed the aqua registry and an
+# npm-fallback install; that story was MEASURED WRONG and is corrected here.
+# `mise latest codex` reads `https://mise-versions.jdx.dev/data/codex.toml`,
+# whose newest row was `"0.150.0-alpha.9"` on 2026-08-26 — control-armed, that
+# URL returns 200 while a bogus tool name 404s, so the probe discriminates.
+# A stale PER-TOOL cache compounds it (`~/.cache/mise/codex/remote_versions-
+# *.msgpack.z`, several ages coexisting): `mise latest codex` reported
+# `0.149.1` on this host, a full release behind, while **0.150.0 was already
+# installed via aqua itself** — `mise tool codex` names the backend, and there
+# was no npm fallback involved. Verify a bump by attempting the install, never
+# by grepping `ls-remote`/`latest` (probes-need-a-control-arm.md).
+#
+# ⚠️ THE PIN BELOW TRADES INTEGRITY VERIFICATION FOR CURRENCY, KNOWINGLY. The
+# `aqua:openai/codex` backend (the short name above) checksums every download
+# (`mise tool codex` → `Security: checksum (sha256)`); the `npm:@openai/codex`
+# backend below does not (`mise tool "npm:@openai/codex"` → `Security:
+# [none]`) and adds a `node` runtime dependency. The owner accepted that cost
+# on 2026-08-26, specifically to reach 0.150.1 past the lagging list above —
+# a stated ruling, not an oversight. Re-litigate it with the owner before
+# reverting to the short name, and update this note if you do.
 #
 # ⚠️ THIS PIN DOES NOT DECIDE WHICH `agy` RUNS. A hand-installed 143 MB
 # binary sits at `~/.local/bin/agy` (dated 2026-07-14, reports **1.1.2**), and
@@ -158,10 +174,15 @@ gh = "2.98.0"
 # `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
-codex = "0.149.1"
-antigravity-cli = "1.1.20"
+"npm:@openai/codex" = "0.150.1"
+antigravity-cli = "1.1.21"
 "npm:ctx7" = { version = "0.5.8", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.1"
+# coreutils: macOS ships BSD userland, not GNU — this repo's own rules and
+# probes want GNU behaviour (`timeout`'s rc 124 on expiry, `nproc`, `tac`).
+# Undeclared, the bare names hit erroring mise shims (rc 1), which reads
+# exactly like the command under test failing. conda backend (prebuilt).
+"conda:coreutils" = "9.11"
 
 [deps.uv]
 auto = true
@@ -708,18 +729,36 @@ run = "uv run kb-setup graphify-contract"
 description = "Build or verify the pinned Graphify-only deterministic AST candidate"
 run = "uv run kb-setup graphify-baseline"
 
-# [tasks.kb-graphify-native-extract] was REMOVED 2026-08-24 — the module it ran
-# (`kb_setup.graphify_native_extract`) is PARKED, not deleted. The cold review of
-# fa4ed551ac7e confirmed three blocking defects reachable only through this task
-# and its CLI subcommand: `--out --dry-run` silently runs a REAL extraction (#479),
-# an inherited GRAPHIFY_OUT bypasses the --out guard entirely (#480), and the two
-# functions that spawn the subprocess have zero test coverage — stubbing both to
-# `return 0` leaves all 42 tests green (#481). Removing the task and the `cli.py`
-# dispatch together is what makes those paths unreachable; the module and its
-# tests stay in the tree as groundwork. Restore both together, and only once
-# #479/#480/#481 are closed. It is a STOPGAP for the SDK path, never the
-# destination (`docs/archive/README.md`), so reviving it is a decision to take,
-# not a repair to perform.
+[tasks.kb-graphify-native-extract]
+description = "graphify's OWN native deep extraction over the pinned sources/graphify clone; --cluster re-clusters an existing --out tree; --artifacts [view...] regenerates derived views (wiki/graphml/svg/...) over it"
+run = "uv run kb-setup graphify-native-extract"
+# UNPARKED 2026-08-26, together with the `cli.py` dispatch — the two are one
+# gesture, exactly as the park's own note required.
+#
+# It was REMOVED 2026-08-24 so that three blocking defects reachable ONLY
+# through this task and that dispatch could not be reached while they were
+# fixed: `--out --dry-run` swallowed the flag and ran a REAL extraction (#479),
+# an inherited GRAPHIFY_OUT bypassed the `--out` guard (#480), and the two
+# functions that spawn the subprocess had zero coverage — stubbing both to
+# `return 0` left all 42 tests green (#481).
+#
+# All three are CLOSED. The module now carries 70 tests, four of which drive
+# `_run_real`/`_run_cluster` directly.
+#
+# What the park did NOT have is a mechanism: its restore condition was prose in
+# a comment, and nothing in this repo evaluates one. The condition went true
+# weeks before anyone noticed, and surfaced only because a `/tmp` sweep for an
+# unrelated reason walked past it. That is #519, and it is the durable defect —
+# this park was just where it showed.
+#
+# No timeout here, deliberately — this is a multi-hour run that stays serial by
+# default (see the module docstring's GRAPHIFY_CLAUDE_CLI_PARALLEL section for
+# what --allow-parallel-claude-cli does and does not establish) and the caller
+# bounds it, not this task. It stays a foreground `--dry-run`-first invocation a
+# human is watching. `--cluster` and `--artifacts` are instant relative to
+# extraction and are untimed for the same reason.
+#
+# NOT in GATE_TASKS and never should be: it spends model tokens.
 
 [tasks.kb-skillopt-contract]
 description = "Verify the exact SkillOpt VCS provenance, reviewed API/CLI, lock, and isolated mock dry-run"
@@ -797,6 +836,24 @@ description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbo
 # built and never wired. `mise-tasks-only.md`: a recurring workflow ships as a task.
 run = "uv run kb-setup affected"
 
+[tasks.kb-code-intel]
+description = 'Provenance-tagged code-intel edges (mise task/skill/dispatch/config -> Python): mise run kb-code-intel [-- --lanes a,b --out PATH --format chunk|json]'
+# This repo's graph indexes Python AST ONLY — no nodes for mise tasks, skills,
+# or config files, so "what task reaches this function?" goes unanswered and
+# the entry-point diagram Ray keeps asking for is hand-drawn and goes stale
+# (#276). Every edge here is PROVENANCE-TAGGED (MISE_TASK/SKILL_FENCE/
+# CLI_DISPATCH/CONFIG_READ/TY_LSP) and carries `verified` — issue #276's own
+# requirement, because an untagged edge set merged into a 736 MiB aggregate
+# graph is unreviewable. The TY_LSP lane is STUBBED (always finds 0) pending
+# the backend decision from #276's Serena evaluation; the other four are
+# static reads (subprocess/AST/regex), all `verified=True` by construction.
+#
+# Read-only and writes NOTHING under graphify-out/: emitting a chunk is in
+# scope, merging it into the aggregate graph is a separate, later step. Not in
+# `_GRAPH_WRITERS`, so no pinned-graphify preflight — same class as
+# `kb-affected`, not `kb-build`. Logic in kb_setup.code_intel.
+run = "uv run kb-setup code-intel"
+
 [tasks.kb-insights]
 description = 'Print what the graph already computed: surprises, questions, god nodes, provenance audit'
 # graphify computes surprises/questions/gods/cohesion on every cluster-only/label run
@@ -859,6 +916,29 @@ description = "Gate: is graph.json still small enough for graphify to READ it?"
 # here: its `GB` suffix means GiB, so a hand-rolled reading agrees on the string
 # and disagrees on the number by 7%.
 run = "uv run kb-setup graph-size"
+
+[tasks.funnel]
+description = "Gate: did this branch's research reach the corpus (sources/**)?"
+# A SHIP GATE for a clause that had lived only in prose: this repo's stated
+# purpose is that research it does becomes corpus another session can query.
+# Measured on the branch that motivated this task: 33 files added under
+# `docs/research/**`/`docs/artifacts/**`, 0 lines under `sources/**` — the same
+# round ran `curl` 31 times and wrote into `sources/` zero times.
+#
+# DRIFT means a docs delta with no `sources/**` delta and no exemption; a
+# `Funnel-exempt: <reason>` commit trailer is the only escape hatch, never a
+# flag or env var (invisible in history the moment the session ends). See
+# `kb_setup.funnel`'s module docstring for the full state table.
+#
+# Named `funnel`, not `kb-funnel`: `kb_setup.gates.GATE_TASKS` names its members
+# by their BARE mise task name (`lint`, `test`, `graph-size`, `hk-test`, …), and
+# a `kb-`-prefixed task here would leave `gates.undeclared` refusing every
+# `kb-ship` run before any gate executes (`tests/test_gates.py`'s
+# `test_ship_gates_are_the_repo_s_real_declared_tasks`).
+run = "uv run kb-setup funnel"
+# Well under the outer 1800s `gates._GATE_TIMEOUT` — this is a handful of `git`
+# subprocess calls against one branch's delta, not a build.
+timeout = "60s"
 
 [tasks.kb-serve]
 description = "Start the read-only MCP server pinned to THIS graph (stdio)"
