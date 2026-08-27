@@ -348,3 +348,25 @@ graphify KB (which we control), not external mirrors.
   README/CLI as the command authority (the graph is the "how it works" layer).
 - Wave 1 (get a queryable graph fast): #1–#9, #11–#14 code+prose. Wave 2: #15–#19.
   #20–#21 stay deferred.
+
+## Backlog added 2026-08-27 — prior art on mechanized control arms
+
+Surfaced by the `aggregated-research` skill's self-referential run
+(`docs/research/reports/2026-08-27-aggregated-research-prior-art.md`, P3 of the
+Aggregated round). All three are published agent prompts that mechanize a
+negative control — the discipline `.claude/rules/probes-need-a-control-arm.md`
+states in prose and `kb_setup.arms` implements. **Read once, not yet ingested.**
+
+- <https://github.com/purpleailab/decepticon> — `validate_workspace_finding`
+  requires a positive command AND an equivalent negative-control command before a
+  finding is promoted. The closest published analogue to `kb-arms`.
+- <https://github.com/cybersecurityup/neurosploit> — a false-positive filter agent
+  whose method is "default to not a finding", per-class refutation, a
+  negative-control re-test, and mandatory reproduction.
+- <https://github.com/terrylica/cc-skills> — the `crucible` plugin's
+  research-foundations skill: shuffled-null design (three null types chosen by
+  hypothesis class) and agent significance corrections.
+
+Two more repos were read only as that report's control arm and are **not**
+proposed as sources: `jamie-bitflight/claude_skills`,
+`alma-oss/spirit-design-system`.

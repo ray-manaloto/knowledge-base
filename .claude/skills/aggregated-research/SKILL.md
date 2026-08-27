@@ -78,11 +78,24 @@ receive anything is not evidence** — `jdx/hk` has issues DISABLED, so every
 Never `gh search issues`: it returns `[]` instead of failing, and its control
 query with 39 real results also returned `[]` (#507).
 
-### 4. Breadth — the developer index, then the web
+### 4. Breadth — delegate to the bundled workflow
 
-Firecrawl's `developer-index` earns its place over plain search because it returns
-full issue bodies and comment threads inline, so the substantive maintainer
-comment arrives without a follow-up fetch. Fall through to web search only after.
+```text
+/deep-research <question>
+```
+
+Claude Code ships this. It fans out across angles, cross-checks, **votes on each
+claim, and filters out the claims that did not survive**. Do not hand-roll a
+fan-out beside it (`use-tool-builtins.md`). It runs only when invoked, and needs
+WebSearch available.
+
+Then **verify its cited claims against primary sources** — it returns a cited
+report, not a verified one, and steps 1-2 above are what settles a citation.
+
+Fall back to Firecrawl `developer-index` when WebSearch is unavailable, or when
+the question is specifically about a repo's issues and PRs: it returns full issue
+bodies and comment threads inline, so the maintainer comment arrives without a
+follow-up fetch.
 
 ### 5. Synthesis by a strong Claude lane that opens the URLs itself
 
