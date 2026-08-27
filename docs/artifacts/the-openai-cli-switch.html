@@ -251,6 +251,58 @@
   a:focus-visible { outline: 2px solid var(--degrade); outline-offset: 2px; }
 
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  /* ANCESTOR-INDEPENDENT. The previous fix scoped every rule under `.mermaid`,
+     and the viewer still reported black-on-black — consistent with the renderer
+     giving the SVG its own id (`#claude-mermaid-N`, visible in comment anchors)
+     outside that class. These target the id prefix, so they hold wherever the
+     SVG ends up in the DOM. Reported twice by Ray, 2026-08-27. */
+  svg[id^="claude-mermaid"] {
+    background: #ffffff !important;
+    max-width: 100%;
+    height: auto;
+    border-radius: 3px;
+  }
+  svg[id^="claude-mermaid"] text,
+  svg[id^="claude-mermaid"] tspan,
+  svg[id^="claude-mermaid"] .nodeLabel,
+  svg[id^="claude-mermaid"] .edgeLabel,
+  svg[id^="claude-mermaid"] .cluster-label,
+  svg[id^="claude-mermaid"] .messageText,
+  svg[id^="claude-mermaid"] .labelText,
+  svg[id^="claude-mermaid"] .loopText,
+  svg[id^="claude-mermaid"] .noteText,
+  svg[id^="claude-mermaid"] .sequenceNumber,
+  svg[id^="claude-mermaid"] foreignObject div,
+  svg[id^="claude-mermaid"] foreignObject span,
+  svg[id^="claude-mermaid"] foreignObject p {
+    fill: #1b1b1b !important;
+    color: #1b1b1b !important;
+    background: transparent !important;
+  }
+  svg[id^="claude-mermaid"] .edgeLabel rect,
+  svg[id^="claude-mermaid"] .label-container,
+  svg[id^="claude-mermaid"] rect.actor,
+  svg[id^="claude-mermaid"] .actor {
+    fill: #f2f2f4 !important;
+    stroke: #8d8d94 !important;
+  }
+  svg[id^="claude-mermaid"] .cluster rect {
+    fill: #fafafa !important;
+    stroke: #b8b8be !important;
+  }
+  svg[id^="claude-mermaid"] .edgePath path,
+  svg[id^="claude-mermaid"] line,
+  svg[id^="claude-mermaid"] .messageLine0,
+  svg[id^="claude-mermaid"] .messageLine1,
+  svg[id^="claude-mermaid"] .actor-line {
+    stroke: #4a4a4a !important;
+  }
+  svg[id^="claude-mermaid"] marker path,
+  svg[id^="claude-mermaid"] .arrowheadPath,
+  svg[id^="claude-mermaid"] .arrowMarkerPath {
+    fill: #4a4a4a !important;
+    stroke: #4a4a4a !important;
+  }
 </style>
 
 <header>

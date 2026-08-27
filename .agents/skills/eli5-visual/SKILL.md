@@ -123,44 +123,71 @@ publication and nobody noticed. Armed at the time: 13 tracked artifacts used
 and the author broke it. That is why the rule is now a copyable block and not a
 sentence: a norm you must retype is a norm you will retype wrong.
 
-### 2. `%%{init}%%` is NOT enough. Force the plate in CSS
+### 2. Style by SVG **id**, not by `.mermaid` — the class is not an ancestor
 
-Getting the element right only makes the diagram *render*. Mermaid then draws
-its own SVG that **does not inherit the container's theme**, and
-`themeVariables` reaches node fills but **not** edge labels, cluster titles or
-sequence actors — those keep mermaid's own dark ink and vanish on a dark ground.
-Ray, on the very next revision: *"this is hard to see with black background and
-black text."*
+Getting the element right only makes the diagram *render*. Colour is a second,
+separate defect, and it took two failed fixes to locate.
 
-Ship this beside every `.mermaid` rule, verbatim:
+The renderer replaces your block with an SVG it names itself:
+**`#claude-mermaid-0`, `#claude-mermaid-1`, …** — visible in artifact comment
+anchors, which read `#claude-mermaid-1 > text:nth-of-type(7)`. So **every rule
+scoped under `.mermaid` can miss**, and a container-level `background` never
+reaches the drawing at all. That is the shape of the reported symptom: the page's
+own dark ground showing behind mermaid's dark ink.
+
+Ship this verbatim. It is ancestor-independent by construction:
 
 ```css
-.mermaid svg { background: #ffffff !important; max-width: 100%; height: auto; }
-.mermaid svg text,
-.mermaid svg .nodeLabel, .mermaid svg .edgeLabel, .mermaid svg .cluster-label,
-.mermaid svg .messageText, .mermaid svg .labelText, .mermaid svg .loopText,
-.mermaid svg .noteText, .mermaid svg .sequenceNumber { fill: #1b1b1b !important; color: #1b1b1b !important; }
-.mermaid svg .edgeLabel rect, .mermaid svg .label-container,
-.mermaid svg rect.actor { fill: #f4f4f6 !important; stroke: #8d8d94 !important; }
-.mermaid svg .cluster rect { fill: #fafafa !important; stroke: #b8b8be !important; }
-.mermaid svg .edgePath path, .mermaid svg line,
-.mermaid svg .messageLine0, .mermaid svg .messageLine1,
-.mermaid svg .actor-line { stroke: #4a4a4a !important; }
-.mermaid svg marker path, .mermaid svg .arrowheadPath { fill: #4a4a4a !important; stroke: #4a4a4a !important; }
+svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
 ```
 
+`foreignObject div/span/p` matters: mermaid renders flowchart labels as **HTML
+inside the SVG**, where `fill` does nothing and only `color` applies. A rule set
+that names `text` alone leaves exactly those labels unstyled.
+
 Keep the `%%{init: {'theme':'base','themeVariables':{…}}}%%` header too — it
-still sets node fills to your palette. The CSS is the backstop for everything it
-misses, and it is deliberately `!important` and theme-independent: the plate
-stays light in **both** themes, so there is no dark-mode arm to get wrong.
+still sets node fills to your palette. The CSS is the backstop, deliberately
+`!important` and theme-independent: the plate stays light in **both** themes, so
+there is no dark-mode arm to get wrong.
 
-### 3. A publish result is not evidence the diagram rendered
+### 3. You cannot see the page. Say so, and ask
 
-**Nothing in the publish output tells you a mermaid block parsed.** Both defects
-above shipped green and were caught only because a human opened the page. So
-after publishing a page with a diagram on it, **say so and ask** — one line is
-enough: *"reload and tell me if the diagrams render."* Do not report a diagram
-page as done on the strength of a successful publish.
+**There is no runtime surface here you can drive.** The publish result says a
+file was uploaded; it says nothing about whether a mermaid block parsed or what
+colour anything came out. Reading the source back does not help either — the
+defect lives in the *rendered DOM*, which you never see.
+
+So the honest verdict on a diagram page is always **BLOCKED on the reader**, and
+the last line of the message must ask for the observation:
+
+> *"Reload and tell me whether the diagrams render, and whether any text is
+> unreadable."*
+
+**Never infer that other pages work.** A previous revision of this skill claimed
+"13 tracked artifacts use `<pre>` correctly" as evidence the recipe was sound.
+That was an inference from source, not an observation of a render — and two pages
+in the same repo had been silently broken since publication, which is proof
+nobody ever looked. **No mermaid diagram in this repo has been confirmed to
+render by anyone except Ray, and every time he has looked, he has found a defect.**
+
+Three revisions, three misses, in order: `<div>` renders nothing → `.mermaid svg`
+rules that may never match → the id-targeted set above. Each was published as
+fixed. The first two were not.
 
 ### Inline SVG
 
