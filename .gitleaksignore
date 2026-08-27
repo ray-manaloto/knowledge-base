@@ -1,0 +1,10 @@
+# #506: one benign finding in a cold-review report — an ASCII-table row
+# (column-padded plugin names) scored as a high-entropy generic-api-key, not
+# a credential. `gitleaks dir` discards its path arguments once given more
+# than one and scans the whole working directory instead, which is how this
+# gitignored `.agent/` report was ever in scope at all.
+#
+# This fingerprint embeds a commit SHA and goes inert once this branch lands
+# and the report is superseded — that expiry is deliberate, not a bug: it is
+# the pressure to fix #506 rather than accumulate suppressions.
+.agent/kb/review/reports/review-d66b306fd4b965e43e1c9425108f9c1ef809add6-cold.md:generic-api-key:58
