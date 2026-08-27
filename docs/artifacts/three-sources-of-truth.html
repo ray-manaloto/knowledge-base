@@ -242,12 +242,16 @@ NODE graphify    [src=graphify/README.md]</pre>
   </section>
 
   <section>
-    <h2>Both stale sources are stale by the same 18 commands</h2>
-    <p><code>graphify --help</code> does not list what <code>graphify</code> can do. Measured against the installed 0.9.50's own dispatch table:</p>
-    <div class="cmds">
-      cache-html &middot; callflow-html<b> ←</b> &middot; falkordb &middot; graphml &middot; hook-check &middot; hook-guard &middot; html &middot; list &middot; merge-chunks &middot; merge-semantic &middot; obsidian &middot; provider &middot; <b>prs ←</b> &middot; remove &middot; show &middot; status &middot; svg &middot; wiki
+    <h2>Both stale sources are stale by the same 14 command paths</h2>
+    <div class="owned" style="margin-bottom:1.1rem">
+      <p style="margin-bottom:0"><strong>Corrected after publication.</strong> This section first said <em>18</em> and named <code>callflow-html</code> as an example. A cold lane re-derived the diff against upstream and refuted both: my list held 17 items, of which <strong><code>callflow-html</code> and <code>status</code> are in <code>--help</code> after all</strong> (<code>export callflow-html</code> at help line 122; <code>hook status</code> listed under its parent), while <code>export neo4j</code> and the whole <code>provider</code> parent command were <em>missed</em>. The corrected figure is <strong>14 undocumented command paths</strong>. The original claim is left visible rather than quietly swapped, because it had already been acted on.</p>
     </div>
-    <p style="margin-top:0.9rem">Two of those are ones you have <em>already asked for by name</em>. <code>prs</code> is this conversation. <strong><code>callflow-html</code> is PART TWO directive 3</strong> &mdash; <em>&ldquo;generate the callflow-html for the graphify cloned repo and our python library&rdquo;</em> &mdash; a feature request for a command that already ships, undiscoverable from the tool's own help.</p>
+    <p><code>graphify --help</code> does not list everything <code>graphify</code> can do. Re-derived against installed 0.9.50 and confirmed not fork-introduced:</p>
+    <div class="cmds">
+      <b>prs ←</b> &middot; provider <i>(a whole parent command, 4 subcommands)</i> &middot; cache-check &middot; merge-chunks &middot; merge-semantic &middot; hook-check &middot; hook-guard &middot; and 7 of <code>export</code>'s 8 formats
+    </div>
+    <p style="margin-top:0.9rem"><strong>The severity is narrower than it first looked, and that matters.</strong> Every one of these except <code>prs</code>, <code>hook-check</code> and <code>hook-guard</code> prints its own usage when run with bad or missing arguments &mdash; so the defect is specifically that the <em>top-level listing</em> never tells you the verb exists to try. <code>prs</code> is the standout: fully working, eight usage lines in the README, and zero discoverability from the CLI.</p>
+    <p><strong>Root cause, read from the source:</strong> <code>__main__.py</code>'s help output is roughly 140 hand-written <code>print()</code> calls, not generated from <code>dispatch_command()</code>'s own table. Two independently maintained lists that drifted.</p>
   </section>
 
   <section>
@@ -317,11 +321,11 @@ NODE graphify    [src=graphify/README.md]</pre>
     <h2>Where each number came from</h2>
     <div class="cites">
       <div>MEASURED &mdash; <code>mise run kb-query -- "graphify prs PR dashboard review queue worktree mapping"</code>, this session: <code>graphify/prs.py</code> returned third.</div>
-      <div>MEASURED &mdash; installed dispatch verbs from <code>.venv/…/graphify/cli.py</code> (<code>cmd == "…"</code>) diffed against <code>graphify --help</code>: 18 implemented and unlisted.</div>
+      <div>MEASURED, THEN CORRECTED &mdash; installed dispatch verbs from <code>.venv/…/graphify/cli.py</code> (<code>cmd == "…"</code>) diffed against <code>graphify --help</code>. My first pass said 18; a cold lane re-derived it as <strong>14 command paths</strong>, catching two false positives and two omissions. I re-confirmed the sharpest correction myself before propagating it: <code>graphify --help | grep -n callflow</code> returns line 122, so <code>callflow-html</code> was never missing. Control arm: the same grep for <code>hook-guard</code> returns 0.</div>
       <div>MEASURED &mdash; <code>graphify/README.md</code>: 6 nodes in the graph; the file is 912 lines.</div>
       <div>READ &mdash; <code>.venv/lib/python3.14/site-packages/graphify/cli.py:1048</code>, the <code>prs</code> dispatch branch.</div>
       <div>READ &mdash; the <code>/graphify</code> SKILL.md Usage block, auto-loaded this session: no <code>prs</code>, no <code>callflow-html</code>.</div>
-      <div>QUOTED &mdash; PART TWO directive 3, <code>docs/direction/2026-08-26-ray-directives.md</code>.</div>
+      <div>RETRACTED &mdash; the claim that PART TWO directive 3 asked for <code>callflow-html</code> because <code>--help</code> hid it. The command is listed. Why it was asked for is not something this page measured, and it should not have said so.</div>
       <div>NOT MEASURED &mdash; whether 6 nodes is normal for a 912-line README under this corpus's extraction settings. It was enough to answer the question, which is the only claim made here.</div>
     </div>
   </section>
