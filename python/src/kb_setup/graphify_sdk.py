@@ -1065,8 +1065,10 @@ _NON_SOURCE_SUFFIXES = frozenset(
         # A `.mcpb` is a zip archive of an MCP server bundle — opaque bytes,
         # like the `.jar` and `.whl` already here.
         ".mcpb",
-        # A `.pth` is one line of text setuptools appends to `sys.path`. Not a
-        # program: nothing in it is reachable as a definition.
+        # Both `.pth` meanings land here and neither is graph source: the
+        # setuptools spelling is a line of text appended to `sys.path`, and the
+        # PyTorch spelling — much the more common one in the wild — is a
+        # serialised checkpoint, opaque bytes like the `.bin` above.
         ".pth",
     }
 )
@@ -1401,7 +1403,16 @@ def _is_non_source(name: str, suffix: str) -> bool:
         or suffix in _NON_SOURCE_SUFFIXES
         # `.search`, not `.match`: the licence word is not at position 0 in a
         # prefixed spelling, and the regex now carries its own leading boundary.
-        or _LICENSE_NAME.search(name) is not None
+        #
+        # The suffix guard is what keeps that widening from reaching CONTENT.
+        # Every licence spelling this class exists for is extensionless or
+        # carries an inert one (`LICENSE`, `LICENSE.md`, `LICENSE_1_0.txt`,
+        # `PRETTIER_LICENSE`), while `docs/verify-license.adoc` is an AsciiDoc
+        # document that merely has the word in a hyphenated segment. Without
+        # this it moved from the COUNTED class to the SILENT one — measured
+        # both ways, and the silent direction is the one that loses corpus
+        # without saying so. Caught by the cold lane on c66da9e0.
+        or (suffix not in _UNSUPPORTED_LANGUAGE_SUFFIXES and _LICENSE_NAME.search(name) is not None)
         or _is_ignore_metadata_name(name)
     )
 

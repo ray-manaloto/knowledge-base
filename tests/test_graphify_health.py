@@ -343,3 +343,60 @@ def test_a_real_graphify_warning_sharing_the_prefix_still_blocks() -> None:
     )
     assert receipt.state is GraphifyState.INCOMPLETE
     assert "stderr" in receipt.reasons
+
+
+# The exact line a real `kb-build` failed closed on, 2026-08-27, once #397's
+# classifier widening let detection through and extraction was reached for the
+# first time. Verbatim from the traceback, not reconstructed from the f-string.
+_REPLACED_NODE_LINE = "[graphify] Replaced 1555 node(s) from re-extracted source file(s)."
+
+
+def test_known_graphify_replace_progress_is_not_unaccounted_stderr() -> None:
+    """GREEN ARM: the `Replaced` sibling of the prune narration is benign.
+
+    Verified against the vendor source rather than its wording
+    (`graphify/build.py:1724`): a node is dropped only when its `source_file`
+    appears in the NEW chunks, and those chunks are merged in the same build,
+    so no source is removed without a replacement. Reverting the `Replaced`
+    alternative in `_ROUTINE_MERGE_PROGRESS` makes this fail.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(observed=True, stderr=_REPLACED_NODE_LINE),
+    )
+    assert receipt.state is GraphifyState.COMPLETE
+    assert receipt.reasons == ()
+    require_complete(receipt)  # must not raise
+
+
+def test_the_replace_line_is_anchored_like_its_prune_sibling() -> None:
+    r"""RED ARM: trailing text on the same line is NOT approved by association.
+
+    The whole reason the pattern is anchored `\A…\Z` is that Graphify reuses
+    the `[graphify] ` prefix for genuine warnings a few statements away.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(
+            observed=True,
+            stderr=f"{_REPLACED_NODE_LINE} WARNING: 900 of them had no replacement",
+        ),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert "stderr" in receipt.reasons
+
+
+def test_a_replace_line_for_edges_is_not_silently_approved() -> None:
+    """A pattern must not be drawn wider than what was observed.
+
+    Graphify prints no `Replaced N edge(s)` line at all — only the node one —
+    so approving an edge spelling would approve something never seen.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(
+            observed=True,
+            stderr="[graphify] Replaced 12 edge(s) from re-extracted source file(s).",
+        ),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE

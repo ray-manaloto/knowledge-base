@@ -521,3 +521,33 @@ def test_a_numeric_suffix_does_not_absorb_a_real_extension(tmp_path: Path) -> No
     _non_source, unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
     assert unsupported == ()
     assert unresolved == (relative,)
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        # REGRESSION, cold lane on c66da9e0. Widening the licence rule to admit
+        # a prefixed spelling also admitted any CONTENT file with the word in a
+        # hyphen- or dot-delimited segment, moving it from the counted class to
+        # the silent one. Control arm below: the same extension without the word
+        # must stay counted, or this test passes for the wrong reason.
+        "docs/verify-license.adoc",
+        "docs/licence-policy.adoc",
+        "spec/copying-rules.graphql",
+    ],
+)
+def test_a_content_file_merely_naming_a_licence_is_never_silent(
+    tmp_path: Path, relative: str
+) -> None:
+    _write(tmp_path, relative)
+    non_source, unsupported, _unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert non_source == ()
+    assert unsupported == (relative,)
+
+
+def test_the_licence_content_control_arm(tmp_path: Path) -> None:
+    """Same extension, no licence word — proves the test above discriminates."""
+    relative = _write(tmp_path, "docs/api.adoc")
+    non_source, unsupported, _unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert non_source == ()
+    assert unsupported == (relative,)
