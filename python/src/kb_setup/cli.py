@@ -62,7 +62,7 @@ def _print_usage() -> int:
         "kb-setup: build | update <name> | watch | prose | query <question> [--prose] | "
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
-        "insights [--top N] | graph-size | "
+        "insights [--top N] | graph-size | funnel | "
         "telemetry-prune | serve | "
         "merge <chunk> | label | "
         "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
@@ -183,6 +183,17 @@ def _run(argv: list[str] | None = None) -> int:
         # Read-only, like `affected` just above: no graph write, so no
         # `_GRAPH_WRITERS` membership and no pinned-graphify preflight (#276).
         return code_intel.code_intel_main(repo_root, rest)
+    if cmd == "funnel":
+        from kb_setup import funnel
+
+        # A bare arm, not grouped into `_dispatch_graph_hygiene` below: that
+        # helper's members share "how big has this grown", and `funnel` asks a
+        # different question (did this branch's research reach `sources/**`).
+        # Left flat on the `pyproject.toml` per-file-ignore precedent this
+        # dispatcher already carries (`C901`/`PLR0911`/`PLR0912`/`PLR0915` for
+        # `cli.py`) — one more `if cmd == ...` arm is the intended shape here,
+        # not a ceiling to work around with a new grouping helper.
+        return funnel.main(repo_root, rest)
     if cmd in {"insights", "graph-size", "telemetry-prune"}:
         return _dispatch_graph_hygiene(repo_root, cmd, rest)
     if cmd == "serve":
@@ -551,7 +562,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | "
-        "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
+        "handoff-check [path] | gates [task...] [--stop] | check <path...> | funnel | "
         "session-state [--no-pr] | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
         "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "

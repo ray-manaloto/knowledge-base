@@ -896,6 +896,29 @@ description = "Gate: is graph.json still small enough for graphify to READ it?"
 # and disagrees on the number by 7%.
 run = "uv run kb-setup graph-size"
 
+[tasks.funnel]
+description = "Gate: did this branch's research reach the corpus (sources/**)?"
+# A SHIP GATE for a clause that had lived only in prose: this repo's stated
+# purpose is that research it does becomes corpus another session can query.
+# Measured on the branch that motivated this task: 33 files added under
+# `docs/research/**`/`docs/artifacts/**`, 0 lines under `sources/**` — the same
+# round ran `curl` 31 times and wrote into `sources/` zero times.
+#
+# DRIFT means a docs delta with no `sources/**` delta and no exemption; a
+# `Funnel-exempt: <reason>` commit trailer is the only escape hatch, never a
+# flag or env var (invisible in history the moment the session ends). See
+# `kb_setup.funnel`'s module docstring for the full state table.
+#
+# Named `funnel`, not `kb-funnel`: `kb_setup.gates.GATE_TASKS` names its members
+# by their BARE mise task name (`lint`, `test`, `graph-size`, `hk-test`, …), and
+# a `kb-`-prefixed task here would leave `gates.undeclared` refusing every
+# `kb-ship` run before any gate executes (`tests/test_gates.py`'s
+# `test_ship_gates_are_the_repo_s_real_declared_tasks`).
+run = "uv run kb-setup funnel"
+# Well under the outer 1800s `gates._GATE_TIMEOUT` — this is a handful of `git`
+# subprocess calls against one branch's delta, not a build.
+timeout = "60s"
+
 [tasks.kb-serve]
 description = "Start the read-only MCP server pinned to THIS graph (stdio)"
 # graphify-mcp binds to an ABSOLUTE graph path, so this server only ever serves

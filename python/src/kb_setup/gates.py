@@ -136,6 +136,18 @@ SHA_ABBREV = 12
 #: died reports rc=0 forever. Wrapped rather than run bare because `hk test`
 #: exits 0 when it runs NOTHING (measured on 1.56.0), so `kb_setup.hk_test`
 #: asserts a floor on the count before it reads hk's rc.
+#: `funnel` joined 2026-08-26 (`kb_setup.funnel`). It is the missing enforcement
+#: for a clause that had lived only in prose: research this repo produces must
+#: reach the corpus. Measured on the branch that motivated it — 33 files added
+#: under `docs/research/**`/`docs/artifacts/**`, 0 lines under `sources/**` — the
+#: same shape `graph-size` fixed for "the number was computed and never gated".
+#: It reads git and prints; it writes NOTHING, so question 1 of `CONCURRENT_SAFE`
+#: below is answered. Question 2 is not: its `git diff`/`git rev-list`/`git
+#: interpret-trailers` calls against the same working tree `lint` and `test`
+#: exercise have not been characterised, so — `hk-test`'s precedent, not
+#: `graph-size`'s — it stays OUT of `CONCURRENT_SAFE` and runs exclusive. It
+#: costs a handful of git subprocess calls, not a `stat`, so "correct and slow"
+#: costs nothing worth trading away here either.
 GATE_TASKS = (
     "lint",
     "test",
@@ -143,6 +155,7 @@ GATE_TASKS = (
     "eval",
     "graph-size",
     "hk-test",
+    "funnel",
 )
 #: `kb-corpus-integrity` WAS here, gating the semantic-corpus layer's staged
 #: evidence tree. It left with that layer's removal (2026-08-24) — see
