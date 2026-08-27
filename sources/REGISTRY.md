@@ -370,3 +370,23 @@ states in prose and `kb_setup.arms` implements. **Read once, not yet ingested.**
 Two more repos were read only as that report's control arm and are **not**
 proposed as sources: `jamie-bitflight/claude_skills`,
 `alma-oss/spirit-design-system`.
+
+## Backlog added 2026-08-27 — Claude↔Codex handoff doctrine
+
+Surfaced by the `aggregated-research` skill's P4 run
+(`docs/research/reports/2026-08-27-claude-codex-handoff.md`). **Read once, not yet
+ingested.** They carry the doctrine the corpus does not have — the standing
+finding is that this corpus indexes its dependencies and not its decisions.
+
+- <https://github.com/pipeshub-ai/pipeshub-ai> — `docs/multi-agent-best-practices.md`,
+  a synthesis of Anthropic's multi-agent guidance: decompose by context boundary
+  rather than role type; typed contracts at every handoff; externalize large state
+  to an artifact store and return a pointer plus summary.
+- <https://github.com/shanraisshan/claude-code-best-practice> — the cross-model
+  Claude+Codex workflow that reviews the PLAN against the codebase before
+  implementation, inserting phases rather than rewriting them.
+- <https://github.com/kryota-dev/actions> — ADR-006: the analysing agent holds no
+  write access; a deterministic engine posts results.
+
+Read only for figures or context and **not** proposed as sources:
+`jgwill/miadi-orchestration-kit`, `rmusser01/tldw_server`.
