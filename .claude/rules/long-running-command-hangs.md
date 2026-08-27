@@ -87,30 +87,44 @@ incident: unbounded wait + pipe-masked exit code.
    `head`/`tail` in one session** (2026-08-08), every one discarding the gate's
    rc — because no task answered "are these two files clean?" until `kb-check`.
 
-3a. **`timeout` DOES NOT EXIST ON macOS, and reaching for it is now DENIED**
-   (`kb_setup.absent_binary`, Ray's ruling 2026-08-18). Neither `timeout` nor
-   `gtimeout` resolves here — control-armed, `command -v` returns 1 for both
-   while `perl` returns `/usr/bin/perl`. That matters far more than a missing
-   convenience: the shell answers `command not found` with **rc 127**, which
-   lands in a transcript looking exactly like the command under test failing.
-   It cost a near-false *"codex unavailable"* — a conclusion about a paid
-   external service drawn from a probe that never ran, which is
-   `probes-need-a-control-arm.md` rule 4 in its most literal form.
+3a. **macOS ships BSD userland — no `timeout`, `nproc` or `tac` by default —
+   and reaching for one of them, or `gtimeout`, is DENIED wherever it is still
+   absent** (`kb_setup.absent_binary`, Ray's ruling 2026-08-18, guard
+   unchanged). This project pins the gap closed: `"conda:coreutils"` in
+   `mise.toml` (declared 2026-08-26, tracked as `[tool.coreutils]` in
+   `currency.toml`) makes `timeout`, `nproc` and `tac` resolve and run BY NAME
+   here, GNU semantics and all (`timeout`'s rc 124 on expiry). `gtimeout` still
+   does not — coreutils never installs that Homebrew name — which is the
+   control arm proving the guard did not go blind: a host or project with no
+   such pin still denies all four exactly as before. The claim is host- and
+   project-conditional, not repealed. **`absent_binary` falling silent on
+   `timeout`/`nproc`/`tac` in this repo is therefore EXPECTED, not a broken
+   guard** — if you see it deny almost nothing here, check `gtimeout 5 ls`
+   still denies (it should) before concluding the guard stopped working.
 
-   Bound the run instead, in this order: **the Bash tool's own `timeout`
-   parameter** (milliseconds — the native mechanism, and `use-tool-builtins.md`
-   says reach for it first); **a mise task's `timeout` key** for anything
+   **None of that promotes a working `timeout` to first choice.** Bound the
+   run in this order regardless of whether it resolves: **the Bash tool's own
+   `timeout` parameter** (milliseconds — the native mechanism, and
+   `use-tool-builtins.md` says reach for it first — it bounds the whole call
+   and needs no binary at all); **a mise task's `timeout` key** for anything
    recurring; `perl -e 'alarm shift @ARGV; exec @ARGV' <secs> <cmd> …` for a
-   one-off.
+   one-off with neither. The pinned GNU binary exists for the rules and probes
+   here that specifically want its exit-code semantics, not as a substitute
+   for bounding a call some other way.
 
-   **Why a deny and not this paragraph.** It *was* this paragraph — it reached a
-   handoff's own "things that will bite you" list, written by the session it bit,
-   and was walked into again. Same measurement as every other guard here: the
-   warning-only graph-first rule scored 0 compliance in 19 chances; the deny that
-   replaced it took its violations 62 → 0. The guard is host-conditional
-   (`shutil.which`), so on a machine where `timeout` exists it is silently inert,
-   and `command -v timeout` / `which timeout` are never denied — they are the
-   control arm.
+   **Why this is a DENY and not just a paragraph.** An unbounded probe against
+   a genuinely absent binary fails with `command not found`, **rc 127**; a name
+   that resolves to a broken shim can instead fail with **rc 1** — either lands
+   in a transcript looking exactly like the command under test failing. It cost
+   a near-false *"codex unavailable"*, a conclusion about a paid external
+   service drawn from a probe that never ran (`probes-need-a-control-arm.md`
+   rule 4, most literal form). This rule *was* only a paragraph once — it
+   reached a handoff's own "things that will bite you" list, written by the
+   session it bit, and was walked into again. Same measurement as every other
+   guard here: the warning-only graph-first rule scored 0 compliance in 19
+   chances; the deny that replaced it took its violations 62 → 0.
+   `command -v timeout` / `which timeout` / `type timeout` are never denied —
+   the other control arm.
 
 4. **A stalled process is a hang — kill it, don't keep waiting.** A
    process sitting at 0% CPU with no children for minutes is wedged

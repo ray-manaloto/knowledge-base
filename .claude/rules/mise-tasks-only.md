@@ -111,16 +111,23 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
    See `research-doc-sources.md` step 0 for the scope.
 2c. **The SAME hook also denies a probe whose command word is not installed
    here** (`kb_setup.absent_binary`, Ray's ruling 2026-08-18). `timeout` /
-   `gtimeout` / `nproc` / `tac` are GNU coreutils and absent on macOS; a probe
-   using one dies with `command not found` (**rc 127**) and reads in a transcript
-   as the thing under test failing. It nearly produced a false *"codex
-   unavailable"*. Host-conditional via `shutil.which`, so it is inert where the
-   binary exists; `command -v` / `which` / `type` are never denied, being the
-   control arm. It runs LAST of the four stateless Bash guards — a command
-   tripping this AND a gate redirect reports the gate, which is about what the
-   author meant to do. Shares `check_first`'s tokeniser (`segments` /
-   `command_word`, promoted to public for exactly this) rather than carrying a
-   second copy to drift. See `long-running-command-hangs.md` rule 3a.
+   `gtimeout` / `nproc` / `tac` are GNU coreutils, absent from macOS's BSD
+   userland by default; a probe using one dies with `command not found`
+   (**rc 127**) and reads in a transcript as the thing under test failing. It
+   nearly produced a false *"codex unavailable"*. Host-conditional via
+   `shutil.which`, so it falls silent wherever the binary resolves AND runs —
+   which, since `"conda:coreutils"` was pinned in `mise.toml` 2026-08-26, is now
+   `timeout`/`nproc`/`tac` **in this project**. `gtimeout` still denies here
+   (coreutils never installs that Homebrew name), which is the control arm
+   proving the guard did not just go blind — a repo or a host with no such pin
+   still denies all four exactly as before. `command -v` / `which` / `type` are
+   never denied, being the other control arm. It runs LAST of the four stateless
+   Bash guards — a command tripping this AND a gate redirect reports the gate,
+   which is about what the author meant to do. Shares `check_first`'s tokeniser
+   (`segments` / `command_word`, promoted to public for exactly this) rather
+   than carrying a second copy to drift. See `long-running-command-hangs.md`
+   rule 3a for the full story, and why a resolvable `timeout` still is not the
+   first reach.
 2d. **The SAME hook also denies a command that would PRINT a credential value**
    (`kb_setup.secret_guard`, #441). `fnox get`/`export`, `fnox list --values`,
    `doppler secrets get`/`download`, bare `doppler secrets` (its default prints

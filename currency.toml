@@ -620,6 +620,24 @@ version_pattern = '^ffmpeg version (\d+\.\d+(?:\.\d+)?)'
 # rather than failing, since the conda install lives on the Mac host.
 os = ["macos"]
 
+# ---- coreutils: GNU behaviour this repo's own rules/probes depend on ---------
+#
+# macOS ships BSD userland. `.claude/rules/long-running-command-hangs.md` rule
+# 3a and several probes across this repo want GNU semantics specifically —
+# `timeout`'s rc 124 on expiry, `nproc`, `tac` — none of which the BSD builtins
+# provide (BSD has no `timeout`/`nproc`/`tac` at all). Same shape as ffmpeg
+# above: no `pypi`/`github`, so this is PRESENCE-ONLY — step 1 checks the pin
+# resolves and `timeout` is reachable, and the upstream probe reports
+# "not version-tracked" rather than manufacturing a permanent ambiguity.
+[tool.coreutils]
+mise_key = "conda:coreutils"
+binary = "timeout"
+version_args = ["--version"]
+version_pattern = '^timeout \(GNU coreutils\) (\d+\.\d+(?:\.\d+)?)'
+# Host-only, like ffmpeg: a Linux CI runner already has GNU coreutils as its
+# native userland, so this pin exists to fix a macOS-only gap.
+os = ["macos"]
+
 # ---- mise itself: the one dependency that gates every other one --------------
 #
 # Every workflow here is a `mise run` task, and mise is installed standalone at

@@ -162,6 +162,11 @@ codex = "0.149.1"
 antigravity-cli = "1.1.20"
 "npm:ctx7" = { version = "0.5.8", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.1"
+# coreutils: macOS ships BSD userland, not GNU — this repo's own rules and
+# probes want GNU behaviour (`timeout`'s rc 124 on expiry, `nproc`, `tac`).
+# Undeclared, the bare names hit erroring mise shims (rc 1), which reads
+# exactly like the command under test failing. conda backend (prebuilt).
+"conda:coreutils" = "9.11"
 
 [deps.uv]
 auto = true
