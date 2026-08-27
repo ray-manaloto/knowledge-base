@@ -1,0 +1,329 @@
+<title>Three Sources Of Truth</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:ital,wght@0,400;0,600;0,800;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground:  #EFEFF2;
+    --card:    #FFFFFF;
+    --sunk:    #E4E5EA;
+    --ink:     #14151A;
+    --muted:   #61636E;
+    --line:    #D3D5DD;
+    --live:    #1F4FD8;
+    --live-bg: #E1E8FC;
+    --stale:   #A6355A;
+    --stale-bg:#F9E3EA;
+    --plate:   #FFFFFF;
+
+    --display: "Instrument Serif", Georgia, serif;
+    --body: "Public Sans", -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #0F1014;
+      --card:    #181A20;
+      --sunk:    #1F2128;
+      --ink:     #E8E9EE;
+      --muted:   #969AA6;
+      --line:    #2C2F38;
+      --live:    #7FA0FF;
+      --live-bg: #16203D;
+      --stale:   #F0879F;
+      --stale-bg:#33161F;
+      --plate:   #FFFFFF;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:  #0F1014;
+    --card:    #181A20;
+    --sunk:    #1F2128;
+    --ink:     #E8E9EE;
+    --muted:   #969AA6;
+    --line:    #2C2F38;
+    --live:    #7FA0FF;
+    --live-bg: #16203D;
+    --stale:   #F0879F;
+    --stale-bg:#33161F;
+    --plate:   #FFFFFF;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 73ch;
+    margin: 0 auto;
+    padding: 4rem 1.4rem 6rem;
+    display: flex; flex-direction: column; gap: 2.6rem;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); margin: 0;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(2.9rem, 8vw, 4.4rem);
+    line-height: 0.98; letter-spacing: -0.01em;
+    text-wrap: balance; margin: 0.5rem 0 0;
+  }
+  h1 em { font-style: italic; color: var(--stale); }
+  .standfirst {
+    font-size: 1.18rem; line-height: 1.5; color: var(--muted);
+    margin: 0; max-width: 60ch;
+  }
+  h2 {
+    font-family: var(--display); font-weight: 400;
+    font-size: 1.85rem; line-height: 1.15; letter-spacing: -0.005em;
+    text-wrap: balance; margin: 0 0 0.6rem;
+  }
+  h3 {
+    font-family: var(--body); font-weight: 700; font-size: 1rem;
+    margin: 0 0 0.3rem;
+  }
+  p { margin: 0 0 0.9rem; } p:last-child { margin-bottom: 0; }
+  section { display: flex; flex-direction: column; }
+  code {
+    font-family: var(--mono); font-size: 0.85em;
+    background: var(--sunk); padding: 0.1em 0.34em; border-radius: 3px;
+  }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
+
+  .verdict {
+    background: var(--card); border: 1px solid var(--line);
+    border-left: 5px solid var(--live);
+    padding: 1.2rem 1.35rem;
+  }
+  .verdict strong { color: var(--live); }
+
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+  th, td { text-align: left; padding: 0.5rem 0.7rem 0.5rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--muted); border-bottom-color: var(--ink);
+  }
+  td.k { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; }
+  .yes { color: var(--live); font-weight: 700; }
+  .no  { color: var(--stale); font-weight: 700; }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 0.55rem; }
+  .figbox {
+    background: var(--card); border: 1px solid var(--line);
+    padding: 1.5rem 1rem; overflow-x: auto;
+  }
+  figure svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  figcaption { font-size: 0.86rem; color: var(--muted); line-height: 1.5; }
+
+  pre.term {
+    background: var(--card); border: 1px solid var(--line);
+    border-left: 5px solid var(--stale);
+    font-family: var(--mono); font-size: 0.76rem; line-height: 1.6;
+    padding: 1rem 1.15rem; margin: 0; overflow-x: auto;
+  }
+  pre.term .hit { color: var(--live); font-weight: 600; }
+
+  .cmds {
+    font-family: var(--mono); font-size: 0.8rem; line-height: 1.9;
+    background: var(--sunk); padding: 1rem 1.15rem; overflow-x: auto;
+  }
+  .cmds b { color: var(--stale); }
+
+  .owned {
+    background: var(--stale-bg); border-left: 5px solid var(--stale);
+    padding: 1.1rem 1.3rem;
+  }
+  .fix { display: flex; flex-direction: column; gap: 0.9rem; }
+  .fix > div {
+    background: var(--card); border: 1px solid var(--line); padding: 1rem 1.2rem;
+  }
+  .fix .tag {
+    font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.3rem;
+  }
+  .cites { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); line-height: 1.85; }
+  .cites div { padding-left: 1.4rem; text-indent: -1.4rem; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">post-mortem &middot; 2026-08-27</p>
+    <h1>The graph knew.<br><em>I never asked it.</em></h1>
+  </header>
+
+  <p class="standfirst">Ray asked why I didn't know <code>graphify prs</code> existed. The honest answer is not that the corpus lacked it. One query would have found it &mdash; and I ran that query only after being told the feature was there.</p>
+
+  <hr>
+
+  <section>
+    <h2>The query I should have run first</h2>
+    <p>This is the actual output, run <em>after</em> Ray pointed at the README. Third result:</p>
+    <pre class="term">$ mise run kb-query -- "graphify prs PR dashboard review queue worktree mapping"
+
+NODE Dashboard   [src=ecc2/src/tui/dashboard.rs loc=L82]
+NODE Worktree    [src= community=zed/src/lib.rs]
+<span class="hit">NODE graphify prs — graph-aware PR dashboard. Fast terminal overview
+     of open PRs…  [src=graphify/prs.py loc=L1 community=prs.py]</span>
+NODE graphify    [src=graphify/README.md]</pre>
+    <p style="margin-top:0.9rem">The graph holds <code>graphify/prs.py</code>, the README that documents it, and the feature's own one-line description. It was never a corpus gap.</p>
+  </section>
+
+  <section>
+    <h2>Three places could have told me. I consulted the two that lie.</h2>
+
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 700 330" role="img" aria-label="Three sources of truth about graphify's feature set: the skill's Usage block and the CLI's own --help are both stale and omit graphify prs, while the knowledge graph contains it. The two stale sources were consulted; the live one was not.">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#1F4FD8"/>
+            </marker>
+          </defs>
+
+          <!-- the question -->
+          <rect x="270" y="12" width="160" height="38" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="350" y="36" font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor" text-anchor="middle">what can graphify do?</text>
+
+          <!-- three sources -->
+          <g fill="none" stroke="currentColor" stroke-width="1.4">
+            <rect x="18"  y="118" width="180" height="66" rx="3"/>
+            <rect x="256" y="118" width="180" height="66" rx="3"/>
+          </g>
+          <rect x="494" y="118" width="180" height="66" rx="3" fill="none" stroke="#1F4FD8" stroke-width="2.4"/>
+
+          <g font-family="IBM Plex Mono, monospace" font-size="11.5" text-anchor="middle">
+            <text x="108" y="143" fill="currentColor">skill Usage block</text>
+            <text x="108" y="160" fill="currentColor" font-size="10.5">generated, in context</text>
+            <text x="346" y="143" fill="currentColor">graphify --help</text>
+            <text x="346" y="160" fill="currentColor" font-size="10.5">the tool's own words</text>
+            <text x="584" y="143" fill="#1F4FD8" font-weight="600">the knowledge graph</text>
+            <text x="584" y="160" fill="#1F4FD8" font-size="10.5">prs.py + README</text>
+          </g>
+
+          <!-- arrows down from question -->
+          <g stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)">
+            <path d="M 300 50 C 220 70 130 82 108 112" fill="none"/>
+            <line x1="350" y1="50" x2="350" y2="112"/>
+          </g>
+          <path d="M 400 50 C 480 70 562 82 584 112" fill="none" stroke="#1F4FD8" stroke-width="2.4" stroke-dasharray="5 4" marker-end="url(#a2)"/>
+
+          <!-- verdicts -->
+          <g font-family="IBM Plex Mono, monospace" font-size="11.5" text-anchor="middle">
+            <text x="108" y="214" fill="#A6355A" font-weight="600">no `prs`</text>
+            <text x="346" y="214" fill="#A6355A" font-weight="600">no `prs`</text>
+            <text x="584" y="214" fill="#1F4FD8" font-weight="600">HAS `prs`</text>
+            <text x="108" y="232" fill="#A6355A" font-size="10.5">18 cmds missing</text>
+            <text x="346" y="232" fill="#A6355A" font-size="10.5">18 cmds missing</text>
+            <text x="584" y="232" fill="#1F4FD8" font-size="10.5">+ its description</text>
+          </g>
+
+          <!-- consulted band -->
+          <line x1="18" y1="266" x2="436" y2="266" stroke="#A6355A" stroke-width="2"/>
+          <text x="227" y="288" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#A6355A" text-anchor="middle" font-weight="600">CONSULTED — both stale</text>
+          <line x1="494" y1="266" x2="674" y2="266" stroke="#1F4FD8" stroke-width="2" stroke-dasharray="5 4"/>
+          <text x="584" y="288" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#1F4FD8" text-anchor="middle" font-weight="600">NOT CONSULTED</text>
+          <text x="350" y="316" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" text-anchor="middle">the dashed path is the one the house rules already require</text>
+        </svg>
+      </div>
+      <figcaption>The same question, three possible sources. The two I reached for are both derived artifacts that drifted; the one that was current is the one <code>graph_first</code> exists to force me toward.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Both stale sources are stale by the same 18 commands</h2>
+    <p><code>graphify --help</code> does not list what <code>graphify</code> can do. Measured against the installed 0.9.50's own dispatch table:</p>
+    <div class="cmds">
+      cache-html &middot; callflow-html<b> ←</b> &middot; falkordb &middot; graphml &middot; hook-check &middot; hook-guard &middot; html &middot; list &middot; merge-chunks &middot; merge-semantic &middot; obsidian &middot; provider &middot; <b>prs ←</b> &middot; remove &middot; show &middot; status &middot; svg &middot; wiki
+    </div>
+    <p style="margin-top:0.9rem">Two of those are ones you have <em>already asked for by name</em>. <code>prs</code> is this conversation. <strong><code>callflow-html</code> is PART TWO directive 3</strong> &mdash; <em>&ldquo;generate the callflow-html for the graphify cloned repo and our python library&rdquo;</em> &mdash; a feature request for a command that already ships, undiscoverable from the tool's own help.</p>
+  </section>
+
+  <section>
+    <h2>What I did wrong, precisely</h2>
+    <div class="owned">
+      <p><strong>I treated a tool's <code>--help</code> as the inventory of that tool's features.</strong> This repo has a rule about exactly this shape &mdash; <code>probes-need-a-control-arm.md</code>: <em>&ldquo;Source beats issue tracker. A tool's claim about a platform ages.&rdquo;</em> I applied it to issue trackers and vendored docs and never to the CLI in front of me.</p>
+      <p style="margin-bottom:0">Worse: I ran a <code>--help</code> grep for <code>pr|impact|affect|risk|diff|blast</code>, got <code>affected</code> back, and stopped. A hit made the probe feel answered. <strong>A 0-result grep needs a control arm; so does a 1-result one that confirms what you expected.</strong></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>The structural half &mdash; and it is the more useful half</h2>
+    <p>Two mechanisms let that mistake pass unchallenged, and neither is about my judgement.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Mechanism</th><th>What it does</th><th>Why it didn't help</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="k">graph_first</td>
+            <td>DENIES a broad source search until one graph query has run this session</td>
+            <td><span class="no">Satisfied once.</span> After my first query about the code I was changing, it fell silent for the rest of the session. It enforces <em>ask the graph once</em>, not <em>ask the graph about this</em>.</td>
+          </tr>
+          <tr>
+            <td class="k">/graphify SKILL.md</td>
+            <td>Injects a Usage block into every session as authoritative-looking reference</td>
+            <td><span class="no">Generated and unchecked.</span> Nothing compares it to the installed CLI, so a feature can ship and the skill will keep describing the version before it &mdash; in context, at the top, on every turn.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1rem">The skill one is the sharper problem. A stale doc on disk is inert until someone opens it; a stale doc <em>auto-loaded into every session</em> actively displaces the live source, because it arrives first and looks canonical.</p>
+  </section>
+
+  <section>
+    <h2>Three fixes, cheapest first</h2>
+    <div class="fix">
+      <div>
+        <span class="tag">habit &mdash; costs nothing</span>
+        <h3>Query the graph about the TOOL, not just the code</h3>
+        <p style="margin-bottom:0">Before driving any pinned tool in a new way, one <code>kb-query</code> against its own source and README. It would have cost one command here and saved this entire exchange.</p>
+      </div>
+      <div>
+        <span class="tag">gate &mdash; small, mechanical</span>
+        <h3>Assert the skill's command list against the installed CLI</h3>
+        <p style="margin-bottom:0">The dispatch table is grep-able (<code>cmd == "…"</code>) and the skill's Usage block is a fixed list. A check that fails when the installed CLI has a verb the skill never mentions would have caught all 18 &mdash; and would catch the next one, on the next bump.</p>
+      </div>
+      <div>
+        <span class="tag">judgement &mdash; yours</span>
+        <h3>Decide whether <code>graph_first</code> should be per-topic</h3>
+        <p style="margin-bottom:0">A session-scoped satisfaction is cheap and un-annoying; a per-topic one would have forced the query that mattered. It is a real trade &mdash; more denials, more friction &mdash; and worth deciding deliberately rather than inheriting.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>A correction, stated because I nearly shipped it</h2>
+    <p>Mid-investigation I grepped <code>sources/graphify/README.md</code> against the graph, got <strong>0</strong>, and was one step from reporting <em>&ldquo;graphify's README is not ingested.&rdquo;</em> It is. The graph stores it relativized, as <code>graphify/README.md</code> &mdash; <strong>6 nodes</strong> &mdash; and my probe carried a path prefix the graph never uses.</p>
+    <p>That is the repo's own <em>a path prefix is an identity claim</em> lesson, recorded two rounds ago, walked into again. What saved it was a control arm that happened to print neighbouring paths.</p>
+    <p style="margin-bottom:0"><strong>The separate finding in #551 survives that correction</strong>, and was re-probed without any prefix assumption: no node in the graph has a <code>source_file</code> ending in <code>graphify_sdk.py</code>, while <code>hook_guard.py</code> returns 40+. That absence is real. This one was my probe.</p>
+  </section>
+
+  <section>
+    <h2>Where each number came from</h2>
+    <div class="cites">
+      <div>MEASURED &mdash; <code>mise run kb-query -- "graphify prs PR dashboard review queue worktree mapping"</code>, this session: <code>graphify/prs.py</code> returned third.</div>
+      <div>MEASURED &mdash; installed dispatch verbs from <code>.venv/…/graphify/cli.py</code> (<code>cmd == "…"</code>) diffed against <code>graphify --help</code>: 18 implemented and unlisted.</div>
+      <div>MEASURED &mdash; <code>graphify/README.md</code>: 6 nodes in the graph; the file is 912 lines.</div>
+      <div>READ &mdash; <code>.venv/lib/python3.14/site-packages/graphify/cli.py:1048</code>, the <code>prs</code> dispatch branch.</div>
+      <div>READ &mdash; the <code>/graphify</code> SKILL.md Usage block, auto-loaded this session: no <code>prs</code>, no <code>callflow-html</code>.</div>
+      <div>QUOTED &mdash; PART TWO directive 3, <code>docs/direction/2026-08-26-ray-directives.md</code>.</div>
+      <div>NOT MEASURED &mdash; whether 6 nodes is normal for a 912-line README under this corpus's extraction settings. It was enough to answer the question, which is the only claim made here.</div>
+    </div>
+  </section>
+
+</div>
