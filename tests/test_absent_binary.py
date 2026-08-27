@@ -1,17 +1,50 @@
 # Copyright (c) 2026 Raymond Manaloto
 """`kb_setup.absent_binary` — deny a probe whose command word cannot RUN.
 
-Every test here fakes `shutil.which` AND `_probe_runs` rather than trusting the
-host, and the reason is this module's own subject, twice over now. Round one
-(2026-08-18): a test that passes because `timeout` happens to be absent on the
-developer's mac is a test that could only pass, and it would go green on a
-Linux CI box for the opposite reason while asserting nothing — both directions
-of `which` are driven explicitly. Round two (2026-08-26): the guard went
-silently inert on THIS SAME MACHINE because a mise reshim made `which` resolve
-`timeout`/`nproc`/`tac` to a shim that cannot run, and nothing here controlled
-that second layer — so it is now driven explicitly too. The one test that is
-allowed to trust the live host is `test_an_introspector_behind_a_transparent_
-prefix_is_not_denied`, and it is that way on purpose: see its own docstring.
+THIS PARAGRAPH USED TO CLAIM "every test here fakes `shutil.which` AND
+`_probe_runs`". That sentence was false, and being false is why the same class
+of regression hit this file THREE times before anyone read it closely enough
+to notice it was a promise nobody was keeping. Written now as a fact about the
+file, checked against the actual fixture list below rather than restated from
+memory the next time this file changes:
+
+WHY THIS KEEPS HAPPENING. `timeout`/`nproc`/`tac`/`gtimeout` genuinely being
+present or absent on THIS machine is not a fixed fact, it is `mise.toml`'s
+current pin state — and that state has changed under this file three times in
+one day: (2026-08-18) `timeout` genuinely absent; (2026-08-26, a mise reshim)
+`timeout`/`nproc`/`tac` resolve to a shim with no version set, so they exist
+as files but cannot run; (2026-08-26, `7eb281a8`) `conda:coreutils` pinned in
+`mise.toml`, so `timeout`/`nproc`/`tac` now genuinely run. `gtimeout` alone has
+stayed absent throughout. A test that asserts a DENY (or an allow) for any of
+these four names against the LIVE host is making a claim about `mise.toml`,
+whether it says so or not, and that claim expires the next time this repo's
+tool pins change — which has already happened three times.
+
+WHICH TESTS FAKE BOTH LAYERS (the default, and what to do unless you have a
+specific reason not to): everything using the `absent`, `present`, or
+`resolves_but_broken` fixtures — the majority of this file. Each controls
+`shutil.which` and, where the code path reaches it, `_probe_runs`, so its
+verdict follows from the FIXTURE, never from what happens to be pinned today.
+
+WHICH TESTS DO NOT, AND WHY EACH ONE IS SAFE ANYWAY — the complete list, so a
+future addition can be checked against it rather than assumed:
+
+* `test_the_hook_actually_denies_it` — compares the hook's verdict to
+  `absent_binary.decide()` called directly, rather than asserting an expected
+  DENY or allow. It is checking that the wiring reaches this module, not what
+  this module currently decides, so it passes under any host state.
+* `test_probe_runs_reports_success_for_a_real_working_binary` — a unit test of
+  `_probe_runs` ITSELF against `/usr/bin/perl`, which is Apple's vendored
+  system perl, not a mise-managed tool. No `mise.toml` change can affect it.
+* `test_probe_runs_reports_failure_for_a_path_that_cannot_exec` — the path is
+  fabricated to never exist on any host; there is no config state that could
+  make it start resolving.
+
+Every one of the three above is deliberate and documented at its own
+definition — read the local docstring before assuming a fourth exception is
+safe by analogy. If you are about to write a NEW test that asserts what
+`timeout`/`nproc`/`tac`/`gtimeout` do against the live host, it is very likely
+wrong; use a fixture instead.
 """
 
 from __future__ import annotations
@@ -301,7 +334,9 @@ def test_an_introspector_behind_a_transparent_prefix_is_not_denied(resolves_but_
     assert "timeout" in denied
 
 
-def test_bare_command_runs_its_argument_and_is_not_an_introspection_probe() -> None:
+def test_bare_command_runs_its_argument_and_is_not_an_introspection_probe(
+    resolves_but_broken,
+) -> None:
     """Round 2's P2, and a hole opened by round 1's own fix.
 
     Round 1 exempted a segment whose stripped prefix contained an introspector,
@@ -313,6 +348,17 @@ def test_bare_command_runs_its_argument_and_is_not_an_introspection_probe() -> N
 
     Both directions are armed here, because closing one and leaving the other is
     what produced this finding in the first place.
+
+    THIRD round this exact class has hit this file. This test ran unmocked
+    against the live host until `conda:coreutils` was pinned in `mise.toml`
+    (`7eb281a8`) and made `timeout` genuinely resolve and run here, which
+    turned `denied is not None` false out from under it — `mise run test`
+    caught it (`git log` on this file confirms the earlier fixes for the
+    same reason: the mise-reshim regression this module was re-armed for,
+    then `test_an_introspector_behind_a_transparent_prefix_is_not_denied`).
+    `resolves_but_broken` makes the assertion about the PARSER — an
+    execution wrapper still counts as running the wrapped name — rather
+    than about whether `timeout` happens to work on this laptop.
     """
     for runs_it in ("command timeout 5 ls", "env command timeout 5 ls"):
         denied = absent_binary.decide(runs_it)
@@ -328,10 +374,22 @@ def test_bare_command_runs_its_argument_and_is_not_an_introspection_probe() -> N
 def test_probe_runs_reports_success_for_a_real_working_binary() -> None:
     """`_probe_runs` itself, armed positive, against a REAL binary.
 
-    `/usr/bin/perl` is the one non-mise binary this repo already treats as a
-    given host fact (see `TRAPS["timeout"]`'s own remedy text), so this is the
-    one `_probe_runs` assertion allowed to depend on live host state — every
-    other case below controls it.
+    Deliberately UNMOCKED, and deliberately kept that way: this function is a
+    unit test of `_probe_runs`, not of `decide()`'s DENY/allow verdict, and
+    faking the subprocess call here would only prove that `subprocess.run`
+    returns whatever a mock is told to return — it would stop testing that
+    `_probe_runs` correctly reads a REAL process's rc and stdout, which is the
+    entire reason this function exists over trusting `shutil.which` alone (see
+    the module docstring's "RE-ARMED" section).
+
+    `/usr/bin/perl` is the right binary to depend on here, and for a DIFFERENT
+    reason than the three regressions above: it is Apple's vendored system
+    perl, not a mise-managed tool, so it carries none of the risk that bit this
+    file three times — `mise.toml` gaining, losing, or activating a pin cannot
+    make `/usr/bin/perl` start or stop working. This repo already leans on that
+    same fact elsewhere (`TRAPS["timeout"]`'s remedy text, and
+    `test_the_remedy_names_a_real_replacement` above), so this is not a new
+    assumption, just the same one applied to a different call site.
     """
     probe = absent_binary._probe_runs("/usr/bin/perl")
     assert probe.ok is True
@@ -340,6 +398,13 @@ def test_probe_runs_reports_success_for_a_real_working_binary() -> None:
 
 def test_probe_runs_reports_failure_for_a_path_that_cannot_exec() -> None:
     """The OSError arm: `which` resolved a moment ago, exec fails now.
+
+    Takes no fixture, but is NOT the same class of risk as the three fixed
+    above: the path is fabricated to never exist on ANY host, so there is no
+    future mise pin, activation, or config change that could make it start
+    resolving — unlike `timeout`/`nproc`/`tac`, whose absence was itself the
+    variable. This is a `FileNotFoundError` by construction, not by the luck
+    of what happens to be installed here today.
 
     Simulated with a path that was never resolvable, which is the same OSError
     shape (`FileNotFoundError`, a subclass of `OSError`) Python raises for a
