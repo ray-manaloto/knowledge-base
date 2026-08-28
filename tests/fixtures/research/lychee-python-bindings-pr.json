@@ -1,0 +1,19 @@
+{
+  "total_count": 2,
+  "items": [
+    {
+      "html_url": "https://github.com/lycheeverse/lychee/pull/2201",
+      "title": "Add Python package metadata",
+      "body": "Package metadata for bindings.",
+      "updated_at": "2026-08-24T09:08:07Z",
+      "pull_request": {}
+    },
+    {
+      "html_url": "https://github.com/lycheeverse/lychee/pull/2199",
+      "title": "Document Python bindings",
+      "body": null,
+      "updated_at": "2026-08-23T08:07:06Z",
+      "pull_request": {}
+    }
+  ]
+}

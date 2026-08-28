@@ -75,6 +75,7 @@ def _print_usage() -> int:
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | skill-refresh | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
+        "research-trackers <OWNER/REPO> <term> | "
         "session-state [--no-pr] | context | "
         "session-select (--current | --sessions <id>... | --last N | "
         "--since <ISO> [--until <ISO>]) | "
@@ -475,6 +476,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
     record_rc = _dispatch_record(repo_root, cmd, rest)
     if record_rc is not None:
         return record_rc
+    if cmd == "research-trackers":
+        from kb_setup.research import trackers
+
+        return trackers.main(rest, repo_root)
     if cmd == "gates":
         from kb_setup import gates
 
@@ -563,6 +568,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | funnel | "
+        "research-trackers <OWNER/REPO> <term> | "
         "session-state [--no-pr] | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
         "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "

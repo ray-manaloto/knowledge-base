@@ -1,0 +1,12 @@
+{
+  "total_count": 9,
+  "items": [
+    {
+      "html_url": "https://github.com/jdx/hk/pull/1253",
+      "title": "chore: update gitleaks coverage",
+      "body": "First line\nSecond line",
+      "updated_at": "2026-08-26T12:02:12Z",
+      "pull_request": {}
+    }
+  ]
+}
