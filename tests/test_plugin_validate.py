@@ -10,6 +10,8 @@ file that failed, per the spec's own requirement.
 from __future__ import annotations
 
 import json
+import unicodedata
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -88,13 +90,14 @@ def _fake_fetch_schema(schemas: dict[str, dict[str, Any]]) -> pv.SchemaFetcher:
     return _fetch
 
 
-_WARN_PREFIX = chr(0x26A0)  # WARNING SIGN — the `⚠ Found N warning(s):` header
-_PASS_PREFIX = chr(0x2714)  # HEAVY CHECK MARK — the final "Validation passed" line
-_ARROW = chr(0x2192)  # RIGHTWARDS ARROW — inside a plugin.json field path
-# Built via `chr()`, not the literal glyphs, so ruff's RUF001 (ambiguous unicode
-# character) has nothing to flag — these reproduce `claude plugin validate`'s
-# EXACT non-ASCII output, verbatim, measured 2026-08-28 on both a marketplace
-# root and a plugin dir (team-lead's respec), no `--strict`, rc 0.
+_WARN_PREFIX = unicodedata.lookup("WARNING SIGN")  # the "Found N warning(s):" header
+_PASS_PREFIX = unicodedata.lookup("HEAVY CHECK MARK")  # the final "Validation passed" line
+_ARROW = unicodedata.lookup("RIGHTWARDS ARROW")  # inside a plugin.json field path
+# Looked up BY NAME, not a literal glyph or a `chr(0x...)` magic number: ruff's
+# RUF001 (ambiguous unicode) has nothing to flag, and a wrong hex digit can't
+# hide the way it could with a bare number. These reproduce `claude plugin
+# validate`'s EXACT non-ASCII output, verbatim, measured 2026-08-28 on both a
+# marketplace root and a plugin dir (team-lead's respec), no `--strict`, rc 0.
 _MARKETPLACE_OK_OUTPUT = "\n".join(
     [
         "Validating marketplace manifest: /path/.claude-plugin/marketplace.json",
@@ -257,6 +260,27 @@ def test_nonzero_rc_with_clean_text_still_fails(tmp_path: Path) -> None:
     assert isinstance(result, Err)
     assert str(root) in result.message
     assert "exited 1" in result.message
+
+
+def test_schema_validation_raises_no_deprecation_warning() -> None:
+    """Proof for the `RefResolver` removal: a DeprecationWarning cannot return silently."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert pv._schema_errors({"name": "x"}, PLUGIN_SCHEMA) == []
+
+        lsp_schema = PLUGIN_SCHEMA["properties"]["lspServers"]["anyOf"][1]
+        lsp_instance = {"ty": {"command": "x", "args": ["y"], "extensionToLanguage": {}}}
+        assert pv._schema_errors(lsp_instance, lsp_schema, resolver_root=PLUGIN_SCHEMA) == []
+
+
+def test_fetch_schema_refuses_file_url_before_opening() -> None:
+    raised = None
+    try:
+        pv._default_fetch_schema("file:///etc/passwd")
+    except ValueError as exc:
+        raised = exc
+    assert raised is not None
+    assert "http/https only" in str(raised)
 
 
 def test_main_returns_bad_request_with_no_args(tmp_path: Path) -> None:

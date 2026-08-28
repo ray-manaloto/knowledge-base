@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import unicodedata
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -52,11 +53,11 @@ LSP_REL = Path(".lsp.json")
 SchemaFetcher = Callable[[str], dict[str, Any]]
 Runner = Callable[[tuple[str, ...]], tuple[int, str]]
 
-_FINDING_PREFIX = chr(0x276F)  # HEAVY RIGHT-POINTING ANGLE QUOTATION MARK ORNAMENT: a finding line
-_FAIL_PREFIX = chr(0x2718)  # HEAVY BALLOT X: `claude plugin validate`'s failure marker
-# Built via `chr()` rather than the literal glyph so ruff's RUF001 (ambiguous
-# unicode character) has no string literal to flag — these are the exact
-# non-ASCII prefixes `claude plugin validate` prints, not a typo risk.
+_FINDING_PREFIX = unicodedata.lookup("HEAVY RIGHT-POINTING ANGLE QUOTATION MARK ORNAMENT")
+_FAIL_PREFIX = unicodedata.lookup("HEAVY BALLOT X")  # `claude plugin validate`'s failure marker
+# Looked up BY NAME rather than a literal glyph or a `chr(0x...)` magic number:
+# ruff's RUF001 (ambiguous unicode) has no string literal to flag, and a wrong
+# hex digit in a `chr()` call can't hide the way it could with a bare number.
 
 _ALLOWED_WARNINGS = ("No version specified",)
 """Warning substrings `claude plugin validate` may emit without failing here.
@@ -70,21 +71,39 @@ that — measured 2026-08-28 on both the marketplace root and a plugin dir.
 def _default_fetch_schema(url: str) -> dict[str, Any]:
     """The real network boundary — GET `url`, follow redirects, parse JSON.
 
-    Same shape as `fetch.http_fetcher`: a scheme-restricted opener built from
-    only the http/https handlers, so `file:` cannot be opened. Redirects are
-    handled by urllib's default `HTTPRedirectHandler`, which `build_opener`
-    always includes — load-bearing here because schemastore's own `.json` URLs
-    301 to `www.schemastore.org` (measured this session).
+    A `file:` URL is refused BEFORE any open, by an explicit scheme check —
+    not by omitting `urllib.request.FileHandler` from the opener, which
+    `build_opener` still adds by default (it appends any handler class not
+    already present, regardless of which ones you pass). The opener here is
+    built with ONLY the handlers this call needs — HTTP(S), the redirect
+    handler schemastore's 301-to-`www.schemastore.org` needs (measured this
+    session), and the two error handlers `urlopen`'s default opener carries —
+    so nothing beyond that set is reachable even if the scheme check above
+    were ever bypassed.
     """
     import urllib.request
 
     if not url.startswith(("http:", "https:")):
         msg = f"{url}: refused (http/https only)"
         raise ValueError(msg)
-    opener = urllib.request.build_opener(urllib.request.HTTPHandler, urllib.request.HTTPSHandler)
+    opener = urllib.request.OpenerDirector()
+    for handler_cls in (
+        urllib.request.HTTPHandler,
+        urllib.request.HTTPSHandler,
+        urllib.request.HTTPRedirectHandler,
+        urllib.request.HTTPDefaultErrorHandler,
+        urllib.request.HTTPErrorProcessor,
+    ):
+        opener.add_handler(handler_cls())
     opener.addheaders = [("User-Agent", "kb-setup-plugin-validate")]
     with opener.open(url, timeout=30) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+_RUNNER_TIMEOUT_SECONDS = 120
+"""Bound BELOW the `kb-plugin-validate` mise task's 5m, so a hung `claude`
+process is killed here with a clear timeout rc rather than by the task's
+own outer timeout with no diagnosis."""
 
 
 def _default_runner(argv: tuple[str, ...]) -> tuple[int, str]:
@@ -94,8 +113,24 @@ def _default_runner(argv: tuple[str, ...]) -> tuple[int, str]:
     other than the allowlisted version one still fails), not solely from the
     exit code, which `--strict` would otherwise turn into a false positive.
     The rc is still returned and used as a belt-and-suspenders check.
+
+    `encoding="utf-8", errors="replace"` rather than bare `text=True`: the
+    latter decodes with the LOCALE encoding, which can raise on a stripped
+    CI/container locale — a crash in the validator itself, not a validation
+    finding. A timeout is a failure (nonzero rc), not an uncaught exception.
     """
-    completed = subprocess.run(argv, check=False, capture_output=True, text=True)
+    try:
+        completed = subprocess.run(
+            argv,
+            check=False,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=_RUNNER_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        timed_out_output = exc.stdout if isinstance(exc.stdout, str) else ""
+        return 124, timed_out_output
     return completed.returncode, completed.stdout
 
 
@@ -125,7 +160,9 @@ def _validate_output_failure(output: str) -> str | None:
 def _load_json(path: Path) -> dict[str, Any] | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except OSError:
+        return None
+    except json.JSONDecodeError:
         return None
 
 
@@ -138,13 +175,19 @@ def _schema_errors(
     """Validation errors for `instance` against `schema`, as short messages.
 
     `resolver_root` lets a SUBSCHEMA (the `.lsp.json` case) resolve `$ref`s
-    relative to the schema it was cut from, rather than to itself.
+    relative to the schema it was cut from, rather than to itself: the
+    validator is built against `resolver_root` (its `$ref`-resolution base),
+    then `.evolve(schema=...)` swaps in the subschema to validate against
+    without swapping the base — no `RefResolver` needed, which is deprecated
+    on the installed jsonschema 4.26.0.
     """
     import jsonschema
 
-    resolver = jsonschema.RefResolver.from_schema(resolver_root or schema)
-    validator_cls = jsonschema.validators.validator_for(schema)
-    validator = validator_cls(schema, resolver=resolver)
+    root = resolver_root or schema
+    validator_cls = jsonschema.validators.validator_for(root)
+    validator_cls.check_schema(root)
+    root_validator = validator_cls(root)
+    validator = root_validator if resolver_root is None else root_validator.evolve(schema=schema)
     return [f"{err.json_path}: {err.message}" for err in validator.iter_errors(instance)]
 
 
@@ -166,7 +209,9 @@ def _validate_lsp(path: Path, data: dict[str, Any], plugin_schema: dict[str, Any
     """Validate `.lsp.json` against the plugin schema's `lspServers` object form."""
     try:
         subschema = plugin_schema["properties"]["lspServers"]["anyOf"][1]
-    except KeyError, IndexError:
+    except KeyError:
+        return f"{path}: plugin schema has no properties.lspServers.anyOf[1] to validate against"
+    except IndexError:
         return f"{path}: plugin schema has no properties.lspServers.anyOf[1] to validate against"
     errors = _schema_errors(data, subschema, resolver_root=plugin_schema)
     if errors:
