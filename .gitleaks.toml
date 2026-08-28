@@ -57,6 +57,17 @@ paths = [
   # If anything authored is ever put here, narrow this the way graphify-out was.
   '''^\.self-graph/''',
   '''^raw/''',
+  # `.research/` — the `aggregated-research` CLI's `--out` landing zone (slice 1,
+  # 2026-08-28). Same class as `.firecrawl/` below, and gitignored beside it:
+  # third-party tracker text (issue/PR titles, URLs, up to 600 chars of issue
+  # body per hit) written by a tool, never authored here. The first live run —
+  # `mise run kb-research -- trackers jdx/hk gitleaks --out .research/…` —
+  # produced 1 `aws-access-token` hit: a gitleaks TEST FIXTURE quoted in a jdx/hk
+  # PR snippet, which turned `mise run lint` red and refused `kb-ship` for an
+  # unrelated commit. Armed both ways the same hour: with the file present and
+  # no entry -> rc 1; with this entry -> rc 0. Same accepted residual as
+  # `.firecrawl/` (`git add -f` commits past the gate) — see #510.
+  '''^\.research/''',
   # `.firecrawl/` — the Firecrawl scrape cache. UNTRUSTED FETCHED CONTENT, and
   # gitignored since #502 precisely for that reason, so nothing here can ever
   # reach a commit. Same class as `^raw/` one line up: someone else's words,
