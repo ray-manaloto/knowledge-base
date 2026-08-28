@@ -72,8 +72,11 @@ gh api -X GET search/issues -f q='repo:OWNER/REPO TERM' --jq '.total_count'
 ```
 
 The first line is not optional. **A count of zero from a channel that cannot
-receive anything is not evidence** — `jdx/hk` has issues DISABLED, so every
-`repo:jdx/hk` search is structurally zero.
+receive anything is not evidence** — `jdx/hk` has issues DISABLED, so an
+`is:issue` search there is structurally zero. **PRs still index under
+`search/issues`**: `repo:jdx/hk gitleaks` returned 9 hits on 2026-08-27, all pull
+requests, while `repo:jdx/hk is:issue` returned 0. Split the search by `is:issue`
+/ `is:pr`, or a real PR hit reads as "issues were searched".
 
 Never `gh search issues`: it returns `[]` instead of failing, and its control
 query with 39 real results also returned `[]` (#507).

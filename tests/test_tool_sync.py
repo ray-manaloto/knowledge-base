@@ -312,6 +312,11 @@ def test_live_eligibility_census_is_exactly_the_two_mise_only_pins() -> None:
     mise-only, presence-only pin exactly like `ffmpeg` — no `python_package`,
     no `manifest`, no `skill_dir`, an exact numeric pin. It qualifies for the
     same reason `ffmpeg` does, and the tuple moves again rather than loosening.
+
+    **And again on 2026-08-27**: `[tool.lychee]` joined `currency.toml` beside
+    `lychee = "0.24.2"` in `mise.toml` (the link checker behind the hk `lychee`
+    steps and `mise run kb-links`) — mise-only, exact, no `python_package`, no
+    `manifest`. Six now. Same rule: the tuple moves, the assertion stays exact.
     """
     repo_root = Path(__file__).parents[1]
     assert tool_sync.eligible_tools(repo_root) == (
@@ -320,6 +325,7 @@ def test_live_eligibility_census_is_exactly_the_two_mise_only_pins() -> None:
         "ctx7",
         "ffmpeg",
         "firecrawl-cli",
+        "lychee",
     )
 
 

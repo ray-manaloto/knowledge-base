@@ -359,6 +359,42 @@ local lintSteps: Mapping<String, Step> = new {
   ["pkl"] = Builtins.pkl
   ["taplo"] = Builtins.taplo
   ["taplo_format"] = Builtins.taplo_format
+  // lychee: link checker over our own docs and code, NOT in the default lint
+  // path. `profiles = List("links")` keeps it inert under `mise run lint` and
+  // pre-commit; `mise run kb-links` sets HK_PROFILE=links and runs this one step.
+  // Why gated (measured 2026-08-27, lychee 0.24.2): an unconfigured run over the
+  // 922 tracked .md/.html files (996 unique URLs) did not finish in 5 minutes —
+  // docs.doppler.com (377 of them) answers every scripted client with a 30-minute
+  // rate-limit backoff. A network linter with that failure mode does not belong
+  // between a developer and a commit. `lychee.toml` (repo root) carries the
+  // exclusions, cache and 10s timeout; with it, docs/**/*.md checks in 34 s.
+  // Vendored corpus and derived output are not ours to link-check.
+  ["lychee"] = (Builtins.lychee) {
+    profiles = List("links")
+    // No **/*.py: string literals in tests/ ("https://example/x", "...\nref") read
+    // as broken links — 40+ false positives, measured 2026-08-27. Docs and config only.
+    glob = List("**/*.md", "**/*.html", "**/*.toml", "**/*.pkl")
+    // lychee.toml is excluded from its own scan: lychee reads .toml as text and
+    // extracts the regex fragments in its exclude list as if they were links.
+    exclude = List("sources/**", "graphify-out/**", "raw/**", "lychee.toml")
+  }
+  // lychee_offline: the same checker with --offline — local/relative links only,
+  // zero network, so it CAN sit in the default check + pre-commit path. Ray's
+  // call, 2026-08-27, made knowing what it measures today: `lychee --offline`
+  // over the tracked docs/config found 1,155 links, all remote, all excluded —
+  // 0 checked. It is wired for the day a relative link appears, and this line
+  // is here so nobody reads its green as link coverage. The network pass is
+  // `mise run kb-links`. Armed: a fixture with a dangling relative link fails it.
+  ["lychee_offline"] = (Builtins.lychee) {
+    check = new CommandSpec {
+      command = new Command { argv = List("lychee", "--no-progress", "--offline", "{{files}}") }
+      effect = "read"
+    }
+    glob = List("**/*.md", "**/*.html", "**/*.toml", "**/*.pkl")
+    // lychee.toml is excluded from its own scan: lychee reads .toml as text and
+    // extracts the regex fragments in its exclude list as if they were links.
+    exclude = List("sources/**", "graphify-out/**", "raw/**", "lychee.toml")
+  }
   ["ruff"] = new Step {
     glob = pyGlob
     check = "uv run ruff check {{files}}"

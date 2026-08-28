@@ -1,0 +1,41 @@
+# lychee (link checker) — read by the hk `lychee` step and `mise run kb-links`.
+# Measured 2026-08-27 on 0.24.2: an unconfigured run over the 922 tracked
+# .md/.html files (996 unique URLs) did not finish in 5 minutes, because
+# docs.doppler.com (377 of those URLs) answers with a 30-minute rate-limit
+# backoff that lychee caps to 1m and re-waits. With this file, docs/**/*.md
+# (1,058 links) checks in 34 s.
+root_dir = "/"
+no_progress = true
+timeout = 10
+max_retries = 0
+max_concurrency = 64
+cache = true
+max_cache_age = "1d"
+# 429 is "asked too fast", not "broken". Every other non-2xx is a finding.
+accept = ["200..=299", "429"]
+exclude = [
+  # rate-limits every scripted client with a 30m backoff (measured above)
+  '^https://docs\.doppler\.com/',
+  # `file:line` citations written as absolute paths — a doc defect to fix in
+  # the doc (only one machine can open them), not a link for lychee to fetch.
+  # They only become excludable once `root_dir` turns them into file:// URLs
+  # (armed 2026-08-27: without root_dir they fail at URL-building, before any
+  # exclude is consulted).
+  '^file:///Users/',
+  # MCP endpoints: alive, but a plain GET answers 401/405 by design
+  '^https://api\.graphify\.com/mcp',
+  '^https://api\.repowise\.dev/mcp/',
+  # template placeholders in skills and docs, e.g. github.com/{owner}/{repo}
+  '%7B',
+  'github\.com/owner/repo',
+  # root-relative doc-site paths quoted from vendored docs (/docs/en/...) — they
+  # are Claude Code docs paths, not files of ours
+  '^file:///docs/',
+  # npmjs.com answers scripted GETs with 403 (measured 2026-08-27 on a package
+  # page that opens fine in a browser) — a bot block, not a dead link
+  '^https://www\.npmjs\.com/',
+  # placeholder hosts in examples
+  '^https?://example[/.]',
+  # loopback
+  '^https?://(localhost|127\.0\.0\.1)',
+]

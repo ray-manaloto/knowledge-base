@@ -31,6 +31,7 @@ fine — `gh pr view` is how you resolve whether a bare `#42` is an issue or a P
 - Without being reminded, on ANY session model: non-trivial implementation runs the fable-orchestrator architect-as-orchestrator flow — invoke the fable-orchestrator:orchestration skill before delegating and follow it as authoritative for routing, verification, review tiers, and advisor consults.
 - fable-orchestrator: implementation lane = codex
 - fable-orchestrator: codex effort = xhigh
+- fable-orchestrator: **always consult `fable-advisor` before any `codex-implementer` dispatch** (Ray, 2026-08-27, verbatim in `docs/direction/2026-08-27-ray-directives.md`).
 
 The first line is the **trigger**, and it is **deliberately UN-gated** (Ray, 2026-08-24).
 The plugin ships it Fable-gated — its changelog: *"sessions on other models skip the flow
@@ -66,7 +67,7 @@ quoted instead of measured. `.claude/settings.json` currently declares
 `jq '.enabledPlugins | to_entries | map(select(.value)) | length' .claude/settings.json`. That is not the same as how many actually run:
 `.claude/settings.local.json` overrides two of the 18 back to `false`
 (`claude-md-management@claude-plugins-official`, `mise@brentmitchell25`), so the
-**effective** count is **16** — `jq -s '(.[0].enabledPlugins + (.[1].enabledPlugins // {})) | to_entries | map(select(.value)) | length' .claude/settings.json .claude/settings.local.json`. Both numbers feed
+**effective** count is **17** (re-measured 2026-08-27; `plugin-dev` was added) — `jq -s '(.[0].enabledPlugins + (.[1].enabledPlugins // {})) | to_entries | map(select(.value)) | length' .claude/settings.json .claude/settings.local.json`. Both numbers feed
 `md-size-budgets.md` § the skill-listing budget, which scales with whichever a
 session actually loads.
 

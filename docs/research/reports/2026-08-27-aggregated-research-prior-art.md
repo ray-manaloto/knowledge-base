@@ -138,7 +138,7 @@ graph-first research ordering.
 - [terrylica/cc-skills](https://github.com/terrylica/cc-skills) — the `crucible` plugin's research-foundations skill: shuffled-null design and agent significance corrections.
 - [jamie-bitflight/claude_skills](https://github.com/jamie-bitflight/claude_skills) — surfaced by the control-arm search; a skills-system reference, read only for the arm.
 - [alma-oss/spirit-design-system](https://github.com/alma-oss/spirit-design-system) — surfaced by the control-arm search; a release-notes skill, read only for the arm.
-- [mattpocock/mattpocock-skills](https://github.com/mattpocock/mattpocock-skills) — already a pinned source (`sources/mattpocock-skills`); its `research` skill is the minimal prior-art shape.
+- [mattpocock/skills](https://github.com/mattpocock/skills) — already a pinned source (the marketplace name is `mattpocock-skills`; the repo is `mattpocock/skills` — URL corrected 2026-08-27, `kb-links` found the 404) (`sources/mattpocock-skills`); its `research` skill is the minimal prior-art shape.
 - [Attacca](https://github.com/Attacca) — already a pinned source (`sources/Attacca`); its `researcher` agent carries the retirement marker this report corroborates.
 
 The three security repos are **new to this repo** and are candidates for

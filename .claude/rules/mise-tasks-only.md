@@ -41,6 +41,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | `git status` + `git branch` + `git log` + `gh pr list`, reformatted by hand into a handoff | `mise run kb-session-state` — one task, already handoff-shaped (#144). `-- --no-pr` skips the network call. A failed `gh` lookup prints `COULD NOT ASK`, never `none`; the four raw commands stay fine for ordinary diagnostics. **To COPY the block, use `uv run kb-setup session-state`** — mise redaction mangles the branch, every SHA and every PR number, which is the one case in this table where the task is not the right transport |
 | running the gates one at a time and retyping the exit codes into a handoff | `mise run kb-gates` — runs them and writes `.agent/kb/gates/gates-<sha>.json`, so the claim has a surviving artifact. The `/tmp` form above is still correct for a ONE-OFF gate; what it cannot do is outlive the session (#146) |
 | `npx <tool>` | the mise-pinned binary directly |
+| running `lychee` by hand over the docs, or wiring it into `lint` | `mise run kb-links` — the hk `lychee` step under `HK_PROFILE=links`, bounded 5m, reading `lychee.toml`; the network pass is never in `lint` (an unconfigured run measured >5 min on `docs.doppler.com` backoffs, 2026-08-27). The zero-network `lychee_offline` step IS in `check`/pre-commit and checks 0 links today — its comment says so |
 
 Read-only introspection with **no task equivalent** stays direct and is
 explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,

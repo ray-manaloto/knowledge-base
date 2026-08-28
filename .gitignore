@@ -234,3 +234,5 @@ brain/graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 # default its output to the aggregate graphify-out/; --out redirects it here.
 # Derived, disposable, rebuilt by kb-build / kb-watch.
 /.self-graph/
+# lychee's result cache (lychee.toml: cache = true) — per-machine, 1-day TTL
+.lycheecache

@@ -154,6 +154,7 @@ svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignOb
 svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
 svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
 svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
 svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
 svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
 svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
@@ -198,6 +199,32 @@ carries hardcoded dark inks.** On a dark page ground that is black-on-black by
 construction, and no `themeVariables` set fixes it — `background` is used for
 internal contrast derivation and never becomes a rect. **The plate and the ink
 must come from CSS outside the SVG**, which is what §2 does.
+
+### 2b. The shape is an ELEMENT, and the group is not it — measured 2026-08-27
+
+The rule set above shipped and Ray reported *"this is still black-on-black text"*
+on three nodes of a page it was on — every one of them a **stadium** (`([…])`),
+none of them carrying a `classDef`. The Mermaid Chart MCP's `rawSVG` shows why:
+
+```html
+<!-- unclassed rectangle: the shape IS the .label-container -->
+<g class="node default "><rect class="basic label-container" style="" …></rect>
+
+<!-- unclassed STADIUM: the shape is a <path> INSIDE a g.label-container -->
+<g class="node default "><g class="basic label-container outer-path"><path d="…"></path></g>
+
+<!-- classed node of either shape: the palette rides INLINE on the element -->
+<rect class="basic label-container" style="fill:#dfe6ff !important;stroke:#2f4fd8 !important">
+```
+
+A `fill` on `g.label-container` reaches the `<path>` only by inheritance, and
+mermaid's own theme styles the path **directly** — a directly styled element
+beats an inherited value every time, so the stadium kept the theme's dark fill
+under my dark text. The added line targets the shape **elements** under `.node`,
+and only the ones with **no inline `fill`**, so a `classDef` palette survives
+and every un-styled node gets a light plate. Two habits follow: give every node
+a `classDef` (then the palette is inline and theme-proof), and treat a node you
+left unclassed as the one that will be unreadable.
 
 ### 3. Validate the source before you publish
 
@@ -255,9 +282,10 @@ in the same repo had been silently broken since publication, which is proof
 nobody ever looked. **No mermaid diagram in this repo has been confirmed to
 render by anyone except Ray, and every time he has looked, he has found a defect.**
 
-Three revisions, three misses, in order: `<div>` renders nothing → `.mermaid svg`
-rules that may never match → the id-targeted set above. Each was published as
-fixed. The first two were not.
+Four revisions, four misses, in order: `<div>` renders nothing → `.mermaid svg`
+rules that may never match → the id-targeted set → the same set styling the
+**group** while the theme styled the **path** (§2b). Each was published as fixed.
+The first three were not.
 
 ### Inline SVG
 

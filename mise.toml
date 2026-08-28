@@ -177,12 +177,13 @@ gh = "2.98.0"
 "npm:@openai/codex" = "0.150.1"
 antigravity-cli = "1.1.21"
 "npm:ctx7" = { version = "0.5.8", minimum_release_age = "0s" }
-"npm:firecrawl-cli" = "1.23.1"
+"npm:firecrawl-cli" = "1.23.3"
 # coreutils: macOS ships BSD userland, not GNU — this repo's own rules and
 # probes want GNU behaviour (`timeout`'s rc 124 on expiry, `nproc`, `tac`).
 # Undeclared, the bare names hit erroring mise shims (rc 1), which reads
 # exactly like the command under test failing. conda backend (prebuilt).
 "conda:coreutils" = "9.11"
+lychee = "0.24.2"
 
 [deps.uv]
 auto = true
@@ -332,6 +333,15 @@ env.HK_OUTPUT_FILE = "{{config_root}}/.agent/kb/gates/lint-output.log"
 # aborts first and reports which task wedged — better than a bare subprocess
 # timeout in python that only knows something took too long.
 timeout = "20m"
+
+[tasks.kb-links]
+description = "Link-check our docs/code with lychee via hk (HK_PROFILE=links) — never part of `lint`"
+# The lychee step in hk.pkl is profile-gated, so the default `lint`/pre-commit
+# paths never wait on the network. This task is the one door to it. Bound
+# because the unbounded form measured >5 min on this repo (see hk.pkl).
+env = { HK_PROFILE = "links" }
+run = "hk run check --all -S lychee"
+timeout = "5m"
 
 [tasks.fmt]
 description = "Auto-fix formatting/lint issues"

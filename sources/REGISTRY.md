@@ -423,3 +423,17 @@ Prior art for the two we would otherwise have written from scratch:
 Read only as a control arm for the plugin-prior-art search and **not** proposed as
 sources: `tarqd/skills`, `nq-rdl/agent-extensions`, `a5c-ai/babysitter`,
 `liby/vibe-coding-plugins`.
+
+### 2026-08-27 — the lychee-from-Python sweep (`docs/research/reports/2026-08-27-lychee-from-python.md`)
+
+- <https://github.com/jb--/lychpy> — the only PyO3 binding for lychee-lib; pushed
+  2023-09-26, "not ready for usage". T3 `deferred` — dead, kept as the negative result.
+- <https://github.com/firecrawl/firecrawl-claude-plugin> — the `firecrawl-developer-index`
+  and `firecrawl-search` skills; the developer index's three surfaces are documented there. T2.
+- <https://github.com/firecrawl/cli> — `firecrawl developer <query>`, the passage-returning
+  surface our connector lacks; pinned here as `npm:firecrawl-cli`. T2.
+- <https://github.com/yuting0624/antigravity-for-claude-code> — `commands/research.md` +
+  the skill's deep-research recipe, read from the 0.23.0 plugin cache. T2.
+- <https://github.com/PyO3/pyo3> — touched only as a lychee CONSUMER (its CI). T3.
+- <https://github.com/bamr87/it-journey> — `scripts/validation/link-checker.py`, prior art
+  for the subprocess + `--format json` bridge (reads a `fail_map` key 0.24.2 does not emit). T3.

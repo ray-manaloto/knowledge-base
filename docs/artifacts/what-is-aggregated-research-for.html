@@ -1,0 +1,303 @@
+<title>What Is Aggregated Research For?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ground:    #eef1f5;
+    --panel:     #ffffff;
+    --ink:       #14203a;
+    --muted:     #55637f;
+    --hair:      #cfd6e2;
+    --cobalt:    #2f4fd8;
+    --cobalt-bg: #dfe6ff;
+    --moss:      #3c7a4e;
+    --moss-bg:   #e3f1e6;
+    --amber:     #c47f16;
+    --amber-bg:  #fff3dc;
+    --plate:     #ffffff;
+    --display: "Bricolage Grotesque", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1422; --panel: #171d2e; --ink: #e6eaf3; --muted: #a3adc4; --hair: #2b3450;
+      --cobalt: #8ea0ff; --cobalt-bg: #1d2650; --moss: #7fc08f; --moss-bg: #17301f;
+      --amber: #e5a63c; --amber-bg: #3a2a0c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0f1422; --panel: #171d2e; --ink: #e6eaf3; --muted: #a3adc4; --hair: #2b3450;
+    --cobalt: #8ea0ff; --cobalt-bg: #1d2650; --moss: #7fc08f; --moss-bg: #17301f;
+    --amber: #e5a63c; --amber-bg: #3a2a0c;
+  }
+  body { background: var(--ground); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.55; margin: 0; }
+  main { max-width: 62rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+  h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.1; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); letter-spacing: -0.02em; font-variation-settings: "opsz" 96; }
+  h2 { font-size: 1.7rem; margin-top: 3.2rem; padding-top: 1.2rem; border-top: 2px solid var(--ink); }
+  h3 { font-size: 1.15rem; margin-top: 1.4rem; }
+  p { max-width: 66ch; margin: 0.8rem 0; }
+  .eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .lede { font-size: 1.25rem; max-width: 60ch; color: var(--ink); margin-top: 1rem; }
+  .lede em { font-style: italic; }
+  header .strip { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.4rem; }
+  .chip { font-family: var(--mono); font-size: 0.78rem; padding: 0.25rem 0.6rem; border-radius: 3px; border: 1px solid var(--hair); background: var(--panel); }
+  .chip.open { border-color: var(--amber); background: var(--amber-bg); }
+  .chip.settled { border-color: var(--moss); background: var(--moss-bg); }
+  .chip.later { color: var(--muted); }
+  figure { margin: 1.4rem 0; }
+  .plate { background: var(--plate); border: 1px solid var(--hair); border-radius: 4px; padding: 0.9rem; overflow-x: auto; }
+  figcaption { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); margin-top: 0.6rem; max-width: 80ch; }
+  pre.mermaid { margin: 0; font-family: var(--mono); }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--panel); border: 1px solid var(--hair); border-radius: 3px; padding: 0.05em 0.35em; }
+  .diff { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.9rem; margin-top: 1rem; }
+  .diff div { background: var(--panel); border: 1px solid var(--hair); border-left: 4px solid var(--cobalt); border-radius: 4px; padding: 0.8rem 1rem; }
+  .diff .k { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .qgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 1.1rem; margin-top: 1.2rem; }
+  .q { background: var(--panel); border: 1px solid var(--hair); border-radius: 4px; padding: 1rem 1.15rem 1.1rem; display: flex; flex-direction: column; gap: 0.55rem; }
+  .q .num { font-family: var(--mono); font-weight: 600; font-size: 0.8rem; color: var(--amber); }
+  .q h3 { margin-top: 0; }
+  .q p { margin: 0; font-size: 0.98rem; }
+  .q dl { margin: 0.2rem 0 0; display: grid; grid-template-columns: 2.2rem 1fr; gap: 0.35rem 0.5rem; font-size: 0.95rem; }
+  .q dt { font-family: var(--mono); font-weight: 600; color: var(--cobalt); }
+  .q dd { margin: 0; }
+  .q .lean { border-top: 1px dashed var(--hair); padding-top: 0.55rem; font-size: 0.95rem; }
+  .q .lean b { color: var(--cobalt); }
+  .q .unblocks { font-family: var(--mono); font-size: 0.74rem; color: var(--muted); }
+  blockquote { margin: 0.9rem 0; padding: 0.7rem 1rem; border-left: 3px solid var(--amber); background: var(--panel); font-style: italic; max-width: 70ch; }
+  blockquote cite { display: block; font-style: normal; font-family: var(--mono); font-size: 0.76rem; color: var(--muted); margin-top: 0.4rem; }
+  .log li { margin: 0.4rem 0; }
+  .log time { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); margin-right: 0.5rem; }
+  footer { margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid var(--hair); font-size: 0.92rem; color: var(--muted); }
+  footer ul { padding-left: 1.2rem; }
+  a { color: var(--cobalt); }
+  a:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+
+  /* mermaid backstop — by SVG id; the class is not an ancestor. Verbatim from eli5-visual §2. */
+  svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+  svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+  svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+  svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+  svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+  svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+  svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+  svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+  svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+  svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+    svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+  svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+  svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+  svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+  svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+  svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">design tree · four rounds, frontier empty · opened 2026-08-27 · session kb-20260827.06</div>
+  <h1>What Is Aggregated Research For?</h1>
+  <p class="lede">Seven decisions settled <em>how</em> to build it and <em>where</em> it lives. None of them said what a person gets by invoking it. This page holds the two pictures that were in disagreement, the tree of decisions that hangs off that gap, and what each round settled. Round 1 settled three of four; the fourth was reframed into <a href="https://claude.ai/code/artifact/a3bf44f2-f540-4d72-ae38-fba84f6c8534">this page&rsquo;s sibling, The Research Spine</a>.</p>
+  <div class="strip">
+    <span class="chip settled">rounds 1–4 + the advisor: 14 settled — every branch of the tree visited, nothing waiting</span>
+    <span class="chip settled">3 settled — HOW, not WHAT</span>
+  </div>
+</header>
+
+<h2>Two pictures of one plugin</h2>
+<p>A is what the last session was building toward: a <b>sequential sweep</b>, cheapest step first, that stops when a cheap step settles the question, with a control arm on every null. B is what you described in the artifact comments: the <b>pipeline shape</b> of <code>/deep-research</code>, fanned out over <em>all</em> our tools at once, with a vote on every claim. The blue boxes are where they differ.</p>
+<figure>
+  <div class="plate">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e8edf5','primaryTextColor':'#14203a','primaryBorderColor':'#7d8aa6','lineColor':'#3c4a66','secondaryColor':'#eef1f6','tertiaryColor':'#f6f8fb','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
+flowchart LR
+  subgraph S["A · the SWEEP — what the last session built toward"]
+    direction TB
+    sq([question]):::base --> s0["0 · graph<br/>kb-query"]:::base
+    s0 -->|"cheapest-refutable first"| s1["1 · installed binary"]:::base
+    s1 --> s2["2 · shipped source<br/>gh api contents?ref=TAG"]:::base
+    s2 --> s3["3 · both trackers<br/>gh api search/issues"]:::base
+    s3 --> s4["4 · breadth<br/>firecrawl web + developer index<br/>exa · context7 · last30days<br/>antigravity:research"]:::base
+    s4 --> s5["5 · one synthesis lane<br/>opens the URLs itself"]:::base
+    s5 --> sr[/"report: ranked sources<br/>every null with its arm<br/>not measured"/]:::base
+    arm{{"control arm<br/>on every null"}}:::diff -.->|"same shape,<br/>known-good input"| s1
+    arm -.-> s3
+    arm -.-> s4
+    stop["stop early when a<br/>cheap step settles it"]:::diff -.-> s1
+  end
+  subgraph P["B · the PIPELINE — what Ray described"]
+    direction TB
+    pq([question]):::base --> p0["Scope"]:::base
+    p0 --> p1["Search — ALL sources at once<br/>graph · gh api · firecrawl web + developer index<br/>firecrawl research index · exa · context7<br/>last30days · antigravity:research<br/>grep.app · deps.dev · lychee"]:::diff
+    p1 --> p2["URL dedup"]:::base
+    p2 --> p3["Fetch and extract"]:::base
+    p3 --> p4["Verify — 3 votes per claim<br/>survives · refuted · unverified"]:::diff
+    p4 --> p5["Synthesize"]:::base
+    p5 --> pr[/"answer · report · daily brief"/]:::base
+  end
+  classDef base fill:#e8edf5,stroke:#7d8aa6,color:#14203a
+  classDef diff fill:#dfe6ff,stroke:#2f4fd8,color:#14203a
+</pre>
+  </div>
+  <figcaption>A is the current SKILL.md, steps 0–5 (.claude/skills/aggregated-research/SKILL.md). B is the stage list read out of the Claude Code 2.1.247 binary by the previous session's lane (.agent/kb/reports/agents/deep-research-internals.md — inherited, not re-read this session). What differs: A is ordered and stops early; B is parallel and votes. A arms each null; B tallies each claim.</figcaption>
+</figure>
+<div class="diff">
+  <div><span class="k">A costs less</span><br>A cheap step that settles the question ends the run. B always pays for the fan-out.</div>
+  <div><span class="k">B trusts less</span><br>B never lets one source be the answer — three votes per claim. A trusts the cheapest source that discriminates.</div>
+  <div><span class="k">Same rule, different depth</span><br>A puts <em>never asked ≠ answered no</em> at each probe. B puts it in the tally: too few valid votes is <em>unverified</em>, never <em>refuted</em>.</div>
+</div>
+
+<h2>The tree, and its frontier</h2>
+<p>Amber is answerable now. Grey waits on an amber answer. Green is settled — but settled about construction, so a dashed line marks which settled boxes an amber answer could move.</p>
+<figure>
+  <div class="plate">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e8edf5','primaryTextColor':'#14203a','primaryBorderColor':'#7d8aa6','lineColor':'#3c4a66','secondaryColor':'#eef1f6','tertiaryColor':'#f6f8fb','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
+flowchart TD
+  R(["What is aggregated-research FOR?"]):::root
+  R --> Q1["Q1 · the value — SETTLED round 2, mostly<br/>the spine, with Ray's four page comments applied"]:::settled
+  R --> Q2["Q2 · when — SETTLED<br/>both, on-demand first"]:::settled
+  R --> Q3["Q3 · who — SETTLED<br/>any of your repos"]:::settled
+  R --> Q4["Q4 · /deep-research — SETTLED<br/>the shape only: cannot tune model, effort or family"]:::settled
+  R --> Q5["recency rule — SETTLED<br/>prefer tools actively worked on"]:::settled
+  Q1 --> R2a["selection rule — SETTLED round 2<br/>tiered: cheap adapters always, expensive by question class"]:::settled
+  Q5 --> R2a
+  Q1 --> R2b["plugin, rule, or skill — SETTLED round 4<br/>a PLUGIN: the spine as its skill, adapters as modules,<br/>firecrawl · exa · context7 · last30days declared, lychee-py a dependency"]:::settled
+  Q3 --> R2b
+  Q2 --> R2c["output — SETTLED round 4<br/>report · artifact when the answer is a decision · graph ingest where a graph exists · brief on a schedule<br/>PLUS machine-readable structured output for other systems"]:::settled
+  Q3 --> R2c
+  R2a --> R2d["token budget — SETTLED round 4<br/>deep-research constants as per-call defaults: angles 5, fetch 15, claims 25, votes 3"]:::settled
+  R2d --> V["fable-advisor conditions — RATIFIED<br/>the stage-1 record carries null-arm + tier · vote independence is by SOURCE DOMAIN<br/>agy is never a routine voter · no brief before a per-run cap"]:::settled
+  Q1 --> B["the lychee binding — SETTLED round 3<br/>PyO3 0.29 + maturin 1.15 · asyncio-native await check()<br/>own repo, after a declared spike here"]:::settled
+  Q1 --> L["lychee as an hk linter — SETTLED rounds 2–3<br/>kb-links, network, profile-gated<br/>+ an offline step in check and pre-commit"]:::settled
+  V --> S["first codex dispatch — SETTLED after the verdict<br/>the adapter contract + gh-trackers adapter FIRST<br/>the binding spike SECOND, with an exit criterion"]:::settled
+  B --> S
+  subgraph H["settled — HOW, not WHAT"]
+    direction LR
+    h1["one package,<br/>three modules"]:::settled ~~~ h2["staged in kb_setup/research,<br/>split out later"]:::settled ~~~ h3["own marketplace,<br/>declares 4 plugins"]:::settled
+  end
+  R2b --> h3
+  classDef root fill:#e8edf5,stroke:#7d8aa6,color:#14203a
+  classDef settled fill:#e3f1e6,stroke:#3c7a4e,color:#14203a
+</pre>
+  </div>
+  <figcaption>Closed. The advisor's verdict ratified the spine with four conditions and moved the first dispatch; you took its order. Grey was round 4's frontier; everything green was settled by an answer you gave or a comment you left, quoted in the cards and the log below. The bottom green boxes are decisions 2, 3, 4 and 6 from session-2026-08-27-g.md §1.</figcaption>
+</figure>
+
+<h2>Round 1 — the four questions, and what you answered</h2>
+<div class="qgrid">
+
+  <div class="q">
+    <div class="num">Q1</div>
+    <h3>What does a person get by invoking it?</h3>
+    <p>The one thing the parts do not give on their own.</p>
+    <dl>
+      <dt>A</dt><dd><b>A verified answer.</b> Picture B: fan out, dedup, fetch, vote, synthesize. The plugin <em>is</em> the pipeline over our tools.</dd>
+      <dt>B</dt><dd><b>A disciplined sweep.</b> Picture A: the ordering plus the control arm plus the report shape. A checklist the agent walks.</dd>
+      <dt>C</dt><dd><b>Both, nested.</b> B is the discipline inside each source step of A; the vote stage is where <em>never asked ≠ answered no</em> lives.</dd>
+    </dl>
+    <div class="lean">➡️ <b>C.</b> Your comment 0bd0b4fa asks for the pipeline shape with our tools as its sources. The sweep discipline does not go away — it becomes what each source step must satisfy before its result may vote.</div>
+    <div class="lean"><b>Round 1 answer:</b> <em>"take a step back and review especially how /deep-research and /antigravity:research work as the structure where we use all these sources … be very detailed … must list all tools/libraries/sdks/mcp/plugins/skills used and where."</em> Plus a ranking rule (comment 92fe3e73): <em>"prefer tools/libraries/sdks/frameworks that are actively being worked on (filter by release date/git commit)."</em> Answered on <b>The Research Spine</b>.</div>
+    <div class="lean"><b>SETTLED — round 2:</b> "Mostly — with changes I will comment on the page." Four comments, all applied to the spine page: context7 belongs in the fetch row · "use agy instead of gemini" · "is the firecrawl mcp necessary or can we just use the firecrawl cli?" → the CLI suffices, and it is now pinned at the latest (1.23.3) · "we have to build the python to rust binding using a modern framework library" → round 3.</div>
+    <div class="unblocks">unblocks: selection rule · plugin-or-rule · budget</div>
+  </div>
+
+  <div class="q">
+    <div class="num">Q2</div>
+    <h3>When does it run?</h3>
+    <p>Directive item 5 asks for a daily morning brief an agent team creates, reviews and synthesizes. #509 describes an on-demand question.</p>
+    <dl>
+      <dt>A</dt><dd><b>On demand only.</b> A person or agent brings one question; the three #509 test prompts are the shape.</dd>
+      <dt>B</dt><dd><b>The daily brief only.</b> A standing question list, scheduled; the answer is a brief, not a reply.</dd>
+      <dt>C</dt><dd><b>Both, one pipeline, two entry points.</b> The brief is a scheduled caller of the on-demand run with a standing question list.</dd>
+    </dl>
+    <div class="lean">➡️ <b>C, on-demand first.</b> A brief that schedules a pipeline that does not yet exist is a cron job with nothing to call. Build the run; then the brief is a routine plus a question list.</div>
+    <div class="lean"><b>SETTLED — round 1:</b> both, on-demand first.</div>
+    <div class="unblocks">unblocks: selection rule · output · budget</div>
+  </div>
+
+  <div class="q">
+    <div class="num">Q3</div>
+    <h3>Who is the user?</h3>
+    <p>Decision 3 (staged standalone package) was made assuming "any repo". The answer decides whether graph-first is a hard dependency or an optional first source.</p>
+    <dl>
+      <dt>A</dt><dd><b>This repo only.</b> It may assume kb-query, the mise tasks and the guards. Simplest; the marketplace is then pointless.</dd>
+      <dt>B</dt><dd><b>Any of your repos.</b> dotfiles and siblings, where there is no graph. Step 0 becomes "the graph if one exists".</dd>
+      <dt>C</dt><dd><b>Anyone from the marketplace.</b> Zero of our infrastructure may be assumed; every source is a declared plugin or a public API.</dd>
+    </dl>
+    <div class="lean">➡️ <b>B.</b> It is what the marketplace decision was already assuming, and it is the smallest scope that makes "install the plugin" a real test. C can be a later hardening, not a first target.</div>
+    <div class="lean"><b>SETTLED — round 1:</b> any of your repos.</div>
+    <div class="unblocks">unblocks: plugin-or-rule · output</div>
+  </div>
+
+  <div class="q">
+    <div class="num">Q4</div>
+    <h3>What is <code>/deep-research</code> to it?</h3>
+    <p>It is user-invoked only — no agent can start it (workflows.md:80, and a lane measured it 2026-08-27). Your comment said "use this workflow or steps but with the results from the other tools, and maybe use /deep-research as one of the sources."</p>
+    <dl>
+      <dt>A</dt><dd><b>The shape.</b> Copy its stages and its three-outcome tally as the plugin's spine.</dd>
+      <dt>B</dt><dd><b>A source.</b> One optional breadth input, present only when you type it.</dd>
+      <dt>C</dt><dd><b>Both.</b> The spine is copied; the command is one source that only a person can add, so the daily brief runs without it.</dd>
+    </dl>
+    <div class="lean">➡️ <b>C</b> — it is what you said, and the one consequence worth confirming: because only you can type it, the scheduled brief can never include it.</div>
+    <div class="lean"><b>SETTLED — round 1: A, the shape only.</b> Your comment af70b8cc: <em>"most likely just A as we want to be able to tune the models/effort/family (claude or codex) that /deep-research does not provide the ability to tune."</em> So it is not a source either — its stages and its tally are copied; the command itself is left to you.</div>
+    <div class="unblocks">confirms the spine for Q1-A/C</div>
+  </div>
+
+</div>
+
+<h2>The tally worth copying</h2>
+<p>The single mechanism Q1 turns on. It is our <em>never asked ≠ answered no</em> rule one level down: a claim that could not be checked is not a claim that was refuted.</p>
+<figure>
+  <div class="plate">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e8edf5','primaryTextColor':'#14203a','primaryBorderColor':'#7d8aa6','lineColor':'#3c4a66','secondaryColor':'#eef1f6','tertiaryColor':'#f6f8fb','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
+flowchart LR
+  c["one claim"]:::base --> v1["vote 1"]:::base
+  c --> v2["vote 2"]:::base
+  c --> v3["vote 3"]:::base
+  v1 --> t{"tally"}:::base
+  v2 --> t
+  v3 --> t
+  t -->|"valid at least 2<br/>and refuted under 2"| s["SURVIVES"]:::good
+  t -->|"refuted at least 2"| r["REFUTED"]:::bad
+  t -->|"too few VALID votes:<br/>timeout, empty, infra failure"| u["UNVERIFIED<br/>never asked ≠ answered no"]:::open
+  classDef base fill:#e8edf5,stroke:#7d8aa6,color:#14203a
+  classDef good fill:#e3f1e6,stroke:#3c7a4e,color:#14203a
+  classDef bad fill:#fbe3e0,stroke:#9e3b26,color:#14203a
+  classDef open fill:#fff3dc,stroke:#c47f16,color:#14203a
+</pre>
+  </div>
+  <figcaption>VOTES_PER_CLAIM = 3, REFUTATIONS_REQUIRED = 2, as the previous session's lane read them from the 2.1.247 binary (inherited; not re-read this session). Its own comment: "infra failure must not read as refuted."</figcaption>
+</figure>
+
+<h2>What the primary sources say</h2>
+<blockquote>i want to run /grilling again on the next session because we dont agree on what the aggregate-research plugin should be doing
+<cite>Ray, closing session kb-20260827.05 — .agent/plans/session-2026-08-27-g.md §0</cite></blockquote>
+<blockquote>we probably want to use this workflow or steps but w the results from the other tools, and maybe use /deep-research as one of the sources
+<cite>artifact comment 0bd0b4fa on the-aggregated-research-plugin.html — unactioned</cite></blockquote>
+<blockquote>after doing a deep dive into each of these we might find overlap and might need them all
+<cite>artifact comment 71392702 — unactioned; the same instruction as "prototype all the tools first"</cite></blockquote>
+<blockquote>run the aggregated-research on this and especially for projects doing similar knowledge-base work on graphify or other tools … this needs to be something we automate daily as morning brief that an agent team can create/review/synthesize to improve this project
+<cite>docs/direction/2026-08-26-ray-directives.md, PART ONE item 5</cite></blockquote>
+<blockquote>Scope — Both a general multi-source sweep and the upstream/dependency case, with the upstream case as the worked example
+<cite>gh issue view 509, "Decisions already made" — read this session</cite></blockquote>
+
+<h2>Round log</h2>
+<ol class="log">
+  <li><time>2026-08-27 · round 1</time> Opened with Q1–Q4. This page is republished at the same path after each round; the tree above is redrawn as nodes settle.</li>
+  <li><time>2026-08-27 · round 2</time> Q1 mostly settled (four comments, applied) · selection rule = <b>tiered</b> — cheap adapters always, expensive ones by question class · lychee linter = the profile-gated network pass plus an offline step · first codex spec = nothing until the grilling closes.</li>
+  <li><time>2026-08-27 · round 3</time> The binding: <b>PyO3 0.29 + maturin 1.15</b> · <b>asyncio-native</b> <code>await check()</code> (pyo3-async-runtimes) · <b>own repo</b> after a declared spike here. The offline step: <b>add it anyway</b>, knowing it checks 0 links today (measured: 1,155 links, all remote) — wired in <code>hk.pkl</code> with that measurement in its comment. Round 4 frontier: plugin-or-rule · output · token budget · whether the binding spike is the first codex-implementer spec.</li>
+  <li><time>2026-08-27 · round 4</time> The last frontier. It ships as a <b>plugin</b> · a run produces the report, an artifact when the answer is a decision, graph ingest where a graph exists, a brief on a schedule — and, your addition, <b>machine-readable structured output</b> "for other systems to be able to pass along" · the token budget is <b>deep-research's constants as per-call defaults</b> · the binding spike is the first codex-implementer dispatch, <b>after the fable-advisor verdict</b>. Two standing directives from you the same session, verbatim in <code>docs/direction/2026-08-27-ray-directives.md</code>: <em>"always use the fable-advisor with codex-implementer."</em></li>
+  <li><time>2026-08-27 · the verdict</time> <code>fable-advisor</code> ratified the spine as settled and added four ship conditions: the stage-1 record carries <b>null-arm and tier</b> fields · vote independence is by <b>source domain</b>, not model family · <b>agy is never a routine voter</b> · <b>no brief before a per-run token cap</b>. It disagreed with round 4 on order — the <b>adapter contract + gh-trackers adapter first</b> (a real red-able fixture: jdx/hk has issues disabled), the binding spike <b>second</b> with the exit criterion "name what subprocess + <code>--format json</code> cannot do". You took the advisor's order. Verbatim report: <code>.agent/kb/reports/agents/advisor-spine.md</code>. The contract spec is written (seven parts, ten emission rows) and is with <code>premise-verifier</code> before <code>codex-implementer</code> sees it.</li>
+  <li><time>2026-08-27 · round 1 answered</time> Q2 = both, on-demand first · Q3 = any of your repos · Q4 = the shape only (tunability) · new: the recency rule. Q1 reframed: draw the two engines first — <b>The Research Spine</b> is that page. Three nodes here were black-on-black (stadium shapes, unclassed); the cause was measured with the Mermaid Chart MCP and the fix is on this page and in the eli5-visual skill (§2b). Picture A's breadth step and picture B's search step were missing firecrawl's developer index, context7 and antigravity:research (comment 923e5c23) — added.</li>
+</ol>
+
+<footer>
+  <p><b>Numbers on this page.</b> Measured this session: 10 unpushed commits on the branch, 3 settled construction decisions drawn, 4 questions opened and 3 settled. The deep-research constants were re-read this session from the installed 2.1.248 binary (VOTES_PER_CLAIM 3, REFUTATIONS_REQUIRED 2, MAX_FETCH 15, MAX_VERIFY_CLAIMS 25 — unchanged from the previous lane's 2.1.247 read). <b>Corrected after publication:</b> the mermaid rule set on the first publish styled the node <em>group</em>; the theme styles the shape <em>element</em>, so three unclassed stadium nodes rendered dark-on-dark. Every node now carries a class and the element-level rule is in the stylesheet.</p>
+  <p><b>Skills considered and not used.</b> <code>dataviz</code> — no data series here, only mechanism. <code>design</code> — one page, not a multi-artboard canvas. <code>writing-for-agents</code> — this is reader prose, not a skill. <code>eli5:eli5</code> alone — no persistence and no honesty rules. <code>artifact-capabilities</code> read; nothing declared, so the page stays shareable.</p>
+  <p><b>Read for this page.</b> .claude/skills/aggregated-research/SKILL.md · its references/acceptance-509.md · gh issue 509 · docs/direction/2026-08-26-ray-directives.md · .agent/plans/session-2026-08-27-g.md · docs/goals/2026-08-27-1342-kb-aggregated-research-goal.md · <code>mise run kb-query --prose</code> (truncated at 53 of 68 nodes; nothing about this skill's purpose in the returned set — #551).</p>
+</footer>
+</main>
