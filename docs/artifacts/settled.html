@@ -1,0 +1,170 @@
+<title>Settled</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Vollkorn:wght@400;600&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #FCFBF9;
+    --panel: #FFFFFF;
+    --sunk: #F2EFEA;
+    --ink: #1C1A17;
+    --muted: #6B665E;
+    --rule: #E3DFD8;
+    --set: #2C6647;
+    --defer: #33608C;
+    --warn: #8A4B2A;
+    --display: "Sora", "Helvetica Neue", sans-serif;
+    --body: "Vollkorn", Georgia, serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  body { background: var(--ground); color: var(--ink); font-family: var(--body); font-size: 18px; line-height: 1.58; }
+  .wrap { max-width: 51rem; margin: 0 auto; padding: 3.5rem 1.5rem 5rem; display: flex; flex-direction: column; gap: 2rem; }
+  .eyebrow { font-family: var(--mono); font-size: 0.67rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--display); font-weight: 700; font-size: clamp(2.1rem, 5.5vw, 3rem); line-height: 1.02; letter-spacing: -0.03em; margin: 0.4rem 0 0; }
+  h2 { font-family: var(--display); font-weight: 700; font-size: 1.24rem; letter-spacing: -0.015em; margin: 0; text-wrap: balance; }
+  .lede { font-size: 1.11rem; color: var(--muted); margin: 0; }
+  p { margin: 0; }
+  section { display: flex; flex-direction: column; gap: 0.95rem; }
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+  code { font-family: var(--mono); font-size: 0.79em; background: var(--sunk); border-radius: 3px; padding: 0.08em 0.34em; }
+
+  figure { margin: 0; }
+  figure svg { display: block; width: 100%; height: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 5px; }
+  figcaption { font-family: var(--mono); font-size: 0.71rem; line-height: 1.55; color: var(--muted); margin-top: 0.6rem; }
+  .fig-scroll { overflow-x: auto; }
+
+  .ledger { border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
+  .grp { font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); background: var(--sunk); padding: 0.55rem 1rem; border-bottom: 1px solid var(--rule); }
+  .item { display: grid; grid-template-columns: 4.6rem 1fr; gap: 1rem; padding: 0.75rem 1rem; background: var(--panel); border-bottom: 1px solid var(--rule); align-items: start; }
+  .item:last-child { border-bottom: 0; }
+  .tag { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 0.22rem; }
+  .tag.s { color: var(--set); }
+  .tag.d { color: var(--defer); }
+  .tag.w { color: var(--warn); }
+  .item div:last-child { font-size: 0.95rem; }
+  .item b { font-family: var(--display); font-weight: 600; font-size: 0.98rem; display: block; margin-bottom: 0.12rem; }
+  .item span { color: var(--muted); }
+  @media (max-width: 34rem) { .item { grid-template-columns: 1fr; } }
+
+  .box { background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--warn); border-radius: 4px; padding: 0.95rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.96rem; }
+  .box b { font-family: var(--display); }
+  .box ol { margin: 0; padding-left: 1.2rem; }
+  .box li { margin-bottom: 0.2rem; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Grilling outcome · 2026-08-28 · input to /to-spec</div>
+    <h1>Settled</h1>
+  </header>
+
+  <p class="lede">Everything the grilling closed, in one tracked place — because the last spec died in a session scratchpad and this page is the fix for that, not a summary of it.</p>
+
+  <div class="box"><p><b>Updated after first publication.</b> A question about logging and structured output reopened the frontier by three decisions; they are in their own group below rather than folded in silently. The finding behind them: logging and the result schema were both decided and built long ago — the research CLI is simply the one module that never joined.</p></div>
+
+  <hr>
+
+  <section>
+    <h2>The build order, and why <code>links</code> goes first</h2>
+    <p>An adapter is only "done" when its cited links resolve. That made <code>links</code> a prerequisite for every other adapter — so it moves to the front, where it is also the cheapest thing to build.</p>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 730 250" role="img" aria-label="The done-criterion that cited links must resolve makes the links adapter a prerequisite for packages, codesearch and breadth. Building links first satisfies that dependency for everything downstream. Order: links, then packages, then codesearch, then breadth, then a report step that turns records into a document.">
+          <defs>
+            <marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2C6647"/></marker>
+            <marker id="d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8A4B2A"/></marker>
+          </defs>
+
+          <text x="14" y="22" font-family="Roboto Mono, monospace" font-size="10" font-weight="500" fill="#8A4B2A">the done-criterion that creates the dependency</text>
+          <rect x="14" y="30" width="222" height="34" rx="3" fill="#FAF3EE" stroke="#8A4B2A" stroke-width="1.4"/>
+          <text x="125" y="51" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="10" fill="#8A4B2A">"its cited links actually resolve"</text>
+
+          <path d="M125 64 L125 96" stroke="#8A4B2A" stroke-width="1.4" marker-end="url(#d)"/>
+          <text x="134" y="86" font-family="Roboto Mono, monospace" font-size="9" fill="#8A4B2A">needs</text>
+
+          <rect x="14" y="104" width="132" height="50" rx="3" fill="#EBF2EE" stroke="#2C6647" stroke-width="2"/>
+          <text x="80" y="124" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="11" font-weight="500" fill="#2C6647">1 · links</text>
+          <text x="80" y="139" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="8.5" fill="#2C6647">lychee 0.24.2, pinned</text>
+          <text x="80" y="150" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="8.5" fill="#2C6647">kb-links is prior art</text>
+
+          <path d="M146 129 L176 129" stroke="#2C6647" stroke-width="1.5" marker-end="url(#f)"/>
+
+          <rect x="184" y="104" width="132" height="50" rx="3" fill="#FFF" stroke="#2C6647" stroke-width="1.4"/>
+          <text x="250" y="124" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="11" fill="#2C6647">2 · packages</text>
+          <text x="250" y="139" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="8.5" fill="#2C6647">deps.dev</text>
+          <text x="250" y="150" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="8.5" fill="#2C6647">keyless HTTP</text>
+
+          <path d="M316 129 L346 129" stroke="#2C6647" stroke-width="1.5" marker-end="url(#f)"/>
+
+          <rect x="354" y="104" width="132" height="50" rx="3" fill="#FFF" stroke="#2C6647" stroke-width="1.4"/>
+          <text x="420" y="124" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="11" fill="#2C6647">3 · codesearch</text>
+          <text x="420" y="139" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="8.5" fill="#2C6647">grep.app</text>
+
+          <path d="M486 129 L516 129" stroke="#2C6647" stroke-width="1.5" marker-end="url(#f)"/>
+
+          <rect x="524" y="104" width="132" height="50" rx="3" fill="#FFF" stroke="#2C6647" stroke-width="1.4"/>
+          <text x="590" y="124" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="11" fill="#2C6647">4 · breadth</text>
+          <text x="590" y="139" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="8.5" fill="#2C6647">firecrawl · exa · last30days</text>
+          <text x="590" y="150" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="8.5" fill="#2C6647">declared dependencies</text>
+
+          <path d="M80 154 L80 186 L590 186 L590 154" stroke="#8A4B2A" stroke-width="1.2" stroke-dasharray="4 3" fill="none"/>
+          <path d="M250 154 L250 186 M420 154 L420 186" stroke="#8A4B2A" stroke-width="1.2" stroke-dasharray="4 3"/>
+          <text x="335" y="202" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="9" fill="#8A4B2A">every later adapter validates its links with the shipped verb — no interim workaround</text>
+
+          <rect x="184" y="212" width="302" height="30" rx="3" fill="#EBF2EE" stroke="#2C6647" stroke-width="1.6"/>
+          <text x="335" y="231" text-anchor="middle" font-family="Roboto Mono, monospace" font-size="10" font-weight="500" fill="#2C6647">5 · report — N records → one document</text>
+        </svg>
+      </div>
+      <figcaption>All four are prototyped end to end before any verb lands. `report` is what makes `--out` files worth writing — today they hold raw JSON nobody reads.</figcaption>
+    </figure>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>The ledger</h2>
+
+    <div class="ledger">
+      <div class="grp">what it is</div>
+      <div class="item"><span class="tag s">settled</span><div><b>Plugin <code>aggregated-research</code>, CLI <code>aggregated-research-cli</code></b><span>"aggregated-search" was a typo. Nothing renames; the installed data dir stays put.</span></div></div>
+      <div class="item"><span class="tag s">settled</span><div><b>The CLI lives in the marketplace repo, beside the plugin</b><span>Not a third repo. It stops being distributed by pipx-ing 1.3 GB of knowledge-base at a stale commit.</span></div></div>
+      <div class="item"><span class="tag s">settled</span><div><b>Plugin directories move under <code>plugins/</code></b><span>No convention exists (7 marketplaces root, 5 subdir) — but the ones using it are those whose repo root carries its own tooling. Ours does.</span></div></div>
+      <div class="item"><span class="tag s">settled</span><div><b>Resume at rung 4, do not rebuild</b><span>The five-verb design already is what was asked for. Rungs 1–3 are done; rung 4 was never started.</span></div></div>
+
+      <div class="grp">how it gets built</div>
+      <div class="item"><span class="tag s">settled</span><div><b>All four adapters prototyped end to end before any verb lands</b><span>Standing rule: prototype the tools first.</span></div></div>
+      <div class="item"><span class="tag s">settled</span><div><b>Done means all four: a red test on a BAD answer · a control arm on every null · container acceptance re-run · cited links resolve</b><span>Not "the JSON parsed". The current trackers gate passes on an empty result and gets tightened when the first new adapter re-runs acceptance.</span></div></div>
+      <div class="item"><span class="tag s">settled</span><div><b>Hand-written code a library already provides gets deleted</b><span>Including <code>schemas/generate_research_record.py</code> — our own wrapper around datamodel-code-generator. Replaced by the tool's CLI behind a mise task.</span></div></div>
+      <div class="item"><span class="tag s">settled</span><div><b><code>$schema</code> and agent-readable comments on every config file</b><span><code>https://mise.jdx.dev/schema/mise.json</code> on the mise files, so an agent can see what values are valid.</span></div></div>
+
+      <div class="grp">logging and output — added after the ledger's first publication</div>
+      <div class="item"><span class="tag s">settled</span><div><b>The research CLI moves onto the structlog event stream BEFORE rung 5 splits it out</b><span>It is the only module of eleven still using bare <code>print</code>, and the only one leaving the package. After the split every option reintroduces coupling or a second drifting event layer. The conversion must be behaviour-preserving so the existing output assertions stay a valid regression arm. <a href="https://claude.ai/code/artifact/61cd116f-aca5-4c3f-9c0b-6aaeab73f693">the one module that prints</a></span></div></div>
+      <div class="item"><span class="tag s">settled</span><div><b>Model-lane output is schema-constrained and generated, like every other model type</b><span>Claims, votes and synthesis come back against a generated schema, not parsed from prose. Extends the mandate that already owns <code>AdapterRecord</code> to the spine's lane contracts. Never discussed before now.</span></div></div>
+      <div class="item"><span class="tag d">provisional</span><div><b>What the event layer looks like in the new package</b><span>Decided by the rung-5 packaging prototype: a shared events package both repos consume (the <code>kb_setup.currency</code> precedent), or structlog directly with a thin local sink. Same paper-trail rule as the agy seam — plan note, issue, inline comment.</span></div></div>
+
+      <div class="grp">written down, but provisional</div>
+      <div class="item"><span class="tag d">provisional</span><div><b>The spine's budgets: 3 votes · 2 refutations kill · 15 fetches · 25 claims</b><span>Committed as tracked defaults with their provenance, and their true-when condition: read from a 2026-07-30 materialisation of the deep-research workflow script, not re-derived against current Claude Code. The prototype tunes them; it does not invent them.</span></div></div>
+      <div class="item"><span class="tag d">provisional</span><div><b><code>bin/</code> — mise generators, or delete it entirely</b><span>A prototype decides between <code>mise generate bootstrap --localize</code> + <code>task-stubs</code>, and firecrawl's approach of shipping no <code>bin/</code> at all. PR #5's wrapper is provisional either way.</span></div></div>
+
+      <div class="grp">deferred, with a paper trail</div>
+      <div class="item"><span class="tag w">seam only</span><div><b>The cheap lane: design the seam, do not implement it</b><span>agy subscription tokens are limited, container acceptance has no agy auth, and its <code>search_web</code> returns coarse summaries the skill already forbids shipping unverified. The spine takes a lane parameter; only the Claude lane exists.</span></div></div>
+      <div class="item"><span class="tag d">own slice</span><div><b>Renovate · Dependabot · semver</b><span>After the adapters. The CLI has to be a published package before there is anything to version. Note <code>mise.lock</code> is committed here, so a lock-refresh workflow is the only mechanism that can keep it current — Renovate structurally cannot.</span></div></div>
+    </div>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>The unimplemented lane must not go quiet</h2>
+    <div class="box">
+      <p><b>Three places record why the agy lane is a seam and not an implementation</b>, so nobody later reads an empty branch as an oversight:</p>
+      <ol>
+        <li>a note in the plan, stating the token constraint and the evidence that weakened its value case;</li>
+        <li>a GitHub issue holding the open question — does agy give a measurable recall gain over firecrawl/exa/last30days — and what would settle it;</li>
+        <li>an inline comment at the seam in the code, naming the issue and saying the lane is pending research and a prototype, not forgotten.</li>
+      </ol>
+      <p>This is the same discipline as the provisional budgets above: the point is never that a decision is final, it is that the next reader can see what was decided and on what evidence.</p>
+    </div>
+  </section>
+
+</div>

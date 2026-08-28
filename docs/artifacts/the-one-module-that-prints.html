@@ -1,0 +1,164 @@
+<title>The One Module That Prints</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;800&family=Petrona:wght@400;600&family=Fira+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #F7F8F7;
+    --panel: #FFFFFF;
+    --sunk: #ECEFEE;
+    --ink: #16191A;
+    --muted: #616B6C;
+    --rule: #DCE1E0;
+    --done: #256B55;
+    --gap: #A33B3B;
+    --note: #2C5C7A;
+    --display: "Manrope", "Helvetica Neue", sans-serif;
+    --body: "Petrona", Georgia, serif;
+    --mono: "Fira Mono", ui-monospace, monospace;
+  }
+  body { background: var(--ground); color: var(--ink); font-family: var(--body); font-size: 18px; line-height: 1.6; }
+  .wrap { max-width: 50rem; margin: 0 auto; padding: 3.5rem 1.5rem 5rem; display: flex; flex-direction: column; gap: 2rem; }
+  .eyebrow { font-family: var(--mono); font-size: 0.67rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--display); font-weight: 800; font-size: clamp(2rem, 5.2vw, 2.9rem); line-height: 1.03; letter-spacing: -0.035em; margin: 0.4rem 0 0; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 700; font-size: 1.22rem; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+  .lede { font-size: 1.11rem; color: var(--muted); margin: 0; }
+  p { margin: 0; }
+  section { display: flex; flex-direction: column; gap: 0.9rem; }
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+  code { font-family: var(--mono); font-size: 0.79em; background: var(--sunk); border-radius: 3px; padding: 0.08em 0.34em; }
+
+  figure { margin: 0; }
+  figure svg { display: block; width: 100%; height: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 5px; }
+  figcaption { font-family: var(--mono); font-size: 0.71rem; line-height: 1.55; color: var(--muted); margin-top: 0.6rem; }
+  .fig-scroll { overflow-x: auto; }
+
+  .three { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
+  .r { display: grid; grid-template-columns: 5.6rem 1fr; gap: 1rem; padding: 0.85rem 1rem; background: var(--panel); border-bottom: 1px solid var(--rule); }
+  .r:last-child { border-bottom: 0; }
+  .r .st { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; padding-top: 0.2rem; }
+  .r .st.d { color: var(--done); }
+  .r .st.g { color: var(--gap); }
+  .r .st.o { color: var(--note); }
+  .r b { font-family: var(--display); font-weight: 600; font-size: 0.99rem; display: block; margin-bottom: 0.14rem; }
+  .r div:last-child { font-size: 0.94rem; }
+  .r span { color: var(--muted); }
+  @media (max-width: 34rem) { .r { grid-template-columns: 1fr; } }
+
+  .box { background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--note); border-radius: 4px; padding: 0.95rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.96rem; }
+  .box.gap { border-left-color: var(--gap); }
+  .box b { font-family: var(--display); }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Measured 2026-08-28 · answering "I don't see anything about logging or structured output"</div>
+    <h1>The one module that prints</h1>
+  </header>
+
+  <p class="lede">Both were decided long ago and built — a 12 KB selection report, six candidates evaluated, structlog chosen, 647 lines of event and sink code, eleven modules emitting. The research CLI is not one of them. It is the only piece heading to another repo, and the only piece still using bare <code>print</code>.</p>
+
+  <hr>
+
+  <section>
+    <h2>What already exists</h2>
+    <div class="box">
+      <p><b>Your own ruling, 2026-08-09, quoted in the code:</b> <em>"one structured event stream with a human-rendering stdout sink"</em> — explicitly not "reports become log lines." Most of this repo's ~455 print sites <em>are the product</em>: `kb-check`'s summary, `kb-gates`' report. They became events; a sink renders them as the text read today.</p>
+      <p><b>The library was chosen on evidence, not preference.</b> `docs/research/reports/2026-08-10-logging-library-selection.md` evaluated six ingested candidates. structlog owns the event layer; <b>stdlib owns the sink layer</b> — the decisive axis, because whoever owns the sink owns the shape of every report this repo prints.</p>
+      <p><b>And there is already a JSONL surface.</b> Set <code>KB_EVENTS_JSONL</code> and every event is also written one JSON object per line. Off by default, so ordinary runs print exactly what they print today.</p>
+    </div>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Where the research CLI sits</h2>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 730 300" role="img" aria-label="Eleven kb_setup modules emit into a structlog event stream, which one sink renders to stdout for humans and optionally to a JSONL file. The research CLI does not emit — it calls print directly to stdout, bypassing the stream. When the CLI moves to the marketplace repo it leaves kb_setup entirely, so the events and sinks modules do not travel with it.">
+          <defs>
+            <marker id="ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#256B55"/></marker>
+            <marker id="bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#A33B3B"/></marker>
+          </defs>
+
+          <rect x="14" y="26" width="150" height="52" rx="4" fill="#EAF2EF" stroke="#256B55" stroke-width="1.6"/>
+          <text x="89" y="46" text-anchor="middle" font-family="Fira Mono, monospace" font-size="10.5" font-weight="500" fill="#256B55">11 kb_setup modules</text>
+          <text x="89" y="61" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9" fill="#256B55">gates · check · currency</text>
+          <text x="89" y="73" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9" fill="#256B55">build · funnel · …</text>
+
+          <path d="M164 52 L206 52" stroke="#256B55" stroke-width="1.6" marker-end="url(#ok)"/>
+          <text x="185" y="44" text-anchor="middle" font-family="Fira Mono, monospace" font-size="8.5" fill="#256B55">emit</text>
+
+          <rect x="214" y="26" width="150" height="52" rx="4" fill="#EAF2EF" stroke="#256B55" stroke-width="1.6"/>
+          <text x="289" y="46" text-anchor="middle" font-family="Fira Mono, monospace" font-size="10.5" font-weight="500" fill="#256B55">events.py — structlog</text>
+          <text x="289" y="61" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9" fill="#256B55">named fields + `text`</text>
+          <text x="289" y="73" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9" fill="#256B55">levels, tally</text>
+
+          <path d="M364 52 L406 52" stroke="#256B55" stroke-width="1.6" marker-end="url(#ok)"/>
+
+          <rect x="414" y="26" width="150" height="52" rx="4" fill="#EAF2EF" stroke="#256B55" stroke-width="1.6"/>
+          <text x="489" y="46" text-anchor="middle" font-family="Fira Mono, monospace" font-size="10.5" font-weight="500" fill="#256B55">sinks.py — stdlib</text>
+          <text x="489" y="61" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9" fill="#256B55">attached ONCE at</text>
+          <text x="489" y="73" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9" fill="#256B55">cli.main</text>
+
+          <path d="M564 40 L604 40" stroke="#256B55" stroke-width="1.4" marker-end="url(#ok)"/>
+          <text x="666" y="43" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9.5" fill="#256B55">human stdout</text>
+          <path d="M564 66 L604 66" stroke="#256B55" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#ok)"/>
+          <text x="666" y="63" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9.5" fill="#256B55">JSONL, opt-in</text>
+          <text x="666" y="75" text-anchor="middle" font-family="Fira Mono, monospace" font-size="8.5" fill="#256B55">KB_EVENTS_JSONL</text>
+
+          <line x1="14" y1="106" x2="716" y2="106" stroke="#DCE1E0" stroke-width="1.5"/>
+
+          <rect x="14" y="126" width="150" height="52" rx="4" fill="#FBEFEF" stroke="#A33B3B" stroke-width="2"/>
+          <text x="89" y="146" text-anchor="middle" font-family="Fira Mono, monospace" font-size="10.5" font-weight="500" fill="#A33B3B">research/ — the CLI</text>
+          <text x="89" y="161" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9" fill="#A33B3B">trackers.py, cli.py</text>
+          <text x="89" y="173" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9" fill="#A33B3B">emits NOTHING</text>
+
+          <path d="M164 152 L604 152" stroke="#A33B3B" stroke-width="2" marker-end="url(#bad)"/>
+          <text x="380" y="144" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9.5" fill="#A33B3B">bare print() — straight past the stream</text>
+          <text x="666" y="155" text-anchor="middle" font-family="Fira Mono, monospace" font-size="9.5" fill="#A33B3B">stdout</text>
+
+          <text x="14" y="204" font-family="Fira Mono, monospace" font-size="9.5" fill="#A33B3B">4 print sites: the record, the "wrote &lt;path&gt;" line, and two error messages. No level, no fields, no JSONL.</text>
+
+          <rect x="14" y="222" width="702" height="62" rx="4" fill="#FFF" stroke="#2C5C7A" stroke-width="1.5" stroke-dasharray="6 4"/>
+          <text x="30" y="244" font-family="Fira Mono, monospace" font-size="10.5" font-weight="500" fill="#2C5C7A">AND THEN IT MOVES</text>
+          <text x="30" y="261" font-family="Fira Mono, monospace" font-size="9.5" fill="#2C5C7A">rung 5 takes research/ out of kb_setup and into the marketplace repo as its own package.</text>
+          <text x="30" y="276" font-family="Fira Mono, monospace" font-size="9.5" fill="#2C5C7A">events.py and sinks.py do NOT travel with it. The one module off the stream is the one module leaving.</text>
+        </svg>
+      </div>
+      <figcaption>Read from `kb_setup/cli.py:33-50` (the sink attached once), `kb_setup/events.py` (251 lines), `sinks.py` (396), and a grep of `research/` for any events import — zero hits, four bare print sites.</figcaption>
+    </figure>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>"Structured output" is three different things here</h2>
+    <div class="three">
+      <div class="r">
+        <div class="st d">built</div>
+        <div><b>The result — one JSON record per adapter</b><span><code>AdapterRecord</code>, generated from <code>schemas/research-record.schema.json</code> with a drift gate. JSON is the only output format; no <code>--json</code> flag, by an advisor ruling. This is the piece that was already right.</span></div>
+      </div>
+      <div class="r">
+        <div class="st g">decided, unused</div>
+        <div><b>The logs — a structured event stream</b><span>structlog + a stdlib sink, chosen on a six-candidate evaluation, with an opt-in JSONL surface. Eleven modules use it. The research CLI does not, and it is the one going somewhere the modules cannot follow.</span></div>
+      </div>
+      <div class="r">
+        <div class="st o">open</div>
+        <div><b>The model's output — schema-constrained generation in the spine</b><span>The spine dispatches to model lanes and takes back claims, votes and a synthesis. Whether those are schema-constrained or parsed from prose has never been decided. It rides with the spine, which is deferred to a prototype.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Why this is worth a decision now, not later</h2>
+    <div class="box gap">
+      <p><b>Rung 5 is a one-way door for this.</b> Once the CLI is its own package in another repo, converting it to the event stream means either vendoring <code>events.py</code>/<code>sinks.py</code>, depending on <code>kb_setup</code> from the new package — reintroducing the coupling rung 5 exists to remove — or writing a second, smaller event layer that will drift from this one.</p>
+      <p>The cheap moment is <b>before</b> the split, while both still live in the same package: convert <code>research/</code> to emit, decide what travels, then move it. That ordering is a spec decision and it belongs in the ticket for rung 5, not discovered during it.</p>
+      <p>It also touches something already on record: the per-call telemetry deleted with the semantic-corpus layer, which you have asked to have back. An adapter emitting structured events with timings and outcomes is the same surface.</p>
+    </div>
+  </section>
+
+</div>
