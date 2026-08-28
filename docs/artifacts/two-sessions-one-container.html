@@ -90,7 +90,7 @@ sequenceDiagram
   A2->>H: fires cold: mise-env install (ty + CLI)
   H-->>A2: hook_response outcome=success "CLI ready"
   A2->>A2: runs trackers --out /tmp/agent-trackers.json
-  A2-->>S: stream + exit 0 · wall clock 20–22 s
+  A2-->>S: stream + exit 0 · wall clock 20–27 s (4 runs)
   S->>S: assert hook_response, init.plugins, file shape, confinement, direct CLI
     </pre>
     <figcaption>Session 1 may only run <code>claude …</code> commands — the container holds a live OAuth token, and the transcript is uploaded as a CI artifact outside GitHub's secret masking. Session 2 is scoped to <code>Bash(aggregated-research *)</code> (plus <code>claude plugin list</code>) — the Opus read found its transcript tailed into the artifact on failure beside an unscoped Bash.</figcaption>
@@ -98,7 +98,7 @@ sequenceDiagram
 
   <h2>Measured this session</h2>
   <div class="grid">
-    <div class="card"><h3>Session 2 wall clock</h3><div class="num">20–22 <small>s</small></div><div class="src">runs 33186621864 (20 s) · 33187463915 (22 s) · 33187970377 · 33188627823 · bounds plugin load + MCP + hook + one turn</div></div>
+    <div class="card"><h3>Session 2 wall clock</h3><div class="num">20–27 <small>s</small></div><div class="src">runs 33186621864 (20 s) · 33187463915 (22 s) · 33187970377 (27 s) · 33188627823 (24 s) — each read from its run log · bounds plugin load + MCP + hook + one turn. <em>Corrected after publication: this read "20–22 s" while citing four runs, two of them unread; the cold lane read all four.</em></div></div>
     <div class="card"><h3>Old whole acceptance step</h3><div class="num">62 <small>s</small></div><div class="src">run 33179092669 · 14:14:53Z → 14:15:55Z · gh run view --json jobs</div></div>
     <div class="card"><h3>Command-hook timeout</h3><div class="num">600 <small>s default</small></div><div class="src">hooks.md:422 · hook never hit <code>cancelled</code> → hooks.json untouched</div></div>
     <div class="card"><h3>Negative arm</h3><div class="num bad">red</div><div class="src">run 33186921942 · both READMEs' dependency blocks removed → plugin "failed to load", hook never fires</div></div>
