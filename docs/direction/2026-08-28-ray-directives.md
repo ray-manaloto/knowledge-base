@@ -275,3 +275,24 @@ review ×2 + Opus silent-failure read; two respec rounds) squash-merged as `eb3b
 closing marketplace #2. Residuals (P3 + one unarmed allowlist claim) are marketplace
 #4. Page: `docs/artifacts/two-sessions-one-container.html`
 (<https://claude.ai/code/artifact/e46bc03b-c662-4ef7-afc9-dbf4be31c2a5>).
+
+## Land + next-round answers (AskUserQuestion, session `kb-20260828.02`, verbatim)
+
+Land: **"Land now (Recommended)"** — knowledge-base PR #567 landed as
+`b2028e6b0dd39c0177506e3528751efb136c2e16`.
+
+Next round: **"Agent-team research THROUGH the plugin (Recommended)"** — the option
+text: *"Your 2026-08-28 correction: run the Claude/Codex agent-team question via the
+installed aggregated-research CLI (`trackers` verb today), not the repo-local skill."*
+
+Clear-prep refinements, option labels verbatim:
+
+- Surface: **"trackers verb, several targets (Recommended)"** — *"Run
+  `aggregated-research trackers` against openai/codex-plugin-cc, anthropics/claude-code,
+  openai/codex (+ others) for "agent team tokens" / "handoff"; the gaps it leaves become
+  the spec for the next verbs (web/docs)."*
+- Output: **"Corpus + page (Recommended)"** — *"Raw results under sources/ via
+  kb-add/extractions (funnel-clean), a docs/research report, and an artifact page;
+  kb-remember closes it."*
+- Plugin: **"Yes, update first (Recommended)"** — update the user-scope install from
+  `05acca22` to the merged marketplace head before the round.
