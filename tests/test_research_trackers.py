@@ -220,6 +220,18 @@ def test_bad_requests_are_typed_without_running_gh(repo: str, term: str, message
     assert message in result.message
 
 
+@pytest.mark.parametrize("payload", ["<html>rate limited</html>", '{"full_name":"owner/repo"}'])
+def test_zero_status_unparsable_payload_fails_closed_as_not_run(payload: str) -> None:
+    def _garbage(_argv: tuple[str, ...]) -> tuple[int, str, str]:
+        return 0, payload, ""
+
+    result = trackers.search("owner/repo", "term", run=_garbage, now=NOW)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "unparsable payload for `gh api repos/owner/repo`" in result.message
+
+
 def test_nonzero_gh_status_is_external_and_blank_stderr_gets_a_reason() -> None:
     def _failed(_argv: tuple[str, ...]) -> tuple[int, str, str]:
         return 17, '{"message":"failure"}', "   "

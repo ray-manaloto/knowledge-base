@@ -66,13 +66,27 @@ def _run_gh(argv: tuple[str, ...]) -> tuple[int, str, str]:
     return process.returncode, process.stdout or "", process.stderr or ""
 
 
-def _request[T](argv: tuple[str, ...], response_type: type[T], run: _GhRunner) -> T | External:
-    """Run one GitHub request, preserving the subprocess's non-zero status."""
+def _request[T](
+    argv: tuple[str, ...], response_type: type[T], run: _GhRunner
+) -> T | External | Err:
+    """Run one GitHub request, preserving the subprocess's non-zero status.
+
+    A zero-status payload that is not the expected JSON (an HTML error page, a
+    truncated body) is NOT a gh failure and NOT a record: it fails closed as
+    ``Err(rc=Rc.NOT_RUN)`` — the question was never answered — mirroring
+    ``kb_setup.pr.checks_state`` on an unparsable payload.
+    """
     returncode, stdout, stderr = run(argv)
     if returncode != 0:
         message = stderr.strip() or f"gh exited {returncode} with no stderr"
         return external_from_returncode(returncode, message)
-    return msgspec.json.decode(stdout, type=response_type)
+    try:
+        return msgspec.json.decode(stdout, type=response_type)
+    except (msgspec.DecodeError, msgspec.ValidationError) as exc:
+        return Err(
+            f"gh returned an unparsable payload for `{_display_command(argv)}`: {exc}",
+            rc=Rc.NOT_RUN,
+        )
 
 
 def _search_argv(repo: str, kind: Kind, term: str | None) -> tuple[str, ...]:
@@ -150,7 +164,7 @@ def search(
 
     repo_argv = ("api", f"repos/{repo}")
     repo_response = _request(repo_argv, _RepoResponse, run)
-    if isinstance(repo_response, External):
+    if isinstance(repo_response, External | Err):
         return repo_response
 
     kinds = [Kind.issue] if repo_response.has_issues else []
@@ -161,7 +175,7 @@ def search(
     for kind in kinds:
         argv = _search_argv(repo, kind, term)
         response = _request(argv, _SearchResponse, run)
-        if isinstance(response, External):
+        if isinstance(response, External | Err):
             return response
         searches.append((kind, argv, response))
         total_count += response.total_count
@@ -173,7 +187,7 @@ def search(
         for kind in kinds:
             arm_argv = _search_argv(repo, kind, None)
             arm_response = _request(arm_argv, _SearchResponse, run)
-            if isinstance(arm_response, External):
+            if isinstance(arm_response, External | Err):
                 return arm_response
             count = arm_response.total_count
             arms.append(
