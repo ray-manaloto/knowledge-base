@@ -1,0 +1,217 @@
+<title>The Team Is a Transport</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#F2F4F1; --plate:#FFFFFF; --ink:#16201A; --muted:#5C6B62; --rule:#CBD3CD;
+    --accent:#C9780A; --ok:#237A57; --bad:#A8352A; --grey:#7A847E;
+    --mermaid-plate:#FBFCFA;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#141A17; --plate:#1C2420; --ink:#E6EBE7; --muted:#9AA79F; --rule:#33403A;
+      --accent:#E8A23A; --ok:#5FC08F; --bad:#E07A6E; --grey:#9AA39D;
+      --mermaid-plate:#FBFCFA;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#141A17; --plate:#1C2420; --ink:#E6EBE7; --muted:#9AA79F; --rule:#33403A;
+    --accent:#E8A23A; --ok:#5FC08F; --bad:#E07A6E; --grey:#9AA39D;
+    --mermaid-plate:#FBFCFA;
+  }
+  body{background:var(--ground);color:var(--ink);font-family:"Source Serif 4",Georgia,serif;font-size:17px;line-height:1.55;margin:0}
+  main{max-width:78ch;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+  h1,h2,h3{font-family:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;text-wrap:balance;line-height:1.1;margin:0}
+  h1{font-size:clamp(2.2rem,6vw,3.6rem);font-weight:700;letter-spacing:-0.02em}
+  h2{font-size:1.6rem;font-weight:700;margin-top:3rem;padding-top:1rem;border-top:2px solid var(--rule)}
+  h3{font-size:1.15rem;font-weight:700;margin-top:1.75rem}
+  p{max-width:68ch;margin:0.9rem 0}
+  .eyebrow{font-family:"IBM Plex Mono",Menlo,monospace;font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)}
+  .lede{font-size:1.2rem;max-width:62ch;color:var(--ink)}
+  .lede strong{color:var(--accent)}
+  code,pre{font-family:"IBM Plex Mono",Menlo,monospace;font-size:0.85em}
+  code{background:var(--plate);border:1px solid var(--rule);border-radius:3px;padding:0 0.3em}
+  pre{background:var(--plate);border:1px solid var(--rule);padding:0.9rem 1rem;overflow-x:auto;line-height:1.45}
+  pre code{border:0;background:none;padding:0}
+  figure{margin:1.5rem 0}
+  figcaption{font-size:0.9rem;color:var(--muted);max-width:68ch;margin-top:0.5rem}
+  .mermaid{background:var(--mermaid-plate);border:1px solid var(--rule);padding:0.75rem;overflow-x:auto;color:#1B2430}
+  table{border-collapse:collapse;width:100%;font-size:0.92rem;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;vertical-align:top;padding:0.5rem 0.6rem;border-bottom:1px solid var(--rule)}
+  th{font-family:"Bricolage Grotesque",sans-serif;font-weight:700}
+  .wrap{overflow-x:auto}
+  .pill{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:0.72rem;letter-spacing:0.06em;padding:0.05rem 0.45rem;border-radius:2px;border:1px solid currentColor;white-space:nowrap}
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .grey{color:var(--grey)} .acc{color:var(--accent)}
+  .card{background:var(--plate);border:1px solid var(--rule);padding:1rem 1.2rem;margin:1rem 0}
+  .card h3{margin-top:0}
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:1rem 0}
+  ol.steps li{counter-increment:s;display:grid;grid-template-columns:2.2rem 1fr;gap:0.6rem;padding:0.6rem 0;border-bottom:1px solid var(--rule)}
+  ol.steps li::before{content:counter(s);font-family:"Bricolage Grotesque",sans-serif;font-weight:700;color:var(--accent);font-size:1.3rem;line-height:1}
+  .src{font-family:"IBM Plex Mono",monospace;font-size:0.78rem;color:var(--muted)}
+  .decide{border-left:4px solid var(--accent);padding-left:1rem}
+  .legend{display:flex;flex-wrap:wrap;gap:0.75rem 1.5rem;font-size:0.85rem;color:var(--muted);margin:0.5rem 0 1.5rem}
+  a{color:inherit}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<main>
+  <p class="eyebrow">knowledge-base · research round 2026-08-28 · extends the 2026-08-27 handoff report</p>
+  <h1>The Team Is a Transport</h1>
+  <p class="lede">You asked how to build a Claude/Codex team that spends Fable-5 sparingly and talks reliably. Every lane this round says the same thing: <strong>you already have the team; what you do not have is a reliable way to hand work across and get it back.</strong> Three of last night's untested fixes were executed today — two hold, one is refuted — and the openai-cli goal turned out to be one command away.</p>
+
+  <p class="legend">
+    <span><span class="pill ok">MEASURED</span> executed this round</span>
+    <span><span class="pill acc">DERIVED</span> computed from measured parts</span>
+    <span><span class="pill grey">INHERITED</span> quoted from an earlier report, not re-run</span>
+  </p>
+
+  <h2>The picture in one line</h2>
+  <p>Two carpenters share a workshop. One designs (Claude), one builds (Codex). The work was never the problem. The problem is how the builder tells the designer "it's done": a <em>shout across the yard</em> that is often not heard, versus a <em>note left on the bench</em> that is always there in the morning.</p>
+
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#1B2430','primaryBorderColor':'#7A847E','lineColor':'#1B2430','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart LR
+  A["Claude architect<br/>(this session)"] -->|"spec, via stdin -"| X["Codex lane<br/>(codex exec)"]
+  X -.->|"the SHOUT: idle notice / final message<br/>lost 8 of 55 times · resend failed 2 of 4"| A
+  X ==>|"the NOTE: report file on disk<br/>read 2 of 2 times, 0 resends"| F[(".agent/kb/reports/")]
+  F ==>|"architect reads the file"| A
+  style F fill:#FFF4E0,stroke:#C9780A,stroke-width:2px
+  style X fill:#FFFFFF,stroke:#7A847E
+  style A fill:#FFFFFF,stroke:#7A847E
+    </pre>
+    <figcaption><strong>The shout vs the note.</strong> Dashed = the notification channel; solid = the file channel. <span class="src">MEASURED: evidence-agent-team-0828.md §1 (8 resends / 55 un-instructed prompts, 107 transcripts); §5 rows 4–5 (v4/v5 resends failed, recovered from transcript). This session's own arm: codex-binary-probe and evidence-0828 both went idle with no text; both files were complete on disk.</span></figcaption>
+  </figure>
+
+  <h2>What was actually executed today</h2>
+  <p>Last night's report recommended five interface changes and admitted its top three rested on flags <em>existing</em>, not on any run here. A lane ran them on the installed <code>codex-cli 0.150.1</code>, in a scratch directory, with a control arm on every negative.</p>
+  <div class="wrap"><table>
+    <thead><tr><th>Last night's claim</th><th>Today</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td><code>--output-schema</code> types the handoff</td><td><span class="pill ok">CONFIRMED</span> happy path</td><td>1-key schema → exactly <code>{"answer":4}</code>, validated. Enforcement against a <em>violating</em> reply not tested. <span class="src">codex-binary-probe.md:19,33</span></td></tr>
+      <tr><td><code>exec resume --last</code> recovers a killed lane</td><td><span class="pill ok">CONFIRMED</span></td><td>SIGTERM 4 s into a turn (rc 143, no output file ever written) → resume recalled the number and the mid-task progress. <span class="src">codex-binary-probe.md:20</span></td></tr>
+      <tr><td><code>--json</code> gives a clock</td><td><span class="pill bad">REFUTED</span></td><td>0 of 6 JSONL events carry any timestamp; control: <code>"type"</code> matched 6/6 on the same file. A wall-clock wrapper is required. <span class="src">codex-binary-probe.md:21</span></td></tr>
+      <tr><td>"8 in 8" un-instructed prompts needed a resend</td><td><span class="pill acc">NARROWED ~7×</span></td><td>8 of <strong>55</strong> (14.5%); the old denominator was its numerator. Direction holds: all 8 came from prompts without the write-to-file sentence. <span class="src">evidence-agent-team-0828.md:52-58</span></td></tr>
+      <tr><td>"one resend recovers the report"</td><td><span class="pill bad">REFUTED</span></td><td>2 of 4 resends in the 08-27i session failed; the lanes were recovered from the transcript. Memory updated. <span class="src">evidence-agent-team-0828.md:187</span></td></tr>
+      <tr><td>(new) a token-budget cap per Codex call</td><td><span class="pill bad">NONE EXISTS</span></td><td>Only <code>GoalsToml.max_goal_token_budget</code>, goal-mode scoped; <code>--max-steps</code> for exec is openai/codex#33294, open. Lever = reasoning effort + external timeout. <span class="src">trackers-agent-team.md:314-335</span></td></tr>
+      <tr><td>(new) <code>codex exec review --output-schema</code></td><td><span class="pill bad">FALSE-SUCCESS TRAP</span></td><td>Schema silently dropped, exit 0, prose. openai/codex#38545 open; the <code>Review</code> arm never calls <code>load_output_schema</code>. <span class="src">trackers-agent-team.md:49-54</span></td></tr>
+      <tr><td>(new) a lane can <em>substitute itself</em></td><td><span class="pill bad">NEW FAILURE CLASS</span></td><td>#559: the codex-implementer wrapper wrote the files with its own Bash; <code>CODEX SAID: N/A</code>. A kill leaves an empty result you can see; a substitution leaves a plausible result under the wrong family. <span class="src">codex-lychee-spike.md:40-42</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Which channel to build on</h2>
+  <p>Three transports exist on the pinned source (<code>rust-v0.150.1</code>). The picture draws the one thing they differ on: <strong>where the durable state lives</strong> — a file and a session id on disk, or a live connection.</p>
+
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#1B2430','primaryBorderColor':'#7A847E','lineColor':'#1B2430','actorBkg':'#FFFFFF','actorBorder':'#7A847E','noteBkgColor':'#FFF4E0','noteBorderColor':'#C9780A','fontFamily':'IBM Plex Mono, monospace','fontSize':'12px'}}}%%
+sequenceDiagram
+  participant A as Claude architect
+  participant F as file + session id (disk)
+  participant X as codex process
+  rect rgb(236,246,240)
+  Note over A,X: A · codex exec + --output-schema + resume — ADOPT
+  A->>X: spawn codex exec --output-schema s.json -o out.json -
+  X->>F: writes report incrementally, session persisted
+  X-->>A: exit, validated JSON in out.json
+  Note over F,X: process killed? codex exec resume --last restores state (MEASURED, rc 143 arm)
+  end
+  rect rgb(250,236,233)
+  Note over A,X: B · codex mcp-server — DEPRECATED on the installed binary
+  A->>X: MCP initialize (stdio, long-lived connection)
+  A->>X: tool codex {prompt, model}  →  {threadId, content}
+  A->>X: tool codex-reply {threadId}
+  Note over X: stderr: deprecated, will be removed (MEASURED)
+  end
+  rect rgb(240,240,240)
+  Note over A,X: C · codex app-server — [experimental], NOT executed here
+  A->>X: JSON-RPC thread/start, turn/start, turn/interrupt
+  X-->>A: streamed turn events
+  end
+    </pre>
+    <figcaption><strong>A keeps its state on disk; B and C keep it in a connection.</strong> Every measured failure in this repo's history (idle-without-report, the 116-second blackout, 222 min of finished-but-undelivered work <span class="src">INHERITED, 2026-08-27 report §1</span>) is a connection failure with an intact result behind it. A turns that into a <code>resume</code>; B and C turn it into a loss. Source read and binary run disagreed on B; the executed binary wins because a deprecation notice is a runtime fact a source read cannot see.</figcaption>
+  </figure>
+
+  <h3>The offload rule, updated</h3>
+  <p><strong>Offload to Codex when the work is bounded by a spec you can write in full, and the result is verifiable without your context.</strong> Four amendments this round earned:</p>
+  <ul>
+    <li>Never route a typed call through <code>codex exec review</code> (#38545).</li>
+    <li>Bound every dispatch externally — Codex has no per-call cap (#33294). Effort tier before, wrapper timeout during.</li>
+    <li>Do not spec a verification the lane's sandbox cannot run. The 2700 s watchdog kill (<code>workspace-write</code> has no network; the spec demanded live <code>gh</code>) and the #559 substitution both trace to that. <span class="src">MEASURED: evidence-agent-team-0828.md:141-145</span></li>
+    <li>Require a <strong>codex session id</strong> inside the typed return, and <em>verify it</em> — <code>codex exec resume &lt;id&gt;</code> succeeds, or the session file exists. <span class="src">Corrected after the fable-advisor verdict: an earlier version of this line said a self-reported <code>executor: "codex"</code> field would fail validation; a lane that wrote the files itself would fill that in just as plausibly, and schema enforcement under a violating reply is unmeasured. An id you can resume is an arm; a label is an attestation.</span></li>
+  </ul>
+
+  <h2>Where Fable-5 is worth spending</h2>
+  <p>The three decision points from last night all held. The cheapest Fable saving, though, is not a model choice: it is the write-to-file sentence, used in <strong>4 of 107</strong> dispatches this window, 3 of them from the single session that had read the report. <span class="src">MEASURED: evidence-agent-team-0828.md:52-64</span></p>
+
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#1B2430','primaryBorderColor':'#7A847E','lineColor':'#1B2430','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart TD
+  D["about to dispatch codex-implementer"] --> G{"SHORT gate (Fable):<br/>spec complete + verifiable<br/>without my context?"}
+  G -->|"no: what is missing"| D
+  G -->|"yes"| X["codex lane runs"]
+  X --> R{"full Fable pass ONLY at:"}
+  R --> P1["1 · a change expensive to reverse"]
+  R --> P2["2 · same problem resisted 2 attempts"]
+  R --> P3["3 · two lanes disagree and no rule settles it"]
+  style G fill:#FFF4E0,stroke:#C9780A,stroke-width:2px
+  style R fill:#FFF4E0,stroke:#C9780A,stroke-width:2px
+    </pre>
+    <figcaption><strong>Settled precedence, open shape.</strong> Your verbatim 2026-08-27 rule — "always consult fable-advisor before codex-implementer" — outranks the 2026-08-27 report's "three points and nowhere else" and <code>kb-advisor.md</code>'s "sparingly"; the fable-advisor refused the synthesis's "unresolved three-way contradiction" framing as over-cautious. What is open is only the <em>shape</em>: the pre-dispatch consult is a short yes/no gate that receives the <strong>spec by file path with a size cap, never the conversation</strong> (the measured cost is reading, so a "short" consult that loads the conversation is not short), and the three points get the full pass. <span class="src">advisor-agent-team.md (c); codex-history-agent-team.md:86; synthesis §4</span></figcaption>
+  </figure>
+
+  <h2>The end goal: graphify on openai-cli</h2>
+  <p>It is already wired. This session dry-ran it (rc 0, nothing invoked). The path below is the whole path.</p>
+
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#1B2430','primaryBorderColor':'#7A847E','lineColor':'#1B2430','fontFamily':'IBM Plex Mono, monospace','fontSize':'12px'}}}%%
+flowchart LR
+  C["mise run kb-graphify-native-extract<br/>-- --backend openai-cli"] --> K["kb_setup.graphify_native_extract<br/>refuses if backend absent"]
+  K -->|"clean_env(): strips OPENAI_API_KEY<br/>= keeps codex on the subscription"| G["graphify extract sources/graphify<br/>--mode deep --backend openai-cli"]
+  G -->|"per chunk, serial, stdin -"| X["codex exec --json --sandbox read-only<br/>effort ultra, model gpt-5.6-sol"]
+  X --> O[(".agent/kb/native-extract<br/>(NOT the aggregate graph)")]
+  B["kb-build → graphify-out/graph.json<br/>FAILS today (#397/#417, Cargo.toml)"]:::dead
+  B -. "unrelated; does not block" .-> O
+  classDef dead fill:#EEEEEE,stroke:#9AA39D,color:#7A847E,stroke-dasharray:4 3
+    </pre>
+    <figcaption><strong>One command, one sidecar output, one dead branch that does not matter.</strong> Two independent lanes read the same path and agreed on every file:line. <span class="src">mise.toml:742-744 · graphify_native_extract.py:568-587 · graphify_env.py:32-58 · llm.py:2054-2094, 3527-3557 (detect_backend can never auto-pick it) · dry-run MEASURED this session</span></figcaption>
+  </figure>
+
+  <div class="card">
+    <h3>What the first real run costs</h3>
+    <p><span class="pill acc">DERIVED</span> graphify's own comment measured one document at <strong>361 s</strong> (<code>llm.py:2091-2093</code>); the pinned clone has 706 plausible inputs (343 .py + 363 .md). A full deep pass is <strong>hours, serial, with no Codex-side token cap</strong>. The recommended first move is the ~25-file <code>mise</code> prose slice with <code>--api-timeout</code> raised, recording backend, model, effort, wall-clock per call and token spend — tokens, not dollars, per your 2026-08-26 directive.</p>
+    <p><strong>Still standing in the way, on paper only:</strong> <code>do-not.md</code> #4, <code>ai-cli-invocation.md:25-29</code>, root <code>CLAUDE.md</code> mandate 2 and issue #455 all still assert the prohibition you lifted on 2026-08-25 — and two of them credit <code>clean_env()</code> with a carve-out that actually lives in <code>detect_backend()</code>. Running the backend while the rules forbid it means either violating them or ignoring them; the edit comes first.</p>
+  </div>
+
+  <h2>What to do, cheapest first</h2>
+  <ol class="steps">
+    <li><div><strong>Put the write-to-file sentence in the committed dispatch templates.</strong> It exists in exactly one file today (<code>kb-extraction-worker.md:28</code>). Fixes the 14.5% resend rate. Cost: a sentence.</div></li>
+    <li><div><strong>Recovery = read the file, then the transcript, then one resend at most.</strong> Never a second wait. (Memory already corrected this session.)</div></li>
+    <li><div><strong>Bound every Codex dispatch externally; never <code>exec review</code> for a typed call.</strong> A flag and a rule line.</div></li>
+    <li><div><strong>Add a verifiable codex session id to the output schema</strong>, checked with <code>codex exec resume &lt;id&gt;</code>. The #559 class is caught by an arm, not a label. A contract, not a role — the roster stays at six.</div></li>
+    <li><div><strong>Write the Fable gate down in its settled shape</strong> (the diagram above): your directive governs; the gate reads a capped spec file, never the conversation.</div></li>
+    <li><div><strong>Sync the four governance surfaces to the 2026-08-25 ruling</strong> — its own PR.</div></li>
+    <li><div><strong>Run the 25-file openai-cli slice</strong>, serial, and record token spend.</div></li>
+    <li><div><span class="grey"><strong>Deferred:</strong> <code>codex app-server</code>. Adopt when <code>mcp-server</code>'s removal actually lands.</span></div></li>
+  </ol>
+
+  <h2 class="decide">Decisions only you can make</h2>
+  <ul>
+    <li>Confirm the <strong>gate shape</strong> in step 5 (a capped spec file, yes/no + what is missing) — the precedence itself is already yours.</li>
+    <li>Step 7's first spend: the ~25-file slice, serial, with <code>GRAPHIFY_OPENAI_CLI_EFFORT</code> exported explicitly and <code>--api-timeout</code> above 2×361 s. <strong>fable-advisor verdict (received 2026-08-28, after first publish): sync the four governance surfaces first</strong> — not because the rules bind (your ruling already lifts them) but because two of them are mechanically wrong and the run's own review would cite them.</li>
+  </ul>
+
+  <h2>Not measured</h2>
+  <ul>
+    <li><code>--output-schema</code> under a model reply that violates the schema.</li>
+    <li><code>codex app-server</code> — never executed; four third-party integrations describe it the same way, all secondary.</li>
+    <li>Whether the 0-of-4 resend result on instructed prompts is the fix or chance (P ≈ 0.54 at the 14.5% base rate).</li>
+    <li>Any per-call time or token figure for <code>openai-cli</code> at effort <code>ultra</code> — nothing has reached the provider on the current pin.</li>
+    <li>Whether #559's substitution recurs (n = 1).</li>
+    <li><code>/deep-research</code> breadth — user-invoked only; not run.</li>
+  </ul>
+
+  <h2>Sources</h2>
+  <p class="src">Lane reports (verbatim, .agent/kb/reports/agents/): codex-binary-probe.md · evidence-agent-team-0828.md · trackers-agent-team.md · openai-cli-backend-path-explore.md · openai-cli-backend-path.md · codex-history-agent-team.md · synthesis-agent-team-0828.md. Baseline: docs/research/reports/2026-08-27-claude-codex-handoff.md. Upstream: openai/codex #38545, #33294; anthropics/claude-code #86471, #90264; mar3co/fable-orchestrator #16. Page source: docs/artifacts/the-team-is-a-transport.html.</p>
+</main>

@@ -443,3 +443,19 @@ sources: `tarqd/skills`, `nq-rdl/agent-extensions`, `a5c-ai/babysitter`,
 - <https://github.com/cli/cli> — `gh`'s exit-code and stream split probed for the trackers
   adapter contract (404 → rc 1, JSON body on stdout, `gh: Not Found (HTTP 404)` on stderr;
   `search/issues` default page 30). T3.
+
+### 2026-08-28 — the agent-team transport round (`docs/research/reports/2026-08-28-agent-team-transport.md`)
+
+- <https://github.com/wtyler2505/protopulse> — `docs/collab/`, a Claude↔Codex protocol
+  co-design; first surfaced codex's non-interactive flag set (baseline round). T3.
+- <https://github.com/johnlindquist/codex-imps> — `docs/ISOLATION.md`, an unofficial
+  reverse-engineered token-cost table for codex's system prompt; unverified. T3.
+- <https://github.com/openclaw/openclaw> · <https://github.com/yishentu/claudian> ·
+  <https://github.com/slopus/happy> · <https://github.com/bullorosso/etienne> — four
+  independent integrations that describe `codex app-server` as JSON-RPC 2.0 over stdio
+  (`thread/start`, `turn/start`, `turn/interrupt`); the only corroboration the
+  `[experimental]` subcommand has. T3 `deferred` until `mcp-server`'s removal lands.
+- <https://github.com/ray-manaloto/claude-code-marketplace> — Ray's own marketplace, the
+  decided home of the `aggregated-research` plugin (2026-08-27 g §1 decision 4); measured
+  2026-08-28: `main` only, one plugin (`mise-toolkit`), 0 tags, last push 2026-04-08. T2
+  `pending` — becomes a manifest once the plugin lands there.
