@@ -198,3 +198,32 @@ README."*
 Resume answer: **"Start slice 2, full order (Recommended)"** — branch → directive
 append → governance sync → spec → premise-verifier → fable-advisor →
 codex-implementer (xhigh).
+
+## The slice-3 answers (clear-prep AskUserQuestion, session `kb-20260828.00`, option labels verbatim)
+
+Recorded one session late (the directive file could not take a commit while
+PR #565's receipt was pinned).
+
+Land: **"Land now (Recommended)"** — PR #565 landed as `03dbc46e9429`.
+
+Slice 3: **"Container acceptance test first (Recommended)"** — the option text:
+*"mise-OCI image + GHA ubuntu job: a Claude agent installs marketplace + plugin
+from the published docs and runs the agent-team question THROUGH the plugin.
+Your definition of done; exposes doc gaps now."*
+
+## Session opener, 2026-08-28 (session `kb-20260828.01`), verbatim
+
+> /i-have-adhd:i-have-adhd
+> /ponytail:ponytail ultra
+> /fable-orchestrator:orchestration use fable-advisor and codex-implementer lanes
+> /graphify
+> /kb-resume
+
+Resume answer: **"Start slice 3, local install first (Recommended)"** — the
+option text: *"Branch → directive append → diagnose WHY the plugin did not
+install here (it is the first acceptance-test premise) → spec →
+premise-verifier → fable-advisor → codex-implementer (xhigh), marketplace repo
+first."* The finding that prompted it: `aggregated-research@ray-manaloto` is
+enabled in `.claude/settings.json` with the `ray-manaloto` marketplace in
+`extraKnownMarketplaces`, yet `claude plugin list` (256 plugins) has no entry,
+no marketplace clone and no cache dir — measured at this session's start.
