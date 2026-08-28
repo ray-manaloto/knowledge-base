@@ -459,3 +459,22 @@ sources: `tarqd/skills`, `nq-rdl/agent-extensions`, `a5c-ai/babysitter`,
   decided home of the `aggregated-research` plugin (2026-08-27 g §1 decision 4); measured
   2026-08-28: `main` only, one plugin (`mise-toolkit`), 0 tags, last push 2026-04-08. T2
   `pending` — becomes a manifest once the plugin lands there.
+
+### 2026-08-28 — the aggregated-research plugin round (`docs/research/reports/2026-08-28-{codex-plugin-cc-anatomy,mcp-1to1-and-lsp,mise-oci-container-ci,plugin-bundle-spec,cli-plugin-anatomy}.md`)
+
+- <https://github.com/openai/codex-plugin-cc> — OpenAI's Claude Code plugin for Codex
+  (installed here as `codex@openai-codex` 1.0.6): the `codex app-server` broker
+  transport in production. Read from the installed cache + `gh api`; T2 `pending` — a
+  manifest is warranted, it is the only production Claude↔Codex transport besides ours.
+- <https://github.com/modelcontextprotocol/modelcontextprotocol> · <https://github.com/modelcontextprotocol/python-sdk>
+  — the MCP spec (revision `2026-07-28`) and `mcp` 2.1.1 (`FastMCP`→`MCPServer` rename);
+  Ray asked for the latest standard and the official sdk. The sdk is ALREADY registered
+  above (2026-08-27b backlog, T2); this line adds only the spec repo. T2 `pending`.
+- <https://github.com/facebook/pyrefly> — the second Python LSP Ray named (`pyrefly lsp`,
+  `pipx:pyrefly` 1.2.0, pushed 2026-08-28). T3 `deferred` — probed, not read.
+- <https://github.com/jdx/mise-action> · <https://github.com/actions/upload-artifact> ·
+  <https://github.com/softprops/action-gh-release> — the GHA pieces of the container
+  test; versions gh-verified 2026-08-28. T3 `tool`.
+- <https://github.com/firecrawl/firecrawl-claude-plugin> · <https://github.com/upstash/context7> —
+  the two plugins dissected as the pattern (and the ctx7 CLI's upstream). firecrawl already
+  registered above (T2); context7 T2 `pending`.
