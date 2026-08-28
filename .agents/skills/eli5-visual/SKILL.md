@@ -85,6 +85,12 @@ Via the Skill tool, **before authoring**:
    normal outcome** for an explainer, and a page that declares capabilities
    cannot be shared publicly.
 
+Then, **between writing the file and publishing it**, one more step that is not a
+skill: every mermaid diagram goes through the **Mermaid Chart MCP** — see
+*Diagram tooling* § 3. A diagram that has not been validated is not ready to
+publish, and this is the only step in this skill with a machine-checkable
+outcome.
+
 Then **say which other skills you considered and did not use, and why.** Ray asked
 for that list explicitly so the gaps are visible rather than silent. The usual
 near-misses and why they lose:
@@ -96,19 +102,198 @@ near-misses and why they lose:
 
 ## Diagram tooling
 
-Artifacts render **mermaid natively** — `<pre class="mermaid">` in HTML. Use it
-for flowcharts, dependency graphs, sequence and state diagrams; it is the right
-tool and far less error-prone than hand-authored SVG for those shapes.
+Artifacts render **mermaid natively**. Use it for flowcharts, dependency graphs,
+sequence and state diagrams; it is the right tool and far less error-prone than
+hand-authored SVG for those shapes.
 
-Two mechanics that are easy to get wrong:
+**Mermaid has broken twice here, both times silently, and both fixes are
+mechanical. Copy the two blocks below rather than reasoning about them.**
 
-- **Pin a light plate under every mermaid block.** Mermaid draws with its own
-  palette and renders dark-on-dark for a viewer in dark mode. Give `.mermaid` an
-  explicit light background token that stays light in *both* themes, or theme it
-  via `%%{init: {'theme':'base','themeVariables':{…}}}%%`.
-- Hand-author inline SVG only where the shape is a genuine comparison figure
-  mermaid cannot express. Then `artifact-diagramming`'s rules apply in full:
-  `viewBox`, `currentColor`, `<figure>` + `<figcaption>`, `role="img"`.
+### 1. The element is `<pre>`. Never `<div>`
+
+```html
+<pre class="mermaid">
+flowchart LR
+  A --> B
+</pre>
+```
+
+`<div class="mermaid">` renders **nothing at all** — `div` collapses the
+whitespace mermaid's grammar depends on. Reported by Ray as *"visual is not
+working"* on two figures, 2026-08-27.
+
+This section already said `<pre>` in plain text and **three pages were authored
+with `<div>` anyway**, plus two earlier pages that had been broken since
+publication and nobody noticed. Armed at the time: 13 tracked artifacts used
+`<pre>` correctly against 5 using `<div>` — the repo's own precedent was right
+and the author broke it. That is why the rule is now a copyable block and not a
+sentence: a norm you must retype is a norm you will retype wrong.
+
+### 2. Style by SVG **id**, not by `.mermaid` — the class is not an ancestor
+
+Getting the element right only makes the diagram *render*. Colour is a second,
+separate defect, and it took two failed fixes to locate.
+
+The renderer replaces your block with an SVG it names itself:
+**`#claude-mermaid-0`, `#claude-mermaid-1`, …** — visible in artifact comment
+anchors, which read `#claude-mermaid-1 > text:nth-of-type(7)`. So **every rule
+scoped under `.mermaid` can miss**, and a container-level `background` never
+reaches the drawing at all. That is the shape of the reported symptom: the page's
+own dark ground showing behind mermaid's dark ink.
+
+Ship this verbatim. It is ancestor-independent by construction:
+
+```css
+svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
+```
+
+`foreignObject div/span/p` matters: mermaid renders flowchart labels as **HTML
+inside the SVG**, where `fill` does nothing and only `color` applies. A rule set
+that names `text` alone leaves exactly those labels unstyled.
+
+Keep the `%%{init: {'theme':'base','themeVariables':{…}}}%%` header too — it
+still sets node fills to your palette. The CSS is the backstop, deliberately
+`!important` and theme-independent: the plate stays light in **both** themes, so
+there is no dark-mode arm to get wrong.
+
+### 2a. Why, measured — the SVG has no background and keeps dark inks
+
+Run through the Mermaid Chart MCP (§3) and inspected, 2026-08-27:
+
+| probe | result |
+|---|---|
+| `background` occurrences in the rendered SVG | **0** — with and without an init header |
+| `'background':'#ffffff'` in `themeVariables` → `#ffffff` in the output | **0** |
+| un-themed inks surviving a full `themeVariables` set | `#666`×5, `#999`×3, `#eaeaea`×4, `#333`×1, `#000000`×1 |
+
+**Control arm:** without the init header the output carries `#ECECFF` (mermaid's
+default primary) and none of my hexes; with it, `#ECECFF` drops to **0** and my
+`#221d1b` / `#f4f1ef` / `#9b8f8a` appear 12 / 5 / 7 times. So `%%{init}%%`
+genuinely works — which is what makes the two rows above findings rather than a
+broken probe.
+
+**And the two diagram types differ — sequence is the dangerous one.** Measured
+across six validated blocks: flowcharts emit `background` **9** times and carry
+**1-7** hardcoded dark inks; sequence diagrams emit it **0** times and carry
+**10-40**. So a sequence diagram has no plate at all *and* the most un-themed
+ink. If a page has one, assume it is the figure that will be unreadable.
+
+The mechanism is therefore settled: **mermaid emits a transparent SVG that still
+carries hardcoded dark inks.** On a dark page ground that is black-on-black by
+construction, and no `themeVariables` set fixes it — `background` is used for
+internal contrast derivation and never becomes a rect. **The plate and the ink
+must come from CSS outside the SVG**, which is what §2 does.
+
+### 2b. The shape is an ELEMENT, and the group is not it — measured 2026-08-27
+
+The rule set above shipped and Ray reported *"this is still black-on-black text"*
+on three nodes of a page it was on — every one of them a **stadium** (`([…])`),
+none of them carrying a `classDef`. The Mermaid Chart MCP's `rawSVG` shows why:
+
+```html
+<!-- unclassed rectangle: the shape IS the .label-container -->
+<g class="node default "><rect class="basic label-container" style="" …></rect>
+
+<!-- unclassed STADIUM: the shape is a <path> INSIDE a g.label-container -->
+<g class="node default "><g class="basic label-container outer-path"><path d="…"></path></g>
+
+<!-- classed node of either shape: the palette rides INLINE on the element -->
+<rect class="basic label-container" style="fill:#dfe6ff !important;stroke:#2f4fd8 !important">
+```
+
+A `fill` on `g.label-container` reaches the `<path>` only by inheritance, and
+mermaid's own theme styles the path **directly** — a directly styled element
+beats an inherited value every time, so the stadium kept the theme's dark fill
+under my dark text. The added line targets the shape **elements** under `.node`,
+and only the ones with **no inline `fill`**, so a `classDef` palette survives
+and every un-styled node gets a light plate. Two habits follow: give every node
+a `classDef` (then the palette is inline and theme-proof), and treat a node you
+left unclassed as the one that will be unreadable.
+
+### 3. Validate the source before you publish
+
+The **Mermaid Chart MCP** is the closest thing to a runtime surface available
+here, and it is a **required step between writing the file and publishing it.**
+Ray enabled it 2026-08-27, after three revisions of this skill had shipped
+guesses.
+
+The tool is deferred, so load it first, then send each diagram body:
+
+```text
+ToolSearch  "select:mcp__claude_ai_Mermaid_Chart__validate_and_render_mermaid_diagram"
+→ validate_and_render_mermaid_diagram({diagramCode: "<the block, init header and all>"})
+```
+
+**Its result is ~100–140 KB every time and blows the tool-result cap, landing in
+a file.** That is expected, not a failure. Extract rather than read — this is the
+whole check:
+
+```bash
+uv run python -c "
+import json,pathlib,re,collections
+d=json.loads(pathlib.Path('<the file the tool named>').read_text())
+print('valid:', d.get('valid'), '| type:', d.get('diagramType'))
+svg=d.get('rawSVG') or ''
+print('bytes:', len(svg), '| background occurrences:', len(re.findall(r'background', svg)))
+c=collections.Counter(re.findall(r'(?:fill|stroke|color)\s*[:=]\s*[\"\x27]?(#[0-9a-fA-F]{3,6}|none)', svg))
+print(c.most_common(12))
+"
+```
+
+What each field buys you:
+
+| field | what it settles |
+|---|---|
+| `valid` | the source parses — a blank figure is now caught before a reader meets one |
+| `diagramType` | you drew what you meant to draw (`sequence` when you wrote a sequence) |
+| colour histogram over `rawSVG` | which inks actually survived your `themeVariables`, and which hardcoded ones did not |
+
+**One limit, and it is the important one: it renders with its own config, not the
+artifact's.** A pass proves the *source* parses. It says nothing about how the
+artifact will colour it or what ground sits behind it — which is exactly the half
+that broke three times.
+
+**Colour still needs the reader.** So the honest verdict on a diagram page is
+**BLOCKED on the reader**, and the last line of the message must ask for it:
+
+> *"Reload and tell me whether the diagrams render, and whether any text is
+> unreadable."*
+
+**Never infer that other pages work.** A previous revision of this skill claimed
+"13 tracked artifacts use `<pre>` correctly" as evidence the recipe was sound.
+That was an inference from source, not an observation of a render — and two pages
+in the same repo had been silently broken since publication, which is proof
+nobody ever looked. **No mermaid diagram in this repo has been confirmed to
+render by anyone except Ray, and every time he has looked, he has found a defect.**
+
+Four revisions, four misses, in order: `<div>` renders nothing → `.mermaid svg`
+rules that may never match → the id-targeted set → the same set styling the
+**group** while the theme styled the **path** (§2b). Each was published as fixed.
+The first three were not.
+
+### Inline SVG
+
+Hand-author it only where the shape is a genuine comparison figure mermaid
+cannot express. Then `artifact-diagramming`'s rules apply in full: `viewBox`,
+`currentColor`, `<figure>` + `<figcaption>`, `role="img"`. Inline SVG has none of
+mermaid's theme problem — it inherits `currentColor` — which is a real reason to
+prefer it for a small figure.
 
 ## Persistence — the part that is usually skipped
 
@@ -153,11 +338,17 @@ necessary; if the page is necessary, the message must not duplicate it.
 ## Done means
 
 - The page exists at `docs/artifacts/<name>.html`, tracked.
+- **Every mermaid block came back `valid: true` from the Mermaid Chart MCP**, with
+  the right `diagramType`, BEFORE the page was published. This is the one item
+  here with a machine-checkable answer — the rest are judgement.
+- Every mermaid block is a `<pre class="mermaid">`, and the page carries the
+  `svg[id^="claude-mermaid"]` rule set.
 - It is published, and you have **read the live bytes back** to confirm what
   shipped — a publish result is a claim, the live page is the evidence.
 - Every figure has a `<figcaption>` stating what it shows.
 - Every number on it was measured this session or is labelled.
-- The terminal message is the link, the headline, and the ask — nothing more.
+- The terminal message is the link, the headline, and the ask — and on a page
+  with diagrams the ask is *"do they render, is anything unreadable"*.
 - You have named the skills you considered and did not use.
 
 ## See also

@@ -1,0 +1,608 @@
+<title>The Undelivered Round</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground:      #f4f6f8;
+    --panel:       #ffffff;
+    --ink:         #141b24;
+    --muted:       #59677a;
+    --hair:        #d7dee6;
+    --work:        #b4530a;
+    --work-soft:   #f6e3cf;
+    --dead:        #8a99ab;
+    --dead-soft:   #e3e8ee;
+    --signal:      #0e6f80;
+    --signal-soft: #d6ecef;
+    --plate:       #ffffff;
+    --plate-ink:   #141b24;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0d131a;
+      --panel:       #131c25;
+      --ink:         #e7edf3;
+      --muted:       #93a1b2;
+      --hair:        #26323f;
+      --work:        #f2a349;
+      --work-soft:   #3a2a17;
+      --dead:        #5c6b7c;
+      --dead-soft:   #1d2731;
+      --signal:      #46bccf;
+      --signal-soft: #12323a;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0d131a;
+    --panel:       #131c25;
+    --ink:         #e7edf3;
+    --muted:       #93a1b2;
+    --hair:        #26323f;
+    --work:        #f2a349;
+    --work-soft:   #3a2a17;
+    --dead:        #5c6b7c;
+    --dead-soft:   #1d2731;
+    --signal:      #46bccf;
+    --signal-soft: #12323a;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Newsreader", Georgia, "Times New Roman", serif;
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 1.25rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 44rem; margin: 0 auto; }
+  .bleed { max-width: 58rem; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.9rem;
+  }
+
+  h1 {
+    font-family: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700;
+    font-size: clamp(2.1rem, 6vw, 3.4rem);
+    line-height: 1.02;
+    letter-spacing: -0.022em;
+    text-wrap: balance;
+    margin: 0 0 1rem;
+  }
+
+  h2 {
+    font-family: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700;
+    font-size: clamp(1.28rem, 3vw, 1.6rem);
+    line-height: 1.15;
+    letter-spacing: -0.012em;
+    text-wrap: balance;
+    margin: 3.4rem 0 0.9rem;
+  }
+
+  h3 {
+    font-family: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 500;
+    font-size: 1.02rem;
+    letter-spacing: 0.005em;
+    margin: 2rem 0 0.5rem;
+  }
+
+  header { padding: 5rem 0 0; }
+
+  .standfirst {
+    font-size: 1.22rem;
+    line-height: 1.5;
+    color: var(--muted);
+    margin: 0 0 2.2rem;
+    text-wrap: pretty;
+  }
+
+  p { margin: 0 0 1.05rem; }
+  strong { font-weight: 500; color: var(--ink); }
+
+  em.lead { font-style: italic; color: var(--muted); }
+
+  code, .num {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.88em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  code { background: var(--dead-soft); padding: 0.1em 0.34em; border-radius: 2px; }
+
+  hr.rule {
+    border: 0;
+    border-top: 1px solid var(--hair);
+    margin: 3.6rem 0 0;
+  }
+
+  figure { margin: 2.4rem 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.74rem;
+    line-height: 1.55;
+    letter-spacing: 0.01em;
+    color: var(--muted);
+    margin-top: 0.9rem;
+    text-align: left;
+  }
+
+  .scroll { overflow-x: auto; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.94rem;
+    margin: 0.4rem 0 1.4rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.5rem 0.85rem 0.5rem 0;
+    border-bottom: 1px solid var(--hair);
+    vertical-align: top;
+  }
+  th {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  td.n {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .mermaid {
+    background: var(--plate);
+    color: var(--plate-ink);
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    padding: 1.5rem 1rem;
+    overflow-x: auto;
+  }
+  /* Mermaid renders its own SVG and does NOT inherit the container's theme, so a
+     dark-mode viewer got black-on-black. Forced light plate + forced dark ink in
+     BOTH themes; the init themeVariables alone did not reach edge labels,
+     cluster titles or sequence actors. Reported by a viewer, 2026-08-27. */
+  .mermaid svg { background: #ffffff !important; max-width: 100%; height: auto; }
+  .mermaid svg text,
+  .mermaid svg .nodeLabel,
+  .mermaid svg .edgeLabel,
+  .mermaid svg .cluster-label,
+  .mermaid svg .messageText,
+  .mermaid svg .labelText,
+  .mermaid svg .loopText,
+  .mermaid svg .noteText,
+  .mermaid svg .actor-line + text,
+  .mermaid svg .sequenceNumber { fill: #1b1b1b !important; color: #1b1b1b !important; }
+  .mermaid svg .edgeLabel rect,
+  .mermaid svg .label-container,
+  .mermaid svg rect.actor { fill: #f4f4f6 !important; stroke: #8d8d94 !important; }
+  .mermaid svg .cluster rect { fill: #fafafa !important; stroke: #b8b8be !important; }
+  .mermaid svg .edgePath path,
+  .mermaid svg line,
+  .mermaid svg .messageLine0,
+  .mermaid svg .messageLine1,
+  .mermaid svg .actor-line { stroke: #4a4a4a !important; }
+  .mermaid svg marker path,
+  .mermaid svg .arrowheadPath { fill: #4a4a4a !important; stroke: #4a4a4a !important; }
+
+
+  .pull {
+    border-left: 2px solid var(--work);
+    padding: 0.2rem 0 0.2rem 1.15rem;
+    margin: 1.9rem 0;
+    font-size: 1.1rem;
+    line-height: 1.5;
+  }
+  .pull .who {
+    display: block;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 0.6rem;
+  }
+
+  .fix {
+    background: var(--signal-soft);
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    padding: 1.1rem 1.3rem;
+    margin: 1.6rem 0;
+  }
+  .fix h3 { margin-top: 0; }
+
+  .cites div {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    color: var(--muted);
+    padding: 0.42rem 0;
+    border-bottom: 1px solid var(--hair);
+  }
+
+  a { color: var(--signal); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .bar-work, .bar-dead { transition: none; }
+  }
+  /* ANCESTOR-INDEPENDENT. The previous fix scoped every rule under `.mermaid`,
+     and the viewer still reported black-on-black — consistent with the renderer
+     giving the SVG its own id (`#claude-mermaid-N`, visible in comment anchors)
+     outside that class. These target the id prefix, so they hold wherever the
+     SVG ends up in the DOM. Reported twice by Ray, 2026-08-27. */
+  svg[id^="claude-mermaid"] {
+    background: #ffffff !important;
+    max-width: 100%;
+    height: auto;
+    border-radius: 3px;
+  }
+  svg[id^="claude-mermaid"] text,
+  svg[id^="claude-mermaid"] tspan,
+  svg[id^="claude-mermaid"] .nodeLabel,
+  svg[id^="claude-mermaid"] .edgeLabel,
+  svg[id^="claude-mermaid"] .cluster-label,
+  svg[id^="claude-mermaid"] .messageText,
+  svg[id^="claude-mermaid"] .labelText,
+  svg[id^="claude-mermaid"] .loopText,
+  svg[id^="claude-mermaid"] .noteText,
+  svg[id^="claude-mermaid"] .sequenceNumber,
+  svg[id^="claude-mermaid"] foreignObject div,
+  svg[id^="claude-mermaid"] foreignObject span,
+  svg[id^="claude-mermaid"] foreignObject p {
+    fill: #1b1b1b !important;
+    color: #1b1b1b !important;
+    background: transparent !important;
+  }
+  svg[id^="claude-mermaid"] .edgeLabel rect,
+  svg[id^="claude-mermaid"] .label-container,
+  svg[id^="claude-mermaid"] rect.actor,
+  svg[id^="claude-mermaid"] .actor {
+    fill: #f2f2f4 !important;
+    stroke: #8d8d94 !important;
+  }
+  svg[id^="claude-mermaid"] .cluster rect {
+    fill: #fafafa !important;
+    stroke: #b8b8be !important;
+  }
+  svg[id^="claude-mermaid"] .edgePath path,
+  svg[id^="claude-mermaid"] line,
+  svg[id^="claude-mermaid"] .messageLine0,
+  svg[id^="claude-mermaid"] .messageLine1,
+  svg[id^="claude-mermaid"] .actor-line {
+    stroke: #4a4a4a !important;
+  }
+  svg[id^="claude-mermaid"] marker path,
+  svg[id^="claude-mermaid"] .arrowheadPath,
+  svg[id^="claude-mermaid"] .arrowMarkerPath {
+    fill: #4a4a4a !important;
+    stroke: #4a4a4a !important;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Knowledge-base &middot; measured 2026-08-27</p>
+    <h1>The Undelivered Round</h1>
+    <p class="standfirst">
+      The Claude&#8202;&#8596;&#8202;Codex handoff is not slow because the models are slow.
+      One round spent <strong>222.4 minutes</strong> waiting on work that had
+      <em class="lead">already finished</em>.
+    </p>
+  </header>
+</div>
+
+<div class="bleed">
+  <figure>
+    <svg viewBox="0 0 900 220" role="img" aria-label="A proportional strip of one 574.3-minute round: a 35-minute band of recoverable lane work against a 222.4-minute band of dead time in which lanes had already finished but their results had not been delivered.">
+      <defs>
+        <marker id="tick" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+          <circle cx="3" cy="3" r="2" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <text x="0" y="18" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.65">ONE ROUND — 574.3 min</text>
+
+      <rect x="0" y="34" width="900" height="46" fill="var(--dead-soft)" stroke="var(--hair)"/>
+
+      <rect x="0" y="34" width="55" height="46" fill="var(--work-soft)" stroke="var(--work)" stroke-width="1.5"/>
+      <rect x="243" y="34" width="349" height="46" fill="var(--dead)" opacity="0.55"/>
+
+      <line x1="0"   y1="92" x2="55"  y2="92" stroke="var(--work)" stroke-width="2"/>
+      <line x1="243" y1="92" x2="592" y2="92" stroke="var(--dead)" stroke-width="2"/>
+
+      <text x="0" y="112" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="var(--work)">~35 min</text>
+      <text x="0" y="130" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">recoverable lane work</text>
+
+      <text x="243" y="112" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">222.4 min &mdash; 38.7%</text>
+      <text x="243" y="130" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">lanes FINISHED, results undelivered</text>
+
+      <line x1="0" y1="164" x2="900" y2="164" stroke="var(--hair)"/>
+      <text x="0" y="186" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.8">ratio of waiting to working</text>
+      <text x="0" y="208" font-family="Bricolage Grotesque, sans-serif" font-size="22" font-weight="700" fill="var(--work)">6.4 : 1</text>
+
+      <text x="820" y="208" font-family="JetBrains Mono, monospace" font-size="11" text-anchor="end" fill="currentColor" opacity="0.6">2026-08-21, the one round measured end to end</text>
+    </svg>
+    <figcaption>
+      Drawn to scale. The amber band is every minute of lane work that could have
+      been recovered; the grey band is dead time in which three lanes had already
+      returned and nothing had collected them. Both figures are from one round's
+      transcript reconstruction &mdash; n=1, and the only round measured end to end.
+    </figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <p>
+    Ray put the problem this way, and the wording is what made it answerable:
+  </p>
+
+  <div class="pull">
+    &ldquo;one thing we are struggling w is the communication between claude and codex
+    models which seems to be fragile and slow&rdquo;
+    <span class="who">Ray, 2026-08-27</span>
+  </div>
+
+  <p>
+    <strong>&ldquo;Fragile and slow&rdquo; is two problems, and neither one is the model.</strong>
+    Splitting them was the whole job. The evidence is not the published
+    literature &mdash; it is <strong>159 cross-family review reports</strong> and
+    <strong>235 lane reports</strong> already sitting on disk in this repo,
+    every one of them a Claude&#8202;&#8596;&#8202;Codex handoff that already happened.
+  </p>
+
+  <h2>Where the wall clock actually goes</h2>
+
+  <div class="scroll">
+  <table>
+    <thead>
+      <tr><th>component</th><th>measured</th><th>share</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Model reasoning</td><td class="n">31.4 / 26.3 min typical; ~35 min for a full cold run</td><td class="n">not the problem</td></tr>
+      <tr><td>Dispatch overhead</td><td class="n">48 min, trigger 06:19:57Z &rarr; first spawn 07:08:01Z</td><td class="n">8.4%</td></tr>
+      <tr><td><strong>Delivery / reap</strong></td><td class="n">222.4 min dead; last notification 223.0 min late</td><td class="n"><strong>38.7%</strong></td></tr>
+      <tr><td>Architect re-read</td><td class="n">53,656 lines / 3.67 MB &asymp; 0.9M tokens</td><td class="n">~1 context window</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>
+    Two smaller lines sit underneath and point the same way:
+    <strong>117.5 minutes</strong> across sixteen hand-rolled poll loops waiting on
+    lanes and PRs, and <strong>50.7 minutes</strong> idle on a single unanswerable
+    question.
+  </p>
+
+  <p>
+    And the protocol emits no clock at all. <strong>150 of 159</strong> cold reports
+    carry findings and no timing; only <code>5/159</code> review reports and
+    <code>75/235</code> agent reports record any duration. Every number above was
+    reconstructed from transcripts after the fact.
+    <em class="lead">A transport that cannot say how long it took cannot be optimised.</em>
+  </p>
+
+  <hr class="rule">
+
+  <h2>The failure is one arrow, and it is the wrong one</h2>
+
+  <p>
+    A lane returns its result twice: it <strong>writes a report to disk</strong>, and it
+    <strong>sends a notification</strong>. The disk write is durable. The notification is
+    the one that fails &mdash; and the architect waits on the notification.
+  </p>
+
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#eef2f6','primaryTextColor':'#141b24','primaryBorderColor':'#8a99ab','lineColor':'#59677a','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
+flowchart LR
+  A["Claude architect"] -->|"dispatch spec"| B["codex lane"]
+  B -->|"writes incrementally<br/>DURABLE"| C[("report on disk")]
+  B -.->|"notification<br/>ARRIVES LATE OR NEVER"| A
+  A -->|"waits on the dotted arrow"| A
+  C -.->|"nobody reads it until asked"| A
+    </pre>
+    <figcaption>
+      Today. The solid path always works; the dotted path is what the architect
+      blocks on. Three recorded failure classes all live on that one dotted arrow.
+    </figcaption>
+  </figure>
+
+  <div class="scroll">
+  <table>
+    <thead>
+      <tr><th>class</th><th>measured</th><th>what it looks like</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Result needs a nudge</td><td class="n">8 of 20</td><td>&ldquo;your final report has not reached me&rdquo;</td></tr>
+      <tr><td>Watchdog kill</td><td class="n">12 of 159</td><td>empty <code>FINAL</code> &mdash; indistinguishable from a clean review</td></tr>
+      <tr><td>Timed out, wrote nothing</td><td class="n">2</td><td>600&thinsp;s and 900&thinsp;s budgets exhausted</td></tr>
+      <tr><td>Finished, undelivered</td><td class="n">3 lanes, one bundle</td><td>all three notifications arrived together, 223.0 min late</td></tr>
+      <tr><td>Lane clobbers a lane</td><td class="n">2</td><td>run-agnostic filenames; a notepad lost 8 hours</td></tr>
+      <tr><td>Unattributable review</td><td class="n">157 of 159</td><td>named just <code>cold</code> &mdash; the family is erased</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>
+    That last row deserves its own sentence. <strong>The cross-family review policy
+    cannot be audited.</strong> <code>report_path</code> strips the <code>:variant</code>,
+    so 157 of 159 reports cannot tell you which model family actually reviewed the
+    code &mdash; the transport erases the single attribute the policy exists to enforce.
+  </p>
+
+  <hr class="rule">
+
+  <h2>The cheapest fix is one sentence</h2>
+
+  <p>
+    The nudge class has a control arm attached, which is what makes it a finding
+    rather than an anecdote. Eight of twenty subagents had to be told their report
+    had not arrived &mdash; and <strong>twelve were spawned and never nudged</strong>.
+    The difference is not the harness. It is the prompt.
+  </p>
+
+  <div class="scroll">
+  <table>
+    <thead>
+      <tr><th>prompt says</th><th>nudges needed</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>&ldquo;write the full report to <code>&lt;path&gt;</code> <strong>and also</strong> return it as your final message&rdquo;</td><td class="n">0 of 12</td></tr>
+      <tr><td>&ldquo;return the full report as your final message&rdquo;</td><td class="n">8 of 8</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>
+    The resends cost <strong>109,165 bytes</strong> of re-emitted payload
+    &mdash; roughly <span class="num">27k</span> tokens &mdash; pushed back into the
+    architect's context, in a session that was ended because context was full.
+  </p>
+
+  <div class="fix">
+    <h3>Five changes, four using primitives already installed</h3>
+    <p style="margin-bottom:0.7rem">
+      Probed against the installed <code>codex-cli 0.150.1</code> this session.
+      None of these is a new dependency.
+    </p>
+    <div class="scroll">
+    <table style="margin-bottom:0">
+      <thead><tr><th>change</th><th>uses</th><th>fixes</th></tr></thead>
+      <tbody>
+        <tr><td>Type the handoff</td><td class="n">--output-schema</td><td>the 0.9M-token re-read</td></tr>
+        <tr><td>Poll the artifact, never the notification</td><td class="n">the existing report store</td><td>222.4 min dead</td></tr>
+        <tr><td>Resume, don't re-dispatch</td><td class="n">codex exec resume</td><td>600&thinsp;s / 900&thinsp;s kills</td></tr>
+        <tr><td>Emit a clock</td><td class="n">--json</td><td>a transport nobody can measure</td></tr>
+        <tr><td>Stop stripping the variant</td><td class="n">report_path</td><td>157 unattributable reviews</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#e2eff1','primaryTextColor':'#141b24','primaryBorderColor':'#0e6f80','lineColor':'#0e6f80','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
+flowchart LR
+  A["Claude architect"] -->|"spec + --output-schema"| B["codex lane"]
+  B -->|"writes + terminal sentinel"| C[("report on disk")]
+  A -->|"POLLS for the sentinel"| C
+  C -->|"validated object,<br/>not prose"| A
+  B -.->|"notification: nice to have"| A
+    </pre>
+    <figcaption>
+      After. The architect waits on the durable path, and the notification becomes
+      an optimisation rather than a dependency. The one arrow that changed direction
+      is the one that was costing 38.7% of the round.
+    </figcaption>
+  </figure>
+
+  <h2>When to offload to Codex at all</h2>
+
+  <p>
+    Ray asked for a rule, not a mode setting. The rule the evidence supports:
+    <strong>offload when the work is bounded by a spec you can write in full,
+    and the result is verifiable without your context.</strong> A diff review
+    against a fixed ref. An implementation whose acceptance criteria already exist.
+    A mechanical migration.
+  </p>
+
+  <p>
+    Keep it inline when writing the spec would cost more than doing the work, or
+    when the result can only be judged against conversation the lane will not have.
+    The published guidance says the same thing in the general case &mdash;
+    <em class="lead">decompose by context boundary, not by role type</em>; splitting
+    planner / implementer / tester / reviewer creates a telephone game where every
+    handoff loses fidelity.
+  </p>
+
+  <h3>Where a scarce Fable budget buys something</h3>
+
+  <p>
+    Three named decision points, and nowhere else: before a change that is expensive
+    to reverse; when the same problem has resisted two attempts; and when two lanes
+    disagree and the disagreement has to be adjudicated. Not as the default
+    architect &mdash; the architect's expensive work here was <em class="lead">re-reading</em>,
+    which a typed contract removes rather than a stronger model.
+  </p>
+
+  <h2>No new roles</h2>
+
+  <p>
+    That is a conclusion, not a default. A six-agent roster shipped 2026-08-06 and
+    five of the six match its own research proposal exactly. What changed since is
+    the lane world, not the work: Gemini is now a one-call reserve rather than a
+    routine reviewer, and <code>grok</code> is not installed. Neither change adds a
+    role; both narrow where an existing one may run.
+  </p>
+
+  <p>
+    One divergence is undocumented and stays Ray's call:
+    <code>kb-advisor</code> (fable) sits where the synthesis proposed
+    <code>kb-fallback-reviewer</code> (opus), and that synthesis said fable was
+    <em class="lead">&ldquo;deliberately ABSENT from the standing roster&rdquo;</em>.
+  </p>
+
+  <hr class="rule">
+
+  <h2>What is not measured</h2>
+
+  <p>
+    Stated because a page like this is believed faster than prose, and an unsourced
+    number in a diagram is worse than no diagram.
+  </p>
+
+  <div class="scroll">
+  <table>
+    <tbody>
+      <tr><td>Every delivery figure</td><td>comes from <strong>one round</strong> (2026-08-21), the only one measured end to end. n=1.</td></tr>
+      <tr><td><code>--output-schema</code></td><td>no lane was run with it. The recommendation rests on the flag existing and on the literature, not on an execution here.</td></tr>
+      <tr><td><code>codex exec resume</code></td><td>untested against a watchdog-killed lane. The recommendation most likely to be wrong.</td></tr>
+      <tr><td>Whether ceremony buys correctness</td><td>only 3 reports carry a <code>PREMISES</code> block. Their 15.5:1 confirm-to-refute ratio looks strong and is not evidence &mdash; n=3, and all three are premise-<em>verification</em> reports whose job is emitting verdicts.</td></tr>
+      <tr><td><code>agy</code></td><td>one call was budgeted for the round and spent on the cold review. No figure for it here.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Everything above, and where it was read</h2>
+
+  <div class="cites">
+    <div>MEASURED, this session &mdash; <code>ls .agent/kb/review/reports/*.md | wc -l</code> &rarr; <strong>159</strong>; <code>*-cold.md</code> &rarr; <strong>150</strong>; filenames naming codex &rarr; <strong>2</strong>.</div>
+    <div>MEASURED, this session &mdash; <code>mise exec -- codex exec --help</code> on <code>codex-cli 0.150.1</code>: <code>--output-schema</code>, <code>--json</code>, <code>resume</code>, <code>fork</code>, <code>review</code> all present; <code>--full-auto</code> absent (armed: <code>grep -c -- "--full-auto"</code> &rarr; 0, control <code>--sandbox</code> &rarr; 1).</div>
+    <div>MEASURED, this session &mdash; report size distribution over both directories: 53,656 lines / 3.67 MB total; review median 66 / max 416, agent median 104 / max 768.</div>
+    <div>READ &mdash; <code>.agent/kb/review/reports/review-870c020c&hellip;-cold.md:214</code>, the 600&thinsp;s watchdog kill with an empty <code>FINAL</code>.</div>
+    <div>READ &mdash; <code>.agent/kb/reports/agents/handoff-verify.md:262</code>, the 900&thinsp;s timeout resumed from 119 surviving lines.</div>
+    <div>READ &mdash; <code>circles-2026-08-21-6ae19ff6.md</code> for the nudge counts and their control arm; <code>session-review-2026-08-21b-result.txt</code> for the 222.4-minute figure and its refutation of a larger one.</div>
+    <div>SECONDARY &mdash; Anthropic's multi-agent research-system write-up and two syntheses of it, for the context-boundary rule and the ~15&times; token multiplier. Not re-derived.</div>
+    <div>NOT MEASURED &mdash; everything in the section above this one.</div>
+  </div>
+
+  <p style="margin-top:2.6rem; font-size:0.9rem; color:var(--muted)">
+    Source: <code>docs/artifacts/the-undelivered-round.html</code>, tracked.
+    Full report: <code>docs/research/reports/2026-08-27-claude-codex-handoff.md</code>.
+  </p>
+
+</div>

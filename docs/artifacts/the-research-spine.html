@@ -1,0 +1,328 @@
+<title>The Research Spine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ground: #f3f4f6; --panel: #ffffff; --ink: #101418; --muted: #4b5860; --hair: #d5dbe0; --plate: #ffffff;
+    --teal: #0f766e; --teal-bg: #d1f0ea; --plum: #6d28d9; --plum-bg: #ede9fe; --amber: #b45309; --amber-bg: #fef3c7;
+    --blue: #1d4ed8; --blue-bg: #dbeafe; --red: #b91c1c; --red-bg: #fee2e2;
+    --display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+    --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --ground: #0d1117; --panel: #161b22; --ink: #e6edf3; --muted: #9fb0bb; --hair: #2a343c;
+    --teal: #5eead4; --teal-bg: #0f2e2a; --plum: #c4b5fd; --plum-bg: #2a1d4d; --amber: #fcd34d; --amber-bg: #3a2a0c;
+    --blue: #93c5fd; --blue-bg: #17264a; --red: #fca5a5; --red-bg: #3f1717; } }
+  :root[data-theme="dark"] {
+    --ground: #0d1117; --panel: #161b22; --ink: #e6edf3; --muted: #9fb0bb; --hair: #2a343c;
+    --teal: #5eead4; --teal-bg: #0f2e2a; --plum: #c4b5fd; --plum-bg: #2a1d4d; --amber: #fcd34d; --amber-bg: #3a2a0c;
+    --blue: #93c5fd; --blue-bg: #17264a; --red: #fca5a5; --red-bg: #3f1717; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--body); font-size: 16.5px; line-height: 1.55; margin: 0; }
+  main { max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+  h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.08; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2.6rem, 6vw, 4.4rem); letter-spacing: -0.01em; }
+  h2 { font-size: 2rem; margin-top: 3.2rem; padding-top: 1rem; border-top: 1px solid var(--ink); }
+  h3 { font-size: 1.35rem; margin-top: 1.6rem; }
+  p { max-width: 68ch; margin: 0.8rem 0; }
+  .eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .lede { font-size: 1.2rem; max-width: 62ch; margin-top: 1rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0; }
+  .sw { font-family: var(--mono); font-size: 0.76rem; padding: 0.22rem 0.6rem; border-radius: 3px; border: 1px solid; }
+  .sw.plum { color: var(--plum); border-color: var(--plum); background: var(--plum-bg); }
+  .sw.amber { color: var(--amber); border-color: var(--amber); background: var(--amber-bg); }
+  .sw.teal { color: var(--teal); border-color: var(--teal); background: var(--teal-bg); }
+  .sw.blue { color: var(--blue); border-color: var(--blue); background: var(--blue-bg); }
+  .sw.red { color: var(--red); border-color: var(--red); background: var(--red-bg); }
+  .sw.grey { color: var(--muted); border-color: var(--hair); background: var(--panel); }
+  figure { margin: 1.4rem 0; }
+  .plate { background: var(--plate); border: 1px solid var(--hair); border-radius: 4px; padding: 0.9rem; overflow-x: auto; }
+  figcaption { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); margin-top: 0.6rem; max-width: 84ch; }
+  pre.mermaid { margin: 0; font-family: var(--mono); }
+  code { font-family: var(--mono); font-size: 0.85em; background: var(--panel); border: 1px solid var(--hair); border-radius: 3px; padding: 0.04em 0.3em; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.8rem; margin-top: 1rem; }
+  .facts div { background: var(--panel); border: 1px solid var(--hair); border-radius: 4px; padding: 0.75rem 0.9rem; font-size: 0.95rem; }
+  .facts .k { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.25rem; }
+  .facts.plum div { border-top: 3px solid var(--plum); }
+  .facts.amber div { border-top: 3px solid var(--amber); }
+  .facts.teal div { border-top: 3px solid var(--teal); }
+  .tbl { overflow-x: auto; margin-top: 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; background: var(--panel); }
+  th, td { text-align: left; vertical-align: top; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--hair); }
+  th { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  tr.stage td { background: var(--ground); font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  td.y { color: var(--teal); font-weight: 600; } td.n { color: var(--red); font-weight: 600; }
+  .callout { border-left: 4px solid var(--blue); background: var(--blue-bg); padding: 0.8rem 1rem; margin: 1.2rem 0; max-width: 72ch; border-radius: 0 4px 4px 0; }
+  .callout .k { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--blue); display: block; margin-bottom: 0.3rem; }
+  blockquote { margin: 0.9rem 0; padding: 0.7rem 1rem; border-left: 3px solid var(--amber); background: var(--panel); font-style: italic; max-width: 70ch; }
+  blockquote cite { display: block; font-style: normal; font-family: var(--mono); font-size: 0.74rem; color: var(--muted); margin-top: 0.4rem; }
+  footer { margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid var(--hair); font-size: 0.9rem; color: var(--muted); }
+  a { color: var(--blue); } a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  /* mermaid backstop — by SVG id, element-level (eli5-visual §2 + §2b, 2026-08-27) */
+  svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+  svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+  svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+  svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+  svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+  svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+  svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+  svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+  svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+  svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+  svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+  svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+  svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+  svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+  svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">the answer to Q1 · round 1 · 2026-08-27 · session kb-20260827.06</div>
+  <h1>The Research Spine</h1>
+  <p class="lede">Two research engines already exist on this machine. One is <code>/deep-research</code>, a workflow baked into the Claude Code binary; the other is <code>/antigravity:research</code>, a command in a plugin. This page takes each apart, stage by stage, then draws the spine we would build out of them — with every tool, plugin, MCP server, skill and library named at the stage where it plugs in.</p>
+  <div class="legend">
+    <span class="sw plum">/deep-research agent</span>
+    <span class="sw amber">agy (Gemini) call</span>
+    <span class="sw teal">Claude lane — ours</span>
+    <span class="sw grey">code, no agent</span>
+    <span class="sw blue">lychee gate</span>
+    <span class="sw red">entry a person types</span>
+  </div>
+</header>
+
+<h2>Engine 1 — <code>/deep-research</code>, as it is in the 2.1.248 binary</h2>
+<p>Read this session from <code>~/.local/share/claude/versions/2.1.248</code> (the binary self-updated from 2.1.247 since the previous lane read it; the constants did not move). Control arm on the read: <code>deep-research</code> → 8 occurrences, <code>WebSearch</code> → 54, a nonsense string → 0.</p>
+<figure>
+  <div class="plate">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e7eef0','primaryTextColor':'#101418','primaryBorderColor':'#7c8a90','lineColor':'#3b4a52','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart TD
+  q(["/deep-research + question<br/>typed by a person — no agent can start it"]):::gate
+  sc["Scope · 1 agent<br/>3–6 search angles, prompted to 5"]:::dr
+  se["Search · 1 agent per angle<br/>WebSearch · top 4–6 results each"]:::dr
+  dd["URL dedup + fetch budget<br/>fetchSlots = 15 · code, no agent"]:::code
+  fe["Fetch + Extract · 1 agent per source<br/>WebFetch · 2–5 falsifiable claims each"]:::dr
+  br["BARRIER · rank claims<br/>importance × sourceQuality · keep 25"]:::code
+  ve["Verify · 3 agents per claim<br/>WebSearch for contradicting evidence<br/>default to refuted=true if uncertain"]:::dr
+  ta{"tally"}:::code
+  s1["survives<br/>valid ≥ 2, refuted under 2"]:::good
+  s2["refuted<br/>refuted ≥ 2"]:::bad
+  s3["unverified<br/>too few valid votes"]:::open
+  sy["Synthesize · 1 agent<br/>merge dupes · rank by confidence · cite"]:::dr
+  out[/"cited report<br/>+ refuted list + unverified list, for transparency"/]:::out
+  q --> sc --> se
+  se -->|"pipeline — no barrier"| dd --> fe --> br --> ve --> ta
+  ta --> s1 --> sy
+  ta --> s2 --> sy
+  ta --> s3 --> sy
+  sy --> out
+  classDef gate fill:#fee2e2,stroke:#b91c1c,color:#101418
+  classDef dr fill:#ede9fe,stroke:#6d28d9,color:#101418
+  classDef code fill:#e7eef0,stroke:#7c8a90,color:#101418
+  classDef good fill:#d1f0ea,stroke:#0f766e,color:#101418
+  classDef bad fill:#fee2e2,stroke:#b91c1c,color:#101418
+  classDef open fill:#fef3c7,stroke:#b45309,color:#101418
+  classDef out fill:#f3f4f6,stroke:#101418,color:#101418
+</pre>
+  </div>
+  <figcaption>The header comment in the binary, verbatim: "deep-research: Scope → pipeline(Search → URL-dedup → Fetch+Extract) → 3-vote Verify → Synthesize. Ported from bughunter architecture. WebSearch/WebFetch instead of git/grep." Only Search→Fetch streams; the barrier before Verify is deliberate ("claim pool must be fully assembled before ranking").</figcaption>
+</figure>
+<div class="facts plum">
+  <div><span class="k">constants</span>VOTES_PER_CLAIM = 3 · REFUTATIONS_REQUIRED = 2 · MAX_FETCH = 15 · MAX_VERIFY_CLAIMS = 25. Angles: schema 3–6, prompt asks 5. Results per angle: max 6. Claims per source: max 5.</div>
+  <div><span class="k">agents spent</span>1 + angles + sources + 3 × voted claims + 1 — its own accounting line. For 5 angles, 15 sources, 25 claims: 97 agents.</div>
+  <div><span class="k">tools</span>WebSearch and WebFetch. Nothing else is named in any prompt. The enterprise setting <code>disableBundledSkills</code> exists "where WebFetch/WebSearch aren't available".</div>
+  <div><span class="k">tunable?</span><b>No.</b> No model, effort or family knob anywhere in the script — every <code>agent()</code> inherits the session. That is the reason you gave for Q4 = A: <em>"we want to be able to tune the models/effort/family (claude or codex)"</em>.</div>
+  <div><span class="k">reachable by an agent?</span><b>No.</b> <code>disableModelInvocation</code> resolves true unless the <code>tengu_sorrel_avocet</code> gate is on; the refusal reads "by the coordinator or by workers — the user can run /deep-research by typing it themselves". <code>workflows.md:80</code> says the same in prose.</div>
+  <div><span class="k">worth copying</span>the stage shape · the streaming Search→Fetch with a barrier only before Verify · the fetch budget as a shared counter · the three-outcome tally · "refuted claims, for transparency" in the output · "an all-errored run is an infrastructure failure, not a research finding".</div>
+</div>
+
+<h2>Engine 2 — <code>/antigravity:research</code>, as the 0.23.0 plugin ships it</h2>
+<p>It is a <b>command</b> (<code>commands/research.md</code>), not a skill, and it delegates to the <code>antigravity</code> skill's "Deep-research recipe". The skill is explicit: <em>"agy has no built-in Deep Research mode … so deep research is a Claude-orchestrated recipe, not a single agy call."</em> Read from <code>~/.claude/plugins/cache/antigravity-for-claude-code/antigravity/0.23.0/</code> this session.</p>
+<figure>
+  <div class="plate">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e7eef0','primaryTextColor':'#101418','primaryBorderColor':'#7c8a90','lineColor':'#3b4a52','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart TD
+  c1["1 · Plan — Claude<br/>3–6 sub-questions + the load-bearing claims to verify"]:::cl
+  a1["2 · Fan-out fetch — agy, tier flash, yolo mode<br/>one call per sub-question<br/>returns 5–8 bullets, each with URL + date"]:::agy
+  a2["3 · Deepen — agy, tier pro, yolo mode<br/>open the URL, quote the supporting sentence<br/>or reply NOT SUPPORTED"]:::agy
+  c2["4 · Adversarial verify — Claude<br/>≥ 2 independent domains per claim<br/>single, vague or domain-only citation = unverified"]:::cl
+  c3["5 · Synthesize — Claude<br/>verified findings only, unverified marked"]:::cl
+  out[/"cited report"/]:::out
+  c1 --> a1 --> a2 --> c2 --> c3 --> out
+  c2 -.->|"gap found → re-dispatch, agy does one pass per call"| a1
+  classDef cl fill:#d1f0ea,stroke:#0f766e,color:#101418
+  classDef agy fill:#fef3c7,stroke:#b45309,color:#101418
+  classDef out fill:#f3f4f6,stroke:#101418,color:#101418
+</pre>
+  </div>
+  <figcaption>Five steps, three owners. The two amber steps are the only ones that spend agy; both are one <code>agy-delegate</code> call each, in print mode, with <code>--yolo</code> because headless print mode cannot show tool-approval prompts.</figcaption>
+</figure>
+<div class="facts amber">
+  <div><span class="k">tools</span><code>agy-delegate</code> (the plugin's bin) → the <code>agy</code> CLI (mise-pinned <code>antigravity-cli 1.1.21</code>) → Google web search grounding, and Vertex AI Search where configured. <code>agy-cost-compare</code>, <code>agy-job</code> (background), <code>agy-doctor</code>, <code>agy-trace</code> sit beside it.</div>
+  <div><span class="k">tunable?</span><b>Yes, per call.</b> <code>--tier flash | flash-lo | pro</code>, or <code>--model</code> for any model <code>agy models</code> lists, and <code>--effort</code>. The skill warns that below agy 1.1.10 those flags were silently ignored in headless mode; 1.1.21 is past that floor.</div>
+  <div><span class="k">reachable by an agent?</span><b>Yes.</b> The <code>antigravity-delegate</code> subagent exists for exactly this, and its only file-acting tool is the delegation wrapper.</div>
+  <div><span class="k">caveats the skill itself states</span>print mode uses search-<em>summary</em> tools and does not reliably fetch full pages, so citations are coarse, often domain-level; it can present parametric "knowledge" as a sourced fact; one agentic pass per call, so Claude re-dispatches to close gaps. <b>Never ship its citations unverified.</b></div>
+  <div><span class="k">budget</span>the agy subscription is a scarce reserve here (your standing rule: one call maximum in a round unless stated). The savings claim is that bulky pages are read in cheap Gemini tokens and reach Claude as bullets.</div>
+  <div><span class="k">worth copying</span>the division of labour — Claude plans, verifies and writes; a cheaper lane does the bulk reading · step 3's <em>"quote the sentence or reply NOT SUPPORTED"</em>, which is a per-claim primary-source arm · the ≥2-independent-domains rule.</div>
+</div>
+
+<h2>The spine — one pipeline, both engines' best parts, our sources plugged in</h2>
+<p>Read it top to bottom. Red is what a person types (two entry points, Q2). Every white box in stage 1 is one <b>adapter</b>: it takes the scoped question and returns the same shape — URL, date, snippet, source kind — so stage 2 can dedup and rank them together. The grey stages are code, not agents. The teal stages are ours and can be routed to any lane (Claude, codex, agy) per call — the tunability <code>/deep-research</code> lacks.</p>
+<figure>
+  <div class="plate">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e7eef0','primaryTextColor':'#101418','primaryBorderColor':'#7c8a90','lineColor':'#3b4a52','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart TD
+  e1(["/aggregated-research + a question"]):::gate
+  e2(["daily brief — a standing question list on a schedule"]):::gate
+  s0["0 · Scope — Claude<br/>question class → angles → which adapters to run"]:::cl
+  subgraph SRC["1 · Search — every adapter at once, each returns URL + date + snippet"]
+    direction LR
+    g["graph<br/>mise run kb-query<br/>0 LLM tokens"]:::src
+    b["installed binary<br/>--help, throwaway probe"]:::src
+    sh["shipped source<br/>gh api contents?ref=TAG"]:::src
+    tr["trackers<br/>gh api search/issues<br/>has_issues checked first"]:::src
+    fd["Firecrawl developer index<br/>MCP categories developer<br/>CLI firecrawl developer"]:::src
+    fw["Firecrawl web + news<br/>firecrawl_search"]:::src
+    fr["Firecrawl research index<br/>papers · github code"]:::src
+    ex["Exa web_search_exa<br/>the control on a Firecrawl null"]:::src
+    c7["context7<br/>resolve-library-id → query-docs"]:::src
+    l3["last30days<br/>Reddit X YouTube HN Bluesky Digg GitHub"]:::src
+    ag["antigravity:research<br/>agy flash → pro"]:::src
+    dv["deps.dev<br/>keyless HTTP"]:::src
+    ga["grep.app MCP<br/>tool list not yet enumerated"]:::src
+  end
+  d1["2 · Dedup + budget + RECENCY — code, no agent<br/>URL dedup · fetch slots<br/>prefer actively maintained: pushed_at, release date"]:::code
+  ly1["lychee, gate 1<br/>a URL that 404s never spends a fetch or a vote"]:::ly
+  f1["3 · Fetch + Extract — Claude lane, or agy pro for bulk<br/>open the URL · quote · 2–5 falsifiable claims"]:::cl
+  v1["4 · Verify — 3 votes per claim, mixed family<br/>Claude · codex reviewer · agy pro<br/>plus a control arm on every null"]:::cl
+  t1{"tally<br/>survives · refuted · unverified"}:::code
+  sy["5 · Synthesize — kb-synthesist<br/>ranked sources · every null with its arm · not measured"]:::cl
+  ly2["lychee, gate 2<br/>every cited URL in the report resolves"]:::ly
+  o1[/"docs/research/reports · artifact · kb-remember"/]:::out
+  e1 --> s0
+  e2 --> s0
+  s0 --> SRC
+  SRC --> d1 --> ly1 --> f1 --> v1 --> t1 --> sy --> ly2 --> o1
+  classDef gate fill:#fee2e2,stroke:#b91c1c,color:#101418
+  classDef cl fill:#d1f0ea,stroke:#0f766e,color:#101418
+  classDef code fill:#e7eef0,stroke:#7c8a90,color:#101418
+  classDef src fill:#ffffff,stroke:#0f766e,color:#101418
+  classDef ly fill:#dbeafe,stroke:#1d4ed8,color:#101418
+  classDef out fill:#f3f4f6,stroke:#101418,color:#101418
+</pre>
+  </div>
+  <figcaption>Stage numbering follows /deep-research; stage 0 and the teal ownership follow /antigravity:research; the arms and the "not measured" section follow this repo's rules. /deep-research itself is not a box: per Q4 it is the shape, not a source.</figcaption>
+</figure>
+
+<div class="callout"><span class="k">where lychee sits — your comment e8af4040 on the synthesis node</span>Not at synthesis. Twice, and both are cheap: <b>gate 1</b> runs before any fetch, so a dead URL never spends a fetch, an extraction or three votes (measured today: 1,058 links in 34 s against 3 agent calls per claim); <b>gate 2</b> runs on the finished report, so every citation a reader can click resolves. A third use is outside the spine entirely — <code>mise run kb-links</code>, the hk step this session added, which link-checks the repo's own docs and code.</div>
+
+<div class="callout"><span class="k">the recency rule — your comment 92fe3e73</span>It lives in stage 2, as a rank term, not a filter that deletes: every adapter that can return a date does (last30days, deps.dev, <code>gh api</code>'s <code>pushed_at</code>, crates.io / PyPI upload dates, Firecrawl's index dates), and a tool or library nobody has touched in a year sinks below one touched last week. Today's worked case: the only PyO3 binding for lychee (<code>jb--/lychpy</code>) was last pushed 2023-09-26 — it ranks below <code>lychee-bin</code> 0.24.2, released weeks ago by the maintainers.</div>
+
+<h3>Stage by stage — who runs it, what enters, what leaves</h3>
+<div class="tbl"><table>
+<thead><tr><th>stage</th><th>who</th><th>enters</th><th>leaves</th><th>the discipline that lives here</th></tr></thead>
+<tbody>
+<tr><td>0 Scope</td><td>Claude (any lane)</td><td>the question</td><td>question class (bug upstream? what do others do? what tools?), 3–6 angles, the adapter set</td><td>#509's three test prompts are the classes; the class picks adapters, so a "what tools exist" question runs deps.dev and the developer index, a "known bug" question runs trackers and shipped source first</td></tr>
+<tr><td>1 Search</td><td>one adapter per source, in parallel (a <code>Workflow</code> <code>pipeline()</code>)</td><td>angle + class</td><td>{url, date, snippet, kind} per hit</td><td>every adapter is code or a fixed prompt; a null result carries its control arm in the same record — the sweep's rule, mechanised</td></tr>
+<tr><td>2 Dedup · budget · recency</td><td>code</td><td>all hits</td><td>ranked, deduped, budgeted candidate list</td><td>fetch slots as a shared counter (from /deep-research); recency as a rank term (your rule); a tracker null with <code>has_issues:false</code> is dropped as "never asked", not "no"</td></tr>
+<tr><td>lychee gate 1</td><td>code</td><td>candidate URLs</td><td>URLs that resolve</td><td>a 404 never reaches a fetch</td></tr>
+<tr><td>3 Fetch + Extract</td><td>Claude lane, or agy pro for bulk pages</td><td>a URL</td><td>2–5 falsifiable claims, each with the quoted sentence</td><td>antigravity's "quote it or NOT SUPPORTED"; the WebFetch/agy split is a per-call routing choice</td></tr>
+<tr><td>4 Verify</td><td>3 voters per claim, at least two families</td><td>a claim + its quote</td><td>3 verdicts</td><td>"default to refuted if uncertain" (deep-research) · ≥2 independent domains (antigravity) · <code>kb-adversarial-verifier</code> and <code>premise-verifier</code> are the named lanes</td></tr>
+<tr><td>tally</td><td>code</td><td>3 verdicts</td><td>survives / refuted / unverified</td><td>infra failure never reads as refuted</td></tr>
+<tr><td>5 Synthesize</td><td><code>kb-synthesist</code></td><td>survivors + the refuted and unverified lists</td><td>answer · ranked sources · every null with its arm · not measured · repos touched</td><td>the report shape #509 asked for</td></tr>
+<tr><td>lychee gate 2</td><td>code</td><td>the report</td><td>the report, every citation live</td><td>a cited report is a checkable one</td></tr>
+</tbody></table></div>
+
+<h2>Every tool, library, SDK, MCP server, plugin and skill — and where</h2>
+<p>Inventoried this session: 17 plugins effective (<code>.claude/settings.json</code> + <code>.local.json</code>, measured with <code>jq</code> — the 16 in CLAUDE.md is stale), 2 servers in <code>.mcp.json</code>, 2 claude.ai connectors visible in the session, 2 plugin MCP servers, 15 repo skills, 6 agents, 3 saved workflows, 5 Python dependencies, and the mise-pinned CLIs below. "Agent-reachable" means a subagent or workflow agent can call it; MCP tools reach workflow agents through <code>ToolSearch</code>.</p>
+<div class="tbl"><table>
+<thead><tr><th>tool</th><th>kind</th><th>where in the spine</th><th>agent-reachable</th><th>cost</th><th>measured this session</th></tr></thead>
+<tbody>
+<tr class="stage"><td colspan="6">stage 0 · scope, and the runtime the spine runs on</td></tr>
+<tr><td>Claude Code <code>Workflow</code> tool (<code>pipeline()</code>, <code>parallel()</code>, <code>agent()</code> with schema)</td><td>bundled runtime</td><td>the whole pipeline — /deep-research is written in it</td><td class="y">yes</td><td>the agents it spawns</td><td>the DSL read out of the 2.1.248 binary</td></tr>
+<tr><td><code>/deep-research</code></td><td>bundled workflow</td><td><b>shape only</b> (Q4 = A) — not an adapter</td><td class="n">no</td><td>~97 agents at defaults</td><td>constants, phases, gate re-read</td></tr>
+<tr><td><code>fable-orchestrator:premise-verifier</code>, <code>fable-advisor</code></td><td>plugin agents</td><td>stage 0 (verify the scope's premises), stage 4</td><td class="y">yes</td><td>one agent each</td><td>listed in the agent roster</td></tr>
+<tr class="stage"><td colspan="6">stage 1 · adapters</td></tr>
+<tr><td><code>mise run kb-query</code> (graphifyy 0.9.50, the fork)</td><td>python lib + mise task</td><td>adapter: graph</td><td class="y">yes</td><td>0 LLM tokens</td><td>ran; truncated at 53 of 68 nodes (#551)</td></tr>
+<tr><td><code>gh</code> 2.98.0</td><td>CLI (mise)</td><td>adapters: shipped source, trackers, repo metadata (<code>pushed_at</code> for recency)</td><td class="y">yes</td><td>API quota</td><td>ran: lychpy metadata, #59/#1931, control 141</td></tr>
+<tr><td>Firecrawl connector — <code>firecrawl_search</code> (+ <code>categories: developer</code>), <code>firecrawl_research_search_papers</code>, <code>firecrawl_research_search_github</code></td><td>claude.ai MCP connector (account-level)</td><td>what this session used for the sweep; <b>optional</b> once the adapters target the CLI (next row)</td><td class="y">via ToolSearch</td><td>2 credits per search</td><td>all four ran on the lychee question</td></tr>
+<tr><td><code>firecrawl</code> CLI 1.23.3 (mise <code>npm:firecrawl-cli</code>, bumped from 1.23.1 this session — latest per <code>mise ls-remote</code>)</td><td>CLI</td><td><b>the Firecrawl adapters, all of them</b>: <code>firecrawl search</code>, <code>search --categories developer</code>, <code>developer &lt;query&gt;</code> (passages), <code>scrape</code>, and the research-paper and developer-source searches its README lists. Your question (comment aab361d6): is the MCP necessary? <b>No.</b> The connector is an account-level claude.ai connector (this repo registers only graphify and repowise in <code>.mcp.json</code>); it lacks the passage-returning <code>firecrawl_developer_search</code> tool the plugin documents, it is not pinnable, and every MCP tool schema is injected into every conversation (<code>research-doc-sources.md</code>). The CLI is pinned, subagent-reachable through Bash, and covers every surface — so the spine's adapters are written against the CLI.</td><td class="y">yes</td><td>2 credits, 1 refunded on feedback</td><td><code>firecrawl developer --help</code> confirmed; 1.23.3 installed and version-armed</td></tr>
+<tr><td>Firecrawl plugin skills — <code>firecrawl-search</code>, <code>firecrawl-developer-index</code>, <code>firecrawl-research-index</code>, <code>firecrawl-scrape</code>, …</td><td>plugin skills</td><td>how-to text for the adapters above; the developer-index skill documents three surfaces (HTTP, MCP, CLI)</td><td class="y">yes</td><td>—</td><td>both SKILL.md files read from <code>firecrawl/firecrawl-claude-plugin</code> (thread 38d175ff)</td></tr>
+<tr><td>Exa — <code>web_search_exa</code>, <code>web_fetch_exa</code></td><td>plugin MCP</td><td>adapter: web, and the <b>control arm</b> on a Firecrawl zero</td><td class="y">via ToolSearch</td><td>per query</td><td>ran; found lychpy and PR #1931</td></tr>
+<tr><td>context7 — <code>resolve-library-id</code> → <code>query-docs</code>; <code>ctx7</code> CLI</td><td>plugin MCP + CLI</td><td>adapter: library docs</td><td class="y">via ToolSearch</td><td>per query</td><td>ran; README-level for lychee, config keys from lychee.cli.rs</td></tr>
+<tr><td><code>/last30days</code> (plugin 3.21.1, its Python engine)</td><td>plugin skill + script</td><td>adapter: what people are DOING — Reddit, X, YouTube, HN, Bluesky, Digg, GitHub, Polymarket</td><td class="y">yes (script)</td><td>free sources + ScrapeCreators credits</td><td>ran with <code>--plan</code>: 71 items, Reddit partial (429), Web 422, IG/TikTok 402</td></tr>
+<tr><td><code>/antigravity:research</code> → <code>agy-delegate</code> → <code>agy</code> 1.1.21</td><td>plugin command + bin + CLI</td><td>adapter: grounded web legwork; also the bulk reader in stage 3</td><td class="y">yes (antigravity-delegate)</td><td>Gemini tokens — scarce</td><td>read, not spent</td></tr>
+<tr><td>deps.dev</td><td>keyless HTTP</td><td>adapter: package versions, dates, advisories — the recency rule's cheapest input</td><td class="y">yes</td><td>free</td><td>not run this session</td></tr>
+<tr><td>grep.app MCP</td><td>MCP, no auth</td><td>adapter: the same pattern across many repos' source</td><td class="y">via mcp2cli or registration</td><td>free</td><td>tool list still not enumerated (prototype owed)</td></tr>
+<tr><td>graphify hosted MCP, repowise MCP (<code>.mcp.json</code>)</td><td>hosted MCP</td><td>adapters for code questions about a 2-repo workspace / this repo</td><td class="y">via ToolSearch</td><td>—</td><td>listed; not used for this question</td></tr>
+<tr><td><code>mise exec -- &lt;tool&gt;</code></td><td>mise</td><td>adapter: installed binary (never the bare shim)</td><td class="y">yes</td><td>free</td><td>lychee 0.24.2 via mise exec</td></tr>
+<tr class="stage"><td colspan="6">stage 2 · dedup, budget, recency · gate 1</td></tr>
+<tr><td>lychee 0.24.2 (mise <code>aqua:lycheeverse/lychee</code>, pinned today)</td><td>CLI</td><td>gate 1 and gate 2; <code>--format json</code> is the contract</td><td class="y">yes</td><td>network time</td><td>996 unique URLs in the repo; 1,058 docs links in 34 s; the JSON has no <code>fail_map</code> key</td></tr>
+<tr><td><code>hk</code> 1.56.1 — <code>Builtins.lychee</code></td><td>hook runner</td><td>outside the spine: <code>mise run kb-links</code>, profile-gated</td><td class="y">yes</td><td>—</td><td>step added; 882 files, 1,324 links, 81 errors before the config fix</td></tr>
+<tr class="stage"><td colspan="6">stage 3 · fetch and extract</td></tr>
+<tr><td>WebFetch / WebSearch</td><td>bundled tools (deferred)</td><td>the default fetcher; what /deep-research uses</td><td class="y">yes</td><td>tokens</td><td>not used — Firecrawl, Exa and context7 fetched instead</td></tr>
+<tr><td><code>firecrawl_scrape</code> / <code>firecrawl scrape</code></td><td>connector / CLI</td><td>full-page fetch with markdown</td><td class="y">yes</td><td>credits</td><td>not used this session</td></tr>
+<tr><td><code>kb-extraction-worker</code>, <code>kb-extract.js</code></td><td>repo agent + saved workflow</td><td>turning a fetched page into graph nodes when it is worth ingesting</td><td class="y">yes</td><td>Claude tokens</td><td>listed</td></tr>
+<tr class="stage"><td colspan="6">stage 4 · verify</td></tr>
+<tr><td><code>kb-adversarial-verifier</code></td><td>repo agent (opus)</td><td>one of the three voters — "find the probe that produces the opposite answer"</td><td class="y">yes</td><td>one agent per claim</td><td>listed</td></tr>
+<tr><td><code>fable-orchestrator:codex-reviewer</code>, <code>codex</code> 0.150.1</td><td>plugin agent + CLI</td><td>the cross-family voter</td><td class="y">yes</td><td>Codex tokens (subscription)</td><td>listed; codex installed</td></tr>
+<tr><td>agy, tier pro</td><td>CLI</td><td>the third family for a vote, when budget allows</td><td class="y">yes</td><td>scarce</td><td>—</td></tr>
+<tr class="stage"><td colspan="6">stage 5 · synthesize, publish, remember</td></tr>
+<tr><td><code>kb-synthesist</code>, <code>kb-tool-researcher</code></td><td>repo agents</td><td>the writer; the one-peer-tool shape</td><td class="y">yes</td><td>Claude tokens</td><td>listed</td></tr>
+<tr><td><code>eli5-visual</code> + Mermaid Chart connector (<code>validate_and_render_mermaid_diagram</code>)</td><td>repo skill + connector</td><td>the artifact, when the answer is a decision</td><td class="y">yes</td><td>—</td><td>six diagrams validated today</td></tr>
+<tr><td><code>mise run kb-remember</code>, <code>kb-reflect</code>, <code>kb-manifest-add</code>, <code>kb-add</code></td><td>mise tasks (kb_setup)</td><td>closing the loop: memory, and ingesting what was worth fetching</td><td class="y">yes</td><td>—</td><td>listed</td></tr>
+<tr><td><code>sources/REGISTRY.md</code>, <code>research-repo-enumeration.md</code></td><td>repo files + rule</td><td>the "GitHub repos touched" section feeds the backlog</td><td class="y">yes</td><td>—</td><td>6 repos appended today</td></tr>
+<tr class="stage"><td colspan="6">not in the spine, stated so the list is not padded</td></tr>
+<tr><td><code>gemini</code> 0.57.0 CLI</td><td>CLI (global mise config, not this repo)</td><td><b>never</b> — your ruling (comment 8a84f975): "use agy instead of gemini". It comes from <code>~/.config/mise/config.toml</code>, not <code>mise.toml</code> here (control: 0 matches in this repo), so this repo neither pins nor removes it; agy is the only Gemini lane in the spine</td><td>—</td><td>—</td><td>source path measured with <code>mise ls gemini --json</code></td></tr>
+<tr><td>Chroma Package Search</td><td>MCP</td><td>dropped — $5 of credits is not a free tier (your comment 4496c040)</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td><code>plugin-eval</code>, <code>skill-creator</code>, <code>plugin-dev</code>, <code>pr-review-toolkit</code>, <code>mattpocock-skills</code>, <code>ponytail</code>, <code>i-have-adhd</code>, <code>eli5</code>, <code>mcp2cli</code>, <code>astral</code></td><td>plugins</td><td>build, review and authoring tooling around the spine, not stages of it</td><td>—</td><td>—</td><td>in the 17 effective</td></tr>
+</tbody></table></div>
+
+<h2>The two engines, side by side</h2>
+<div class="tbl"><table>
+<thead><tr><th></th><th>/deep-research</th><th>/antigravity:research</th><th>the spine takes</th></tr></thead>
+<tbody>
+<tr><td>who plans</td><td>a Scope agent</td><td>Claude</td><td>Claude, with the question class</td></tr>
+<tr><td>who searches</td><td>5 WebSearch agents</td><td>agy, one call per sub-question</td><td>one adapter per source, all at once</td></tr>
+<tr><td>who reads pages</td><td>WebFetch agents, 15 max</td><td>agy pro, quoting or NOT SUPPORTED</td><td>a Claude lane, or agy pro for bulk — per call</td></tr>
+<tr><td>who verifies</td><td>3 skeptic agents per claim, same family</td><td>Claude, ≥2 domains</td><td>3 voters, at least two families</td></tr>
+<tr><td>what a failed vote means</td><td>unverified, never refuted</td><td>unverified</td><td>the same, and every null carries its arm</td></tr>
+<tr><td>tunable model / effort / family</td><td>no</td><td>yes, per call</td><td>yes — the reason for Q4 = A</td></tr>
+<tr><td>an agent can start it</td><td>no</td><td>yes</td><td>yes, and so can a schedule (Q2)</td></tr>
+<tr><td>sources</td><td>the open web only</td><td>Google grounding, Vertex</td><td>13 adapters, the graph first</td></tr>
+</tbody></table></div>
+
+<h2>What the sweep found when the spine ran by hand today</h2>
+<p>The lychee-from-Python question was run through every stage-1 adapter you named, by hand, before this page was drawn — the full report with every null and its arm is at <code>docs/research/reports/2026-08-27-lychee-from-python.md</code>. The one-line answer: <b>no maintained Python binding exists</b> (#59 is an open wishlist item; <code>jb--/lychpy</code> died in 2023), the maintainers shipped <code>lychee-bin</code> 0.24.2 as the Python-side artifact instead, and the cheapest bridge is subprocess + <code>--format json</code>. <b>Your ruling on that line (comment c4a5e3ea): "we have to build the python to rust binding using a modern framework library."</b> So the subprocess bridge is the interim, and the binding is a build — the round-3 section below is which framework and where it lives. The recency rule decided it; the developer index and Exa found it; the graph, context7 and the research index confirmed they were the wrong instruments for it, each with a control arm.</p>
+
+<h2>The advisor's conditions — ratified 2026-08-27</h2>
+<div class="callout"><span class="k">fable-advisor, at the commitment boundary</span>The spine stands, tiered, with four conditions it would refuse to ship without, and you adopted them: <b>(1)</b> the stage-1 record carries two more fields — every null its <b>arm</b>, every adapter its <b>tier</b> — so <code>{url, date, snippet, kind}</code> became <code>{url, date, snippet, kind, tier, null-arm}</code>; <b>(2) vote independence is by source domain</b>, not model family — three voters reading one page are one vote at 3× cost, and a single-domain claim stays <em>unverified</em> whatever the tally; <b>(3) agy is never a routine voter</b> (your one-call-per-round rule), so "≥ 2 families" means Claude + codex in practice; <b>(4) the daily brief ships only after a per-run token cap exists</b>. It also moved the first build: the <b>adapter contract + gh-trackers adapter</b> goes to <code>codex-implementer</code> first — its fixture is real (jdx/hk has issues disabled, and its structural zero must read as <em>never asked</em>) — and the binding spike second, with an exit criterion: name what subprocess + <code>--format json</code> cannot do.</div>
+
+<h2>Round 4 — what ships, what a run produces, what it may spend</h2>
+<div class="callout"><span class="k">decided — round 4, 2026-08-27</span><b>A plugin</b> on your marketplace: the spine is its skill, the adapters are modules (staged in <code>kb_setup/research/</code>, split out later per decision 3), <code>firecrawl</code>, <code>exa</code>, <code>context7</code> and <code>last30days</code> are declared dependencies, and <code>lychee-py</code> is a package dependency. <b>A run produces</b> the report under <code>docs/research/reports/</code>, an artifact when the answer is a decision, graph ingest of what was worth fetching where a graph exists, a brief when scheduled — and, your addition, <b>machine-readable structured output</b> "for other systems to be able to pass along": the same report as data (answer, ranked sources, claims with their tally outcome, every null with its arm, not measured, repos touched), with return codes as enums — the universal-structured-output rule from your 2026-08-26 directive, item 4. <b>The budget</b> is /deep-research's measured constants as per-call defaults — angles 5 (3–6), fetch 15, claims 25, votes 3 — with tiering deciding which adapters run at all.</div>
+
+<h2>Round 3 — the binding you asked for</h2>
+<p>lychee-lib's entry point is <code>pub async fn check(...)</code> (docs.rs, read this session), so the binding must own a tokio runtime and hand results back across the GIL — exactly the seam where the R wrapper crashed on teardown. Three frameworks exist; every date is from crates.io / PyPI this session.</p>
+<div class="tbl"><table>
+<thead><tr><th>option</th><th>latest</th><th>async lychee-lib</th><th>what it buys</th><th>what it costs</th></tr></thead>
+<tbody>
+<tr><td><b>PyO3 + maturin</b> (+ <code>pyo3-async-runtimes</code> for tokio)</td><td>pyo3 0.29.2 (2026-08-05) · maturin 1.15.0 (2026-08-24) · pyo3-async-runtimes 0.29.0 (2026-06-12)</td><td class="y">yes — tokio ↔ asyncio bridge, or a runtime owned by the module behind a sync <code>check()</code></td><td>the standard; the paper the research index returned (arXiv 2507.00264) benchmarks it best-of-class; wheels for every platform via maturin; <code>lychpy</code> is the same shape, so its 2023 code is a readable starting point</td><td>a Rust toolchain in the build; the runtime-drop / teardown class of bug is ours to test</td></tr>
+<tr><td><b>uniffi</b></td><td>0.32.0 (2026-06-30)</td><td class="n">no — sync FFI only; async needs a hand-written shim</td><td>one binding for Python, Swift, Kotlin</td><td>we need one language; the async shim is the hard part, unhelped</td></tr>
+<tr><td><b>lychee-bin subprocess</b> (what exists today)</td><td>0.24.2 (weeks ago)</td><td class="y">n/a — process boundary</td><td>zero build cost; maintained by the lychee team; the JSON contract measured today</td><td>a process per call; no <code>ClientBuilder</code> from Python — you ruled this the interim, not the answer</td></tr>
+</tbody></table></div>
+<div class="callout"><span class="k">decided — round 3, 2026-08-27</span><b>PyO3 0.29 + maturin 1.15</b>, with <code>pyo3-async-runtimes</code>: the Python surface is <b>asyncio-native</b> — <code>await lychee.check(...)</code> — not the sync wrapper this page recommended; and it lives in <b>its own repo</b> (<code>ray-manaloto/lychee-py</code>) after a declared spike in this repo proves <code>check()</code> end to end with the teardown case exercised. The offline hk step was added too, with its 0-links-today measurement in the comment above it.</div>
+<p>Where it lives is the second half: a separate repo (<code>ray-manaloto/lychee-py</code> — its own crate, wheel and PyPI name, installable from any of your repos, which Q3 asked for) or a workspace member here (faster to start; ties a Rust toolchain to this repo's <code>uv sync</code>). Under your VALIDATED rule the first step is the same either way: a declared-spike prototype that calls <code>lychee_lib::check</code> from Python end to end, with the teardown case exercised, before any module is written.</p>
+
+<footer>
+  <p><b>Numbers on this page.</b> Measured this session: every /deep-research constant and quote (2.1.248 binary), the antigravity recipe (0.23.0 cache), 17 effective plugins, 15 skills, 6 agents, 3 workflows, 2 <code>.mcp.json</code> servers, the lychee timings (34 s / 1,058 links; 32 s / 1,324 links; a 5-minute kill on the unconfigured run), 996 unique URLs, 6 validated diagrams. "~97 agents" is derived from the binary's own formula at its defaults, not observed. Nothing here is inherited from a previous session without being re-read.</p>
+  <p><b>One ambiguity.</b> You wrote "/deep-review workflow"; every earlier comment says /deep-research, and no bundled workflow is named deep-review, so this page reads it as /deep-research. Say so if you meant the multi-agent <code>/code-review ultra</code>.</p>
+  <p><b>Skills considered and not used.</b> <code>dataviz</code> — no data series, only mechanism. <code>design</code> — one page. <code>writing-for-agents</code> — reader prose. <code>eli5</code> alone — no persistence, no honesty rules. <code>artifact-capabilities</code> read; nothing declared, so the page can be shared.</p>
+  <p><b>Read for this page.</b> the 2.1.248 binary · <code>sources/agent-harness-docs/docs/claude-code/workflows.md</code> · the antigravity plugin's <code>commands/research.md</code>, <code>skills/antigravity/SKILL.md</code>, <code>agents/antigravity-delegate.md</code>, <code>bin/</code> · <code>.claude/settings.json</code>, <code>.mcp.json</code>, <code>mise ls</code>, <code>pyproject.toml</code>, <code>.claude/{skills,agents,workflows}</code> · <code>firecrawl/firecrawl-claude-plugin</code> two SKILL.md files, <code>firecrawl/cli</code> README and the developer-index launch post (2026-08-20, 70M+ artifacts) · <code>sources/hk/pkl/builtins/lychee.pkl</code>, <code>Config.pkl</code>, <code>docs/cli/check.md</code>.</p>
+</footer>
+</main>

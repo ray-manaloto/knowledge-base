@@ -1,0 +1,522 @@
+<title>The Research Ladder</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --ground:    #eeeef2;
+    --panel:     #ffffff;
+    --ink:       #191a25;
+    --muted:     #5d6070;
+    --hair:      #d2d3dc;
+    --accent:    #b1452c;
+    --accent-bg: #f7e4de;
+    --ok:        #1c6b63;
+    --ok-bg:     #d9ecea;
+    --gap:       #8a6d1f;
+    --gap-bg:    #f5ecd2;
+    --plate:     #ffffff;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:    #14151d;
+      --panel:     #1c1e29;
+      --ink:       #e9e9f0;
+      --muted:     #9497a8;
+      --hair:      #2e3040;
+      --accent:    #e07b60;
+      --accent-bg: #35201a;
+      --ok:        #56b8ac;
+      --ok-bg:     #14302d;
+      --gap:       #d6b153;
+      --gap-bg:    #322a13;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:    #14151d;
+    --panel:     #1c1e29;
+    --ink:       #e9e9f0;
+    --muted:     #9497a8;
+    --hair:      #2e3040;
+    --accent:    #e07b60;
+    --accent-bg: #35201a;
+    --ok:        #56b8ac;
+    --ok-bg:     #14302d;
+    --gap:       #d6b153;
+    --gap-bg:    #322a13;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 1.25rem 6rem;
+  }
+
+  .wrap  { max-width: 43rem; margin: 0 auto; }
+  .bleed { max-width: 60rem; margin: 0 auto; }
+
+  header { padding: 4.5rem 0 0; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 1rem;
+  }
+
+  h1 {
+    font-family: "Instrument Serif", Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(2.6rem, 8vw, 4.4rem);
+    line-height: 0.98;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 1.1rem;
+  }
+
+  h2 {
+    font-family: "Instrument Serif", Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(1.55rem, 3.6vw, 2.05rem);
+    line-height: 1.1;
+    text-wrap: balance;
+    margin: 3.6rem 0 0.8rem;
+  }
+
+  h3 {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 0.96rem;
+    letter-spacing: 0.01em;
+    margin: 2rem 0 0.45rem;
+  }
+
+  .standfirst {
+    font-family: "Instrument Serif", Georgia, serif;
+    font-size: 1.42rem;
+    line-height: 1.35;
+    color: var(--muted);
+    font-style: italic;
+    margin: 0 0 2.4rem;
+    text-wrap: pretty;
+  }
+
+  p { margin: 0 0 1rem; }
+  strong { font-weight: 600; }
+
+  code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.85em;
+    background: var(--panel);
+    border: 1px solid var(--hair);
+    padding: 0.06em 0.3em;
+    border-radius: 2px;
+  }
+
+  hr.rule { border: 0; border-top: 1px solid var(--hair); margin: 3.4rem 0 0; }
+
+  figure { margin: 2.4rem 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.73rem;
+    line-height: 1.55;
+    color: var(--muted);
+    margin-top: 0.85rem;
+  }
+
+  .scroll { overflow-x: auto; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin: 0.3rem 0 1.3rem; }
+  th, td { text-align: left; padding: 0.48rem 0.8rem 0.48rem 0; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  th {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); font-weight: 400; white-space: nowrap;
+  }
+  td.m { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .tag {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.64rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 0.14em 0.45em;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .t-have { background: var(--ok-bg);     color: var(--ok); }
+  .t-gap  { background: var(--gap-bg);    color: var(--gap); }
+  .t-ask  { background: var(--accent-bg); color: var(--accent); }
+
+  .mermaid {
+    background: var(--plate);
+    color: #191a25;
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    padding: 1.5rem 1rem;
+    overflow-x: auto;
+  }
+  /* Mermaid renders its own SVG and does NOT inherit the container's theme, so a
+     dark-mode viewer got black-on-black. Forced light plate + forced dark ink in
+     BOTH themes; the init themeVariables alone did not reach edge labels,
+     cluster titles or sequence actors. Reported by a viewer, 2026-08-27. */
+  .mermaid svg { background: #ffffff !important; max-width: 100%; height: auto; }
+  .mermaid svg text,
+  .mermaid svg .nodeLabel,
+  .mermaid svg .edgeLabel,
+  .mermaid svg .cluster-label,
+  .mermaid svg .messageText,
+  .mermaid svg .labelText,
+  .mermaid svg .loopText,
+  .mermaid svg .noteText,
+  .mermaid svg .actor-line + text,
+  .mermaid svg .sequenceNumber { fill: #1b1b1b !important; color: #1b1b1b !important; }
+  .mermaid svg .edgeLabel rect,
+  .mermaid svg .label-container,
+  .mermaid svg rect.actor { fill: #f4f4f6 !important; stroke: #8d8d94 !important; }
+  .mermaid svg .cluster rect { fill: #fafafa !important; stroke: #b8b8be !important; }
+  .mermaid svg .edgePath path,
+  .mermaid svg line,
+  .mermaid svg .messageLine0,
+  .mermaid svg .messageLine1,
+  .mermaid svg .actor-line { stroke: #4a4a4a !important; }
+  .mermaid svg marker path,
+  .mermaid svg .arrowheadPath { fill: #4a4a4a !important; stroke: #4a4a4a !important; }
+
+
+  .note {
+    background: var(--panel);
+    border: 1px solid var(--hair);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.2rem;
+    margin: 1.6rem 0;
+    font-size: 0.95rem;
+  }
+  .note h3 { margin-top: 0; }
+
+  .cites div {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.71rem;
+    line-height: 1.6;
+    color: var(--muted);
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--hair);
+  }
+
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* ANCESTOR-INDEPENDENT. The previous fix scoped every rule under `.mermaid`,
+     and the viewer still reported black-on-black — consistent with the renderer
+     giving the SVG its own id (`#claude-mermaid-N`, visible in comment anchors)
+     outside that class. These target the id prefix, so they hold wherever the
+     SVG ends up in the DOM. Reported twice by Ray, 2026-08-27. */
+  svg[id^="claude-mermaid"] {
+    background: #ffffff !important;
+    max-width: 100%;
+    height: auto;
+    border-radius: 3px;
+  }
+  svg[id^="claude-mermaid"] text,
+  svg[id^="claude-mermaid"] tspan,
+  svg[id^="claude-mermaid"] .nodeLabel,
+  svg[id^="claude-mermaid"] .edgeLabel,
+  svg[id^="claude-mermaid"] .cluster-label,
+  svg[id^="claude-mermaid"] .messageText,
+  svg[id^="claude-mermaid"] .labelText,
+  svg[id^="claude-mermaid"] .loopText,
+  svg[id^="claude-mermaid"] .noteText,
+  svg[id^="claude-mermaid"] .sequenceNumber,
+  svg[id^="claude-mermaid"] foreignObject div,
+  svg[id^="claude-mermaid"] foreignObject span,
+  svg[id^="claude-mermaid"] foreignObject p {
+    fill: #1b1b1b !important;
+    color: #1b1b1b !important;
+    background: transparent !important;
+  }
+  svg[id^="claude-mermaid"] .edgeLabel rect,
+  svg[id^="claude-mermaid"] .label-container,
+  svg[id^="claude-mermaid"] rect.actor,
+  svg[id^="claude-mermaid"] .actor {
+    fill: #f2f2f4 !important;
+    stroke: #8d8d94 !important;
+  }
+  svg[id^="claude-mermaid"] .cluster rect {
+    fill: #fafafa !important;
+    stroke: #b8b8be !important;
+  }
+  svg[id^="claude-mermaid"] .edgePath path,
+  svg[id^="claude-mermaid"] line,
+  svg[id^="claude-mermaid"] .messageLine0,
+  svg[id^="claude-mermaid"] .messageLine1,
+  svg[id^="claude-mermaid"] .actor-line {
+    stroke: #4a4a4a !important;
+  }
+  svg[id^="claude-mermaid"] marker path,
+  svg[id^="claude-mermaid"] .arrowheadPath,
+  svg[id^="claude-mermaid"] .arrowMarkerPath {
+    fill: #4a4a4a !important;
+    stroke: #4a4a4a !important;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">knowledge-base &middot; how research should work here</p>
+    <h1>The Research Ladder</h1>
+    <p class="standfirst">
+      Order the sweep by how a wrong answer fails. Never believe a negative that
+      has not been armed. Everything else is detail.
+    </p>
+  </header>
+
+  <p>
+    Two rules carry the whole workflow, and both exist because they were bought
+    with real mistakes.
+  </p>
+
+  <p>
+    <strong>Cheapest-refutable-first.</strong> A sweep that starts with a web search
+    and ends at the source has paid for the expensive step before asking the cheap
+    question. The run this was built from went source-last and produced an artifact
+    and two commits before anyone asked whether the behaviour was already known
+    upstream. It was &mdash; for fourteen months.
+  </p>
+
+  <p>
+    <strong>Every null carries a control arm.</strong> A &ldquo;not found&rdquo; with no
+    proof the probe could have found something is not a finding. It is a lead, and
+    reporting it as a finding is how five false negatives reached a report in one
+    session.
+  </p>
+</div>
+
+<div class="bleed">
+  <figure>
+    <svg viewBox="0 0 900 470" role="img" aria-label="The research sweep as a ladder of six rungs ordered by cost, cheapest at the top: the graph, the installed binary, shipped source at a pinned ref, both issue trackers, breadth, and synthesis. Each rung names the tool that serves it and whether that tool is installed here.">
+      <defs>
+        <marker id="down" markerWidth="9" markerHeight="9" refX="4.5" refY="7" orient="auto">
+          <polygon points="0,0 9,0 4.5,8" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <text x="0" y="16" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.5" fill="currentColor" opacity="0.55">CHEAP · REFUTES FAST</text>
+      <text x="0" y="452" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.5" fill="currentColor" opacity="0.55">EXPENSIVE · LAST RESORT</text>
+
+      <line x1="14" y1="28" x2="14" y2="424" stroke="currentColor" stroke-width="1.5" opacity="0.3" marker-end="url(#down)"/>
+
+      <g font-family="IBM Plex Sans, sans-serif">
+        <!-- rung 0 -->
+        <rect x="38" y="34" width="862" height="52" fill="var(--panel)" stroke="var(--hair)"/>
+        <text x="54" y="55" font-size="14" font-weight="600" fill="currentColor">0 &nbsp; The graph</text>
+        <text x="54" y="74" font-size="12" fill="currentColor" opacity="0.7">is it already ingested? &mdash; zero LLM tokens, hook-enforced</text>
+        <text x="886" y="55" font-size="11.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="var(--ok)">mise run kb-query</text>
+        <text x="886" y="74" font-size="10.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="currentColor" opacity="0.55">HAVE</text>
+
+        <!-- rung 1 -->
+        <rect x="38" y="98" width="862" height="52" fill="var(--panel)" stroke="var(--hair)"/>
+        <text x="54" y="119" font-size="14" font-weight="600" fill="currentColor">1 &nbsp; The installed binary</text>
+        <text x="54" y="138" font-size="12" fill="currentColor" opacity="0.7">what does it do HERE? &mdash; the only rung that answers what no document says</text>
+        <text x="886" y="119" font-size="11.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="var(--ok)">mise exec -- &lt;tool&gt; --help</text>
+        <text x="886" y="138" font-size="10.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="currentColor" opacity="0.55">HAVE</text>
+
+        <!-- rung 2 -->
+        <rect x="38" y="162" width="862" height="52" fill="var(--panel)" stroke="var(--hair)"/>
+        <text x="54" y="183" font-size="14" font-weight="600" fill="currentColor">2 &nbsp; Shipped source, at a pinned ref</text>
+        <text x="54" y="202" font-size="12" fill="currentColor" opacity="0.7">source beats issue tracker &mdash; issues stay open after the fix ships</text>
+        <text x="886" y="183" font-size="11.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="var(--ok)">gh api …/contents/…?ref=TAG</text>
+        <text x="886" y="202" font-size="10.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="var(--gap)">+ package source: GAP</text>
+
+        <!-- rung 3 -->
+        <rect x="38" y="226" width="862" height="52" fill="var(--panel)" stroke="var(--hair)"/>
+        <text x="54" y="247" font-size="14" font-weight="600" fill="currentColor">3 &nbsp; Both trackers &mdash; issues AND PRs AND discussions</text>
+        <text x="54" y="266" font-size="12" fill="currentColor" opacity="0.7">check has_issues FIRST: a disabled channel reports zero forever</text>
+        <text x="886" y="247" font-size="11.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="var(--ok)">gh api -X GET search/issues</text>
+        <text x="886" y="266" font-size="10.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="currentColor" opacity="0.55">HAVE</text>
+
+        <!-- rung 4 -->
+        <rect x="38" y="290" width="862" height="66" fill="var(--panel)" stroke="var(--hair)"/>
+        <text x="54" y="311" font-size="14" font-weight="600" fill="currentColor">4 &nbsp; Breadth</text>
+        <text x="54" y="330" font-size="12" fill="currentColor" opacity="0.7">firecrawl developer · research · last30days · agy-delegate</text>
+        <text x="54" y="348" font-size="12" fill="var(--accent)" opacity="0.95">/deep-research &mdash; ASK THE USER, an agent cannot invoke it</text>
+        <text x="886" y="311" font-size="11.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="var(--ok)">4 of 5 HAVE</text>
+        <text x="886" y="330" font-size="10.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="var(--gap)">many-repo grep: GAP</text>
+
+        <!-- rung 5 -->
+        <rect x="38" y="368" width="862" height="52" fill="var(--panel)" stroke="var(--hair)"/>
+        <text x="54" y="389" font-size="14" font-weight="600" fill="currentColor">5 &nbsp; Synthesis &mdash; a lane that opens the URLs itself</text>
+        <text x="54" y="408" font-size="12" fill="currentColor" opacity="0.7">leads are breadth, not truth. Spot-check every claim a lane returns.</text>
+        <text x="886" y="389" font-size="11.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="var(--ok)">kb-synthesist · kb-tool-researcher</text>
+        <text x="886" y="408" font-size="10.5" font-family="IBM Plex Mono, monospace" text-anchor="end" fill="currentColor" opacity="0.55">HAVE</text>
+      </g>
+    </svg>
+    <figcaption>
+      The ordering is the substance, not the tool list. Stop at the first rung that
+      answers &mdash; a lower rung costs more and refutes less. Two gaps are marked:
+      nothing here reads the source of a published package version, and nothing
+      greps across many repos at once.
+    </figcaption>
+  </figure>
+</div>
+
+<div class="wrap">
+
+  <h2>The gate every result passes through</h2>
+
+  <p>
+    A rung returning nothing is not an answer. It goes through the arm first, and
+    what comes out the other side is labelled either a <strong>finding</strong> or a
+    <strong>lead</strong> &mdash; never both, never neither.
+  </p>
+
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#f2f2f6','primaryTextColor':'#191a25','primaryBorderColor':'#8a8d9e','lineColor':'#5d6070','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart TD
+  R["a rung returns"] --> Q{"empty?"}
+  Q -->|no| F["FINDING<br/>cite file:line or the hunk"]
+  Q -->|yes| A["run the SAME command shape<br/>against a case known to succeed"]
+  A --> V{"did the arm<br/>return something?"}
+  V -->|yes| G["FINDING: a real absence<br/>state the arm you ran"]
+  V -->|no| B["THE PROBE IS BROKEN<br/>not the world — fix the probe"]
+  Q -->|"404 · 301 · timeout · jq miss"| N["NEVER ASKED<br/>not 'answered no'"]
+  N --> A
+    </pre>
+    <figcaption>
+      The arm is the whole gate. A redirect, a timeout, a jq miss and an empty grep
+      all mean <em>never asked</em>. Bounds count too: a <code>--limit</code>, a
+      <code>-maxdepth</code>, a time window &mdash; and a token spelling, which is the
+      most common form.
+    </figcaption>
+  </figure>
+
+  <div class="note">
+    <h3>The rule has a lane, and the lane is already installed</h3>
+    <p style="margin-bottom:0">
+      <code>kb-adversarial-verifier</code> exists to <em>&ldquo;try to REFUTE a claim by
+      finding the probe that produces the opposite answer&rdquo;</em> &mdash; the gate above,
+      executable. <code>fable-orchestrator:premise-verifier</code> is the sibling for
+      a claim's unstated assumptions. Neither was named in the skill until today,
+      which is the real finding of the tooling sweep: <strong>the gap was not a
+      missing plugin. It was seven installed lanes nobody had written down.</strong>
+    </p>
+  </div>
+
+  <h2>What we have, what we lack, what we must ask for</h2>
+
+  <div class="scroll">
+  <table>
+    <thead>
+      <tr><th>capability</th><th>served by</th><th></th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Is it in our corpus?</td><td class="m">mise run kb-query</td><td><span class="tag t-have">have</span></td></tr>
+      <tr><td>What does the binary do here?</td><td class="m">mise exec -- &lt;tool&gt;</td><td><span class="tag t-have">have</span></td></tr>
+      <tr><td>Source at a pinned ref</td><td class="m">gh api …?ref=TAG</td><td><span class="tag t-have">have</span></td></tr>
+      <tr><td>Issues, PRs, discussions</td><td class="m">gh api -X GET search/issues</td><td><span class="tag t-have">have</span></td></tr>
+      <tr><td>Coding-agent index</td><td class="m">firecrawl developer</td><td><span class="tag t-have">have</span></td></tr>
+      <tr><td>Academic papers</td><td class="m">firecrawl research</td><td><span class="tag t-have">have</span></td></tr>
+      <tr><td>What people are <em>doing</em>, dated</td><td class="m">last30days</td><td><span class="tag t-have">have</span></td></tr>
+      <tr><td>Cross-family grounded web</td><td class="m">agy-delegate</td><td><span class="tag t-have">have</span></td></tr>
+      <tr><td>Refute a negative</td><td class="m">kb-adversarial-verifier</td><td><span class="tag t-have">have</span></td></tr>
+      <tr><td>Voting fan-out over many angles</td><td class="m">/deep-research</td><td><span class="tag t-ask">ask</span></td></tr>
+      <tr><td><strong>Do our cited URLs still resolve?</strong></td><td class="m">lychee</td><td><span class="tag t-gap">gap</span></td></tr>
+      <tr><td><strong>Grep source across many repos</strong></td><td class="m">mcp.grep.app</td><td><span class="tag t-gap">gap</span></td></tr>
+      <tr><td><strong>Package registry metadata</strong></td><td class="m">deps.dev</td><td><span class="tag t-gap">gap</span></td></tr>
+      <tr><td><strong>Source of a published package version</strong></td><td class="m">Chroma Package Search</td><td><span class="tag t-gap">gap</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>
+    <strong>551 unique external URLs</strong> sit in this repo's tracked markdown and
+    nothing checks any of them. That is the same rot that put nine wrong
+    <code>file:line</code> anchors into two published pages &mdash; the other axis of
+    one problem.
+  </p>
+
+  <hr class="rule">
+
+  <h2>How a tool should arrive</h2>
+
+  <p>
+    Four layers, each pinning the one above it. The rule that makes it work is
+    that <strong>a tool does not enter the skill until its module exists and its
+    test is green</strong> &mdash; because the failure this design exists to stop is
+    adoption by paragraph, which has now happened twice.
+  </p>
+
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#f2f2f6','primaryTextColor':'#191a25','primaryBorderColor':'#8a8d9e','lineColor':'#5d6070','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart TD
+  T["the tool<br/>lychee · deps.dev · grep.app"] -->|"pinned by"| M["kb_setup module<br/>returns Ok/Err/External"]
+  M -->|"invoked by"| K["mise task<br/>kb-links, kb-pkg"]
+  K -->|"named by"| S["SKILL.md<br/>the ordering"]
+  S -->|"bundled by"| P[".claude-plugin<br/>marketplace.json"]
+  P -->|"/plugins updates"| U["another repo"]
+  X["a test in tests/"] -->|"gates"| M
+  X -.->|"NO test, NO entry"| S
+    </pre>
+    <figcaption>
+      Each layer pins the one above. The dotted edge is the gate: a tool with no
+      passing test never reaches the skill, no matter how good its README is.
+    </figcaption>
+  </figure>
+
+  <div class="note">
+    <h3>Two traps in the plugin layer, both measured</h3>
+    <p>
+      <strong>Setting <code>version</code> PINS it.</strong> Push new commits without
+      bumping the string and users stay on the cached copy. Omit it and Claude Code
+      falls back to the git SHA. Never set it in both <code>plugin.json</code> and
+      the marketplace entry &mdash; <code>plugin.json</code> silently wins.
+    </p>
+    <p style="margin-bottom:0">
+      <strong>The manifest is root-anchored.</strong>
+      <code>.claude-plugin/marketplace.json</code> lives at a repository root and
+      cannot be nested. A monorepo is still fine &mdash; <code>git-subdir</code>
+      sources and <code>--sparse</code> cover it &mdash; but a relative
+      <code>./plugins/x</code> source breaks for anyone who adds the marketplace by
+      direct URL.
+    </p>
+  </div>
+
+  <h2>What is not settled</h2>
+
+  <p>
+    This page describes a workflow, and four decisions inside it are open and are
+    Ray's: what <em>validated</em> must mean before a tool ships; whether the wrapper
+    is one module or four; whether the marketplace lives in this repo or its own;
+    and whether it bundles just the tools or the skill with them.
+  </p>
+
+  <h2>Everything above, and where it was read</h2>
+
+  <div class="cites">
+    <div>RUN, this session &mdash; <code>agy-delegate --tier flash --yolo</code> returned 7 dated findings; <code>AGY_USAGE {"status":"SUCCESS", total 217,992}</code>. Three of its four load-bearing claims then confirmed against primary sources, one left unverified (a domain-level citation).</div>
+    <div>RUN, this session &mdash; <code>mise exec -- firecrawl developer "&hellip;"</code> returned lychee's own README comparison table (<code>JSON output: yes</code>) and a real migration PR. The CLI works; the MCP <code>firecrawl_search</code> failed with <code>socket hang up</code> for one lane, so the CLI is the reliable transport.</div>
+    <div>READ &mdash; <code>sources/agent-harness-docs/docs/claude-code/plugin-marketplaces.md:122</code> (root-anchored), <code>:284</code> (no nesting), <code>:834-844</code> (version resolution and the pin trap), <code>:310-311</code> (<code>ref</code> + <code>sha</code>).</div>
+    <div>READ &mdash; <code>sources/agent-harness-docs/docs/claude-code/workflows.md:80</code>: <em>&ldquo;/deep-research runs only when you invoke it.&rdquo;</em></div>
+    <div>MEASURED &mdash; 551 unique external URLs in tracked markdown; control arm: a bogus token returned 0 to the same command shape.</div>
+    <div>MEASURED &mdash; <code>grep -ci</code> over <code>SKILL.md</code>: 0 for exa / last30days / antigravity / adversarial / premise-verifier / repowise / WebSearch, against a control of 2 for <code>kb-query</code>.</div>
+    <div>NOT MEASURED &mdash; nothing in the gap rows has been installed or run end to end. grep.app was proven to handshake, not to answer. Chroma was never called; it needs a key and its pricing is unpublished.</div>
+    <div>NOT MEASURED &mdash; <code>lychee --help</code> has never run here. Its <code>--format json</code> is read from source at tag <code>lychee-v0.24.2</code> and corroborated by its README, not by execution.</div>
+  </div>
+
+  <p style="margin-top:2.6rem; font-size:0.88rem; color:var(--muted)">
+    Source: <code>docs/artifacts/the-research-ladder.html</code>, tracked.
+    The skill it describes: <code>.claude/skills/aggregated-research/SKILL.md</code>.
+  </p>
+
+</div>

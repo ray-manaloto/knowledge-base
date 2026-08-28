@@ -390,3 +390,50 @@ finding is that this corpus indexes its dependencies and not its decisions.
 
 Read only for figures or context and **not** proposed as sources:
 `jgwill/miadi-orchestration-kit`, `rmusser01/tldw_server`.
+
+## Backlog added 2026-08-27b — the plugin build's own sources
+
+Surfaced while designing `aggregated-research` as a marketplace plugin
+(`.agent/plans/session-2026-08-27-g.md`). **Read once, not yet ingested.**
+
+Tools the plugin will wrap — each needs a prototype before a module is written:
+
+- <https://github.com/lycheeverse/lychee> — link/citation-rot checker, Rust.
+  Publishes its own **binary** to PyPI as `lychee-bin` 0.24.2, so it is
+  `uv add`-able. `--format json` confirmed from source at tag `lychee-v0.24.2`
+  (`lychee-bin/src/config/output.rs:16-23`). This repo has **551 unique external
+  URLs** in tracked markdown and nothing checks any of them.
+- <https://github.com/modelcontextprotocol/python-sdk> — the `mcp` PyPI package,
+  2.1.1 (2026-08-25, re-derived as latest). The client for `mcp.grep.app`, which
+  has **zero** Python packages of its own.
+- Google Open Source Insights / `deps.dev` — keyless HTTP, no official client;
+  Google's own docs say *"use any HTTP client."* No repo to pin; the API is the
+  artifact.
+
+Prior art for the two we would otherwise have written from scratch:
+
+- <https://github.com/terrylica/cc-skills> — its `link-tools` plugin (★61, pushed
+  2026-08-26) already wraps lychee as two Claude skills with a `config/lychee.toml`.
+  Read before building ours.
+- <https://github.com/jaredpalmer/claude-plugins> · <https://github.com/krmcbride/claude-plugins>
+  — both wrap `grep.app` via its MCP.
+- <https://github.com/anthropics/claude-plugins-official> — 289 plugins; the source
+  of `plugin-dev`, and the marketplace-manifest reference implementation.
+
+Read only as a control arm for the plugin-prior-art search and **not** proposed as
+sources: `tarqd/skills`, `nq-rdl/agent-extensions`, `a5c-ai/babysitter`,
+`liby/vibe-coding-plugins`.
+
+### 2026-08-27 — the lychee-from-Python sweep (`docs/research/reports/2026-08-27-lychee-from-python.md`)
+
+- <https://github.com/jb--/lychpy> — the only PyO3 binding for lychee-lib; pushed
+  2023-09-26, "not ready for usage". T3 `deferred` — dead, kept as the negative result.
+- <https://github.com/firecrawl/firecrawl-claude-plugin> — the `firecrawl-developer-index`
+  and `firecrawl-search` skills; the developer index's three surfaces are documented there. T2.
+- <https://github.com/firecrawl/cli> — `firecrawl developer <query>`, the passage-returning
+  surface our connector lacks; pinned here as `npm:firecrawl-cli`. T2.
+- <https://github.com/yuting0624/antigravity-for-claude-code> — `commands/research.md` +
+  the skill's deep-research recipe, read from the 0.23.0 plugin cache. T2.
+- <https://github.com/PyO3/pyo3> — touched only as a lychee CONSUMER (its CI). T3.
+- <https://github.com/bamr87/it-journey> — `scripts/validation/link-checker.py`, prior art
+  for the subprocess + `--format json` bridge (reads a `fail_map` key 0.24.2 does not emit). T3.

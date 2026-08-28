@@ -320,7 +320,7 @@
   <section class="prov">
     <h2>Measured, not recalled</h2>
     <ul>
-      <li><code>decide()</code>'s six keyword-only parameters — read this session at <code>python/src/kb_setup/currency/decide.py:429-437</code>.</li>
+      <li><code>decide()</code>'s six keyword-only parameters — read this session at <code>python/src/kb_setup/currency/decide.py:435-443</code>. <strong>CORRECTED 2026-08-27:</strong> published as <code>:429-437</code>, which now lands inside a recommendation string six lines earlier &mdash; the file moved under the citation. Re-derived with <code>git grep -n "^def decide("</code>; the six parameters and the argument about them are unchanged.</li>
       <li><b>44</b> <code>decide(</code> call sites in <code>tests/test_currency_decide.py</code>, <b>7</b> in the new <code>tests/test_currency_watch_reviewed.py</code> — counted this session.</li>
       <li>No <code>max-args</code> override exists in <code>pyproject.toml</code>, so the limit is ruff's default of 5 — checked this session; the file's ruff sections are <code>[tool.ruff]</code>, <code>lint</code>, <code>per-file-ignores</code>, <code>pydocstyle</code>, <code>mccabe</code>, none of which set it.</li>
       <li>The existing exception list and the <code>session_review_archive.py</code> precedent — <code>pyproject.toml:153-189</code>.</li>

@@ -2114,3 +2114,16 @@ version_pattern = '^(\d+\.\d+\.\d+)$'
 mise_key = "npm:ctx7"
 binary = "ctx7"
 version_pattern = '^(\d+\.\d+\.\d+)$'
+
+[tool.lychee]
+# The link checker behind the hk `lychee` step and `mise run kb-links`. Pinned
+# 2026-08-27 at the latest release (`mise ls-remote lychee` -> 0.24.2, the same
+# version PyPI's `lychee-bin` and crates.io's `lychee-lib` carry). No source
+# manifest yet: the sweep that adopted it (docs/research/reports/
+# 2026-08-27-lychee-from-python.md) read the shipped source via `gh api`, and
+# a 40 MB Rust clone is a corpus decision, not a pin decision.
+mise_key = "lychee"
+binary = "lychee"
+github = "lycheeverse/lychee"
+# `mise exec -- lychee --version` prints `lychee 0.24.2`.
+version_pattern = '^lychee (\d+\.\d+\.\d+)'

@@ -72,32 +72,86 @@ gh api -X GET search/issues -f q='repo:OWNER/REPO TERM' --jq '.total_count'
 ```
 
 The first line is not optional. **A count of zero from a channel that cannot
-receive anything is not evidence** — `jdx/hk` has issues DISABLED, so every
-`repo:jdx/hk` search is structurally zero.
+receive anything is not evidence** — `jdx/hk` has issues DISABLED, so an
+`is:issue` search there is structurally zero. **PRs still index under
+`search/issues`**: `repo:jdx/hk gitleaks` returned 9 hits on 2026-08-27, all pull
+requests, while `repo:jdx/hk is:issue` returned 0. Split the search by `is:issue`
+/ `is:pr`, or a real PR hit reads as "issues were searched".
 
 Never `gh search issues`: it returns `[]` instead of failing, and its control
 query with 39 real results also returned `[]` (#507).
 
-### 4. Breadth — delegate to the bundled workflow
+### 4. Breadth — the developer index, and the one you must ASK for
 
-```text
-/deep-research <question>
-```
+**Run: Firecrawl `developer-index`, then the web.** It returns full issue bodies
+and comment threads inline, so the substantive maintainer comment arrives without
+a follow-up fetch. On the run that evaluated this skill it produced the decisive
+lead that plain web search did not.
 
-Claude Code ships this. It fans out across angles, cross-checks, **votes on each
-claim, and filters out the claims that did not survive**. Do not hand-roll a
-fan-out beside it (`use-tool-builtins.md`). It runs only when invoked, and needs
-WebSearch available.
+**Ask the user for: `/deep-research <question>`.** Claude Code ships it as a
+bundled workflow — it fans out across angles, cross-checks, **votes on each claim,
+and filters out the claims that did not survive** — and it is strictly better than
+hand-rolling a fan-out (`use-tool-builtins.md`). But it is **user-invoked only**:
+*"`/deep-research` runs only when you invoke it. Before v2.1.218, Claude could
+also start it on its own"*
+(`sources/agent-harness-docs/docs/claude-code/workflows.md:80`). A subagent cannot
+reach it at all — measured 2026-08-27, when a lane told to follow this skill
+reported it *"could not invoke it from this subagent"*.
 
-Then **verify its cited claims against primary sources** — it returns a cited
-report, not a verified one, and steps 1-2 above are what settles a citation.
+So when breadth is the crux, say so and hand the reader the command. Do not plan
+around running it yourself.
 
-Fall back to Firecrawl `developer-index` when WebSearch is unavailable, or when
-the question is specifically about a repo's issues and PRs: it returns full issue
-bodies and comment threads inline, so the maintainer comment arrives without a
-follow-up fetch.
+*(This step said "delegate to the bundled workflow" until 2026-08-27. That was
+adopted from the shipped doc without an execution — the skill's own P3 report
+flagged it as unverified — and the first attempt to run it refuted it. Corrected
+rather than overwritten, because the reasoning for preferring it still stands.)*
+
+**When breadth needs a lane, use `antigravity:research`.** It is cross-family
+(Gemini) grounded web legwork with Claude verifying the citations, it IS
+subagent-reachable, and it is the substitute for the paragraph above. Budget it:
+the `agy` subscription depletes fast, so it is a scarce reserve, not a routine
+call.
+
+**Two Firecrawl surfaces beside `developer-index`, both installed and keyed:**
+`firecrawl-research-index` for academic and paper questions, and
+`firecrawl_research_search_github` for public-code search. Different indexes, not
+different wrappers.
+
+**`last30days` when the question is what people are DOING, not what is true.**
+Dated, engagement-weighted evidence from Reddit / HN / X / YouTube / GitHub. It is
+the only recency instrument here, and test prompt 2 — "what do other projects do
+about X" — is exactly the class with no primary source to anchor on.
+
+Then **verify every cited claim against primary sources** — a cited report is not
+a verified one, and steps 1-2 above are what settles a citation.
+
+### 4a. Four sources this repo does not have installed
+
+Not installed, so they are a recommendation each time you need them, never an
+assumption. Measured 2026-08-27; **installing any is Ray's call** (`do-not.md` #11).
+
+| when you need | reach for | cost |
+|---|---|---|
+| package metadata — versions, publish dates, advisories, licences | `curl https://api.deps.dev/v3/systems/pypi/packages/<name>` | **keyless, nothing to install** |
+| "does an MCP server for X exist?" | `curl 'https://registry.modelcontextprotocol.io/v0/servers?search=<term>'` | keyless; it under-covers HOSTED servers, so a 0 there is not an absence |
+| the same pattern across MANY repos' source at once | `mcp.grep.app` — regex over ~1M public repos, no auth (handshake measured) | register, or reach it via `mcp2cli` first |
+| the real source of a PUBLISHED package version | Chroma Package Search MCP | needs an API key, pricing unpublished — ask before relying on it |
+
+The first two answer questions this sweep otherwise guesses at. The third is what
+turns *"what do other projects do about X"* from a blog-post question into a
+source question.
+
+**And what is NOT missing:** academic and paper search. `firecrawl-research-index`
+is installed and keyed. A session that reaches for an arXiv or OpenAlex MCP is
+duplicating a working tool — measured, when a lane was told paper search was a gap
+and refuted it on the first call.
 
 ### 5. Synthesis by a strong Claude lane that opens the URLs itself
+
+**The lane has a name — two, in `.claude/agents/`.** `kb-synthesist` combines
+several single-source analyses into one comparison; `kb-tool-researcher` handles
+the one-peer-tool-against-our-graph shape and is instructed to query the graph
+first. This step said "a strong Claude lane" and named none until 2026-08-27.
 
 Research leads are breadth, not truth. A lane that summarises a search-result
 snippet has not read the source. Spot-check every factual claim a lane returns —
@@ -123,6 +177,18 @@ A redirect, a timeout, a `jq` miss and an empty grep are all *never asked*, not
 *answered no*. Say which arm you ran: "bogus input → 404 while known-good → 200,
 so the probe discriminates."
 
+**When the negative is expensive to get wrong, the arm has a lane.**
+`kb-adversarial-verifier` exists to *"try to REFUTE a claim by finding the probe
+that produces the opposite answer"* — this rule, executable. Hand it the negative
+before you write it down. `fable-orchestrator:premise-verifier` is the sibling for
+trap 5: per-premise CONFIRMED / REFUTED / UNVERIFIABLE with cited `file:line`,
+plus the premises a claim assumed without declaring.
+
+A cheaper arm for a WEB null specifically: run the same query on a **second
+independent index**. `exa` is installed and keyed, and its value here is exactly
+that — not as a primary source (it duplicates Firecrawl on most questions) but as
+the control on a Firecrawl zero.
+
 **Bounds are the commonest hidden null.** `-maxdepth`, `head -N`, `--limit`, a
 time window, a `2>/dev/null` — and a token spelling. A session grepped `lmstudio`
 and `lm_studio`, got 0, and reported the feature absent; it is spelled `LM Studio`
@@ -136,7 +202,11 @@ Each of these was hit for real. Run the check, do not just know the trap.
 2. Tracker null → **`gh api repos/OWNER/REPO` first**, read `has_issues` /
    `has_discussions`.
 3. A citation can contradict what it annotates (#508) → **open the citation**.
-4. Version skew → **`mise exec --`**, never the bare shim.
+4. Version skew → **`mise exec --`**, never the bare shim. **And a `command -v`
+   hit is not an install** on a mise host: `command -v mkdocs` and
+   `command -v doxygen` both print FOUND here, and both are shims that die with
+   `No version is set for shim`. Probe the binary, not its name — measured
+   2026-08-27 on this skill's own evaluation run.
 5. A lane's factual claims → **spot-check against this repo** before quoting them.
 
 ## Output

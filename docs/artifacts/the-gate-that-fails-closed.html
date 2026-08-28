@@ -313,7 +313,7 @@ categories={timeout: 1, <span class="hi">unclassified-files: 10</span>};<br>
       <pre class="mermaid">
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#EEF4F1','primaryTextColor':'#131E1B','primaryBorderColor':'#7B8F89','lineColor':'#576863','fontFamily':'JetBrains Mono, monospace','fontSize':'13px'}}}%%
 flowchart TD
-  M["sources/&lt;name&gt;.manifest<br/>url + ref + commit"] --> C["clone_dir<br/>(gitignored)"]
+  M["sources/#lt;name#gt;.manifest<br/>url + ref + commit"] --> C["clone_dir<br/>(gitignored)"]
   C -->|"git clone --no-local<br/>+ checkout --detach"| S["disposable snapshot"]
   S --> G1{"identity assert<br/>tree + HEAD + status"}
   G1 -->|"any untracked path<br/>= snapshot-drift"| X1(["FAIL"])
@@ -470,12 +470,14 @@ flowchart TD
   <section>
     <h2>Everything above, and where it was read</h2>
     <div class="cites">
+      <div><strong>CORRECTION, 2026-08-27 (added after publication).</strong> Eight of the <code>file:line</code> citations below were stale when this page was published &mdash; off by +14 to +77 lines, because the file moved under them. Found by a cold cross-family review lane on <code>a61988b2454a</code> and re-derived here from <code>git grep -n</code>. The four <code>graph.py</code> anchors were re-checked in the same pass and were correct. Nothing in the argument above changes; only where to read it does. The stale numbers were: <code>graphify_sdk.py</code> 1288 / 1329 / 1344 / 1361 / 1246 / 1270 and <code>graphify_health.py</code> 337 / 346.</div>
+      <div><strong>CORRECTION, 2026-08-28 (added after publication).</strong> The first diagram on this page did not render: its manifest node label was written as <code>&amp;lt;name&amp;gt;</code>, which the browser decodes to a literal <code>&lt;name&gt;</code> before mermaid parses it, and mermaid's flowchart lexer reads that as a tag start (<code>TAGSTART</code> parse error, verified with the Mermaid Chart MCP). It now uses mermaid's own entity codes, <code>#lt;name#gt;</code>. Found by the cold cross-family review lane on <code>8656620cfd77</code>. Nothing in the argument changes.</div>
       <div>MEASURED &mdash; <code>mise run kb-build</code> rc=1, this session: 11 sources fail, categories <code>{timeout: 1, unclassified-files: 10}</code>, 56 unresolved paths.</div>
       <div>MEASURED &mdash; <code>uv run kb-setup detect-census --source biome</code> and <code>--source gh</code>, this session.</div>
-      <div>READ &mdash; <code>python/src/kb_setup/graphify_sdk.py:1288</code> <code>classify_unclassified()</code>; <code>:1329</code> <code>_is_non_source()</code>; <code>:1344</code> <code>_is_unsupported_language()</code>; <code>:1361</code> <code>_classifiable_name()</code> containment check.</div>
-      <div>READ &mdash; <code>python/src/kb_setup/graphify_sdk.py:1246</code> <code>source_detection_policy()</code>; <code>:1270</code> <code>_apply_detection_classes()</code>.</div>
+      <div>READ &mdash; <code>python/src/kb_setup/graphify_sdk.py:1359</code> <code>classify_unclassified()</code>; <code>:1394</code> <code>_is_non_source()</code>; <code>:1420</code> <code>_is_unsupported_language()</code>; <code>:1438</code> <code>_classifiable_name()</code> containment check.</div>
+      <div>READ &mdash; <code>python/src/kb_setup/graphify_sdk.py:1311</code> <code>source_detection_policy()</code>; <code>:1336</code> <code>_apply_detection_classes()</code>.</div>
       <div>READ &mdash; <code>python/src/kb_setup/graph.py:1004</code> <code>_create_source_snapshot()</code>; <code>:1076</code> <code>_assert_disposable_clone_identity()</code>; <code>:1124</code> <code>_is_detector_sidecar()</code>; <code>:1256</code> <code>_require_post_detection_clone_identity()</code>.</div>
-      <div>READ &mdash; <code>python/src/kb_setup/graphify_health.py:337</code> <code>_unresolved_unclassified()</code>; <code>:346</code> <code>_coverage_reasons()</code>.</div>
+      <div>READ &mdash; <code>python/src/kb_setup/graphify_health.py:351</code> <code>_unresolved_unclassified()</code>; <code>:360</code> <code>_coverage_reasons()</code>.</div>
       <div>READ &mdash; <code>sources/anthropic-sdk-python.manifest</code>: <code>ref = v1.0.0</code>, refuting #397's body.</div>
       <div>INHERITED, UNVERIFIED &mdash; the 12 paths the build log's per-source cap did not print.</div>
       <div>INHERITED &mdash; #409's 94 and 233 entry counts, and Ray's override, both from the 2026-08-27c handoff rather than re-measured.</div>

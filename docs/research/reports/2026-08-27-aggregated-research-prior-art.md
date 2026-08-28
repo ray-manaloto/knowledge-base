@@ -138,8 +138,98 @@ graph-first research ordering.
 - [terrylica/cc-skills](https://github.com/terrylica/cc-skills) — the `crucible` plugin's research-foundations skill: shuffled-null design and agent significance corrections.
 - [jamie-bitflight/claude_skills](https://github.com/jamie-bitflight/claude_skills) — surfaced by the control-arm search; a skills-system reference, read only for the arm.
 - [alma-oss/spirit-design-system](https://github.com/alma-oss/spirit-design-system) — surfaced by the control-arm search; a release-notes skill, read only for the arm.
-- [mattpocock/mattpocock-skills](https://github.com/mattpocock/mattpocock-skills) — already a pinned source (`sources/mattpocock-skills`); its `research` skill is the minimal prior-art shape.
+- [mattpocock/skills](https://github.com/mattpocock/skills) — already a pinned source (the marketplace name is `mattpocock-skills`; the repo is `mattpocock/skills` — URL corrected 2026-08-27, `kb-links` found the 404) (`sources/mattpocock-skills`); its `research` skill is the minimal prior-art shape.
 - [Attacca](https://github.com/Attacca) — already a pinned source (`sources/Attacca`); its `researcher` agent carries the retirement marker this report corroborates.
 
 The three security repos are **new to this repo** and are candidates for
 `sources/REGISTRY.md`; the last two are already pinned.
+
+---
+
+## ADDENDUM, 2026-08-27 — the discovery sweep this report did not do
+
+**Added after publication rather than rewritten**, because the counts above are
+already committed and someone may have read them.
+
+**The `AGG-SELF: 11 prior-art tool(s) evaluated` line overstates what happened.**
+Of those 11, exactly **one** was discovered — the marketplace `deep-research`
+plugin, from a single line of a corpus inventory. The other ten were the candidate
+list the round's rider handed over: firecrawl, exa, context7, last30days,
+repowise, mcp2cli, Explore, `gh api`, WebFetch/WebSearch, graphify's verbs.
+
+So this report answered *"which already-installed things should fold in?"* It did
+not answer #509's actual ask, which is broader and worth quoting against itself:
+
+> *"Ray also asked that the skill re-run itself to discover more research tooling
+> — i.e. one of its own worked examples should be 'what other CLIs, MCP servers,
+> or skills would answer this class of question', so the tool list stays current
+> rather than frozen at what was installed the day it was written."*
+
+Frozen at what was installed is exactly what the report above is. Ray caught it.
+
+Two lanes then ran the sweep properly, both following the skill:
+`.agent/kb/reports/agents/tooling-sweep-local.md` (143 lines) and
+`tooling-sweep-world.md` (106 lines).
+
+### What the local sweep found — the gap is not a missing plugin
+
+**Seven research-capable lanes are already installed, already paid for, and were
+named nowhere in the skill.** Armed: `grep -ci` over `SKILL.md` returned **0** for
+`exa`, `last30days`, `antigravity`, `adversarial`, `premise-verifier`, `repowise`
+and `WebSearch`, against a control of `kb-query` **2** and `ctx7` **1** — so the
+zeroes are absences, not a broken grep.
+
+Two of them close holes the skill itself documents: `antigravity:research` is a
+subagent-reachable substitute for `/deep-research`, which step 4 records as
+unreachable; and `kb-adversarial-verifier` is the control-arm rule as an
+executable lane. Both are now named in the skill.
+
+**Of 219 marketplace entries read in full, nothing is a must-install.** The read
+was exhaustive rather than keyword-filtered on purpose, and that paid: two
+candidates (`graph-query-mcp`, `writ`) carry none of research/search/docs/knowledge
+in their names and a keyword pass would have missed both — which is precisely how
+the original run saw three entries out of 219.
+
+### What the world sweep found — four real gaps, and one refuted premise
+
+**Refuted first: academic and paper search is NOT a gap.** The brief named it as
+one; `firecrawl_research_search_papers` is installed and returned three real arXiv
+records on the first call. Every arXiv/OpenAlex MCP server was rejected as a
+duplicate of a working tool.
+
+| # | candidate | capability this stack lacks | cost |
+|---|---|---|---|
+| 1 | **`lychee`** (3,865★, Apache-2.0, pushed 2026-08-25) | verifies a cited URL still resolves. **551 unique external URLs** in tracked markdown, unchecked. `aqua:lycheeverse/lychee` → 0.24.2 | one mise pin + one task |
+| 2 | **`mcp.grep.app`** | regex source search across ~1M public repos; handshake measured live, no auth | register, or `mcp2cli` first |
+| 3 | **`deps.dev`** | package-registry metadata as a first-class source | keyless, no install |
+| 4 | **Chroma Package Search** | grep/read the real source of a published package version, six registries | API key, pricing unpublished |
+
+The official **MCP Registry** is added to the skill as a *discovery source*, not an
+install: `curl registry.modelcontextprotocol.io/v0/servers?search=` is the cheapest
+"does an MCP for X exist" probe, with the caveat its own null carries — it
+under-covers hosted servers, so a 0 there is not an absence (grep.app is live and
+unregistered).
+
+**Rejected classes, one line each:** every web-search wrapper (Firecrawl covers
+it); every persistent-memory plugin — including `basic-memory`, which is already
+*in* this corpus — because that is graphify's job and adopting one forks it;
+`grace-marketplace` and eight other code-knowledge-graph plugins as graphify peers;
+twelve debate/panel plugins, which *"produce opinions, not armed nulls — the exact
+failure mode this skill was built against"*; ~90 orchestration frameworks, since
+`fable-orchestrator` occupies that slot.
+
+### Bounds both sweeps inherited, stated
+
+- The marketplace corpus file is itself a **filtered** view: its header records
+  `TOTAL: 2263 | STRONG-relevant: 235 | BEYOND agent*/ai* front: 219`. The 16
+  `agent*`/`ai*` entries are absent from the file, and the other 2,028 were cut by
+  a relevance judgement made elsewhere and not re-derived.
+- **Nothing was installed and nothing was run end to end.** grep.app was proven to
+  handshake, not to answer a real question; Chroma's tools were never called.
+- Directory counts quoted by the world sweep (claude-plugins.dev's plugin/skill
+  totals) are secondary and unverified.
+
+### Adopting any of these is Ray's call
+
+`do-not.md` #11 — project scope only, never a write to `~/.claude`. Both sweeps
+recommend and hand back.
