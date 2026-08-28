@@ -100,7 +100,7 @@ flowchart TB
     C --> S["codesearch (grep.app)"]
     C --> L["links (lychee CLI subprocess)"]
     C --> B["breadth (shells to the declared plugins' CLIs:<br/>firecrawl · ctx7 · exa · last30days)"]
-    C -->|"every verb: --json, -o .research/&lt;slug&gt;.json"| OUT[(".research/ files")]
+    C -->|"every verb: --out .research/&lt;slug&gt;.json<br/>(JSON is the only output; no -o, no --json)"| OUT[(".research/ files")]
   end
   SK -->|"Bash"| C
   OUT -->|"grep / head"| SK
@@ -157,7 +157,7 @@ flowchart LR
 
   <h2>Build order, cheapest first</h2>
   <ol>
-    <li>CLI entry point + <code>trackers</code> verb + <code>--json</code>/<code>-o</code> convention + one test that goes red (mostly exists).</li>
+    <li>CLI entry point + <code>trackers</code> verb + the <code>--out PATH</code> convention (long flag, per the repo; JSON is the only output, so no <code>--json</code>) + one test that goes red (mostly exists). <span class="src">fable-advisor 2026-08-28: this page's earlier <code>-o</code>/<code>--json</code> wording was corrected here so the page and the spec do not restate each other differently.</span></li>
     <li>Plugin dir in this repo first (dogfood): manifest without <code>version</code>, the spine skill, the SessionStart check, <code>rules/security.md</code>.</li>
     <li>Marketplace: tag, reset, manifest entry, <code>allowCrossMarketplaceDependenciesOn</code>; install here from the marketplace; delete the local skill.</li>
     <li><code>packages</code>, <code>codesearch</code>, <code>links</code>, <code>breadth</code> — each prototyped end to end before its verb lands (your standing "prototype all the tools first").</li>
