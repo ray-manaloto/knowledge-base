@@ -75,3 +75,27 @@ So the next step is research, not a spec: what a Claude Code plugin can bundle
 (the manifest schema and the docs at the pinned `claude-code-docs` ref), and how
 the installed `firecrawl` and `context7` (ctx7) plugins wrap their CLIs — that
 pair is the model for the aggregated-search plugin.
+
+## Three comments on the blueprint page (`aggregated-research-plugin-blueprint`, 2026-08-28 05:25–05:29), verbatim
+
+On *"What a plugin can carry"*:
+
+> make sure to use and add this schema to the the config file for the marketplace:
+> https://json.schemastore.org/claude-code-marketplace.json
+> and validate against it and use that as what we can add to a marketplace
+
+On *"hooks/hooks.json"*:
+
+> is there a schema for hooks.json?
+> or do we use https://json.schemastore.org/claude-code-settings.json?
+
+On *"No plugin mechanism downloads and installs an external CLI"*:
+
+> but we can have a script that downloads the cli from repo as a github package or artifact
+
+Read together: the marketplace manifest carries `$schema` and is validated against
+it (that schema defines what a marketplace can hold); the hooks file's schema is a
+question to answer by probing schemastore; and the CLI is delivered by a plugin
+script (the documented `SessionStart` + `${CLAUDE_PLUGIN_DATA}` pattern) that
+fetches it from a GitHub release/package — so "the plugin cannot install a CLI"
+is true only of first-class manifest fields, not of the hook script.
