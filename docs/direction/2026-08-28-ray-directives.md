@@ -233,7 +233,7 @@ no marketplace clone and no cache dir — measured at this session's start.
 Scope: **"Fixes + container CI, one M dispatch (Recommended)"** — the shared
 `bin/mise-env` shim (ceiling, trust, uv cache, `__MISE_*` unset), hook and
 wrappers calling it, README updated, `.github/workflows` with `mise oci build`
-+ install job + agent job.
+plus the install job and the agent job.
 
 Secret (`CLAUDE_CODE_OAUTH_TOKEN` in the marketplace repo), free text:
 **"You have permission to do it yourself via gh cli"**.
