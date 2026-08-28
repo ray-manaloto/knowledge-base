@@ -44,7 +44,7 @@
   .status { margin-top: 2.5rem; padding: .75rem 1rem; border-left: 3px solid var(--accent); background: var(--card); font-size: .9rem; }
 </style>
 <main>
-  <div class="eyebrow">claude-code-marketplace · slice 3b · PR #3 · b9ab477 · 2026-08-28</div>
+  <div class="eyebrow">claude-code-marketplace · slice 3b · PR #3 · head e77fd7a · 2026-08-28</div>
   <h1>Two Sessions, One Container</h1>
   <p class="lede">Until today the CI test typed the install commands itself. Now a Claude agent, handed only the two READMEs, does the installing — and a second, fresh session proves the plugin's start-up hook fires on its own. If the docs have a hole, the PR goes red.</p>
 
@@ -57,10 +57,10 @@ flowchart LR
     direction TB
     s1["script types<br/>marketplace add + plugin install"] --> s2["script runs the hook<br/>by hand (sh -c)"] --> s3["agent runs the CLI"]
   end
-  subgraph A["AFTER — PR #3 (b9ab477)"]
+  subgraph A["AFTER — PR #3 (e77fd7a)"]
     direction TB
     a0["N2 probe: add /work with no auth<br/>→ rc 0 → remove it again"] --> a1["session 1: agent reads<br/>2 READMEs, installs everything<br/>Bash allowlist = claude * only"]
-    a1 --> a2["script asserts: plugin listed,<br/>source has no repo key (local, not GitHub),<br/>data dir still EMPTY"]
+    a1 --> a2["script asserts: plugin listed,<br/>all 5 marketplaces present,<br/>ray-manaloto source = directory, path = /work,<br/>data dir still EMPTY"]
     a2 --> a3["session 2: fresh claude -p<br/>hook fires cold, for real"]
     a3 --> a4["script reads the stream:<br/>hook_response = success<br/>init.plugins has the plugin"]
     a4 --> a5["confinement + direct CLI<br/>(unchanged, moved after)"]
@@ -85,20 +85,20 @@ sequenceDiagram
   S->>A1: claude -p "follow ONLY the two READMEs" --allowedTools Read,Bash(claude *)
   A1->>CC: marketplace add /work · 4 dependency marketplaces · plugin install
   A1-->>S: exit 0
-  S->>S: assert plugin list, no repo key (path printed), data dir empty
-  S->>A2: claude -p --output-format stream-json (SYNC_PLUGIN_INSTALL=1)
+  S->>S: assert plugin list, 5 marketplaces, source=directory + path=/work, data dir empty
+  S->>A2: claude -p --output-format stream-json · Bash(aggregated-research *) only
   A2->>H: fires cold: mise-env install (ty + CLI)
   H-->>A2: hook_response outcome=success "CLI ready"
   A2->>A2: runs trackers --out /tmp/agent-trackers.json
   A2-->>S: stream + exit 0 · wall clock 20–22 s
   S->>S: assert hook_response, init.plugins, file shape, confinement, direct CLI
     </pre>
-    <figcaption>Session 1 may only run <code>claude …</code> commands — the container holds a live OAuth token, and the transcript is uploaded as a CI artifact outside GitHub's secret masking. Session 2 gets a plain <code>Bash</code> because it only runs the plugin's own CLI.</figcaption>
+    <figcaption>Session 1 may only run <code>claude …</code> commands — the container holds a live OAuth token, and the transcript is uploaded as a CI artifact outside GitHub's secret masking. Session 2 is scoped to <code>Bash(aggregated-research *)</code> (plus <code>claude plugin list</code>) — the Opus read found its transcript tailed into the artifact on failure beside an unscoped Bash.</figcaption>
   </figure>
 
   <h2>Measured this session</h2>
   <div class="grid">
-    <div class="card"><h3>Session 2 wall clock</h3><div class="num">20–22 <small>s</small></div><div class="src">runs 33186621864 (20 s, 8b66c95) · 33187463915 (22 s, b9ab477) · bounds plugin load + MCP + hook + one turn</div></div>
+    <div class="card"><h3>Session 2 wall clock</h3><div class="num">20–22 <small>s</small></div><div class="src">runs 33186621864 (20 s) · 33187463915 (22 s) · 33187970377 · 33188627823 · bounds plugin load + MCP + hook + one turn</div></div>
     <div class="card"><h3>Old whole acceptance step</h3><div class="num">62 <small>s</small></div><div class="src">run 33179092669 · 14:14:53Z → 14:15:55Z · gh run view --json jobs</div></div>
     <div class="card"><h3>Command-hook timeout</h3><div class="num">600 <small>s default</small></div><div class="src">hooks.md:422 · hook never hit <code>cancelled</code> → hooks.json untouched</div></div>
     <div class="card"><h3>Negative arm</h3><div class="num bad">red</div><div class="src">run 33186921942 · both READMEs' dependency blocks removed → plugin "failed to load", hook never fires</div></div>
@@ -109,12 +109,15 @@ sequenceDiagram
   <div class="wrap"><table>
     <tr><th>Vacuous pass</th><th>Why it would have been green</th><th>What now catches it</th></tr>
     <tr><td>Script still installs, then agent "installs"</td><td>steps b/c ran before session 1, so the agent had nothing left to do</td><td>token path skips b/c entirely; N2 probe is undone with <code>marketplace remove</code></td></tr>
-    <tr><td>Agent installs <code>main</code>, not the PR</td><td><code>marketplace add ray-manaloto/claude-code-marketplace</code> registers the same name and fetches main</td><td><code>marketplace list --json</code>: entry for <code>ray-manaloto</code> has no <code>repo</code> key (GitHub sources always carry one); <code>.path</code> printed as evidence — it was <code>/work</code> verbatim on 8b66c95, but the spelling is undocumented so the gate no longer depends on it (changed in b9ab477)</td></tr>
+    <tr><td>Agent installs <code>main</code>, not the PR</td><td><code>marketplace add ray-manaloto/claude-code-marketplace</code> registers the same name and fetches main</td><td><code>marketplace list --json</code>: the <code>ray-manaloto</code> entry has <code>source == "directory"</code> AND <code>path == "/work"</code> (both positive markers, observed on every green run). Two earlier gates were replaced: <code>.path == "/work"</code> alone (8b66c95), then <code>has("repo")|not</code> (b9ab477) — the Opus read armed the latter with five jq fixtures and a nested GitHub marker passed it, so a negative gate on an undocumented key fails OPEN</td></tr>
     <tr><td>"Cold" hook already warm</td><td>the plugin README prints the hook command; an agent that runs it to confirm pre-installs 1.3 GB</td><td><code>$CLAUDE_PLUGIN_DATA/mise/installs</code> must be absent or empty before session 2; the allowlist also cannot run it</td></tr>
   </table></div>
 
   <h2>The one that would have broken the run</h2>
   <p>Both READMEs teach <code>CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1 claude plugin marketplace add …</code>. Under <code>Bash(claude *)</code> that line does not start with <code>claude</code>, and a permission rule must match each subcommand independently (<code>cd /work &amp;&amp; claude …</code> fails the same way). In <code>-p</code> mode nobody can approve the denial. The fix is a prompt constraint — commands issued bare, the variable is already exported — not a looser allowlist.</p>
 
-  <div class="status"><strong>Status.</strong> PR #3 green (<code>acceptance</code> conclusion <code>success</code>, cross-checked via <code>gh run view --json conclusion</code>). Cold review (codex) + Opus silent-failure read in flight; merge is Ray's call. Not closed by this PR: the 1.3 GB thin-package split, the agent-team research run <em>through</em> the plugin.</div>
+  <h2>A fix inside the fix</h2>
+  <p>My round-2 addendum asked for a schema-free provenance check: <code>installPath</code> must start with <code>/work/</code>. It could never pass — <code>installPath</code> is always a <code>plugins/cache/…</code> copy; the <code>/work/aggregated-research</code> I had read was session 2's <code>init.plugins[].path</code>, a different field with a look-alike value. One red run (<code>c07a667</code>), corrected in <code>e77fd7a</code> to the marketplace entry's own <code>path</code>. Recorded here rather than silently overwritten: the wrong premise was the architect's.</p>
+
+  <div class="status"><strong>Status.</strong> PR #3 green (<code>acceptance</code> conclusion <code>success</code>, cross-checked via <code>gh run view --json conclusion</code>). Cold review (codex ×2) + Opus silent-failure read done; two respec rounds; residuals filed as marketplace #4; final cold pass on e77fd7a in flight; merge is Ray’s call. Not closed by this PR: the 1.3 GB thin-package split, the agent-team research run <em>through</em> the plugin.</div>
 </main>
