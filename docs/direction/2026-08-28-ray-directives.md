@@ -240,3 +240,11 @@ Secret (`CLAUDE_CODE_OAUTH_TOKEN` in the marketplace repo), free text:
 
 Acceptance question: **"trackers on openai/codex-plugin-cc (Recommended)"** —
 `aggregated-research trackers openai/codex-plugin-cc "agent team tokens"`.
+
+## Merge answer (AskUserQuestion, session `kb-20260828.01`, verbatim)
+
+**"Squash-merge now (Recommended)"** — marketplace PR #1 (head `3e7ce09`,
+three green `acceptance` runs, codex cold review ×2 + Opus silent-failure
+read) squash-merged as `05acca22`. The advisor's ruling stands: slice 3 is
+NOT closed — the container's install is scripted, not agent-driven; the
+agent-driven install arm is marketplace issue #2 (slice 3b).
