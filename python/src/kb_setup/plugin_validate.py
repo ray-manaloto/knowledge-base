@@ -10,8 +10,15 @@ against the schema it names (schemastore 301s `.json` URLs to
 `www.schemastore.org` — `urllib` follows that by default); a plugin dir's
 `.lsp.json`, if present, validates against the plugin schema's inline
 `properties.lspServers.anyOf[1]` subschema — nothing else opens that file
-(spec M-5); then `claude plugin validate --strict` over the marketplace root
-and over each local-source plugin dir.
+(spec M-5); then `claude plugin validate` (no `--strict`) over the
+marketplace root and over each local-source plugin dir, with its output
+scanned rather than its exit code trusted: `--strict` turns Ray's own ruling
+(no `version` field — commit-SHA versioning, plugins-reference.md:1318) into a
+failure, since `claude plugin validate --strict` exits 1 on both the root and
+every plugin dir with exactly one warning, "No version specified. Consider
+adding a version following semver" (measured 2026-08-28). So this runs
+WITHOUT `--strict` and fails only on a `✘`/error line, or a `⚠`/warning line
+other than that one allowlisted case.
 
 `fetch_schema` and `runner` are injected so tests own their environment
 (`probes-need-a-control-arm.md`) — no test here touches the network or spawns
@@ -34,7 +41,15 @@ PLUGIN_MANIFEST_REL = Path(".claude-plugin/plugin.json")
 LSP_REL = Path(".lsp.json")
 
 SchemaFetcher = Callable[[str], dict[str, Any]]
-Runner = Callable[[tuple[str, ...]], int]
+Runner = Callable[[tuple[str, ...]], str]
+
+_ALLOWED_WARNINGS = ("No version specified",)
+"""Warning substrings `claude plugin validate` may emit without failing here.
+
+Omitting `version` is Ray's ruling (commit-SHA versioning, per
+plugins-reference.md:1318), and it is the ONLY warning the tool emits for
+that — measured 2026-08-28 on both the marketplace root and a plugin dir.
+"""
 
 
 def _default_fetch_schema(url: str) -> dict[str, Any]:
@@ -57,9 +72,28 @@ def _default_fetch_schema(url: str) -> dict[str, Any]:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _default_runner(argv: tuple[str, ...]) -> int:
-    """`claude plugin validate`, stdio inherited so its own diagnostics show."""
-    return subprocess.run(argv, check=False).returncode
+def _default_runner(argv: tuple[str, ...]) -> str:
+    """`claude plugin validate`, stdout CAPTURED so the caller can scan it.
+
+    Not inherited: the caller decides pass/fail from the text (a warning
+    other than the allowlisted version one still fails), not from the exit
+    code, which `--strict` would otherwise turn into a false positive.
+    """
+    return subprocess.run(argv, check=False, capture_output=True, text=True).stdout
+
+
+def _validate_output_failure(output: str) -> str | None:
+    """The first line in `output` that should fail the run, or `None`.
+
+    A `✘`/`error` line always fails. A `⚠`/warning line fails UNLESS it
+    matches `_ALLOWED_WARNINGS` — today, only the missing-`version` warning.
+    """
+    for line in output.splitlines():
+        if "✘" in line or "error" in line.lower():
+            return line
+        if "⚠" in line and not any(allowed in line for allowed in _ALLOWED_WARNINGS):
+            return line
+    return None
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
@@ -157,13 +191,14 @@ def _validate_plugin_dir(
 def _run_claude_validate(
     targets: tuple[Path, ...], runner: Runner, checked: list[str]
 ) -> str | None:
-    """`claude plugin validate --strict` over each target, appending to `checked`."""
+    """`claude plugin validate` (no `--strict`) over each target; see module docstring."""
     for target in targets:
-        argv = ("claude", "plugin", "validate", "--strict", str(target))
-        rc = runner(argv)
-        if rc != 0:
-            return f"claude plugin validate --strict {target}: exited {rc}"
-        checked.append(f"claude plugin validate --strict {target}")
+        argv = ("claude", "plugin", "validate", str(target))
+        output = runner(argv)
+        failure = _validate_output_failure(output)
+        if failure is not None:
+            return f"claude plugin validate {target}: {failure.strip()}"
+        checked.append(f"claude plugin validate {target}")
     return None
 
 

@@ -88,12 +88,15 @@ def _fake_fetch_schema(schemas: dict[str, dict[str, Any]]) -> pv.SchemaFetcher:
     return _fetch
 
 
-def _fake_runner(rc: int = 0) -> tuple[pv.Runner, list[tuple[str, ...]]]:
+_VERSION_WARNING = "⚠ version: No version specified. Consider adding a version following semver"
+
+
+def _fake_runner(output: str = "") -> tuple[pv.Runner, list[tuple[str, ...]]]:
     calls: list[tuple[str, ...]] = []
 
-    def _run(argv: tuple[str, ...]) -> int:
+    def _run(argv: tuple[str, ...]) -> str:
         calls.append(argv)
-        return rc
+        return output
 
     return _run, calls
 
@@ -103,7 +106,7 @@ _SCHEMAS = {_MARKETPLACE_SCHEMA_URL: MARKETPLACE_SCHEMA, _PLUGIN_SCHEMA_URL: PLU
 
 def test_a_good_marketplace_passes(tmp_path: Path) -> None:
     root = _good_marketplace_root(tmp_path)
-    runner, calls = _fake_runner(rc=0)
+    runner, calls = _fake_runner()
 
     result = pv.validate(root, fetch_schema=_fake_fetch_schema(_SCHEMAS), runner=runner)
 
@@ -111,8 +114,18 @@ def test_a_good_marketplace_passes(tmp_path: Path) -> None:
     # marketplace.json, plugin.json, .lsp.json, then two `claude plugin validate` calls.
     assert len(result.value) == 5
     assert len(calls) == 2
-    assert calls[0] == ("claude", "plugin", "validate", "--strict", str(root))
+    assert calls[0] == ("claude", "plugin", "validate", str(root))
     assert calls[1][-1] == str(root / "aggregated-research")
+
+
+def test_the_no_version_warning_alone_passes(tmp_path: Path) -> None:
+    """Ray's ruling (no `version`, commit-SHA versioning) must not fail the run."""
+    root = _good_marketplace_root(tmp_path)
+    runner, _calls = _fake_runner(output=_VERSION_WARNING)
+
+    result = pv.validate(root, fetch_schema=_fake_fetch_schema(_SCHEMAS), runner=runner)
+
+    assert isinstance(result, Ok)
 
 
 def test_missing_name_in_plugin_json_fails_naming_the_file(tmp_path: Path) -> None:
@@ -161,7 +174,17 @@ def test_lsp_json_missing_extension_to_language_fails_naming_the_file(tmp_path: 
 
 def test_claude_plugin_validate_failure_is_reported(tmp_path: Path) -> None:
     root = _good_marketplace_root(tmp_path)
-    runner, _calls = _fake_runner(rc=1)
+    runner, _calls = _fake_runner(output="✘ plugin.json: something is wrong")
+
+    result = pv.validate(root, fetch_schema=_fake_fetch_schema(_SCHEMAS), runner=runner)
+
+    assert isinstance(result, Err)
+    assert str(root) in result.message
+
+
+def test_a_non_version_warning_fails_naming_the_file(tmp_path: Path) -> None:
+    root = _good_marketplace_root(tmp_path)
+    runner, _calls = _fake_runner(output="⚠ some other warning that is not about version")
 
     result = pv.validate(root, fetch_schema=_fake_fetch_schema(_SCHEMAS), runner=runner)
 
@@ -177,7 +200,7 @@ def test_main_returns_ok_rc_for_a_good_marketplace(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root = _good_marketplace_root(tmp_path)
-    runner, _calls = _fake_runner(rc=0)
+    runner, _calls = _fake_runner()
     monkeypatch.setattr(pv, "_default_fetch_schema", _fake_fetch_schema(_SCHEMAS))
     monkeypatch.setattr(pv, "_default_runner", runner)
 
