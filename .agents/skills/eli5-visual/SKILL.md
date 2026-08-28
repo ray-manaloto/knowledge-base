@@ -226,6 +226,15 @@ and every un-styled node gets a light plate. Two habits follow: give every node
 a `classDef` (then the palette is inline and theme-proof), and treat a node you
 left unclassed as the one that will be unreadable.
 
+**An HTML entity in a node label is decoded BEFORE mermaid parses it** (Ray:
+add here, 2026-08-28). `A([&lt;name&gt;])` inside `<pre class="mermaid">`
+reaches mermaid as `<name>` — the browser decodes the entity first — and
+mermaid's lexer reads `<` as TAGSTART and fails the whole diagram. Write
+mermaid's own escapes, `#lt;name#gt;`, never `&lt;`. Measured on
+`docs/artifacts/the-gate-that-fails-closed.html` (cold lane on `8656620c`,
+P2): the 2-line repro is invalid in the Mermaid Chart MCP, the `#lt;` form
+valid.
+
 ### 3. Validate the source before you publish
 
 The **Mermaid Chart MCP** is the closest thing to a runtime surface available
