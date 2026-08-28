@@ -1,0 +1,123 @@
+<title>Two Sessions, One Container</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f6f7f4; --ink: #1c211f; --muted: #5b6561; --line: #d6dbd7;
+    --card: #ffffff; --accent: #0e6f8a; --accent-ink: #ffffff;
+    --good: #2f7d3a; --bad: #b3402e; --plate: #fbfcfa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151917; --ink: #e8ece9; --muted: #9aa5a0; --line: #2c3431;
+      --card: #1d2320; --accent: #4fb6d1; --accent-ink: #0d1a1e;
+      --good: #6fcf7c; --bad: #ef8a73; --plate: #f4f6f3;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151917; --ink: #e8ece9; --muted: #9aa5a0; --line: #2c3431;
+    --card: #1d2320; --accent: #4fb6d1; --accent-ink: #0d1a1e;
+    --good: #6fcf7c; --bad: #ef8a73; --plate: #f4f6f3;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; line-height: 1.5; margin: 0; }
+  main { max-width: 62rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  h1, h2 { font-family: "Bricolage Grotesque", "IBM Plex Sans", sans-serif; text-wrap: balance; letter-spacing: -0.01em; }
+  h1 { font-size: 2.4rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; margin: 2.5rem 0 .75rem; }
+  .lede { color: var(--muted); max-width: 42rem; margin: 0 0 1.5rem; }
+  .eyebrow { font-family: "IBM Plex Mono", monospace; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+  p { max-width: 42rem; }
+  code { font-family: "IBM Plex Mono", monospace; font-size: .9em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.1rem; }
+  .card h3 { margin: 0 0 .35rem; font-size: 1rem; }
+  .num { font-family: "Bricolage Grotesque", sans-serif; font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .num small { font-size: .9rem; font-weight: 500; color: var(--muted); }
+  .src { font-family: "IBM Plex Mono", monospace; font-size: .72rem; color: var(--muted); }
+  figure { margin: 1rem 0; }
+  figcaption { color: var(--muted); font-size: .9rem; margin-top: .5rem; max-width: 42rem; }
+  .mermaid { background: var(--plate); border: 1px solid var(--line); border-radius: 6px; padding: .75rem; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: "IBM Plex Mono", monospace; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .wrap { overflow-x: auto; }
+  .good { color: var(--good); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; }
+  .status { margin-top: 2.5rem; padding: .75rem 1rem; border-left: 3px solid var(--accent); background: var(--card); font-size: .9rem; }
+</style>
+<main>
+  <div class="eyebrow">claude-code-marketplace · slice 3b · PR #3 · head e77fd7a · 2026-08-28</div>
+  <h1>Two Sessions, One Container</h1>
+  <p class="lede">Until today the CI test typed the install commands itself. Now a Claude agent, handed only the two READMEs, does the installing — and a second, fresh session proves the plugin's start-up hook fires on its own. If the docs have a hole, the PR goes red.</p>
+
+  <h2>What changed, in one picture</h2>
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f2f6','primaryTextColor':'#1c211f','primaryBorderColor':'#0e6f8a','lineColor':'#1c211f','secondaryColor':'#f1f3ef','tertiaryColor':'#fbfcfa','fontFamily':'IBM Plex Sans, sans-serif'}}}%%
+flowchart LR
+  subgraph B["BEFORE — PR #1 (05acca22)"]
+    direction TB
+    s1["script types<br/>marketplace add + plugin install"] --> s2["script runs the hook<br/>by hand (sh -c)"] --> s3["agent runs the CLI"]
+  end
+  subgraph A["AFTER — PR #3 (e77fd7a)"]
+    direction TB
+    a0["N2 probe: add /work with no auth<br/>→ rc 0 → remove it again"] --> a1["session 1: agent reads<br/>2 READMEs, installs everything<br/>Bash allowlist = claude * only"]
+    a1 --> a2["script asserts: plugin listed,<br/>all 5 marketplaces present,<br/>ray-manaloto source = directory, path = /work,<br/>data dir still EMPTY"]
+    a2 --> a3["session 2: fresh claude -p<br/>hook fires cold, for real"]
+    a3 --> a4["script reads the stream:<br/>hook_response = success<br/>init.plugins has the plugin"]
+    a4 --> a5["confinement + direct CLI<br/>(unchanged, moved after)"]
+  end
+  B -. "same container, same assertions,<br/>who types the install changed" .-> A
+    </pre>
+    <figcaption>Left: the old script did the installing, so a doc gap could never fail it. Right: the agent installs from the docs alone; the script only checks. The "data dir still EMPTY" check is what makes session 2's hook genuinely cold — the plugin README prints the hook command, and an agent that "confirmed" by running it would have warmed the install.</figcaption>
+  </figure>
+
+  <h2>The two sessions, in order</h2>
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f2f6','primaryTextColor':'#1c211f','primaryBorderColor':'#0e6f8a','lineColor':'#1c211f','actorBkg':'#e6f2f6','actorBorder':'#0e6f8a','signalColor':'#1c211f','signalTextColor':'#1c211f','noteBkgColor':'#fbfcfa','noteBorderColor':'#d6dbd7','fontFamily':'IBM Plex Sans, sans-serif'}}}%%
+sequenceDiagram
+  participant S as acceptance.sh
+  participant A1 as session 1 (install agent)
+  participant CC as claude plugin …
+  participant A2 as session 2 (fresh)
+  participant H as SessionStart hook
+  S->>CC: marketplace add /work (no token) → rc 0
+  S->>CC: marketplace remove ray-manaloto
+  S->>A1: claude -p "follow ONLY the two READMEs" --allowedTools Read,Bash(claude *)
+  A1->>CC: marketplace add /work · 4 dependency marketplaces · plugin install
+  A1-->>S: exit 0
+  S->>S: assert plugin list, 5 marketplaces, source=directory + path=/work, data dir empty
+  S->>A2: claude -p --output-format stream-json · Bash(aggregated-research *) only
+  A2->>H: fires cold: mise-env install (ty + CLI)
+  H-->>A2: hook_response outcome=success "CLI ready"
+  A2->>A2: runs trackers --out /tmp/agent-trackers.json
+  A2-->>S: stream + exit 0 · wall clock 20–27 s (4 runs)
+  S->>S: assert hook_response, init.plugins, file shape, confinement, direct CLI
+    </pre>
+    <figcaption>Session 1 may only run <code>claude …</code> commands — the container holds a live OAuth token, and the transcript is uploaded as a CI artifact outside GitHub's secret masking. Session 2 is scoped to <code>Bash(aggregated-research *)</code> (plus <code>claude plugin list</code>) — the Opus read found its transcript tailed into the artifact on failure beside an unscoped Bash.</figcaption>
+  </figure>
+
+  <h2>Measured this session</h2>
+  <div class="grid">
+    <div class="card"><h3>Session 2 wall clock</h3><div class="num">20–27 <small>s</small></div><div class="src">runs 33186621864 (20 s) · 33187463915 (22 s) · 33187970377 (27 s) · 33188627823 (24 s) — each read from its run log · bounds plugin load + MCP + hook + one turn. <em>Corrected after publication: this read "20–22 s" while citing four runs, two of them unread; the cold lane read all four.</em></div></div>
+    <div class="card"><h3>Old whole acceptance step</h3><div class="num">62 <small>s</small></div><div class="src">run 33179092669 · 14:14:53Z → 14:15:55Z · gh run view --json jobs</div></div>
+    <div class="card"><h3>Command-hook timeout</h3><div class="num">600 <small>s default</small></div><div class="src">hooks.md:422 · hook never hit <code>cancelled</code> → hooks.json untouched</div></div>
+    <div class="card"><h3>Negative arm</h3><div class="num bad">red</div><div class="src">run 33186921942 · both READMEs' dependency blocks removed → plugin "failed to load", hook never fires</div></div>
+  </div>
+
+  <h2>Three gates that could have passed for the wrong reason</h2>
+  <p>Each was found by the premise-verifier before dispatch and is now a real assertion in <code>ci/acceptance.sh</code>.</p>
+  <div class="wrap"><table>
+    <tr><th>Vacuous pass</th><th>Why it would have been green</th><th>What now catches it</th></tr>
+    <tr><td>Script still installs, then agent "installs"</td><td>steps b/c ran before session 1, so the agent had nothing left to do</td><td>token path skips b/c entirely; N2 probe is undone with <code>marketplace remove</code></td></tr>
+    <tr><td>Agent installs <code>main</code>, not the PR</td><td><code>marketplace add ray-manaloto/claude-code-marketplace</code> registers the same name and fetches main</td><td><code>marketplace list --json</code>: the <code>ray-manaloto</code> entry has <code>source == "directory"</code> AND <code>path == "/work"</code> (both positive markers, observed on every green run). Two earlier gates were replaced: <code>.path == "/work"</code> alone (8b66c95), then <code>has("repo")|not</code> (b9ab477) — the Opus read armed the latter with five jq fixtures and a nested GitHub marker passed it, so a negative gate on an undocumented key fails OPEN</td></tr>
+    <tr><td>"Cold" hook already warm</td><td>the plugin README prints the hook command; an agent that runs it to confirm pre-installs 1.3 GB</td><td><code>$CLAUDE_PLUGIN_DATA/mise/installs</code> must be absent or empty before session 2; the allowlist also cannot run it</td></tr>
+  </table></div>
+
+  <h2>The one that would have broken the run</h2>
+  <p>Both READMEs teach <code>CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1 claude plugin marketplace add …</code>. Under <code>Bash(claude *)</code> that line does not start with <code>claude</code>, and a permission rule must match each subcommand independently (<code>cd /work &amp;&amp; claude …</code> fails the same way). In <code>-p</code> mode nobody can approve the denial. The fix is a prompt constraint — commands issued bare, the variable is already exported — not a looser allowlist.</p>
+
+  <h2>A fix inside the fix</h2>
+  <p>My round-2 addendum asked for a schema-free provenance check: <code>installPath</code> must start with <code>/work/</code>. It could never pass — <code>installPath</code> is always a <code>plugins/cache/…</code> copy; the <code>/work/aggregated-research</code> I had read was session 2's <code>init.plugins[].path</code>, a different field with a look-alike value. One red run (<code>c07a667</code>), corrected in <code>e77fd7a</code> to the marketplace entry's own <code>path</code>. Recorded here rather than silently overwritten: the wrong premise was the architect's.</p>
+
+  <div class="status"><strong>Status.</strong> PR #3 green (<code>acceptance</code> conclusion <code>success</code>, cross-checked via <code>gh run view --json conclusion</code>). Cold review (codex ×2) + Opus silent-failure read done; two respec rounds; residuals filed as marketplace #4; final cold pass on e77fd7a clean (one unarmed P1 refuted by docs → #4); <strong>squash-merged as <code>eb3ba054916fc20dbe7ac00178ba2fe983b19684</code></strong>, marketplace #2 closed. Not closed by this PR: the 1.3 GB thin-package split, the agent-team research run <em>through</em> the plugin.</div>
+</main>

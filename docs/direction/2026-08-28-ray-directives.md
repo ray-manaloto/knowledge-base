@@ -248,3 +248,30 @@ three green `acceptance` runs, codex cold review ×2 + Opus silent-failure
 read) squash-merged as `05acca22`. The advisor's ruling stands: slice 3 is
 NOT closed — the container's install is scripted, not agent-driven; the
 agent-driven install arm is marketplace issue #2 (slice 3b).
+
+## Session opener, 2026-08-28 (session `kb-20260828.02`), verbatim
+
+> /i-have-adhd:i-have-adhd
+> /ponytail:ponytail ultra
+> /fable-orchestrator:orchestration use fable-advisor and codex-implementer lanes
+> /graphify
+> /kb-resume
+
+Resume answer: **"Start slice 3b, full order (Recommended)"** — the option text:
+*"Branch → directive §0 append → read #2 + artifact comments → spec in the
+marketplace repo → premise-verifier → fable-advisor → codex-implementer (xhigh)
+→ cross-family review."* Slice 3b = marketplace issue #2, the agent-driven
+install arm — Ray's clear-prep answer of session `kb-20260828.01`, verbatim:
+**"Slice 3b: agent-driven install arm (Recommended)"** — *"Marketplace #2 — two
+`claude -p` sessions in the container: an agent installs marketplace+plugin from
+the READMEs alone, a fresh session runs the question so the real SessionStart
+hook fires. Closes your definition of done. ~1 codex round."*
+
+## Merge answer, slice 3b (AskUserQuestion, session `kb-20260828.02`, verbatim)
+
+**"Squash-merge now (Recommended)"** — marketplace PR #3 (head `e77fd7a`; four green
+`acceptance` runs 33186621864 / 33187463915 / 33187970377 / 33188627823; codex cold
+review ×2 + Opus silent-failure read; two respec rounds) squash-merged as `eb3ba054916fc20dbe7ac00178ba2fe983b19684`,
+closing marketplace #2. Residuals (P3 + one unarmed allowlist claim) are marketplace
+#4. Page: `docs/artifacts/two-sessions-one-container.html`
+(<https://claude.ai/code/artifact/e46bc03b-c662-4ef7-afc9-dbf4be31c2a5>).
