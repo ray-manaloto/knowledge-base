@@ -22,11 +22,12 @@ credentials. Routing doctrine lives in
 `.claude/skills/orchestrator-routing/SKILL.md` and is grounded in this repo's
 own graph (`mise run kb-query -- "<routing question>"`).
 
-**None of these lanes may do the corpus's LLM work.** Extraction and labelling
-are Claude-only by hard invariant — `kb_setup.graphify_env.clean_env()` strips
-every non-Claude backend trigger from every graphify subprocess. An AI CLI here
-is a *reviewer or implementer of this repo's code*, never an extraction backend.
-See `do-not.md`.
+**`codex` may ALSO do the corpus's LLM work — as graphify's `openai-cli`
+BACKEND, never as a lane.** `claude-cli` and `openai-cli` (which shells
+`codex exec`) are the two sanctioned extraction backends (`do-not.md` #4; Ray,
+2026-08-25), selected only by an explicit `--backend` through
+`mise run kb-graphify-native-extract`; graphify's `detect_backend()` never
+auto-selects either. `agy` is not a backend. Key-detected backends stay stripped.
 
 ## Codex CLI
 
