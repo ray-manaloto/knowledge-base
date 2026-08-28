@@ -1,0 +1,106 @@
+<title>The Binding and the Spawn</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+:root{--bg:#f6f4ef;--ink:#1d2229;--muted:#5b626b;--rule:#cfcac0;--card:#ffffff;--accent:#9a4b1e;--ok:#2f6b3a;--warn:#8a5a00;--mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;--sans:'IBM Plex Sans',system-ui,sans-serif;--disp:'Fraunces',Georgia,serif}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#171a1f;--ink:#e8e4dc;--muted:#a49f95;--rule:#3a3f47;--card:#20242b;--accent:#e08a4a;--ok:#7dc98a;--warn:#e0b45a}}
+:root[data-theme="dark"]{--bg:#171a1f;--ink:#e8e4dc;--muted:#a49f95;--rule:#3a3f47;--card:#20242b;--accent:#e08a4a;--ok:#7dc98a;--warn:#e0b45a}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);margin:0;line-height:1.5}
+main{max-width:64rem;margin:0 auto;padding:2.5rem 1.25rem 4rem}
+h1{font-family:var(--disp);font-size:2.4rem;font-weight:600;margin:0 0 .25rem;text-wrap:balance}
+h2{font-family:var(--disp);font-size:1.35rem;font-weight:600;margin:2.25rem 0 .75rem}
+.eyebrow{font-family:var(--mono);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+p{max-width:65ch}
+code,pre{font-family:var(--mono);font-size:.86em}
+figure{margin:1.25rem 0;background:var(--card);border:1px solid var(--rule);border-radius:4px;padding:1rem;overflow-x:auto}
+figcaption{color:var(--muted);font-size:.9rem;margin-top:.5rem;max-width:70ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:4px;padding:1rem}
+.card h3{margin:0 0 .4rem;font-size:1rem}
+.tag{display:inline-block;font-family:var(--mono);font-size:.72rem;padding:.1rem .45rem;border:1px solid currentColor;border-radius:3px;margin-right:.4rem}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.acc{color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{text-align:left;padding:.45rem .6rem;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-weight:600;font-family:var(--mono);font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td.num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.src{color:var(--muted);font-size:.82rem}
+svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
+</style>
+<main>
+<div class="eyebrow">lychee-py spike · 2026-08-28 · declared spike, verify-only</div>
+<h1>The Binding and the Spawn</h1>
+<p>Two ways for Python to ask lychee "is this link alive?". One already runs in this repo's lint. The other was built today to see whether it survives. <strong>Both return the same four facts.</strong> The picture shows the one thing that differs: which boundary the question crosses.</p>
+
+<figure>
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#f2f2f4','primaryTextColor':'#1b1b1b','primaryBorderColor':'#8d8d94','lineColor':'#4a4a4a','fontFamily':'IBM Plex Sans'}}}%%
+flowchart LR
+  subgraph SPAWN["Today: the spawn — hk.pkl steps lychee / lychee_offline"]
+    H[hk step] -->|spawns ONE process per run| C[lychee CLI 0.24.2]
+    C -->|--format json, one blob for ALL links| J[JSON on stdout]
+    J -->|parse| F1["url · status · code · ok"]
+  end
+  subgraph BIND["Spike: the binding — lychee_py, built today"]
+    P[python await check#lpar;url#rpar;] -->|FFI, in-process, per URL| B[PyO3 0.29 + pyo3-async-runtimes]
+    B -->|tokio future -> asyncio| L[lychee-lib 0.24 compiled into a wheel]
+    L -->|typed Status| F2["url · status · code · ok"]
+  end
+  classDef same fill:#e4efe6,stroke:#2f6b3a,color:#1b1b1b
+  classDef cost fill:#f7e3d3,stroke:#9a4b1e,color:#1b1b1b
+  class F1,F2 same
+  class B,L cost
+</pre>
+<figcaption>Green: the facts are identical on both paths (measured — the spike printed <code>200 OK code=200</code> and <code>Rejected status code: 404 Not Found code=404</code>, the CLI's JSON carries the same fields). Copper: what the binding adds that the spawn does not have — a Rust toolchain and lychee-lib's dependency tree (aws-lc-sys, ring, reqwest) compiled into a wheel this repo would own and re-pin.</figcaption>
+</figure>
+
+<h2>What the spike measured (this session, this host)</h2>
+<table>
+<thead><tr><th>question</th><th>result</th><th>evidence</th></tr></thead>
+<tbody>
+<tr><td>Does the tokio → asyncio bridge work for <code>lychee_lib::check</code>?</td><td class="ok">Yes</td><td class="src">spike.py rc=0, live arm 200, local-404 arm rejected as data (no exception) — <code>lychee-py-spike/run.log</code></td></tr>
+<tr><td>Does the interpreter exit cleanly right after an awaited check?</td><td class="ok">Yes on macOS — 5/5 rc=0, <code>-X dev -X faulthandler</code> rc=0</td><td class="src">stderr 214 bytes on every run, byte-identical: uv's <code>VIRTUAL_ENV</code> warning, not the extension. <span class="warn">Windows — where rambutan crashed — untested.</span></td></tr>
+<tr><td>Did the API premises hold?</td><td class="warn">One did not</td><td class="src"><code>Response::request_uri()</code> does not exist in lychee-lib 0.24 (build.log:624, E0599); <code>Status::is_success</code>/<code>code</code> do. The lane had flagged exactly these three as unverified.</td></tr>
+<tr><td>What does <code>await check()</code> give that the spawn cannot?</td><td class="acc">Nothing the hk linter needs</td><td class="src">Same four facts. The binding buys per-URL in-process await with a typed <code>Status</code>. <em>Corrected 2026-08-28:</em> this cell first read "per-call latency was not measured" — it now is, in the section below.</td></tr>
+</tbody>
+</table>
+
+<h2>Measured latency <span class="tag">added 2026-08-28, after option C was chosen</span></h2>
+<p>50 URLs on a local <code>http.server</code> (25 × 200, 25 × 404), 3 repeats, medians. Every arm is verified against the server's own GET count — the first two runs were wrong (the CLI had read the repo's <code>lychee.toml</code> and excluded everything; two flags did not exist on 0.24.2) and are recorded in the report, not here.</p>
+<table>
+<thead><tr><th>arm</th><th>wall-clock (median)</th><th>per URL</th><th>server GETs / expected</th></tr></thead>
+<tbody>
+<tr><td>CLI, one spawn, <code>--format json</code>, 50 mixed</td><td class="num">1.920 s</td><td class="num">38 ms</td><td class="num">90 / 150 — dedup: 30 unique</td></tr>
+<tr><td>CLI, 25 all-200 URLs</td><td class="num">0.569 s</td><td class="num">23 ms</td><td class="num">—</td></tr>
+<tr><td>CLI, <code>--max-retries 0</code>, 50 mixed</td><td class="num">1.909 s</td><td class="num">38 ms</td><td class="num">retries are not the gap</td></tr>
+<tr><td>CLI spawn alone (<code>--version</code>)</td><td class="num">0.009 s</td><td class="num">—</td><td class="num">spawn is not the gap</td></tr>
+<tr><td>binding, <code>gather(50)</code></td><td class="num">0.156 s</td><td class="num">3 ms</td><td class="num">150 / 150</td></tr>
+<tr><td>binding, sequential</td><td class="num">0.024 s</td><td class="num">0.5 ms</td><td class="num">150 / 150</td></tr>
+</tbody>
+</table>
+<p class="src">Reading: the CLI's cost is per FAILED url (~54 ms each above the 200 baseline; cause not established — HEAD→GET fallback is the unmeasured candidate). On localhost the binding is 10–80× faster per URL. hk's real check is network-bound (100 ms+ remote round-trips), where 23 ms of CLI overhead is a fraction, not a multiple — that case was not measured. The structural difference that survives: the CLI dedups and retries; the binding hands you raw per-URL awaits and leaves both to you.</p>
+
+<h2>The choice</h2>
+<div class="grid">
+<div class="card"><h3><span class="tag">A</span>Stop here — the spawn stays</h3><p>hk already runs the CLI; <code>--format json</code> carries every fact the binding returned. The spike's own exit criterion ("or 'nothing', which ends the binding") is met as measured. Cost: zero. Risk: if a future adapter wants per-URL streaming or a typed Status, this is re-opened.</p></div>
+<div class="card"><h3><span class="tag">B</span>Build the binding in its own repo</h3><p>Your round-3 ruling: PyO3 0.29 + maturin 1.15, asyncio-native, own repo after a spike here. The spike passed its two soundness questions. Cost: a Rust toolchain in that repo's CI, a wheel to publish and re-pin, lychee-lib's tree to track. Risk: Windows teardown unmeasured.</p></div>
+<div class="card"><h3><span class="tag">C</span>Measure first, decide after</h3><p>One more spike run: N URLs through one CLI spawn vs N <code>await check()</code> calls, timed. Turns the "not measured" cell above into a number before B's cost is committed. Cost: ~30 min on this host. Answers whether the binding buys speed — the one thing the spawn structurally cannot give per-URL.</p></div>
+</div>
+
+<h2>Provenance</h2>
+<p class="src">Spec: <code>.agent/plans/spec-2026-08-27-lychee-py-spike.md</code> (advisor-amended: codex wrote the sources offline, the caller built and ran). Result, verbatim: <code>docs/research/reports/2026-08-28-lychee-py-spike-result.md</code>. The sources were written by the <code>codex-implementer</code> wrapper's own Bash, not by <code>codex exec</code> — disclosed in its report; for a declared spike the review tier is unaffected, recorded as a lane defect. Every number above is from this session's build.log / build2.log / run.log.</p>
+</main>
