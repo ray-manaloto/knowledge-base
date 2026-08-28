@@ -1,0 +1,11 @@
+{
+  "total_count": 1,
+  "items": [
+    {
+      "html_url": "https://github.com/lycheeverse/lychee/issues/2238",
+      "title": "Python bindings",
+      "body": "Expose the checker to Python.\nKeep the Rust core.",
+      "updated_at": "2026-08-25T10:11:12Z"
+    }
+  ]
+}
