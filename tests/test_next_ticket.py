@@ -175,6 +175,12 @@ def test_a_nonzero_rc_produces_could_not_ask_not_blocked(
     assert isinstance(result, Ok)
     assert result.value.startswith("COULD NOT ASK")
     assert "BLOCKED" not in result.value
+    # The REASON must survive, not just the fact of failure. rc != 0 is the
+    # most likely real failure — no network, expired auth, a rate limit — and
+    # `_gh` merges stderr into `out` so it can be reported. Without this
+    # assertion the branch can silently regress to a bare "gh exited 1", which
+    # is what it did until the cold review of a43afc22 caught it.
+    assert "could not connect to api.github.com" in result.value
 
 
 def test_an_unparsable_body_produces_could_not_ask(

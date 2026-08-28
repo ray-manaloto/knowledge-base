@@ -293,7 +293,13 @@ def _parse_lookup(rc: int, out: str, alias_to_number: dict[str, int]) -> _Lookup
     Checked in order: rc, parse, `errors`, then per-alias state.
     """
     if rc != 0:
-        return _Lookup(None, f"gh exited {rc}")
+        # Keep `out`, truncated, exactly as the sibling this module mirrors does
+        # (`session_state.py:458`). rc != 0 is the MOST LIKELY real failure —
+        # no network, expired auth, a rate limit, a timeout — and `_gh` merges
+        # stderr into `out` precisely so the reason survives. Reporting only
+        # "gh exited 1" throws away the one thing that tells an operator which
+        # of those it was, and sends them to re-run it by hand to find out.
+        return _Lookup(None, f"gh exited {rc}: {out.strip()[:200]}")
     try:
         parsed = json.loads(out)
     except json.JSONDecodeError:
