@@ -1,0 +1,190 @@
+<title>The Wrong Locker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Literata:opsz,wght@7..72,400;7..72,600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ground: #FAF8F4;
+    --panel: #FFFFFF;
+    --ink: #1B1D2A;
+    --muted: #6B6F80;
+    --rule: #E0DCD3;
+    --wrong: #9A5B1E;
+    --right: #2F6B4F;
+    --display: "Familjen Grotesk", "Helvetica Neue", sans-serif;
+    --body: "Literata", Georgia, serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  body { background: var(--ground); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.65; }
+  .wrap { max-width: 47rem; margin: 0 auto; padding: 3.5rem 1.5rem 5rem; display: flex; flex-direction: column; gap: 2.2rem; }
+
+  .eyebrow { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--display); font-weight: 700; font-size: clamp(2.1rem, 5.5vw, 3.1rem); line-height: 1.02; letter-spacing: -0.025em; text-wrap: balance; margin: 0.4rem 0 0; }
+  .lede { font-size: 1.14rem; color: var(--muted); margin: 0; }
+  p { margin: 0; }
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+  code { font-family: var(--mono); font-size: 0.85em; background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 0.06em 0.34em; }
+
+  .beat { display: grid; grid-template-columns: 2.4rem 1fr; gap: 1.1rem; align-items: start; }
+  .beat-n { font-family: var(--mono); font-size: 0.78rem; font-weight: 600; color: var(--muted); padding-top: 0.42rem; border-top: 2px solid var(--rule); }
+  .beat-body { display: flex; flex-direction: column; gap: 0.75rem; }
+  .beat h2 { font-family: var(--display); font-weight: 700; font-size: 1.22rem; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+  .beat.bad .beat-n { border-top-color: var(--wrong); color: var(--wrong); }
+  .beat.good .beat-n { border-top-color: var(--right); color: var(--right); }
+
+  figure { margin: 0.3rem 0 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { font-family: var(--mono); font-size: 0.73rem; line-height: 1.55; color: var(--muted); margin-top: 0.6rem; }
+  .fig-scroll { overflow-x: auto; }
+
+  .aside { background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--wrong); border-radius: 3px; padding: 0.9rem 1.1rem; font-size: 0.95rem; }
+  .aside.ok { border-left-color: var(--right); }
+  .aside strong { font-family: var(--display); }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 34rem) { .pair { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  .card-h { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  .card.bad .card-h { color: var(--wrong); }
+  .card.good .card-h { color: var(--right); }
+  .card pre { font-family: var(--mono); font-size: 0.76rem; line-height: 1.6; margin: 0; overflow-x: auto; }
+  .card p { font-size: 0.9rem; color: var(--muted); }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">All figures measured in this session · 2026-08-28</div>
+    <h1>The wrong locker</h1>
+  </header>
+
+  <p class="lede">A plugin was told where its own belongings live. It was told wrong — handed the address of a different plugin's locker. Everything that followed is a consequence of that one bad address.</p>
+
+  <hr>
+
+  <div class="beat">
+    <div class="beat-n">01</div>
+    <div class="beat-body">
+      <h2>Every plugin gets a private locker</h2>
+      <p>A Claude Code plugin ships small — some markdown, a couple of scripts. Anything heavy it needs (a Python runtime, tools, caches) it installs later, into a private folder of its own. Ours holds about 1.3 GB.</p>
+      <p>Claude Code names that folder after the plugin: <code>~/.claude/plugins/data/aggregated-research-ray-manaloto</code>. The codex plugin gets <code>…/codex-openai-codex</code>. Every plugin, its own locker.</p>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="beat-n">02</div>
+    <div class="beat-body">
+      <h2>The plugin is told its address in a note</h2>
+      <p>The plugin's script does not work the address out for itself. Claude Code writes it into an environment variable — <code>CLAUDE_PLUGIN_DATA</code> — on the process it launches for that plugin. The script reads the note and goes there.</p>
+      <p>That is correct, and documented, <em>for a hook Claude Code runs on the plugin's behalf</em>.</p>
+    </div>
+  </div>
+
+  <div class="beat bad">
+    <div class="beat-n">03</div>
+    <div class="beat-body">
+      <h2>Run it any other way and the note is someone else's</h2>
+      <p>Type the command into an ordinary terminal — which is exactly what this round asked for — and the note is still pinned up. But it now carries whichever plugin wrote it last. In this session that was the codex plugin.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg viewBox="0 0 700 300" role="img" aria-label="When Claude Code runs the plugin's own hook, CLAUDE_PLUGIN_DATA names the plugin's own locker and the tool works. When the same tool is run from an ordinary Bash command, the variable still holds whichever plugin set it last, so the tool walks to the codex plugin's locker, finds nothing, and refuses.">
+            <defs>
+              <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2F6B4F"/></marker>
+              <marker id="w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9A5B1E"/></marker>
+            </defs>
+
+            <text x="0" y="14" font-family="IBM Plex Mono, monospace" font-size="10.5" font-weight="600" fill="#2F6B4F">THE CASE THAT WORKS — Claude Code runs the plugin's own hook</text>
+
+            <rect x="0" y="28" width="150" height="44" rx="4" fill="none" stroke="#2F6B4F" stroke-width="1.6"/>
+            <text x="75" y="47" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2F6B4F">SessionStart hook</text>
+            <text x="75" y="62" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2F6B4F">for THIS plugin</text>
+
+            <line x1="150" y1="50" x2="232" y2="50" stroke="#2F6B4F" stroke-width="1.6" marker-end="url(#g)"/>
+            <text x="191" y="42" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#2F6B4F">note says</text>
+
+            <rect x="240" y="28" width="252" height="44" rx="4" fill="none" stroke="#2F6B4F" stroke-width="1.6"/>
+            <text x="252" y="47" font-family="IBM Plex Mono, monospace" font-size="10" fill="#2F6B4F">CLAUDE_PLUGIN_DATA =</text>
+            <text x="252" y="62" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="600" fill="#2F6B4F">…/aggregated-research-ray-manaloto</text>
+
+            <line x1="492" y1="50" x2="574" y2="50" stroke="#2F6B4F" stroke-width="1.6" marker-end="url(#g)"/>
+            <text x="640" y="46" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" fill="#2F6B4F">own locker</text>
+            <text x="640" y="61" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#2F6B4F">1.3 GB, works</text>
+
+            <line x1="0" y1="104" x2="700" y2="104" stroke="currentColor" stroke-width="1" opacity="0.25"/>
+
+            <text x="0" y="140" font-family="IBM Plex Mono, monospace" font-size="10.5" font-weight="600" fill="#9A5B1E">THE CASE THIS ROUND NEEDS — the same tool, typed as a command</text>
+
+            <rect x="0" y="154" width="150" height="44" rx="4" fill="none" stroke="#9A5B1E" stroke-width="1.8"/>
+            <text x="75" y="173" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#9A5B1E">a Bash command</text>
+            <text x="75" y="188" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#9A5B1E">no plugin context</text>
+
+            <line x1="150" y1="176" x2="232" y2="176" stroke="#9A5B1E" stroke-width="1.8" marker-end="url(#w)"/>
+            <text x="191" y="168" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#9A5B1E">stale note</text>
+
+            <rect x="240" y="154" width="252" height="44" rx="4" fill="none" stroke="#9A5B1E" stroke-width="1.8"/>
+            <text x="252" y="173" font-family="IBM Plex Mono, monospace" font-size="10" fill="#9A5B1E">CLAUDE_PLUGIN_DATA =</text>
+            <text x="252" y="188" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="600" fill="#9A5B1E">…/codex-openai-codex</text>
+
+            <line x1="492" y1="176" x2="574" y2="176" stroke="#9A5B1E" stroke-width="1.8" marker-end="url(#w)"/>
+            <text x="640" y="172" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" fill="#9A5B1E">codex's locker</text>
+            <text x="640" y="187" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#9A5B1E">nothing of ours in it</text>
+
+            <rect x="240" y="228" width="380" height="44" rx="4" fill="none" stroke="#9A5B1E" stroke-width="1.4" stroke-dasharray="4 3"/>
+            <text x="252" y="247" font-family="IBM Plex Mono, monospace" font-size="10" fill="#9A5B1E">"aggregated-research: nothing installed under</text>
+            <text x="252" y="262" font-family="IBM Plex Mono, monospace" font-size="10" fill="#9A5B1E"> …/codex-openai-codex"  → exit 2</text>
+            <line x1="366" y1="198" x2="366" y2="226" stroke="#9A5B1E" stroke-width="1.4" marker-end="url(#w)"/>
+          </svg>
+        </div>
+        <figcaption>Same binary, same install, one variable different. The install was never broken — the address was.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <div class="beat bad">
+    <div class="beat-n">04</div>
+    <div class="beat-body">
+      <h2>And it would have built a shelf in there</h2>
+      <p>Refusing to start is the visible half. The script also runs <code>mkdir -p</code> on whatever address the note gives it — so for some subcommands it quietly <em>creates</em> a directory inside the other plugin's locker.</p>
+      <div class="aside"><strong>Measured against the pre-fix wrapper:</strong> it created a folder named <code>some-other-plugin</code> inside a foreign data root. The patched one creates only its own.</div>
+    </div>
+  </div>
+
+  <div class="beat good">
+    <div class="beat-n">05</div>
+    <div class="beat-body">
+      <h2>The fix: read the name on the locker</h2>
+      <p>Don't trust the note blindly. Work out the plugin's own address, and accept the note only when it points at a locker whose name is ours. Anything else — another plugin, a relative path, a name that merely <em>ends</em> in ours — is ignored and the known-good address is used instead.</p>
+      <div class="aside ok"><strong>Why honour the note at all, then?</strong> So that if Claude Code ever moves where lockers live, the plugin follows. It checks the name, not the neighbourhood.</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="beat bad">
+    <div class="beat-n">06</div>
+    <div class="beat-body">
+      <h2>The part worth your attention: my test could not fail</h2>
+      <p>I added a check to catch this in CI. A cold reviewer found the check was decorative — it read the wrong number, and always read “fine”.</p>
+
+      <div class="pair">
+        <div class="card bad">
+          <div class="card-h">what I wrote</div>
+          <pre>if ! cmd; then
+    rc=$?
+fi</pre>
+          <p>Inside the branch, <code>$?</code> is the result of the <em>test</em> — “did the negation succeed” — which is always 0. The failing command's real code is already gone.</p>
+        </div>
+        <div class="card good">
+          <div class="card-h">what it had to be</div>
+          <pre>cmd || rc=$?</pre>
+          <p>Here <code>$?</code> is still the command's own code.</p>
+        </div>
+      </div>
+
+      <figcaption>Probed in dash and /bin/sh: a command returning 7 gives rc=0 through the left form, rc=7 through the right.</figcaption>
+
+      <div class="aside"><strong>The shape to notice.</strong> The bug I set out to fix was “a check that reports success no matter what.” My fix for it was a check that reports success no matter what. Same defect, one layer down — which is why the fix commit gets its own cold review rather than riding along on the first one's.</div>
+    </div>
+  </div>
+
+</div>

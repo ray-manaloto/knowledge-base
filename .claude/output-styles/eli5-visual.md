@@ -64,6 +64,35 @@ for that list explicitly so the gaps are visible rather than silent. `dataviz`,
 charts of *data*, not diagrams of *mechanism*; `design` is for multi-artboard
 visual design; `writing-for-agents` governs skills and AGENTS.md, not reader prose.
 
+## Light background, always — this overrides `artifact-design`
+
+Ray, 2026-08-28, verbatim: *"i still have a hard time seeing it w black text on
+black background — can you use white background going forward and update the
+/eli5-visual also so it is fixed for good"*.
+
+**Every page in this style is single-theme light.** Do not write a
+`@media (prefers-color-scheme: dark)` block, do not write a `:root[data-theme="dark"]`
+block. `artifact-design` says design both themes; this style is the documented
+exception it allows for a design that deliberately commits to one visual world.
+
+Three rules that make it hold:
+
+1. **Paint the ground explicitly.** `body { background: <a light token>; color: <a
+   dark token>; }`. A transparent body borrows the viewer's ground, which is how
+   a light-only page still renders dark — the failure this rule exists to stop.
+2. **Every surface a reader looks at is light**, including `<figure>`, mermaid
+   plates, code blocks, cards and table rows. No element gets a dark fill.
+3. **Inline SVG is the trap, and it is what actually broke.** A literal hex in an
+   SVG attribute (`fill="#A63D2F"`) does NOT follow a CSS variable, so a
+   theme-aware page still draws hardcoded diagram colors on whatever ground the
+   viewer has. Three pages shipped that way before it was caught. Since the page
+   is light-only, literals are safe — but keep every diagram color dark enough to
+   read on white (aim for 4.5:1 against the page ground), and never rely on
+   `currentColor` alone to rescue a diagram.
+
+**A page that renders unreadably is a failed explanation**, whatever its content.
+Check contrast before publishing, not after.
+
 ## Diagram tooling
 
 Artifacts render **mermaid natively** — `<pre class="mermaid">` in HTML. Use it
@@ -74,8 +103,10 @@ Two mechanics that are easy to get wrong:
 
 - **Pin a light plate under every mermaid block.** Mermaid draws with its own
   palette and will render dark-on-dark for a viewer in dark mode. Give
-  `.mermaid` an explicit light background token that stays light in *both*
-  themes, or theme it via `%%{init: {'theme':'base','themeVariables':{…}}}%%`.
+  `.mermaid` an explicit light background, or theme it via
+  `%%{init: {'theme':'base','themeVariables':{…}}}%%`. Under the light-only rule
+  above this is no longer about the viewer's theme — mermaid can still pick its
+  own dark palette on a light page, so the plate is still required.
 - Hand-author inline SVG only where the shape is a genuine comparison figure
   mermaid cannot express. Then `artifact-diagramming`'s rules apply in full:
   `viewBox`, `currentColor`, `<figure>` + `<figcaption>`, `role="img"`.

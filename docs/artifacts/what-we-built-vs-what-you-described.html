@@ -1,0 +1,225 @@
+<title>Nine Gaps</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@600;700&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Space+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --ground: #F1F3F6;
+    --panel: #FFFFFF;
+    --sunk: #E7EBF0;
+    --ink: #141A22;
+    --muted: #5F6B7A;
+    --rule: #D3D9E1;
+    --gap: #B03A48;
+    --built: #2D6E5A;
+    --blue: #2B5F8F;
+    --display: "Chivo", "Helvetica Neue", sans-serif;
+    --body: "Newsreader", Georgia, serif;
+    --mono: "Space Mono", ui-monospace, monospace;
+  }
+
+  body { background: var(--ground); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; }
+  .wrap { max-width: 52rem; margin: 0 auto; padding: 3.5rem 1.5rem 5rem; display: flex; flex-direction: column; gap: 2.2rem; }
+  .eyebrow { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--display); font-weight: 700; font-size: clamp(2rem, 5.5vw, 3rem); line-height: 1.03; letter-spacing: -0.03em; text-wrap: balance; margin: 0.4rem 0 0; }
+  h2 { font-family: var(--display); font-weight: 700; font-size: 1.25rem; letter-spacing: -0.015em; margin: 0; text-wrap: balance; }
+  .lede { font-size: 1.12rem; color: var(--muted); margin: 0; }
+  p { margin: 0; }
+  section { display: flex; flex-direction: column; gap: 1rem; }
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+  code { font-family: var(--mono); font-size: 0.82em; background: var(--sunk); border-radius: 3px; padding: 0.08em 0.34em; }
+
+  figure { margin: 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { font-family: var(--mono); font-size: 0.72rem; line-height: 1.55; color: var(--muted); margin-top: 0.7rem; }
+  .fig-scroll { overflow-x: auto; }
+
+  .ledger { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
+  .row { display: grid; grid-template-columns: 1.6rem 1fr 1fr; gap: 1rem; padding: 0.9rem 1rem; border-bottom: 1px solid var(--rule); background: var(--panel); }
+  .row:last-child { border-bottom: 0; }
+  .row.head { background: var(--sunk); font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 0.6rem 1rem; }
+  .n { font-family: var(--mono); font-size: 0.72rem; font-weight: 700; color: var(--gap); }
+  .want { font-size: 0.94rem; }
+  .want b { font-family: var(--display); font-weight: 600; display: block; font-size: 0.99rem; margin-bottom: 0.15rem; }
+  .have { font-size: 0.9rem; color: var(--muted); }
+  .have .flag { font-family: var(--mono); font-size: 0.63rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gap); display: block; margin-bottom: 0.15rem; }
+  .have .flag.part { color: var(--blue); }
+  .have .flag.ok { color: var(--built); }
+  @media (max-width: 38rem) { .row { grid-template-columns: 1.6rem 1fr; } .have { grid-column: 2; } }
+
+  .callout { background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--gap); border-radius: 4px; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .callout.ok { border-left-color: var(--built); }
+  .callout b { font-family: var(--display); }
+  .callout pre { font-family: var(--mono); font-size: 0.76rem; line-height: 1.6; margin: 0; overflow-x: auto; color: var(--ink); }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Measured this session · 2026-08-28 · two lanes still reporting</div>
+    <h1>Nine gaps</h1>
+  </header>
+
+  <p class="lede">What exists is a 334-line single-source lookup tool with one verb, shipped by installing an entire 1.3 GB knowledge base. What you described is a multi-source research aggregator installed as its own pinnable tool. These are not the same object, and I had been polishing the first one.</p>
+
+  <div class="callout">
+    <p><b>Corrected after publication, 19:20.</b> Two rows below were wrong when first published and are marked in place. <b>Gap 05 was false</b> — schema-driven code generation is already built and running, not absent. <b>Gap 06 was overstated</b> — a survey of 42 marketplaces found no convention to be violating. The correction is kept visible rather than silently overwritten.</p>
+    <p>One thing this page did not know at first publication and now does: <b>the spec is not lost.</b> It is recoverable in full from the artifact pages, the direction files, and a plan under <code>~/.claude/plans/</code>.</p>
+  </div>
+
+  <hr>
+
+  <section>
+    <h2>You asked one question directly. Here is the answer.</h2>
+    <p><em>“What exactly did we test with a Claude agent following instructions from the plugin — did it actually perform a search and validate the results?”</em></p>
+    <div class="callout">
+      <p><b>It searched. Nothing validated the results.</b> In the container, a fresh agent read the READMEs, installed the plugin, and ran the CLI. It hit GitHub's search API for real and got two genuine hits — pull requests #574 and #346 in <code>openai/codex-plugin-cc</code>.</p>
+      <p>But the gate on that output was:</p>
+      <pre>jq -e '.adapter == "trackers" and (.hits | type == "array")'</pre>
+      <p>That asserts the JSON has the right <em>shape</em>. An empty <code>hits</code> array passes it. Nothing checked relevance, nothing checked the links resolve, nothing compared sources — because there is only one source. The test proved <b>the agent can invoke the tool</b>. It never proved <b>the tool researches anything</b>.</p>
+    </div>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>What installing the CLI actually installs</h2>
+    <p>This is the gap with the largest blast radius, and it is invisible from the plugin's manifest.</p>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 720 330" role="img" aria-label="Today the plugin's mise.toml installs the entire knowledge-base repository from git via pipx, pinned to an old commit, producing a 1.3 GB install whose console script is the CLI. The intended shape is a standalone aggregated-search-cli package that any project pins in its own mise.toml.">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#B03A48"/></marker>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2D6E5A"/></marker>
+          </defs>
+
+          <text x="0" y="13" font-family="Space Mono, monospace" font-size="10.5" font-weight="700" fill="#B03A48">TODAY</text>
+
+          <rect x="0" y="26" width="150" height="52" rx="4" fill="none" stroke="#B03A48" stroke-width="1.6"/>
+          <text x="12" y="45" font-family="Space Mono, monospace" font-size="10" fill="#B03A48">plugin mise.toml</text>
+          <text x="12" y="60" font-family="Space Mono, monospace" font-size="9.5" fill="#B03A48">[tools]</text>
+          <text x="12" y="73" font-family="Space Mono, monospace" font-size="9.5" fill="#B03A48">pipx:git+…</text>
+
+          <line x1="150" y1="52" x2="196" y2="52" stroke="#B03A48" stroke-width="1.6" marker-end="url(#a1)"/>
+
+          <rect x="204" y="26" width="212" height="52" rx="4" fill="none" stroke="#B03A48" stroke-width="1.6"/>
+          <text x="216" y="45" font-family="Space Mono, monospace" font-size="10" font-weight="700" fill="#B03A48">the WHOLE knowledge-base</text>
+          <text x="216" y="60" font-family="Space Mono, monospace" font-size="9.5" fill="#B03A48">repo, pinned a872cb01</text>
+          <text x="216" y="73" font-family="Space Mono, monospace" font-size="9.5" fill="#B03A48">graphify, hk, every kb_setup module</text>
+
+          <line x1="416" y1="52" x2="462" y2="52" stroke="#B03A48" stroke-width="1.6" marker-end="url(#a1)"/>
+
+          <rect x="470" y="26" width="150" height="52" rx="4" fill="none" stroke="#B03A48" stroke-width="1.6"/>
+          <text x="482" y="45" font-family="Space Mono, monospace" font-size="10" fill="#B03A48">1.3 GB installed</text>
+          <text x="482" y="60" font-family="Space Mono, monospace" font-size="9.5" fill="#B03A48">to run 334 lines</text>
+          <text x="482" y="73" font-family="Space Mono, monospace" font-size="9.5" fill="#B03A48">of research code</text>
+
+          <text x="0" y="112" font-family="Space Mono, monospace" font-size="9.5" fill="#B03A48">the pin is a commit from an earlier round — the plugin ships a STALE copy of this repo</text>
+
+          <line x1="0" y1="140" x2="720" y2="140" stroke="currentColor" stroke-width="1" opacity="0.2"/>
+
+          <text x="0" y="174" font-family="Space Mono, monospace" font-size="10.5" font-weight="700" fill="#2D6E5A">WHAT YOU DESCRIBED</text>
+
+          <rect x="0" y="188" width="150" height="52" rx="4" fill="none" stroke="#2D6E5A" stroke-width="1.6"/>
+          <text x="12" y="207" font-family="Space Mono, monospace" font-size="10" fill="#2D6E5A">ANY project's</text>
+          <text x="12" y="222" font-family="Space Mono, monospace" font-size="10" fill="#2D6E5A">own mise.toml</text>
+          <text x="12" y="235" font-family="Space Mono, monospace" font-size="9.5" fill="#2D6E5A">pins its version</text>
+
+          <line x1="150" y1="214" x2="196" y2="214" stroke="#2D6E5A" stroke-width="1.6" marker-end="url(#a2)"/>
+
+          <rect x="204" y="188" width="212" height="52" rx="4" fill="none" stroke="#2D6E5A" stroke-width="1.6"/>
+          <text x="216" y="207" font-family="Space Mono, monospace" font-size="10" font-weight="700" fill="#2D6E5A">aggregated-search-cli</text>
+          <text x="216" y="222" font-family="Space Mono, monospace" font-size="9.5" fill="#2D6E5A">its own package, its own repo home</text>
+          <text x="216" y="235" font-family="Space Mono, monospace" font-size="9.5" fill="#2D6E5A">models GENERATED from schema</text>
+
+          <line x1="416" y1="214" x2="462" y2="214" stroke="#2D6E5A" stroke-width="1.6" marker-end="url(#a2)"/>
+
+          <rect x="470" y="188" width="150" height="52" rx="4" fill="none" stroke="#2D6E5A" stroke-width="1.6"/>
+          <text x="482" y="207" font-family="Space Mono, monospace" font-size="10" fill="#2D6E5A">small install</text>
+          <text x="482" y="222" font-family="Space Mono, monospace" font-size="9.5" fill="#2D6E5A">plugin and repo both</text>
+          <text x="482" y="235" font-family="Space Mono, monospace" font-size="9.5" fill="#2D6E5A">consume the same pin</text>
+
+          <text x="0" y="274" font-family="Space Mono, monospace" font-size="9.5" fill="#2D6E5A">the plugin becomes ONE consumer of the tool, not its distribution channel</text>
+          <text x="0" y="292" font-family="Space Mono, monospace" font-size="9.5" fill="#2D6E5A">— which is the firecrawl shape you named</text>
+        </svg>
+      </div>
+      <figcaption>Read from the plugin's own mise.toml at `aggregated-research/mise.toml`. The "thin-package split" was already on the owed list as a size problem; it is really a distribution-model problem.</figcaption>
+    </figure>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>The ledger</h2>
+
+    <div class="ledger">
+      <div class="row head">
+        <div>#</div><div>what you described</div><div>what is on disk</div>
+      </div>
+
+      <div class="row">
+        <div class="n">01</div>
+        <div class="want"><b>aggregated-<i>search</i>, CLI named <code>aggregated-search-cli</code></b>A search product with a named CLI.</div>
+        <div class="have"><span class="flag">name mismatch</span>Everything on disk is <code>aggregated-research</code> — plugin, skill, CLI, data dir, marketplace entry. Renaming touches the installed data directory, so it is not free.</div>
+      </div>
+
+      <div class="row">
+        <div class="n">02</div>
+        <div class="want"><b>A mise-installed tool, version-pinnable per project</b>Any project declares the version it wants.</div>
+        <div class="have"><span class="flag">not built</span>The CLI is a console script inside this repo's package. Installing it installs the whole knowledge base from git at a fixed old commit.</div>
+      </div>
+
+      <div class="row">
+        <div class="n">03</div>
+        <div class="want"><b>Aggregation across several tools and services</b>One consolidated JSON result.</div>
+        <div class="have"><span class="flag">1 of 24</span>One verb, <code>trackers</code>, calling <code>gh api search/issues</code>. The plugin's own skill instructs <b>24 capabilities</b>; exactly one has a CLI verb behind it. The other 23 are prose the agent is expected to perform by hand.</div>
+      </div>
+
+      <div class="row">
+        <div class="n">04</div>
+        <div class="want"><b>The layers from /deep-agents and antigravity:research</b>Plus lychee validating the links.</div>
+        <div class="have"><span class="flag">not built</span>No web layer, no docs layer, no link validation, no planning or verification pass. A lane is reconstructing exactly which layers were specced.</div>
+      </div>
+
+      <div class="row">
+        <div class="n">05</div>
+        <div class="want"><b>Every model generated from a schema</b><code>datamodel-code-generator</code>, no drift.</div>
+        <div class="have"><span class="flag ok">CORRECTED — already built</span>My first version of this row said the models were hand-written. <b>False.</b> <code>schemas/research-record.schema.json</code> generates <code>kb_setup/generated/research_record.py</code> via <code>schemas/generate_research_record.py</code>, with <code>schemas/check_research_record_codegen.py</code> as a drift gate. The one thing you asked for that was already done.</div>
+      </div>
+
+      <div class="row">
+        <div class="n">06</div>
+        <div class="want"><b>Marketplace holds plugins under <code>plugins/</code></b>Room for more than one.</div>
+        <div class="have"><span class="flag part">CORRECTED — no convention exists</span>I called this a violation. Across 42 marketplaces on this machine, 14 host several plugins: <b>7 put plugin dirs at the root, 5 use <code>plugins/</code></b>, and Anthropic's own two split. The real argument for <code>plugins/</code> is narrower and better: the marketplaces that use it are the ones whose repo root carries its own tooling. Ours does — <code>mise.toml</code>, <code>ci/</code>, <code>.github/</code>. So it is a good move for a reason, not for conformity.</div>
+      </div>
+
+      <div class="row">
+        <div class="n">07</div>
+        <div class="want"><b>Schemas + inline comments on every config file</b><code>"$schema"</code> so an agent knows valid values.</div>
+        <div class="have"><span class="flag">absent</span>Neither <code>mise.toml</code> carries a <code>$schema</code>. Also: the pinned mise docs are at <b>v2026.8.10</b> while the running mise is <b>2026.8.14</b>.</div>
+      </div>
+
+      <div class="row">
+        <div class="n">08</div>
+        <div class="want"><b>mise does the installing; <code>bin/</code> shrinks</b>Projects are mise-native, scaffoldable.</div>
+        <div class="have"><span class="flag part">hand-rolled</span>Two shell wrappers set six <code>MISE_*</code> variables by hand. Whether mise hooks replace that is being checked — <code>mise generate</code> is the scaffolding question.</div>
+      </div>
+
+      <div class="row">
+        <div class="n">09</div>
+        <div class="want"><b>The plugin guides the agent to use the CLI</b>The firecrawl shape.</div>
+        <div class="have"><span class="flag ok">shape is right</span>This one we did build: a skill instructs the agent, a hook installs the CLI, the agent invokes it. It is the only layer that matches — it just wraps a tool that does one thing.</div>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Where the misunderstanding came from</h2>
+    <div class="callout">
+      <p>Two rounds were spent on <b>delivery</b> — confining mise, container acceptance, an agent-driven install arm, and today a leaked environment variable. Every one of those was real work and none of it was the product.</p>
+      <p>The tell was there and I read past it: the acceptance test's success condition was <em>“the agent successfully invoked the CLI”</em>. Nobody writes that gate for a research tool. You write it for an <b>installer</b>. We had been testing the installer.</p>
+    </div>
+  </section>
+
+</div>

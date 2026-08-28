@@ -1,0 +1,5 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+url = https://github.com/openai/codex-plugin-cc
+ref = main
+commit = db52e28f4d9ded852ab3942cea316258ae4ef346
+kind = code
