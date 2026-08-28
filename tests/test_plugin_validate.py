@@ -88,15 +88,60 @@ def _fake_fetch_schema(schemas: dict[str, dict[str, Any]]) -> pv.SchemaFetcher:
     return _fetch
 
 
-_VERSION_WARNING = "⚠ version: No version specified. Consider adding a version following semver"
+_WARN_PREFIX = chr(0x26A0)  # WARNING SIGN — the `⚠ Found N warning(s):` header
+_PASS_PREFIX = chr(0x2714)  # HEAVY CHECK MARK — the final "Validation passed" line
+_ARROW = chr(0x2192)  # RIGHTWARDS ARROW — inside a plugin.json field path
+# Built via `chr()`, not the literal glyphs, so ruff's RUF001 (ambiguous unicode
+# character) has nothing to flag — these reproduce `claude plugin validate`'s
+# EXACT non-ASCII output, verbatim, measured 2026-08-28 on both a marketplace
+# root and a plugin dir (team-lead's respec), no `--strict`, rc 0.
+_MARKETPLACE_OK_OUTPUT = "\n".join(
+    [
+        "Validating marketplace manifest: /path/.claude-plugin/marketplace.json",
+        "",
+        f"{_WARN_PREFIX} Found 1 warning:",
+        "",
+        (
+            f"  {pv._FINDING_PREFIX} plugins[0] plugin.json {_ARROW} version: No version "
+            'specified. Consider adding a version following semver (e.g., "1.0.0")'
+        ),
+        "",
+        f"{_PASS_PREFIX} Validation passed with warnings",
+        "",
+    ]
+)
+
+_PLUGIN_DIR_OK_OUTPUT = "\n".join(
+    [
+        "Validating plugin manifest: /path/aggregated-research/.claude-plugin/plugin.json",
+        "",
+        f"{_WARN_PREFIX} Found 1 warning:",
+        "",
+        (
+            f"  {pv._FINDING_PREFIX} version: No version specified. Consider adding a "
+            'version following semver (e.g., "1.0.0")'
+        ),
+        "",
+        f"{_PASS_PREFIX} Validation passed with warnings",
+        "",
+    ]
+)
 
 
-def _fake_runner(output: str = "") -> tuple[pv.Runner, list[tuple[str, ...]]]:
+def _fake_runner(
+    outputs: list[tuple[int, str]] | None = None,
+) -> tuple[pv.Runner, list[tuple[str, ...]]]:
+    """`outputs[i]` answers the i-th call; the last entry is reused past that.
+
+    Default: a clean `(0, "")` for every call — `validate()` calls the runner
+    once per target (root, then each local plugin dir), in that order.
+    """
     calls: list[tuple[str, ...]] = []
+    answers = outputs or [(0, "")]
 
-    def _run(argv: tuple[str, ...]) -> str:
+    def _run(argv: tuple[str, ...]) -> tuple[int, str]:
         calls.append(argv)
-        return output
+        return answers[min(len(calls) - 1, len(answers) - 1)]
 
     return _run, calls
 
@@ -118,10 +163,10 @@ def test_a_good_marketplace_passes(tmp_path: Path) -> None:
     assert calls[1][-1] == str(root / "aggregated-research")
 
 
-def test_the_no_version_warning_alone_passes(tmp_path: Path) -> None:
-    """Ray's ruling (no `version`, commit-SHA versioning) must not fail the run."""
+def test_the_measured_pass_output_passes(tmp_path: Path) -> None:
+    """The verbatim measured output (version warning only) must not fail the run."""
     root = _good_marketplace_root(tmp_path)
-    runner, _calls = _fake_runner(output=_VERSION_WARNING)
+    runner, _calls = _fake_runner([(0, _MARKETPLACE_OK_OUTPUT), (0, _PLUGIN_DIR_OK_OUTPUT)])
 
     result = pv.validate(root, fetch_schema=_fake_fetch_schema(_SCHEMAS), runner=runner)
 
@@ -172,9 +217,10 @@ def test_lsp_json_missing_extension_to_language_fails_naming_the_file(tmp_path: 
     assert str(lsp_path) in result.message
 
 
-def test_claude_plugin_validate_failure_is_reported(tmp_path: Path) -> None:
+def test_claude_plugin_validate_x_line_fails_naming_the_file(tmp_path: Path) -> None:
     root = _good_marketplace_root(tmp_path)
-    runner, _calls = _fake_runner(output="✘ plugin.json: something is wrong")
+    fail_line = f"{pv._FAIL_PREFIX} Validation failed"
+    runner, _calls = _fake_runner([(1, fail_line)])
 
     result = pv.validate(root, fetch_schema=_fake_fetch_schema(_SCHEMAS), runner=runner)
 
@@ -182,14 +228,35 @@ def test_claude_plugin_validate_failure_is_reported(tmp_path: Path) -> None:
     assert str(root) in result.message
 
 
-def test_a_non_version_warning_fails_naming_the_file(tmp_path: Path) -> None:
+def test_a_non_version_finding_fails_naming_the_file(tmp_path: Path) -> None:
+    """The measured pass output, but with the finding changed to a real defect."""
     root = _good_marketplace_root(tmp_path)
-    runner, _calls = _fake_runner(output="⚠ some other warning that is not about version")
+    original_finding = (
+        f"  {pv._FINDING_PREFIX} plugins[0] plugin.json {_ARROW} version: No version "
+        'specified. Consider adding a version following semver (e.g., "1.0.0")'
+    )
+    changed = _MARKETPLACE_OK_OUTPUT.replace(
+        original_finding, f"  {pv._FINDING_PREFIX} name: Missing required field"
+    )
+    runner, _calls = _fake_runner([(0, changed)])
 
     result = pv.validate(root, fetch_schema=_fake_fetch_schema(_SCHEMAS), runner=runner)
 
     assert isinstance(result, Err)
     assert str(root) in result.message
+    assert "Missing required field" in result.message
+
+
+def test_nonzero_rc_with_clean_text_still_fails(tmp_path: Path) -> None:
+    """No finding line in the text, but a nonzero rc must still fail."""
+    root = _good_marketplace_root(tmp_path)
+    runner, _calls = _fake_runner([(1, f"{_PASS_PREFIX} Validation passed with warnings\n")])
+
+    result = pv.validate(root, fetch_schema=_fake_fetch_schema(_SCHEMAS), runner=runner)
+
+    assert isinstance(result, Err)
+    assert str(root) in result.message
+    assert "exited 1" in result.message
 
 
 def test_main_returns_bad_request_with_no_args(tmp_path: Path) -> None:

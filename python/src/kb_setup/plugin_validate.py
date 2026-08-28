@@ -11,14 +11,23 @@ against the schema it names (schemastore 301s `.json` URLs to
 `.lsp.json`, if present, validates against the plugin schema's inline
 `properties.lspServers.anyOf[1]` subschema — nothing else opens that file
 (spec M-5); then `claude plugin validate` (no `--strict`) over the
-marketplace root and over each local-source plugin dir, with its output
-scanned rather than its exit code trusted: `--strict` turns Ray's own ruling
-(no `version` field — commit-SHA versioning, plugins-reference.md:1318) into a
-failure, since `claude plugin validate --strict` exits 1 on both the root and
-every plugin dir with exactly one warning, "No version specified. Consider
-adding a version following semver" (measured 2026-08-28). So this runs
-WITHOUT `--strict` and fails only on a `✘`/error line, or a `⚠`/warning line
-other than that one allowlisted case.
+marketplace root and over each local-source plugin dir. `--strict` turns
+Ray's own ruling (no `version` field — commit-SHA versioning,
+plugins-reference.md:1318) into a failure, since `claude plugin validate
+--strict` exits 1 on both the root and every plugin dir with exactly one
+warning, "No version specified. Consider adding a version following semver"
+(measured 2026-08-28). Non-strict output has a fixed shape (measured, both
+targets, rc 0): a "Validating ..." header line, a blank, a summary line
+("Found N warning(s):", prefixed with a warning glyph), one indented FINDING
+line per warning prefixed with an angle-arrow glyph, and a final "Validation
+passed with warnings" line prefixed with a checkmark glyph.
+
+So a FINDING line — the one whose first non-space character is the
+angle-arrow glyph (`_FINDING_PREFIX` below) — fails unless it matches
+`_ALLOWED_WARNINGS`; a line starting with the fail glyph (`_FAIL_PREFIX`)
+always fails; the summary/header/blank lines carry no finding and are
+ignored; and a nonzero exit code with no other finding still fails (belt
+and suspenders against an output shape this hasn't seen).
 
 `fetch_schema` and `runner` are injected so tests own their environment
 (`probes-need-a-control-arm.md`) — no test here touches the network or spawns
@@ -41,7 +50,13 @@ PLUGIN_MANIFEST_REL = Path(".claude-plugin/plugin.json")
 LSP_REL = Path(".lsp.json")
 
 SchemaFetcher = Callable[[str], dict[str, Any]]
-Runner = Callable[[tuple[str, ...]], str]
+Runner = Callable[[tuple[str, ...]], tuple[int, str]]
+
+_FINDING_PREFIX = chr(0x276F)  # HEAVY RIGHT-POINTING ANGLE QUOTATION MARK ORNAMENT: a finding line
+_FAIL_PREFIX = chr(0x2718)  # HEAVY BALLOT X: `claude plugin validate`'s failure marker
+# Built via `chr()` rather than the literal glyph so ruff's RUF001 (ambiguous
+# unicode character) has no string literal to flag — these are the exact
+# non-ASCII prefixes `claude plugin validate` prints, not a typo risk.
 
 _ALLOWED_WARNINGS = ("No version specified",)
 """Warning substrings `claude plugin validate` may emit without failing here.
@@ -72,27 +87,38 @@ def _default_fetch_schema(url: str) -> dict[str, Any]:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _default_runner(argv: tuple[str, ...]) -> str:
+def _default_runner(argv: tuple[str, ...]) -> tuple[int, str]:
     """`claude plugin validate`, stdout CAPTURED so the caller can scan it.
 
     Not inherited: the caller decides pass/fail from the text (a warning
-    other than the allowlisted version one still fails), not from the exit
-    code, which `--strict` would otherwise turn into a false positive.
+    other than the allowlisted version one still fails), not solely from the
+    exit code, which `--strict` would otherwise turn into a false positive.
+    The rc is still returned and used as a belt-and-suspenders check.
     """
-    return subprocess.run(argv, check=False, capture_output=True, text=True).stdout
+    completed = subprocess.run(argv, check=False, capture_output=True, text=True)
+    return completed.returncode, completed.stdout
 
 
 def _validate_output_failure(output: str) -> str | None:
-    """The first line in `output` that should fail the run, or `None`.
+    """The first FINDING line in `output` that should fail the run, or `None`.
 
-    A `✘`/`error` line always fails. A `⚠`/warning line fails UNLESS it
-    matches `_ALLOWED_WARNINGS` — today, only the missing-`version` warning.
+    A finding is a line whose first non-space character is `_FINDING_PREFIX`
+    (indented under the "Found N warning(s):" summary header, which itself
+    carries no finding and is ignored) or `_FAIL_PREFIX`. A `_FINDING_PREFIX`
+    line fails unless it matches `_ALLOWED_WARNINGS` — today, only the
+    missing-`version` warning; a `_FAIL_PREFIX` line always fails. Everything
+    else ("Validating ...", the summary/pass lines, blanks) is not a finding
+    and is ignored — deliberately NOT a case-insensitive "error" substring
+    test, which would fail on a plugin legitimately named e.g. `error-handler`.
     """
-    for line in output.splitlines():
-        if "✘" in line or "error" in line.lower():
-            return line
-        if "⚠" in line and not any(allowed in line for allowed in _ALLOWED_WARNINGS):
-            return line
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line[0] == _FAIL_PREFIX:
+            return raw_line
+        if line[0] == _FINDING_PREFIX and not any(allowed in line for allowed in _ALLOWED_WARNINGS):
+            return raw_line
     return None
 
 
@@ -194,8 +220,10 @@ def _run_claude_validate(
     """`claude plugin validate` (no `--strict`) over each target; see module docstring."""
     for target in targets:
         argv = ("claude", "plugin", "validate", str(target))
-        output = runner(argv)
+        rc, output = runner(argv)
         failure = _validate_output_failure(output)
+        if failure is None and rc != 0:
+            failure = f"exited {rc}"
         if failure is not None:
             return f"claude plugin validate {target}: {failure.strip()}"
         checked.append(f"claude plugin validate {target}")
