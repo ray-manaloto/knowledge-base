@@ -63,12 +63,12 @@ Two hard mandates (Ray, 2026-07-22, machine-enforced):
    `kb_setup.hook_guard` (wired in `.claude/settings.json`) DENIES a raw `graphify …`
    / `_merge_docs.py` / graphify-bundled-python call and prints the task to use. See
    `.claude/skills/kb-curator` for the full workflow.
-2. **All LLM work is Claude — NEVER Gemini or any auto-detected key.** A global
-   `GEMINI_API_KEY` (a mise secret) exists, so this is NOT "no API key" — it is a
-   *forbidden* key: `kb_setup.graphify_env.clean_env()` strips every non-Claude
-   backend trigger (Gemini/Google/OpenAI/Kimi/DeepSeek/Azure/**Bedrock via
-   `AWS_REGION`**/Ollama) from every graphify subprocess, so graphify's
-   `detect_backend()` can never pick one. `ANTHROPIC_*` is kept (the Claude path).
+2. **Corpus LLM work runs on `claude-cli` or `openai-cli`, chosen by an EXPLICIT
+   `--backend`** (Ray, 2026-08-25); a key-detected backend is forbidden. A global
+   `GEMINI_API_KEY` (a mise secret) exists, so it is a *forbidden* key: `kb_setup.graphify_env.clean_env()`
+   strips every key trigger (Gemini/Google/OpenAI/Kimi/DeepSeek/Azure/**Bedrock via
+   `AWS_REGION`**/Ollama) from every graphify subprocess. The two CLI backends are
+   explicit-only by graphify's own `detect_backend()`, not by the cleaner.
 
 Concretely:
 
@@ -78,8 +78,8 @@ Concretely:
 - **Prose (docs/URLs/blogs)**: `mise run kb-add -- <url>` fetches to `./raw`; semantic
   extraction is the **Claude host agent** (a Workflow fan-out of `general-purpose`
   subagents that read each raw file → `{nodes,edges}` → one combined chunk in
-  `sources/extractions/`), then `mise run kb-merge -- <chunk>`. Ollama/other
-  non-Claude backends are stripped.
+  `sources/extractions/`), then `mise run kb-merge -- <chunk>`. Key-detected
+  backends (Gemini/OpenAI-key/Ollama/…) are stripped.
 - **Video**: `mise run kb-add -- <yt-url>` then `mise run kb-transcribe -- raw/<yt>.m4a` (local faster-whisper — no key, no LLM), then host-agent extract the transcript.
 - **Label** after every merge: `mise run kb-label` — deterministic hub labels (no LLM, Gemini-free); LLM-named communities via claude-cli remain untested (#2076).
 

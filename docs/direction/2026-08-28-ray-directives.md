@@ -170,3 +170,31 @@ official python-sdk or a popular library. (4) The plugin bundles `.lsp.json`
 entries for `ty` and `pyrefly`. (5) The container is built with mise's OCI
 features from a mise-first bootstrap script, exercised by a GitHub Actions
 workflow that can also publish downloadable artifacts.
+
+## The slice-2 answers (clear-prep AskUserQuestion, 2026-08-28, option labels verbatim)
+
+Recorded here one session late: the directive file could not take another
+commit while PR #563's review receipt was pinned to `879619ef390a`.
+
+Slice 2 = **"Marketplace + plugin dir"** — the option text: *"Tag
+pre-reset-2026-08-27, reset main, plugin dir with plugin.json + marketplace.json
+carrying $schema, a kb_setup validation task, SessionStart CLI-fetch hook, spine
+skill; then install here from the marketplace and delete the local skill."*
+
+LSP = **"ty only"** — the option text: *"Already pinned here (0.0.74),
+astral-maintained alongside ruff/uv; pyrefly noted as an alternative in the
+README."*
+
+## Session opener, 2026-08-28 (session `kb-20260828.00`), verbatim
+
+> /i-have-adhd
+> /ponytail ultra
+> /fable-orchestrator:orchestration use fable-advisor and codex-implementer lanes
+> /graphify
+> /kb-resume
+> /i-have-adhd
+> use fable-advisor andcodex-implementer lanes
+
+Resume answer: **"Start slice 2, full order (Recommended)"** — branch → directive
+append → governance sync → spec → premise-verifier → fable-advisor →
+codex-implementer (xhigh).

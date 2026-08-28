@@ -53,10 +53,10 @@ The task map:
 | record / reflect | `mise run kb-remember` / `mise run kb-reflect` | ~~`graphify save-result`/`reflect`~~ |
 | artifacts | `mise run kb-artifacts` | — |
 
-**2. Claude Code only — NEVER Gemini or any auto-detected key.** All LLM work is
-Claude (the host-agent Workflow for extraction; deterministic no-LLM for labeling).
-Every task strips `GEMINI_API_KEY`/`GOOGLE_API_KEY` (`graphify_env.clean_env`) so
-graphify's backend auto-detect can never pick a non-Claude provider. graphify's
+**2. `claude-cli` or `openai-cli` by explicit `--backend` — NEVER an auto-detected
+key** (Ray, 2026-08-25; `do-not.md` #4). The host-agent Workflow does extraction here;
+labeling is deterministic no-LLM. Every task strips every key trigger
+(`graphify_env.clean_env`) so graphify's auto-detect can never pick a provider. graphify's
 `claude-cli` backend exists but is BROKEN for labeling (#2076 — prose-wrapped JSON),
 so `kb-label` defaults to the deterministic hub labeler.
 

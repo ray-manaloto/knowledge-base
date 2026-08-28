@@ -42,6 +42,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | running the gates one at a time and retyping the exit codes into a handoff | `mise run kb-gates` — runs them and writes `.agent/kb/gates/gates-<sha>.json`, so the claim has a surviving artifact. The `/tmp` form above is still correct for a ONE-OFF gate; what it cannot do is outlive the session (#146) |
 | `npx <tool>` | the mise-pinned binary directly |
 | running `lychee` by hand over the docs, or wiring it into `lint` | `mise run kb-links` — the hk `lychee` step under `HK_PROFILE=links`, bounded 5m, reading `lychee.toml`; the network pass is never in `lint` (an unconfigured run measured >5 min on `docs.doppler.com` backoffs, 2026-08-27). The zero-network `lychee_offline` step IS in `check`/pre-commit and checks 0 links today — its comment says so |
+| hand-checking a Claude Code plugin marketplace against schemastore, or eyeballing `claude plugin validate` output | `mise run kb-plugin-validate -- <marketplace root>` (`kb_setup.plugin_validate`) — validates every `marketplace.json`/`plugin.json` against its own `$schema`, a plugin dir's `.lsp.json` against the plugin schema's `lspServers` subschema, then runs `claude plugin validate --strict` over the root and each local plugin dir; any failure names the file |
 
 Read-only introspection with **no task equivalent** stays direct and is
 explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,

@@ -53,14 +53,19 @@ The authoritative list of things agents (and humans) must not do in this repo.
    introspection with no task equivalent (`path`/`explain`/`god-nodes`/
    `affected`/`diagnose`) is allowed. See `mise-tasks-only.md`.
 
-4. **Do NOT let any non-Claude LLM backend touch the corpus.** A global
-   `GEMINI_API_KEY` exists on this machine, so this is not "no API key" — it is
-   a *forbidden* key. `kb_setup.graphify_env.clean_env()` strips every
-   non-Claude backend trigger (Gemini/Google/OpenAI/Kimi/DeepSeek/Azure/
-   **Bedrock via `AWS_REGION`**/Ollama) from every graphify subprocess so
-   `detect_backend()` can never pick one. Never re-introduce one of those vars
-   into a graphify call path, and never "temporarily" unset the cleaner to make
-   something work.
+4. **Do NOT let any KEY-DETECTED LLM backend touch the corpus.** Two graphify
+   agents are sanctioned — `claude-cli` and `openai-cli` (Ray, 2026-08-25,
+   `docs/direction/2026-08-25-ray-directives.md` §2; both subscription-billed,
+   both `--backend`-explicit only). What stays forbidden is any backend an API
+   KEY selects: a global `GEMINI_API_KEY` exists on this machine, so
+   `kb_setup.graphify_env.clean_env()` strips every key trigger (Gemini/Google/
+   OpenAI/Kimi/DeepSeek/Azure/**Bedrock via `AWS_REGION`**/Ollama) from every
+   graphify subprocess. The CLI carve-out is graphify's own, not `clean_env()`'s:
+   `detect_backend()` (`sources/graphify/graphify/llm.py:3527`) never auto-selects
+   `claude-cli` or `openai-cli`. Keep the `OPENAI_API_KEY` strip — without it the
+   openai-cli route can fall through to the METERED API (`llm.py:1870-1874`).
+   Never re-introduce a key var into a graphify call path, and never
+   "temporarily" unset the cleaner to make something work.
 
 5. **Do NOT commit `graphify-out/` beyond `memory/`.** Everything else is
    DERIVED and rebuilt by `kb-build` / `kb-artifacts`; at aggregate scale the

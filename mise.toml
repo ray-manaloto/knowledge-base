@@ -846,6 +846,11 @@ description = "aggregated-research plugin CLI: mise run kb-research -- <verb> [a
 run = "uv run aggregated-research"
 timeout = "10m"
 
+[tasks.kb-plugin-validate]
+description = "Validate a Claude Code plugin marketplace checkout: mise run kb-plugin-validate -- <marketplace root>"
+run = "uv run kb-setup plugin-validate"
+timeout = "5m"
+
 [tasks.kb-affected]
 description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbol>" [--depth N]'
 # The question `kb-query` structurally CANNOT answer. `query` is a forward BFS from
