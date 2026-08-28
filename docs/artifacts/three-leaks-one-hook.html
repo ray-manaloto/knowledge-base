@@ -107,8 +107,25 @@ flowchart TD
     <p style="margin-top:1rem">So slice 3 is two things, not one: the container acceptance test Ray asked for, <em>and</em> these three fixes in the hook and wrappers — otherwise the test passes over a plugin that breaks on the one machine that matters.</p>
   </section>
 
+  <section>
+    <h2>Outcome — slice 3 shipped (updated 2026-08-28, same session)</h2>
+    <p>All four items below landed in marketplace PR #1 (branch <code>slice-3-container-acceptance</code>, head <code>1eadcc5</code>). The <code>acceptance</code> workflow is green twice (runs 33177039252 and 33178232076, both <code>conclusion: success</code> read from the API). Inside the container, with no Claude auth: marketplace added (<code>rc=0</code> — research null N2 answered), plugin + 4 dependencies installed, the hook stayed confined (only the plugin's <code>mise.toml</code> loaded; nothing written under <code>~/.local/share/mise</code>), and <code>aggregated-research trackers openai/codex-plugin-cc</code> ran for real — once directly, once by a <code>claude -p</code> agent following only the two READMEs — each writing a JSON file the script checked with <code>jq</code>.</p>
+    <div class="wrap"><table>
+      <thead><tr><th>found only by running it</th><th>fix</th></tr></thead>
+      <tbody>
+        <tr><td>apt OCI layers need root on ubuntu-latest</td><td><code>sudo -E mise oci build</code></td></tr>
+        <tr><td>mise's npm installer denies postinstall scripts → <code>claude</code> had no native binary</td><td><code>allow_builds</code> on the claude-code pin</td></tr>
+        <tr><td><code>tree-sitter-dm</code> has no py3.14 linux wheel</td><td><code>apt:build-essential</code></td></tr>
+        <tr><td><code>mise config ls</code> prints <code>~</code>, not <code>$HOME</code></td><td>expand before comparing</td></tr>
+        <tr><td><code>claude -p</code> defaults to manual permissions</td><td><code>--allowedTools Read,Bash</code></td></tr>
+        <tr><td>my spec guessed a <code>"repo"</code> key in the trackers JSON — there is none</td><td>assert on a file written via <code>--out</code>, not on prose</td></tr>
+      </tbody>
+    </table></div>
+    <p class="cite">Two review lenses on the diff: codex cold review (2 P2, 2 P3) and an Opus silent-failure read (3 P1: fork PRs skipped the agent step silently; the agent check grepped the model's prose; the confinement check passed on empty output). All eight confirmed findings fixed in one respec round; the "hook timeout is 60 s" claim was refuted (600 s for command hooks, hooks.md:422).</p>
+  </section>
+
   <section class="decide">
-    <h2>What slice 3 must contain</h2>
+    <h2>What slice 3 had to contain (the plan, as written before the dispatch)</h2>
     <ol>
       <li><strong>Hook + both wrappers share one environment.</strong> Today the wrapper does not even carry the hook's confinement — invoking it re-leaked the home config and started a Rust install. One shim (<code>bin/mise-env</code>) that sets ceiling, trust, data dir, uv cache and unsets <code>__MISE_*</code>; hook and wrappers call it.</li>
       <li><strong>Container CI in the marketplace repo</strong> (it has no <code>.github/</code> today): <code>mise oci build</code> on <code>ubuntu-latest</code>, then a job that runs the README's install commands, the hook, and <code>aggregated-research trackers …</code>.</li>
