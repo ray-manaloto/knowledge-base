@@ -841,6 +841,11 @@ description = "Search one repository's GitHub issue and pull-request trackers"
 run = "uv run kb-setup research-trackers"
 timeout = "10m"
 
+[tasks.kb-research]
+description = "aggregated-research plugin CLI: mise run kb-research -- <verb> [args...]"
+run = "uv run aggregated-research"
+timeout = "10m"
+
 [tasks.kb-affected]
 description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbol>" [--depth N]'
 # The question `kb-query` structurally CANNOT answer. `query` is a forward BFS from

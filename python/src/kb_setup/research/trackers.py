@@ -245,10 +245,30 @@ def validate(record: AdapterRecord) -> None:
 
 
 def main(argv: list[str], repo_root: Path) -> int:
-    """Print one validated adapter record as the process's only stdout."""
+    """Print one validated adapter record, or write it to ``--out PATH``.
+
+    ``--out`` may appear anywhere after the positional ``repo``; its value is
+    stripped from the search term before the remaining words are joined.
+    """
     del repo_root
     repo = argv[0] if argv else ""
-    term = " ".join(argv[1:])
+    term_words: list[str] = []
+    out_path: Path | None = None
+    rest = argv[1:]
+    i = 0
+    while i < len(rest):
+        if rest[i] == "--out":
+            if i + 1 >= len(rest):
+                err = Err("--out requires a path", rc=Rc.BAD_REQUEST)
+                print(f"kb-research-trackers: {err.message}", file=sys.stderr)
+                return exit_code(err)
+            out_path = Path(rest[i + 1])
+            i += 2
+            continue
+        term_words.append(rest[i])
+        i += 1
+    term = " ".join(term_words)
+
     result = search(repo, term, run=_run_gh)
     if not isinstance(result, Ok):
         print(f"kb-research-trackers: {result.message}", file=sys.stderr)
@@ -256,5 +276,11 @@ def main(argv: list[str], repo_root: Path) -> int:
 
     record = result.value
     validate(record)
-    print(msgspec.json.format(msgspec.json.encode(record).decode(), indent=2))
+    text = msgspec.json.format(msgspec.json.encode(record).decode(), indent=2)
+    if out_path is not None:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(text + "\n")
+        print(f"[aggregated-research] wrote {out_path}")
+    else:
+        print(text)
     return exit_code(result)

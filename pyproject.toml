@@ -37,6 +37,7 @@ dependencies = [
 
 [project.scripts]
 kb-setup = "kb_setup.cli:main"
+aggregated-research = "kb_setup.research.cli:main"
 
 [project.optional-dependencies]
 # DELIBERATELY a floor and not an `==`, unlike the dev group below — this is the

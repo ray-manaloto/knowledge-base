@@ -99,3 +99,74 @@ question to answer by probing schemastore; and the CLI is delivered by a plugin
 script (the documented `SessionStart` + `${CLAUDE_PLUGIN_DATA}` pattern) that
 fetches it from a GitHub release/package — so "the plugin cannot install a CLI"
 is true only of first-class manifest fields, not of the hook script.
+
+## Two more blueprint comments (05:34–05:39), verbatim
+
+On the CLI-vs-MCP fork:
+
+> the aggregated-search cli can internally call other mcp servers if necessary
+
+On the build order (anchored at the "Every step goes fable-advisor → codex-implementer" paragraph):
+
+> the definition of done is to install the marketplace  and plugin in an isolated environment like a docker container that can be fully and autonomously installed via ai llm optimized instructions from a claude code agent only following the instructions from the marketplace and plugin's documentation
+> our documentation needs to be very specific on what environment variables need to be set fo the dependency plugins/skills
+> - such as:
+>    - firecrawl
+>    - exa
+>    - context7
+>    - last30days
+> - it is oke to delegate the instructions to the other tools, it just needs to be very specific to direct where to look
+
+So: the interface is CLI-only (the CLI may be an MCP *client* internally); and the
+DEFINITION OF DONE is an autonomous install in an isolated container — a Claude Code
+agent, given only the marketplace's and plugin's own documentation, installs the
+marketplace, the plugin, its dependency plugins, and sets every required
+environment variable for firecrawl / exa / context7 / last30days, with the docs
+naming exactly where each is documented upstream.
+
+## Five more artifact comments (05:08–05:56), verbatim
+
+On the transport page (`the-team-is-a-transport`), title:
+
+> this research was supposed to be done by the aggegated-search plugin
+> you did not follow instructions
+
+On the same page, "The picture in one line":
+
+> did we review how https://github.com/openai/codex-plugin-cc works?
+
+On the blueprint, the MCP row ("no — the CLI is the interface"):
+
+> we can also deploy an mcp server
+> but we are cli first
+> is it possible to make the mcp features 1:1 with the cli?
+> i would like to support the latest protocol standard: https://github.com/modelcontextprotocol/modelcontextprotocol
+> can we use 3rd party libraries and sdks to rapidly prototype
+> like:
+> - https://github.com/modelcontextprotocol/python-sdk
+> - or other popular libraries and sdks
+
+On the blueprint, the LSP row ("no"):
+
+> can we have it use these lsp servers:
+> - astral-sh ty
+> - https://github.com/facebook/pyrefly
+
+On the blueprint, "docker container":
+
+> use mise oci features to create the docker image
+> can create a mise-first script that uses mise to install all the tools needed to build the cli and plugin from scratch
+> can be tested via ci/cd gha workflow
+> gha workflows can generate the artifacts to download if needed
+
+Read together: (1) the agent-team research was to be run THROUGH the plugin; it was
+run through the repo-local skill because the plugin did not exist — a sequencing
+failure, recorded as such; the remedy is that the plugin's first real question,
+and its acceptance test, is that same question re-run through it. (2)
+`openai/codex-plugin-cc` (the `codex@openai-codex` plugin installed here) was NOT
+reviewed and must be — it is a Claude↔Codex transport in production. (3) MCP is
+a second surface, 1:1 with the CLI, on the current MCP spec, prototyped with the
+official python-sdk or a popular library. (4) The plugin bundles `.lsp.json`
+entries for `ty` and `pyrefly`. (5) The container is built with mise's OCI
+features from a mise-first bootstrap script, exercised by a GitHub Actions
+workflow that can also publish downloadable artifacts.

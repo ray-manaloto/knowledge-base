@@ -100,7 +100,7 @@ flowchart TB
     C --> S["codesearch (grep.app)"]
     C --> L["links (lychee CLI subprocess)"]
     C --> B["breadth (shells to the declared plugins' CLIs:<br/>firecrawl · ctx7 · exa · last30days)"]
-    C -->|"every verb: --json, -o .research/&lt;slug&gt;.json"| OUT[(".research/ files")]
+    C -->|"every verb: --out .research/&lt;slug&gt;.json<br/>(JSON is the only output; no -o, no --json)"| OUT[(".research/ files")]
   end
   SK -->|"Bash"| C
   OUT -->|"grep / head"| SK
@@ -121,16 +121,48 @@ flowchart TB
   </ul>
 
   <div class="fork">
-    <strong>The one fork that is yours.</strong> Firecrawl and context7 disagree on the interface: <em>CLI through Bash</em> (firecrawl) or <em>MCP tools</em> (context7). The blueprint above is CLI-only, because your words were "a full cli", and because the spine needs file-isolated, machine-readable output that a CLI gives for free. An MCP server can be added later as a thin wrapper over the same CLI if a tool-call interface turns out to matter. Confirm CLI-only, or say MCP too.
+    <strong>Interface — settled by your comment.</strong> <em>"the aggregated-search cli can internally call other mcp servers if necessary."</em> So: CLI-only at the surface (firecrawl's shape), and the CLI is free to be an MCP <em>client</em> inside — the <code>breadth</code> verb may reach <code>mcp.context7.com</code> or grep.app's MCP directly rather than through a plugin. No MCP server is shipped by the plugin.
   </div>
+
+  <h2>Definition of done — your words</h2>
+  <p><em>"install the marketplace and plugin in an isolated environment like a docker container that can be fully and autonomously installed via ai llm optimized instructions from a claude code agent only following the instructions from the marketplace and plugin's documentation."</em></p>
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#0F1F24','primaryBorderColor':'#526168','lineColor':'#0F1F24','fontFamily':'DM Mono, monospace','fontSize':'12px'}}}%%
+flowchart LR
+  D["fresh container<br/>(claude code + mise only;<br/>no repo checkout, no dotfiles)"] --> A["Claude Code agent<br/>reads ONLY:<br/>marketplace README + plugin README/SKILL"]
+  A -->|"claude plugin marketplace add ray-manaloto/claude-code-marketplace"| M["marketplace registered"]
+  M -->|"claude plugin install aggregated-research"| P["plugin + its 4 declared deps installed"]
+  P -->|"SessionStart hook"| C["CLI fetched into $CLAUDE_PLUGIN_DATA"]
+  P -->|"docs say EXACTLY which env vars, and where upstream documents each"| E["env vars set:<br/>firecrawl · exa · context7 · last30days"]
+  C --> T["acceptance: one real question end to end,<br/>every adapter answers or degrades LOUDLY"]
+  E --> T
+  style T fill:#FFF1EA,stroke:#B5471B
+    </pre>
+    <figcaption><strong>The install is the test.</strong> An agent with no prior context, an empty machine, and only the published docs must reach a working end-to-end run. Anything the agent has to guess is a documentation defect, and the container makes the guess visible instead of letting a warm machine hide it.</figcaption>
+  </figure>
+
+  <h3>The environment variables the docs must name</h3>
+  <p>Measured from the installed plugins' own files (<span class="src">cli-plugin-anatomy.md §c per plugin</span>); the plugin's README will carry this table with the exact upstream file to read for each — delegation is fine, as you said, when it says precisely where to look.</p>
+  <div class="wrap"><table>
+    <thead><tr><th>Dependency</th><th>What auth it needs</th><th>Where upstream documents it</th><th>Without it</th></tr></thead>
+    <tbody>
+      <tr><td>firecrawl</td><td><code>firecrawl login --browser</code> or <code>firecrawl login --api-key &lt;key&gt;</code> (the CLI stores it; no env var required for the keyless free tier)</td><td>the firecrawl plugin's <code>skills/firecrawl/SKILL.md</code> + <code>firecrawl login --help</code></td><td>search / scrape / interact still work on the free tier; the rest refuse</td></tr>
+      <tr><td>context7</td><td><code>CONTEXT7_API_KEY</code> — injected as an <code>Authorization</code> header by the plugin's <code>.mcp.json</code>; anonymous if unset</td><td>the context7 plugin's <code>.mcp.json</code> and README</td><td>works anonymously at a lower rate limit</td></tr>
+      <tr><td>exa</td><td>none required — hosted MCP, open endpoint <span class="src">per the installed plugin's .mcp.json; re-verify at spec time</span></td><td>the exa plugin's <code>.mcp.json</code></td><td>works</td></tr>
+      <tr><td>last30days</td><td><code>SCRAPECREATORS_API_KEY</code> primary; optional per-source keys (<code>OPENAI_API_KEY</code>, <code>XAI_API_KEY</code>, …) — degrades per source</td><td>the last30days plugin README and its <code>doctor</code> command</td><td>sources without a key are skipped, and <code>doctor</code> says which</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>This table is the spec's <code>E</code>-row material, not yet the README:</strong> each variable name above is re-read from the plugin files at spec time and the container test is what proves the README is sufficient.</p>
 
   <h2>Build order, cheapest first</h2>
   <ol>
-    <li>CLI entry point + <code>trackers</code> verb + <code>--json</code>/<code>-o</code> convention + one test that goes red (mostly exists).</li>
+    <li>CLI entry point + <code>trackers</code> verb + the <code>--out PATH</code> convention (long flag, per the repo; JSON is the only output, so no <code>--json</code>) + one test that goes red (mostly exists). <span class="src">fable-advisor 2026-08-28: this page's earlier <code>-o</code>/<code>--json</code> wording was corrected here so the page and the spec do not restate each other differently.</span></li>
     <li>Plugin dir in this repo first (dogfood): manifest without <code>version</code>, the spine skill, the SessionStart check, <code>rules/security.md</code>.</li>
     <li>Marketplace: tag, reset, manifest entry, <code>allowCrossMarketplaceDependenciesOn</code>; install here from the marketplace; delete the local skill.</li>
     <li><code>packages</code>, <code>codesearch</code>, <code>links</code>, <code>breadth</code> — each prototyped end to end before its verb lands (your standing "prototype all the tools first").</li>
     <li>Split the CLI out to its own <code>uv</code>-installable package; pin it in <code>mise.toml</code> beside <code>firecrawl-cli</code> and <code>ctx7</code>.</li>
+    <li><strong>Done means:</strong> the container install above succeeds with an agent reading only the published docs — run as the last step of every slice, not once at the end.</li>
   </ol>
   <p>Every step goes <code>fable-advisor</code> → <code>codex-implementer</code> → cross-family cold review, per your 2026-08-27 rule.</p>
 

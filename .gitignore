@@ -9,6 +9,9 @@ __pycache__/
 # Firecrawl web-research outputs are transient, untrusted fetched content.
 .firecrawl/
 
+# aggregated-research plugin CLI --out target, same shape as .firecrawl/.
+.research/
+
 # mise
 # (mise.lock IS committed — reproducible tool installs)
 
