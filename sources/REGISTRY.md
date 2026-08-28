@@ -437,3 +437,9 @@ sources: `tarqd/skills`, `nq-rdl/agent-extensions`, `a5c-ai/babysitter`,
 - <https://github.com/PyO3/pyo3> — touched only as a lychee CONSUMER (its CI). T3.
 - <https://github.com/bamr87/it-journey> — `scripts/validation/link-checker.py`, prior art
   for the subprocess + `--format json` bridge (reads a `fail_map` key 0.24.2 does not emit). T3.
+- <https://github.com/jdx/hk> — the aggregated-research spine's issues-DISABLED fixture:
+  `has_issues` false, `has_discussions` true, `is:issue` structurally 0 while `is:pr` → 1005
+  (re-measured 2026-08-28 by three premise-verifier passes). Its source is the `hk` we run. T2.
+- <https://github.com/cli/cli> — `gh`'s exit-code and stream split probed for the trackers
+  adapter contract (404 → rc 1, JSON body on stdout, `gh: Not Found (HTTP 404)` on stderr;
+  `search/issues` default page 30). T3.
