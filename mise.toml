@@ -828,6 +828,19 @@ run = "uv run --group codegen python schemas/generate_fetch_receipt.py"
 description = "Fail if generated fetch-receipt models differ from the schema"
 run = "uv run --group codegen python -m schemas.check_fetch_receipt_codegen"
 
+[tasks.kb-research-record-codegen]
+description = "Regenerate strict research-record msgspec models from JSON Schema"
+run = "uv run --group codegen python schemas/generate_research_record.py"
+
+[tasks.kb-research-record-codegen-check]
+description = "Fail if generated research-record models differ from the schema"
+run = "uv run --group codegen python -m schemas.check_research_record_codegen"
+
+[tasks.kb-research-trackers]
+description = "Search one repository's GitHub issue and pull-request trackers"
+run = "uv run kb-setup research-trackers"
+timeout = "10m"
+
 [tasks.kb-affected]
 description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbol>" [--depth N]'
 # The question `kb-query` structurally CANNOT answer. `query` is a forward BFS from

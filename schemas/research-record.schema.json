@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ray-manaloto/knowledge-base/schemas/research-record.schema.json",
+  "title": "AdapterRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "adapter",
+    "tier",
+    "question",
+    "command",
+    "has_issues",
+    "has_discussions",
+    "ran_at",
+    "total_count",
+    "hits",
+    "null_result"
+  ],
+  "properties": {
+    "adapter": {"type": "string"},
+    "tier": {"$ref": "#/$defs/Tier"},
+    "question": {"type": "string", "minLength": 1, "maxLength": 512},
+    "command": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "has_issues": {"type": "boolean"},
+    "has_discussions": {"type": "boolean"},
+    "ran_at": {"$ref": "#/$defs/UtcTimestamp"},
+    "total_count": {"type": "integer", "minimum": 0},
+    "hits": {
+      "type": "array",
+      "maxItems": 60,
+      "items": {"$ref": "#/$defs/Hit"}
+    },
+    "null_result": {
+      "anyOf": [
+        {"$ref": "#/$defs/Null"},
+        {"type": "null"}
+      ]
+    }
+  },
+  "$defs": {
+    "Tier": {
+      "type": "string",
+      "enum": ["cheap", "expensive"]
+    },
+    "Kind": {
+      "type": "string",
+      "enum": ["issue", "pr"]
+    },
+    "UtcTimestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "Hit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "title", "snippet", "date", "kind"],
+      "properties": {
+        "url": {"type": "string", "pattern": "^https://"},
+        "title": {"type": "string", "minLength": 0, "maxLength": 512},
+        "snippet": {"type": "string", "minLength": 0, "maxLength": 600},
+        "date": {"$ref": "#/$defs/UtcTimestamp"},
+        "kind": {"$ref": "#/$defs/Kind"}
+      }
+    },
+    "Arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "command", "result", "discriminates"],
+      "properties": {
+        "kind": {"$ref": "#/$defs/Kind"},
+        "command": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "result": {"type": "string"},
+        "discriminates": {"type": "boolean"}
+      }
+    },
+    "Null": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["arms"],
+      "properties": {
+        "arms": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {"$ref": "#/$defs/Arm"}
+        }
+      }
+    }
+  }
+}
