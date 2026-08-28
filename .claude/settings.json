@@ -97,7 +97,7 @@
     "last30days@last30days-skill": true,
     "i-have-adhd@i-have-adhd": true,
     "ponytail@ponytail": true,
-    "aggregated-research@claude-code-marketplace": true
+    "aggregated-research@ray-manaloto": true
   },
   "extraKnownMarketplaces": {
     "fable-orchestrator": {
@@ -154,7 +154,7 @@
         "repo": "mvanhorn/last30days-skill"
       }
     },
-    "claude-code-marketplace": {
+    "ray-manaloto": {
       "source": {
         "source": "github",
         "repo": "ray-manaloto/claude-code-marketplace"

@@ -65,7 +65,7 @@ def _good_marketplace_root(tmp_path: Path) -> Path:
         root / pv.MARKETPLACE_REL,
         {
             "$schema": _MARKETPLACE_SCHEMA_URL,
-            "name": "claude-code-marketplace",
+            "name": "ray-manaloto",
             "owner": {"name": "Raymond Manaloto"},
             "plugins": [{"name": "aggregated-research", "source": "./aggregated-research"}],
         },
