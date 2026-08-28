@@ -266,3 +266,12 @@ install arm — Ray's clear-prep answer of session `kb-20260828.01`, verbatim:
 `claude -p` sessions in the container: an agent installs marketplace+plugin from
 the READMEs alone, a fresh session runs the question so the real SessionStart
 hook fires. Closes your definition of done. ~1 codex round."*
+
+## Merge answer, slice 3b (AskUserQuestion, session `kb-20260828.02`, verbatim)
+
+**"Squash-merge now (Recommended)"** — marketplace PR #3 (head `e77fd7a`; four green
+`acceptance` runs 33186621864 / 33187463915 / 33187970377 / 33188627823; codex cold
+review ×2 + Opus silent-failure read; two respec rounds) squash-merged as `eb3ba054916fc20dbe7ac00178ba2fe983b19684`,
+closing marketplace #2. Residuals (P3 + one unarmed allowlist claim) are marketplace
+#4. Page: `docs/artifacts/two-sessions-one-container.html`
+(<https://claude.ai/code/artifact/e46bc03b-c662-4ef7-afc9-dbf4be31c2a5>).
