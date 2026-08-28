@@ -227,3 +227,16 @@ first."* The finding that prompted it: `aggregated-research@ray-manaloto` is
 enabled in `.claude/settings.json` with the `ray-manaloto` marketplace in
 `extraKnownMarketplaces`, yet `claude plugin list` (256 plugins) has no entry,
 no marketplace clone and no cache dir — measured at this session's start.
+
+## The slice-3 scope answers (AskUserQuestion after `three-leaks-one-hook`, session `kb-20260828.01`, verbatim)
+
+Scope: **"Fixes + container CI, one M dispatch (Recommended)"** — the shared
+`bin/mise-env` shim (ceiling, trust, uv cache, `__MISE_*` unset), hook and
+wrappers calling it, README updated, `.github/workflows` with `mise oci build`
++ install job + agent job.
+
+Secret (`CLAUDE_CODE_OAUTH_TOKEN` in the marketplace repo), free text:
+**"You have permission to do it yourself via gh cli"**.
+
+Acceptance question: **"trackers on openai/codex-plugin-cc (Recommended)"** —
+`aggregated-research trackers openai/codex-plugin-cc "agent team tokens"`.

@@ -1,0 +1,119 @@
+<title>Three Leaks, One Hook</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --ink: #1b212c; --muted: #5b6472; --line: #d7dbe2;
+    --leak: #c2401f; --leak-bg: #fbe9e3; --held: #227a4a; --held-bg: #e3f3e9; --accent: #4b3f8f;
+    --plate: #ffffff; --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #13171e; --panel: #1b2029; --ink: #e7eaf0; --muted: #a2aab8; --line: #303743;
+    --leak: #ff8a68; --leak-bg: #3a1f16; --held: #6fd39a; --held-bg: #16302200; --accent: #b3a7ff; --plate: #f3f4f7;
+  } }
+  :root[data-theme="dark"] {
+    --bg: #13171e; --panel: #1b2029; --ink: #e7eaf0; --muted: #a2aab8; --line: #303743;
+    --leak: #ff8a68; --leak-bg: #3a1f16; --held: #6fd39a; --held-bg: #16302200; --accent: #b3a7ff; --plate: #f3f4f7;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; line-height: 1.55; margin: 0; }
+  main { max-width: 62rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; display: grid; gap: 2rem; }
+  h1, h2 { font-family: Manrope, "IBM Plex Sans", sans-serif; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2rem, 4vw, 2.8rem); font-weight: 800; line-height: 1.1; }
+  h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: .6rem; }
+  p { max-width: 65ch; margin: 0 0 .75rem; }
+  .eyebrow { font-family: var(--mono); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: .5rem; }
+  .lede { font-size: 1.15rem; color: var(--ink); }
+  code { font-family: var(--mono); font-size: .88em; background: color-mix(in srgb, var(--line) 45%, transparent); padding: .05em .35em; border-radius: 3px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1.4rem 1.5rem; }
+  figure { margin: 0; }
+  figcaption { color: var(--muted); font-size: .9rem; margin-top: .6rem; max-width: 65ch; }
+  .mermaid { background: var(--plate); color: #1b212c; border-radius: 6px; padding: .75rem; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .wrap { overflow-x: auto; }
+  .pill { display: inline-block; font-family: var(--mono); font-size: .72rem; padding: .1rem .5rem; border-radius: 999px; font-weight: 600; }
+  .pill.leak { color: var(--leak); background: var(--leak-bg); }
+  .pill.held { color: var(--held); background: var(--held-bg); border: 1px solid var(--held); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; }
+  .card { border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.1rem; }
+  .card h3 { margin: 0 0 .4rem; font-size: 1rem; font-family: Manrope, sans-serif; }
+  .card p { font-size: .95rem; margin: 0 0 .4rem; }
+  .cite { color: var(--muted); font-size: .8rem; font-family: var(--mono); }
+  ol { padding-left: 1.3rem; max-width: 65ch; } li { margin-bottom: .4rem; }
+  .decide { border-left: 4px solid var(--accent); }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow">knowledge-base · slice 3 · measured 2026-08-28, session kb-20260828.01</div>
+    <h1>Three Leaks, One Hook</h1>
+    <p class="lede">The plugin never installed itself here. Once installed by hand, its SessionStart hook pulled <strong>8.3 GB of your own tools</strong> into the plugin's data dir and still failed. Three walls the hook builds do not hold on a real host — and every one of them holds in a container, which is why the container test alone would have said "green".</p>
+  </header>
+
+  <section>
+    <h2>Why it was not installed at all</h2>
+    <p>The house analogy: putting a plugin's name in the project's <code>.claude/settings.json</code> is like writing a guest on the invitation list. Since Claude Code 2.1.195 that no longer opens the door — the guest must be walked in with <code>claude plugin install</code>. Marketplace <code>ray-manaloto</code> was not even registered on this machine.</p>
+    <p class="cite">sources/claude-code-docs/…/discover-plugins.md:486 · fix = the README's own two commands, run this session: marketplace add → plugin install (+4 dependencies), scope: user</p>
+  </section>
+
+  <section>
+    <h2>Where the hook leaks — the path, with the three walls</h2>
+    <figure>
+      <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#1b212c','lineColor':'#5b6472','fontFamily':'IBM Plex Sans, sans-serif','fontSize':'13px'}}}%%
+flowchart TD
+  H[SessionStart hook<br/>mise --cd PLUGIN_ROOT install] --> W{config walk<br/>from PLUGIN_ROOT up to HOME}
+  W -- "matches HOME/.config/mise/config.toml<br/>as a LOCAL hierarchy file" --> L1[LEAK 1<br/>~120 of your tools install<br/>into PLUGIN_DATA/mise<br/>8.3 GB · 408 s]
+  W -- "MISE_CEILING_PATHS=PLUGIN_ROOT<br/>stops the walk" --> P[installs ty + the pipx CLI only]
+  P --> U[uv checks this repo out under<br/>~/Library/Caches/uv/…]
+  U --> G[uv runs git submodule update]
+  G -- "git = the mise SHIM<br/>reads the checkout's mise.toml<br/>NOT in MISE_TRUSTED_CONFIG_PATHS" --> L2[LEAK 2<br/>shim exits 1 → uv exit 2<br/>CLI never installs]
+  G -- "UV_CACHE_DIR=PLUGIN_DATA/uv<br/>+ trust PLUGIN_DATA" --> OK1[CLI installed · 47 s · 1.3 GB]
+  OK1 --> X[bin/aggregated-research<br/>mise exec -- aggregated-research]
+  X -- "shell already mise-ACTIVATED<br/>__MISE_DIFF / __MISE_SESSION set<br/>exec keeps the OLD PATH" --> L3[LEAK 3<br/>couldn't exec process]
+  X -- "env -u __MISE_DIFF -u __MISE_SESSION<br/>-u __MISE_ORIG_PATH" --> OK2[aggregated-research --help answers]
+  style L1 fill:#fbe9e3,stroke:#c2401f,color:#1b212c
+  style L2 fill:#fbe9e3,stroke:#c2401f,color:#1b212c
+  style L3 fill:#fbe9e3,stroke:#c2401f,color:#1b212c
+  style OK1 fill:#e3f3e9,stroke:#227a4a,color:#1b212c
+  style OK2 fill:#e3f3e9,stroke:#227a4a,color:#1b212c
+  style P fill:#e3f3e9,stroke:#227a4a,color:#1b212c
+      </pre>
+      <figcaption>Each fork is one probe run this session: the red branch is what the shipped hook does, the green branch is the same command with one environment variable added. Every label on a red arrow is the literal cause read from mise's output.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Measured, unfixed vs fixed (same host, cold data dir both times)</h2>
+    <div class="wrap"><table>
+      <thead><tr><th>run</th><th>rc</th><th>time</th><th>data dir</th><th>tools installed</th></tr></thead>
+      <tbody>
+        <tr><td>shipped hook, by hand <span class="pill leak">leaks</span></td><td>1</td><td>408 s</td><td>8.3 GB</td><td>~120 (your whole <code>~/.config/mise</code>)</td></tr>
+        <tr><td>+ ceiling + uv cache + trust <span class="pill held">holds</span></td><td>0</td><td>47 s</td><td>1.3 GB</td><td>2 (ty, the pipx CLI)</td></tr>
+        <tr><td>wrapper in an activated shell <span class="pill leak">leaks</span></td><td>1</td><td>—</td><td>—</td><td>"couldn't exec process" although <code>mise which</code> finds it</td></tr>
+        <tr><td>wrapper with <code>__MISE_*</code> unset <span class="pill held">holds</span></td><td>0</td><td>—</td><td>—</td><td>PATH gains the 2 plugin bin dirs</td></tr>
+      </tbody>
+    </table></div>
+    <p class="cite">1.3 GB is the CLI's full dependency set (this repo's pyproject), not the leak — the "split into a uv-installable package" decision of 2026-08-27 is what shrinks it.</p>
+  </section>
+
+  <section>
+    <h2>Why the container would have lied</h2>
+    <div class="cards">
+      <div class="card"><h3>Leak 1 · home config</h3><p>A container has no <code>~/.config/mise/config.toml</code>. Nothing to walk into.</p><p class="cite">sources/mise/docs/configuration.md:15 — <code>.config/mise/config.toml</code> is a hierarchy filename</p></div>
+      <div class="card"><h3>Leak 2 · the git shim</h3><p>A container has no <code>~/.local/share/mise/shims</code> on PATH; <code>git</code> is <code>/usr/bin/git</code>. The untrusted checkout is never consulted.</p><p class="cite">mise verbose: "Config files in …/checkouts/…/mise.toml are not trusted"</p></div>
+      <div class="card"><h3>Leak 3 · activation</h3><p>A container shell is not <code>mise activate</code>d, so <code>__MISE_DIFF</code> is unset and <code>mise exec</code> builds PATH from scratch.</p><p class="cite">armed: <code>mise bin-paths</code> lists both dirs; <code>exec</code>'s PATH had neither</p></div>
+    </div>
+    <p style="margin-top:1rem">So slice 3 is two things, not one: the container acceptance test Ray asked for, <em>and</em> these three fixes in the hook and wrappers — otherwise the test passes over a plugin that breaks on the one machine that matters.</p>
+  </section>
+
+  <section class="decide">
+    <h2>What slice 3 must contain</h2>
+    <ol>
+      <li><strong>Hook + both wrappers share one environment.</strong> Today the wrapper does not even carry the hook's confinement — invoking it re-leaked the home config and started a Rust install. One shim (<code>bin/mise-env</code>) that sets ceiling, trust, data dir, uv cache and unsets <code>__MISE_*</code>; hook and wrappers call it.</li>
+      <li><strong>Container CI in the marketplace repo</strong> (it has no <code>.github/</code> today): <code>mise oci build</code> on <code>ubuntu-latest</code>, then a job that runs the README's install commands, the hook, and <code>aggregated-research trackers …</code>.</li>
+      <li><strong>One human step only you can do:</strong> <code>claude setup-token</code> → <code>gh secret set CLAUDE_CODE_OAUTH_TOKEN -R ray-manaloto/claude-code-marketplace</code>. The repo has zero secrets today; the install job needs none, the agent job needs this one.</li>
+      <li><strong>Host regression arms stay in the docs</strong>: the three probes above, so a future hook change is armed against a real host, not only the container.</li>
+    </ol>
+  </section>
+</main>
