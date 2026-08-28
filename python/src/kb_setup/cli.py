@@ -75,6 +75,7 @@ def _print_usage() -> int:
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | skill-refresh | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
+        "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
         "session-state [--no-pr] | context | "
         "session-select (--current | --sessions <id>... | --last N | "
@@ -491,6 +492,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         # a gate — it writes no `.agent/kb/gates/` record, because a per-file
         # check is not evidence about a commit.
         return check.main(repo_root, rest)
+    if cmd == "plugin-validate":
+        from kb_setup import plugin_validate
+
+        return plugin_validate.main(repo_root, rest)
     if cmd == "skill-score":
         from kb_setup import skill_eval
 
@@ -568,6 +573,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | funnel | "
+        "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
         "session-state [--no-pr] | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
