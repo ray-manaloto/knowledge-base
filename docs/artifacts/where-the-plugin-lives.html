@@ -1,0 +1,156 @@
+<title>Where the Plugin Lives</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #F5F8F6; --paper: #FFFFFF; --ink: #15221D; --muted: #566761;
+    --rule: #CDD8D3; --pine: #2C6B5B; --pine-soft: #DDEEE7; --iris: #5B48A8; --iris-soft: #E6E1F5;
+    --warn: #A3571C; --warn-soft: #F7E7D8;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --ground: #0F1613; --paper: #172019; --ink: #E6EEE9; --muted: #9DB0A7;
+    --rule: #2C3A33; --pine: #7CC7AE; --pine-soft: #1E3A31; --iris: #B3A4F0; --iris-soft: #2C2650;
+    --warn: #E8A163; --warn-soft: #3D2A17;
+  } }
+  :root[data-theme="dark"] {
+    --ground: #0F1613; --paper: #172019; --ink: #E6EEE9; --muted: #9DB0A7;
+    --rule: #2C3A33; --pine: #7CC7AE; --pine-soft: #1E3A31; --iris: #B3A4F0; --iris-soft: #2C2650;
+    --warn: #E8A163; --warn-soft: #3D2A17;
+  }
+  body { background: var(--ground); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; line-height: 1.5; margin: 0; }
+  main { max-width: 62rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  h1, h2, h3 { font-family: "Sora", "IBM Plex Sans", sans-serif; text-wrap: balance; line-height: 1.15; }
+  h1 { font-size: 2.2rem; margin: 0 0 .4rem; font-weight: 700; }
+  h2 { font-size: 1.35rem; margin: 2.5rem 0 .75rem; }
+  h3 { font-size: 1.05rem; margin: 1.25rem 0 .4rem; }
+  p { max-width: 65ch; }
+  .eyebrow { font-family: "IBM Plex Mono", monospace; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--pine); }
+  code { font-family: "IBM Plex Mono", monospace; font-size: .88em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 .3em; }
+  pre.mermaid { background: #fff; border: 1px solid var(--rule); border-radius: 4px; padding: .75rem; overflow-x: auto; }
+  figure { margin: 1.25rem 0; }
+  figcaption { font-size: .85rem; color: var(--muted); margin-top: .5rem; max-width: 65ch; }
+  .forks { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; }
+  .card { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 1rem 1.1rem; }
+  .card h3 { margin-top: 0; }
+  .card.pick { border-color: var(--pine); box-shadow: inset 4px 0 0 var(--pine); }
+  .card.alt { box-shadow: inset 4px 0 0 var(--iris); }
+  .tag { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; border-radius: 3px; padding: .1em .5em; margin-bottom: .5rem; }
+  .tag.pick { background: var(--pine-soft); color: var(--pine); }
+  .tag.alt { background: var(--iris-soft); color: var(--iris); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  ul { padding-left: 1.2rem; } li { margin: .25rem 0; max-width: 65ch; }
+  .src { font-family: "IBM Plex Mono", monospace; font-size: .78rem; color: var(--muted); }
+  .measured { border-top: 1px solid var(--rule); margin-top: 2.5rem; padding-top: 1rem; font-size: .9rem; color: var(--muted); }
+  svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+  svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+  svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+  svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+  svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+  svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+  svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+  svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+  svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+  svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+  svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+  svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+  svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+  svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+  svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
+</style>
+<main>
+  <div class="eyebrow">aggregated-research plugin · slice 2 · decision page · 2026-08-28</div>
+  <h1>Where the Plugin Lives</h1>
+  <p>Three choices decide the slice-2 spec. Two are about <em>where bytes sit</em>; one is a
+  destructive step on your marketplace repo. The picture below is the install chain a fresh
+  container walks — every option is a different answer to one box on it.</p>
+
+  <div class="card" style="border-color: var(--warn); box-shadow: inset 4px 0 0 var(--warn); margin-bottom:1.5rem">
+    <span class="tag warn">corrected after publication · 2026-08-28</span>
+    <p><strong>These three forks were already settled on 2026-08-27</strong> (<code>.agent/plans/session-2026-08-27-g.md</code> §1, decisions 3–7)
+    and should not have been re-asked. Ray's answers, verbatim option labels: Fork 1 = <strong>B, in the marketplace repo</strong>
+    ("search history, we reviewed this already to start over by removing what exists now"); Fork 2 = <strong>the mise-first installer
+    script</strong> ("use mise first installer script" — the plugin ships a <code>mise.toml</code> pinning the CLI, the SessionStart hook runs
+    <code>mise install</code> into <code>$CLAUDE_PLUGIN_DATA</code>); Fork 3 = <strong>"Tag, then wipe main"</strong>. The recommendations
+    below were wrong on Forks 1 and 2 and are left in place so the record shows what was proposed.</p>
+  </div>
+  <figure>
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#f2f2f4','primaryTextColor':'#1b1b1b','primaryBorderColor':'#8d8d94','lineColor':'#4a4a4a','fontFamily':'IBM Plex Mono, monospace','fontSize':'12px'}}}%%
+flowchart LR
+  A["claude plugin marketplace add#lt;br#gt;ray-manaloto/claude-code-marketplace"] -->|"reads .claude-plugin/marketplace.json"| M["marketplace.json entry#lt;br#gt;aggregated-research"]
+  M -->|"source: FORK 1"| P["plugin dir#lt;br#gt;plugin.json · skills/ · hooks/hooks.json · .lsp.json"]
+  P -->|"claude plugin install … --yes#lt;br#gt;+ 4 declared deps"| I["installed plugin"]
+  I -->|"SessionStart hook: FORK 2"| C["CLI in $CLAUDE_PLUGIN_DATA#lt;br#gt;aggregated-research trackers …"]
+  I -->|"skill runs via Bash"| C
+  C -->|"--out .research/#lt;slug#gt;.json"| O[(".research/ files")]
+  classDef fork fill:#DDEEE7,stroke:#2C6B5B,color:#1b1b1b
+  class M,I fork
+</pre>
+    <figcaption>The install chain in a fresh container. The two green boxes are where Fork 1 (which repo the plugin dir sits in) and Fork 2 (how the hook fetches the CLI) change the chain. Fork 3 is not on the chain — it is what happens to the marketplace repo before the entry is added.</figcaption>
+  </figure>
+
+  <h2>Fork 1 — which repo holds the plugin dir</h2>
+  <div class="forks">
+    <div class="card pick">
+      <span class="tag pick">A · recommended</span>
+      <h3>In <code>knowledge-base</code>, at <code>plugins/aggregated-research/</code></h3>
+      <ul>
+        <li>Marketplace entry: <code>{"source":"git-subdir","url":"…/knowledge-base","path":"plugins/aggregated-research"}</code> — a shape the marketplace schema defines (required: <code>source</code>, <code>url</code>, <code>path</code>; measured this session from the fetched schema).</li>
+        <li>The marketplace repo changes by <strong>one entry + README</strong>. Everything else stays in the repo that already has the gates, the CLI code, and <code>kb_setup</code>.</li>
+        <li>The <code>kb_setup</code> validation task validates <em>local</em> files — one repo, one <code>kb-check</code>.</li>
+        <li>Spine skill and CLI version together; "delete the local skill" becomes a <code>git mv</code>.</li>
+      </ul>
+    </div>
+    <div class="card alt">
+      <span class="tag alt">B · mise-toolkit's shape</span>
+      <h3>In the marketplace repo, at <code>./aggregated-research</code></h3>
+      <ul>
+        <li>Marketplace entry: <code>{"source":"./aggregated-research"}</code> — what <code>mise-toolkit</code> uses today.</li>
+        <li>The lane edits <strong>two repos</strong>; the validation task must reach across a second checkout; the skill's history leaves this repo.</li>
+        <li>Skill and CLI drift on separate clocks — the CLI pins here, the skill that drives it pins there.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Fork 2 — how the SessionStart hook delivers the CLI</h2>
+  <div class="forks">
+    <div class="card pick">
+      <span class="tag pick">1 · recommended now</span>
+      <h3><code>uv tool install</code> from this repo at a pinned SHA</h3>
+      <ul>
+        <li>Hook: <code>UV_TOOL_DIR=$CLAUDE_PLUGIN_DATA uv tool install --from git+https://github.com/ray-manaloto/knowledge-base@#lt;sha#gt; kb-setup</code>, skipped when the recorded SHA matches.</li>
+        <li><strong>Proven pattern:</strong> dotfiles already installs <code>kb-setup</code> as a SHA-pinned git dependency <span class="src">pyproject.toml:7</span>.</li>
+        <li>Ceiling: it resolves <code>graphifyy[all]==0.9.50</code> and every other runtime dep <span class="src">pyproject.toml dependencies</span> — minutes on a cold machine. Fine for slice 2; the split package (slice 3) removes it.</li>
+      </ul>
+    </div>
+    <div class="card alt">
+      <span class="tag alt">2 · slice 3</span>
+      <h3>A wheel on a GitHub release</h3>
+      <ul>
+        <li>Hook: <code>gh release download</code> then <code>uv tool install ./aggregated_research-*.whl</code>. Light and fast.</li>
+        <li>Needs the package split out of <code>kb_setup</code> AND a <code>.github/</code> workflow (this repo has none) — two slices of work before the first fetch works.</li>
+        <li>Blueprint already names this as the end state: <code>softprops/action-gh-release</code>, GHA ubuntu build.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Fork 3 — the marketplace reset</h2>
+  <div class="card">
+    <span class="tag warn">destructive · your repo</span>
+    <h3>Tag <code>pre-reset-2026-08-27</code>, then wipe <code>main</code></h3>
+    <p>Your 2026-08-27 decision, unchanged in the blueprint. Measured this session: the repo has
+    <strong>1 plugin</strong> (<code>mise-toolkit</code>, v0.6.0), <strong>0 tags</strong>, last push
+    <strong>2026-04-08</strong>. Wiping <code>main</code> removes <code>mise-toolkit</code> from the
+    branch; it survives only under the tag. Under Fork 1-A the wipe is optional — the new entry can sit
+    beside <code>mise-toolkit</code> instead. The lane will not force-push without your explicit yes.</p>
+  </div>
+
+  <div class="measured">
+    Measured this session: both schemas fetched from schemastore (301 → www.schemastore.org; <code>plugin.version</code> optional,
+    <code>marketplace.plugins[].source</code> has 5 shapes); marketplace repo via <code>gh api</code>;
+    <code>claude plugin validate --strict</code> exists on claude 2.1.250 and will run beside the schema check.
+    Skills considered and not used: <code>dataviz</code> (no data series), <code>design</code> (not a multi-artboard deliverable),
+    <code>writing-for-agents</code> (reader prose, not a skill file).
+  </div>
+</main>
