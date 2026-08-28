@@ -1,0 +1,144 @@
+<title>Aggregated-Research Plugin Blueprint</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root{--ground:#EEF2F3;--plate:#FFFFFF;--ink:#0F1F24;--muted:#526168;--rule:#C6D2D6;--accent:#B5471B;--yes:#1F7A5C;--no:#9A2F2F;--soft:#DCE8EC;--mermaid-plate:#FAFCFC}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ground:#101819;--plate:#182225;--ink:#E4ECEE;--muted:#9AABB1;--rule:#2E3C41;--accent:#F0824A;--yes:#5FC79A;--no:#E3776F;--soft:#1F2C31;--mermaid-plate:#FAFCFC}}
+  :root[data-theme="dark"]{--ground:#101819;--plate:#182225;--ink:#E4ECEE;--muted:#9AABB1;--rule:#2E3C41;--accent:#F0824A;--yes:#5FC79A;--no:#E3776F;--soft:#1F2C31;--mermaid-plate:#FAFCFC}
+  body{background:var(--ground);color:var(--ink);font-family:Newsreader,Georgia,serif;font-size:17.5px;line-height:1.55;margin:0}
+  main{max-width:80ch;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+  h1,h2,h3{font-family:Sora,"Helvetica Neue",sans-serif;text-wrap:balance;line-height:1.1;margin:0}
+  h1{font-size:clamp(2rem,5.5vw,3.2rem);font-weight:700;letter-spacing:-0.02em}
+  h2{font-size:1.45rem;margin-top:2.75rem;padding-bottom:0.35rem;border-bottom:2px solid var(--accent)}
+  h3{font-size:1.05rem;margin-top:1.5rem}
+  p{max-width:68ch;margin:0.9rem 0}
+  .eyebrow{font-family:"DM Mono",monospace;font-size:0.74rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)}
+  .lede{font-size:1.2rem;max-width:62ch}
+  code{font-family:"DM Mono",monospace;font-size:0.84em;background:var(--plate);border:1px solid var(--rule);padding:0 0.3em;border-radius:3px}
+  pre{font-family:"DM Mono",monospace;font-size:0.82rem;background:var(--plate);border:1px solid var(--rule);padding:0.9rem 1rem;overflow-x:auto;line-height:1.5}
+  pre code{border:0;background:none;padding:0}
+  table{border-collapse:collapse;width:100%;font-size:0.9rem}
+  th,td{text-align:left;vertical-align:top;padding:0.5rem 0.6rem;border-bottom:1px solid var(--rule)}
+  th{font-family:Sora,sans-serif;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em}
+  .wrap{overflow-x:auto}
+  .yes{color:var(--yes);font-weight:600}.no{color:var(--no);font-weight:600}
+  figure{margin:1.5rem 0}figcaption{font-size:0.9rem;color:var(--muted);margin-top:0.5rem;max-width:68ch}
+  .mermaid{background:var(--mermaid-plate);border:1px solid var(--rule);padding:0.75rem;overflow-x:auto;color:#0F1F24}
+  .src{font-family:"DM Mono",monospace;font-size:0.76rem;color:var(--muted)}
+  .fork{background:var(--soft);border-left:5px solid var(--accent);padding:0.9rem 1.1rem;margin:1rem 0}
+  .fork strong{font-family:Sora,sans-serif}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+<main>
+  <p class="eyebrow">knowledge-base · 2026-08-28 · two research lanes, measured against the installed plugins and the pinned docs</p>
+  <h1>Aggregated-Research Plugin Blueprint</h1>
+  <p class="lede">You asked for everything a Claude Code plugin can bundle, and for the plugin to work like the firecrawl and ctx7 ones. Both were read. The short version: <strong>firecrawl is the pattern; the context7 plugin is the opposite shape; and a plugin can carry a lot — but it cannot install your CLI for you.</strong></p>
+
+  <h2>What a plugin can carry</h2>
+  <p>Nine component types, all auto-discovered from conventional directories or named in <code>plugin.json</code>. <span class="src">plugins.md:163-186 · plugins-reference.md:13-14 (pinned claude-code-docs)</span></p>
+  <div class="wrap"><table>
+    <thead><tr><th>Component</th><th>Lives in</th><th>Use in aggregated-research?</th></tr></thead>
+    <tbody>
+      <tr><td>Skills</td><td><code>skills/&lt;name&gt;/SKILL.md</code></td><td class="yes">yes — the spine, and one per adapter</td></tr>
+      <tr><td>Agents</td><td><code>agents/*.md</code></td><td class="yes">yes — the synthesist and the adversarial verifier travel with the plugin</td></tr>
+      <tr><td>Hooks</td><td><code>hooks/hooks.json</code></td><td class="yes">one — a <code>SessionStart</code> script that installs the pinned CLI from a GitHub release into <code>${CLAUDE_PLUGIN_DATA}</code> if missing or stale (your comment; the docs' own pattern)</td></tr>
+      <tr><td>MCP servers</td><td><code>.mcp.json</code></td><td class="no">no — the CLI is the interface (see the fork below)</td></tr>
+      <tr><td>LSP servers</td><td><code>.lsp.json</code></td><td class="no">no</td></tr>
+      <tr><td><code>bin/</code> PATH addition</td><td><code>bin/</code></td><td class="no">no — a Python CLI is not a small redistributable binary <span class="src">plugins-reference.md:869-870</span></td></tr>
+      <tr><td>Monitors · themes · output styles · default settings</td><td>various</td><td class="no">no</td></tr>
+      <tr><td>Dependencies on other plugins</td><td><code>plugin.json.dependencies</code> + the root marketplace's <code>allowCrossMarketplaceDependenciesOn</code></td><td class="yes">yes — <code>firecrawl</code>, <code>exa</code>, <code>context7</code>, <code>last30days</code> declared, never vendored <span class="src">plugin-dependencies.md:79-104</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>How the CLI gets onto the machine</h3>
+  <p><strong>No manifest field installs an external CLI — but a hook script can, and the docs show exactly that shape.</strong> <span class="src">Corrected 2026-08-28 after your comment "we can have a script that downloads the cli from repo as a github package or artifact" — an earlier version of this section stopped at "cannot".</span> The paths are: bundle a binary under <code>bin/</code>; declare where a tool lives (<code>.mcp.json</code>/<code>.lsp.json</code> <code>command</code>); Node deps auto-install with <code>--ignore-scripts</code> (nothing builds); or a <strong><code>SessionStart</code> hook that installs into <code>${CLAUDE_PLUGIN_DATA}</code></strong> — the documented answer for "dependencies the automatic install can't provide", a directory that survives plugin updates. <span class="src">plugins-reference.md:718-747, 784-809, 869-870</span> So the blueprint's hook does not merely check: it fetches the pinned CLI release from GitHub (a wheel or a `uv tool install git+…@tag`) into <code>${CLAUDE_PLUGIN_DATA}</code> when the recorded version differs, and prints what it did. Firecrawl relies on the user instead (<code>npx firecrawl-cli@latest init</code>; here <code>mise.toml:180</code> pins <code>npm:firecrawl-cli</code>) — ours goes one step further because you asked it to.</p>
+
+  <h3>The schemas, probed</h3>
+  <div class="wrap"><table>
+    <thead><tr><th>File</th><th>Schema</th><th>Probe (2026-08-28)</th></tr></thead>
+    <tbody>
+      <tr><td><code>.claude-plugin/marketplace.json</code></td><td><code>https://json.schemastore.org/claude-code-marketplace.json</code> — goes in the file as <code>$schema</code>, and the plugin-entry keys it defines are the inventory of what a marketplace entry can carry: <code>dependencies · hooks · commands · agents · skills · outputStyles · themes · channels · mcpServers · lspServers · monitors · settings · userConfig · source · category · tags · strict</code>, plus the root <code>allowCrossMarketplaceDependenciesOn</code></td><td class="yes">HTTP 200</td></tr>
+      <tr><td><code>.claude-plugin/plugin.json</code></td><td><code>https://json.schemastore.org/claude-code-plugin-manifest.json</code> (same component keys minus <code>source/category/tags/strict</code>)</td><td class="yes">HTTP 200 — found via the schemastore catalog; a first probe spelled it <code>claude-code-plugin.json</code> and got 404, which is a spelling bound, not an absence</td></tr>
+      <tr><td><code>hooks/hooks.json</code></td><td><strong>No standalone hooks schema exists</strong> (catalog lists keybindings, plugin-manifest, marketplace, settings, launch — nothing for hooks). The hooks <em>shape</em> is defined twice: <code>claude-code-settings.json#/properties/hooks</code> (with <code>$defs/hookMatcher</code>, <code>hookCommand</code>) and inline at <code>claude-code-plugin-manifest.json#/properties/hooks/anyOf/1</code>. Validate <code>hooks.json</code> against one of those sub-schemas.</td><td class="no">404 for <code>claude-code-hooks.json</code>; control: bogus name 404, marketplace 200</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>Validation is a gate, not a habit:</strong> a <code>kb_setup</code> check (one mise task, one hk step in the marketplace repo) that validates both manifests and <code>hooks.json</code> against those schemas, so a manifest that drifts from the schema fails before it is pushed. <code>plugin-dev</code>'s <code>plugin-validator</code> agent is the second, advisory read.</p>
+
+  <h2>Firecrawl and context7 are not the same shape</h2>
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#0F1F24','primaryBorderColor':'#526168','lineColor':'#0F1F24','fontFamily':'DM Mono, monospace','fontSize':'12px'}}}%%
+flowchart LR
+  subgraph FC["firecrawl plugin (22 files · 0 MCP · 0 hooks · 0 agents)"]
+    FS["skills teach Claude<br/>the CLI verbs"] -->|"Bash: firecrawl scrape … -o .firecrawl/x.md"| FB["firecrawl CLI<br/>installed SEPARATELY<br/>(npm / mise pin)"]
+    FB -->|"writes"| FF[(".firecrawl/*.md<br/>read back via grep/head")]
+  end
+  subgraph C7["context7 plugin (8 files · 1 MCP · 0 CLI)"]
+    CS["skill + agent + command"] -->|"MCP tools: resolve-library-id, query-docs"| CM["https://mcp.context7.com/mcp<br/>(hosted, CONTEXT7_API_KEY header)"]
+  end
+  X["ctx7 CLI (npm ctx7 0.5.8, mise pin)<br/>same upstream, SEPARATE package,<br/>referenced NOWHERE in the plugin"]:::ghost
+  X -. "this repo drives it directly<br/>(research-doc-sources.md step 3)" .-> CS
+  classDef ghost fill:#EEEEEE,stroke:#9AA39D,color:#526168,stroke-dasharray:4 3
+    </pre>
+    <figcaption><strong>Left is a CLI wrapper; right is a hosted-MCP client.</strong> "ctx7" is a real CLI on this machine (<code>ctx7 --version</code> → 0.5.8, control-armed against a dead shim), but the installed context7 plugin never touches it. So "like firecrawl and ctx7" resolves to: <em>like firecrawl, pointed at our own CLI</em>. <span class="src">cli-plugin-anatomy.md pattern table; firecrawl rules/security.md for the file-isolation rule</span></figcaption>
+  </figure>
+
+  <h2>The blueprint</h2>
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#0F1F24','primaryBorderColor':'#526168','lineColor':'#0F1F24','fontFamily':'DM Mono, monospace','fontSize':'12px'}}}%%
+flowchart TB
+  subgraph MP["ray-manaloto/claude-code-marketplace"]
+    PJ["aggregated-research/.claude-plugin/plugin.json<br/>NO fixed version → tracks the git SHA<br/>dependencies: firecrawl · exa · context7 · last30days"]
+    SK["skills/ — the spine + one per adapter<br/>each defers to `aggregated-research &lt;verb&gt; --help`"]
+    AG["agents/ — synthesist, adversarial verifier"]
+    HK["hooks/ SessionStart:<br/>fetch the pinned CLI release from GitHub<br/>into $CLAUDE_PLUGIN_DATA when the version differs;<br/>validated against the manifest schema's hooks shape"]
+    RU["rules/security.md — CLI output is file-isolated,<br/>read back with grep/head (firecrawl's rule, copied)"]
+  end
+  subgraph CLI["the CLI — installed SEPARATELY (uv tool / mise pipx pin)"]
+    C["aggregated-research"] --> T["trackers ✔ (kb_setup/research/trackers.py)"]
+    C --> P["packages (deps.dev)"]
+    C --> S["codesearch (grep.app)"]
+    C --> L["links (lychee CLI subprocess)"]
+    C --> B["breadth (shells to the declared plugins' CLIs:<br/>firecrawl · ctx7 · exa · last30days)"]
+    C -->|"every verb: --json, -o .research/&lt;slug&gt;.json"| OUT[(".research/ files")]
+  end
+  SK -->|"Bash"| C
+  OUT -->|"grep / head"| SK
+  PJ -. "declares, never vendors" .-> DEP["firecrawl@firecrawl · exa@exa<br/>context7@context7-marketplace · last30days@last30days-skill"]
+  style PJ fill:#FFF1EA,stroke:#B5471B
+  style C fill:#FFF1EA,stroke:#B5471B
+    </pre>
+    <figcaption><strong>Two artifacts, one seam.</strong> The plugin is prose + agents + one hook; the CLI is a separate installable that the plugin's skills drive through Bash with file-isolated output — firecrawl's shape exactly. The CLI is staged in <code>kb_setup/research/</code> first (your 2026-08-27 decision 3) and split out to its own package once it runs end to end.</figcaption>
+  </figure>
+
+  <h3>Manifest facts that decide the details</h3>
+  <ul>
+    <li><strong>No fixed <code>version</code>.</strong> "Pushing new commits without bumping it has no effect" — users would go stale; omitting it tracks the git SHA. <span class="src">plugins-reference.md:1300-1320 · plugin-marketplaces.md:922-925</span></li>
+    <li><strong>Cross-marketplace deps need the root marketplace's allowlist</strong> (<code>allowCrossMarketplaceDependenciesOn</code>); trust does not chain. The four names already sit in this repo's <code>extraKnownMarketplaces</code>. <span class="src">plugin-dependencies.md:79-104</span></li>
+    <li><strong>Tags for semver deps</strong> are <code>{plugin}--v{version}</code> via <code>claude plugin tag --push</code>. <span class="src">plugin-dependencies.md:23-49</span></li>
+    <li><strong>A <code>command</code> plugin source exists</strong> (v2.1.229+; installed 2.1.250): a marketplace entry can say <code>{source: "command", command: "aggregated-research claude-plugin-path"}</code> and the CLI <em>generates the plugin directory</em> each session. Tempting; deferred — it needs one-time explicit acceptance and cannot be a transitive dependency. <span class="src">plugin-marketplaces.md:499-561</span></li>
+    <li><strong>Marketplace prep</strong> is the 2026-08-27 decision, unchanged: tag <code>pre-reset-2026-08-27</code>, push it, then wipe <code>main</code>. Today: 0 tags, one plugin, last push 2026-04-08.</li>
+  </ul>
+
+  <div class="fork">
+    <strong>The one fork that is yours.</strong> Firecrawl and context7 disagree on the interface: <em>CLI through Bash</em> (firecrawl) or <em>MCP tools</em> (context7). The blueprint above is CLI-only, because your words were "a full cli", and because the spine needs file-isolated, machine-readable output that a CLI gives for free. An MCP server can be added later as a thin wrapper over the same CLI if a tool-call interface turns out to matter. Confirm CLI-only, or say MCP too.
+  </div>
+
+  <h2>Build order, cheapest first</h2>
+  <ol>
+    <li>CLI entry point + <code>trackers</code> verb + <code>--json</code>/<code>-o</code> convention + one test that goes red (mostly exists).</li>
+    <li>Plugin dir in this repo first (dogfood): manifest without <code>version</code>, the spine skill, the SessionStart check, <code>rules/security.md</code>.</li>
+    <li>Marketplace: tag, reset, manifest entry, <code>allowCrossMarketplaceDependenciesOn</code>; install here from the marketplace; delete the local skill.</li>
+    <li><code>packages</code>, <code>codesearch</code>, <code>links</code>, <code>breadth</code> — each prototyped end to end before its verb lands (your standing "prototype all the tools first").</li>
+    <li>Split the CLI out to its own <code>uv</code>-installable package; pin it in <code>mise.toml</code> beside <code>firecrawl-cli</code> and <code>ctx7</code>.</li>
+  </ol>
+  <p>Every step goes <code>fable-advisor</code> → <code>codex-implementer</code> → cross-family cold review, per your 2026-08-27 rule.</p>
+
+  <h2>Not measured</h2>
+  <ul>
+    <li>The <code>command</code> plugin source was read in the docs, never executed.</li>
+    <li>Whether a <code>SessionStart</code> hook that only checks (never installs) is acceptable to you — firecrawl ships no hook at all and relies on the SKILL's install line.</li>
+    <li>The installed <code>plugin-dev</code> skill's own doc is stale on path-merge semantics (found by the lane; see its report).</li>
+  </ul>
+  <p class="src">Sources: .agent/kb/reports/agents/plugin-bundle-spec.md · cli-plugin-anatomy.md (both promoted to docs/research/reports/) · docs/direction/2026-08-27-ray-directives.md · session-2026-08-27-g.md §1. Page source: docs/artifacts/aggregated-research-plugin-blueprint.html</p>
+</main>

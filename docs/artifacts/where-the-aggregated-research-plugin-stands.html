@@ -1,0 +1,96 @@
+<title>Where the Aggregated-Research Plugin Stands</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Fira+Code:wght@400;500&display=swap">
+<style>
+  :root{--ground:#F5F3EE;--plate:#FFFFFF;--ink:#1F1A14;--muted:#6B6259;--rule:#D9D2C6;--accent:#3A6EA5;--done:#2F7D4F;--stop:#9B3A2E;--todo:#B8860B;--mermaid-plate:#FBFAF7}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ground:#171512;--plate:#211E1A;--ink:#EBE6DE;--muted:#A69C90;--rule:#3B352E;--accent:#7FB0E6;--done:#6CC08F;--stop:#E48A7C;--todo:#E2B44A;--mermaid-plate:#FBFAF7}}
+  :root[data-theme="dark"]{--ground:#171512;--plate:#211E1A;--ink:#EBE6DE;--muted:#A69C90;--rule:#3B352E;--accent:#7FB0E6;--done:#6CC08F;--stop:#E48A7C;--todo:#E2B44A;--mermaid-plate:#FBFAF7}
+  body{background:var(--ground);color:var(--ink);font-family:Lora,Georgia,serif;font-size:17px;line-height:1.55;margin:0}
+  main{max-width:76ch;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+  h1,h2{font-family:"Archivo Narrow","Arial Narrow",sans-serif;text-wrap:balance;line-height:1.05;margin:0;text-transform:uppercase;letter-spacing:0.01em}
+  h1{font-size:clamp(2.4rem,7vw,4rem);font-weight:700}
+  h2{font-size:1.35rem;margin-top:2.75rem;padding-top:0.75rem;border-top:3px solid var(--ink)}
+  p{max-width:66ch;margin:0.9rem 0}
+  .eyebrow{font-family:"Fira Code",monospace;font-size:0.74rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)}
+  .lede{font-size:1.2rem;max-width:60ch}
+  code{font-family:"Fira Code",monospace;font-size:0.84em;background:var(--plate);border:1px solid var(--rule);padding:0 0.3em;border-radius:2px}
+  table{border-collapse:collapse;width:100%;font-size:0.92rem}
+  th,td{text-align:left;vertical-align:top;padding:0.5rem 0.6rem;border-bottom:1px solid var(--rule)}
+  th{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:0.04em;font-size:0.85rem}
+  .wrap{overflow-x:auto}
+  .tag{font-family:"Fira Code",monospace;font-size:0.72rem;padding:0.05rem 0.4rem;border:1px solid currentColor;border-radius:2px;white-space:nowrap}
+  .done{color:var(--done)}.stop{color:var(--stop)}.todo{color:var(--todo)}
+  figure{margin:1.5rem 0}figcaption{font-size:0.9rem;color:var(--muted);margin-top:0.5rem;max-width:66ch}
+  .mermaid{background:var(--mermaid-plate);border:1px solid var(--rule);padding:0.75rem;overflow-x:auto;color:#1F1A14}
+  .opt{background:var(--plate);border:1px solid var(--rule);border-left:5px solid var(--accent);padding:0.9rem 1.1rem;margin:0.9rem 0}
+  .opt strong{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:0.03em}
+  .src{font-family:"Fira Code",monospace;font-size:0.76rem;color:var(--muted)}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+<main>
+  <p class="eyebrow">knowledge-base · 2026-08-28 · history review, measured today</p>
+  <h1>Where the aggregated-research plugin stands</h1>
+  <p class="lede">You decided on 2026-08-27 that <code>aggregated-research</code> becomes a plugin in <code>ray-manaloto/claude-code-marketplace</code>. Today the marketplace has not been touched since April, and one of the plugin's three planned modules exists. The research I ran this morning used the <em>repo-local skill</em>, because the plugin does not exist yet.</p>
+
+  <h2>What was decided, and when</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>Date · session</th><th>Decision (verbatim source)</th><th>Status today</th></tr></thead>
+    <tbody>
+      <tr><td>2026-08-27 · g</td><td><strong>7 HOW decisions</strong> by <code>/grilling</code>: the plugin IS <code>aggregated-research</code>; staged in <code>kb_setup/research/</code> first, split to a <code>uv</code> package once proven; reuse the marketplace — <strong>tag <code>pre-reset-2026-08-27</code>, push the tag, then wipe <code>main</code></strong>; this repo deletes its local skill and installs the plugin; declare (not vendor) <code>last30days-skill</code>, <code>firecrawl</code>, <code>exa</code>, <code>context7-marketplace</code>; <code>plugin-dev</code>'s validator is the manifest gate. <span class="src">session-2026-08-27-g.md §1</span></td><td><span class="tag done">DECIDED</span></td></tr>
+      <tr><td>2026-08-27 · h (kb-20260827.06)</td><td><strong>12 WHAT decisions</strong>: the spine (deep-research's stage shape + 3-vote tally + Claude-plans/cheap-lane-reads), on-demand first then a daily brief, any of your repos as user, tunable model/effort/family, recency as a rank term, tiered adapters, machine-readable output, deep-research constants as budgets. <span class="src">docs/direction/2026-08-27-ray-directives.md; docs/artifacts/what-is-aggregated-research-for.html</span></td><td><span class="tag done">DECIDED</span></td></tr>
+      <tr><td>2026-08-27 · i → 08-28 · a</td><td>First build: adapter contract + <strong>gh-trackers adapter</strong> via codex-implementer → PR <strong>#557</strong> landed. <span class="src">python/src/kb_setup/research/trackers.py</span></td><td><span class="tag done">BUILT · 1 of 3 modules</span></td></tr>
+      <tr><td>2026-08-28 · a</td><td><code>lychee-py</code> <strong>PyO3 binding</strong> (a library, not the module): spiked, benched, and you chose "A: stop — keep the CLI in hk". <strong>Corrected 2026-08-28 after your comment:</strong> this stopped <em>only the binding</em>. The <code>links</code> module (lychee CLI via subprocess, <code>--format json</code>), the plugin and its CLI were never stopped — an earlier version of this row said otherwise. <span class="src">docs/direction/2026-08-28-ray-directives.md § Correction</span></td><td><span class="tag stop">BINDING STOPPED</span><br><span class="tag todo">MODULE NOT BUILT</span></td></tr>
+      <tr><td>—</td><td><code>packages</code> (deps.dev) and <code>codesearch</code> (grep.app) modules — "prototype all the tools first" was the standing instruction.</td><td><span class="tag todo">NOT PROTOTYPED</span></td></tr>
+      <tr><td>—</td><td>Marketplace: tag, reset, manifest entry, plugin directory.</td><td><span class="tag todo">NOT STARTED</span> — <code>main</code> only, 1 plugin (<code>mise-toolkit</code>), 0 tags, last push 2026-04-08 <span class="src">measured: gh api branches / tags / marketplace.json</span></td></tr>
+      <tr><td>—</td><td>This repo deletes <code>.claude/skills/aggregated-research/</code> and installs the plugin.</td><td><span class="tag todo">NOT STARTED</span> — skill still local; no <code>extraKnownMarketplaces</code> entry for your marketplace <span class="src">measured: .claude/settings.json</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The shape that was decided, with what exists coloured in</h2>
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#1F1A14','primaryBorderColor':'#6B6259','lineColor':'#1F1A14','fontFamily':'Fira Code, monospace','fontSize':'12px'}}}%%
+flowchart LR
+  subgraph MK["ray-manaloto/claude-code-marketplace (untouched since 2026-04-08)"]
+    T["tag pre-reset-2026-08-27"]:::todo --> W["wipe main"]:::todo --> MJ["marketplace.json entry"]:::todo --> PL["aggregated-research/ plugin dir<br/>SKILL + agents + declared deps"]:::todo
+  end
+  subgraph KB["knowledge-base (this repo)"]
+    SK[".claude/skills/aggregated-research/<br/>(local skill — to be DELETED once plugin installs)"]:::done
+    TR["kb_setup/research/trackers.py<br/>gh trackers adapter, #557"]:::done
+    LN["links (lychee-py)"]:::stop
+    PK["packages (deps.dev)"]:::todo
+    CS["codesearch (grep.app)"]:::todo
+  end
+  PL -. "declares: last30days · firecrawl · exa · context7" .-> DEP["four dependency marketplaces<br/>(already in settings.json)"]:::done
+  PL -. "wraps" .-> TR
+  PL -. "wraps" .-> PK
+  PL -. "wraps" .-> CS
+  SK -. "moves into" .-> PL
+  classDef done fill:#E3F1E8,stroke:#2F7D4F,color:#1F1A14
+  classDef stop fill:#F5E1DD,stroke:#9B3A2E,color:#1F1A14,stroke-dasharray:4 3
+  classDef todo fill:#FFF7E0,stroke:#B8860B,color:#1F1A14
+    </pre>
+    <figcaption><strong>Green exists, amber was decided and never started, red was stopped by you.</strong> Everything in the marketplace box is amber. The one green module is the trackers adapter that ran this morning's research.</figcaption>
+  </figure>
+
+  <h2>What you clarified, and the build it implies</h2>
+  <p><strong>Your comment, verbatim:</strong> <em>"I didnt want to stop this work — i wanted a full cli built for aggregated-search plugin."</em> The three A/B/C ordering options that stood here were withdrawn: the WHAT was already decided, and the deliverable is a <strong>CLI</strong>, which the plugin wraps. Below is the shape that follows from your 2026-08-27 decisions plus this correction — the thing to confirm before a spec goes to <code>fable-advisor</code> and then <code>codex-implementer</code>.</p>
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#1F1A14','primaryBorderColor':'#6B6259','lineColor':'#1F1A14','fontFamily':'Fira Code, monospace','fontSize':'12px'}}}%%
+flowchart TB
+  U["any of your repos<br/>(Claude Code session)"] -->|"/aggregated-research question"| SK["plugin SKILL = the spine<br/>plan · dispatch · 3-vote verify · synthesize"]
+  SK -->|"shells out"| CLI["aggregated-research CLI<br/>(uv-installable; staged in kb_setup/research/ first)<br/>--json on every subcommand"]
+  CLI --> T["trackers<br/>gh issues + PRs, has_issues arm<br/>EXISTS (#557)"]:::done
+  CLI --> P["packages<br/>deps.dev, keyless"]:::todo
+  CLI --> C["codesearch<br/>grep.app MCP"]:::todo
+  CLI --> L["links<br/>lychee CLI subprocess, --format json"]:::todo
+  CLI --> B["breadth<br/>firecrawl / exa / last30days / context7<br/>declared plugins, not vendored"]:::todo
+  CLI -->|"machine-readable result<br/>+ report + artifact-when-decision"| OUT[("report · JSON · graph ingest")]
+  classDef done fill:#E3F1E8,stroke:#2F7D4F,color:#1F1A14
+  classDef todo fill:#FFF7E0,stroke:#B8860B,color:#1F1A14
+    </pre>
+    <figcaption><strong>One CLI, one subcommand per adapter, every adapter with a control arm and a test that can go red.</strong> The plugin dir in the marketplace holds the skill and declares the CLI + the four dependency marketplaces. Green exists; amber is the build. Build order follows the 2026-08-27 advisor order: CLI shell + trackers first (mostly exists), then packages, codesearch, links, then breadth; marketplace tag + reset + plugin dir once the CLI runs end to end from a clean install.</figcaption>
+  </figure>
+
+  <p class="src">Sources: .agent/plans/session-2026-08-27-g.md · docs/direction/2026-08-27-ray-directives.md · docs/direction/2026-08-28-ray-directives.md · auto-memory aggregated-research-is-becoming-a-plugin, aggregated-research-grilling-settled-2026-08-27 · gh api on the marketplace repo (today). Page source: docs/artifacts/where-the-aggregated-research-plugin-stands.html</p>
+</main>
