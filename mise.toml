@@ -1385,6 +1385,19 @@ description = "Print the session's working state as a paste-ready handoff block:
 # without the markdown. Logic in kb_setup.session_state.
 run = "uv run kb-setup session-state"
 
+[tasks.kb-next-ticket]
+description = "Print the tracked chain's next ready ticket, or why not: mise run kb-next-ticket"
+# Interactive use only. `/clear-prep` calls `uv run kb-setup next-ticket` directly,
+# never this task — same reason as kb-session-state above: mise's output
+# redaction mangles digit runs, and this task's whole output is issue numbers (#574).
+# Reads docs/roadmap/aggregated-research-chain.toml (the ORDERING) against the
+# tracker's live issue state (the STATUS), via one batched `gh api graphql` call,
+# and reports exactly one of three states on its first line — READY, BLOCKED, or
+# COULD NOT ASK — reusing #144's decision that a failed tracker lookup is its own
+# state and never renders as "nothing ready". Never skips a blocked ticket to
+# report a later one instead. Logic in kb_setup.next_ticket.
+run = "uv run kb-setup next-ticket"
+
 [tasks.kb-goal-check]
 description = 'Mechanically check a /goal goal+rider pair: mise run kb-goal-check -- <path|pair-prefix|--text "...">'
 # ADVISORY — always exits 0. A goal document is authored input, not repo source, so a
