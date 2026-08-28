@@ -99,3 +99,27 @@ question to answer by probing schemastore; and the CLI is delivered by a plugin
 script (the documented `SessionStart` + `${CLAUDE_PLUGIN_DATA}` pattern) that
 fetches it from a GitHub release/package — so "the plugin cannot install a CLI"
 is true only of first-class manifest fields, not of the hook script.
+
+## Two more blueprint comments (05:34–05:39), verbatim
+
+On the CLI-vs-MCP fork:
+
+> the aggregated-search cli can internally call other mcp servers if necessary
+
+On the build order (anchored at the "Every step goes fable-advisor → codex-implementer" paragraph):
+
+> the definition of done is to install the marketplace  and plugin in an isolated environment like a docker container that can be fully and autonomously installed via ai llm optimized instructions from a claude code agent only following the instructions from the marketplace and plugin's documentation
+> our documentation needs to be very specific on what environment variables need to be set fo the dependency plugins/skills
+> - such as:
+>    - firecrawl
+>    - exa
+>    - context7
+>    - last30days
+> - it is oke to delegate the instructions to the other tools, it just needs to be very specific to direct where to look
+
+So: the interface is CLI-only (the CLI may be an MCP *client* internally); and the
+DEFINITION OF DONE is an autonomous install in an isolated container — a Claude Code
+agent, given only the marketplace's and plugin's own documentation, installs the
+marketplace, the plugin, its dependency plugins, and sets every required
+environment variable for firecrawl / exa / context7 / last30days, with the docs
+naming exactly where each is documented upstream.
