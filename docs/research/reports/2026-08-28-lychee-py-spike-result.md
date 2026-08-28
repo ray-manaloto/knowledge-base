@@ -106,6 +106,12 @@ is network-bound (remote round-trips of 100 ms+), where a 23 ms CLI overhead per
 multiple — the bench did not measure that case. The ONE structural difference stands: the CLI dedups and
 retries for you; the binding gives you raw per-URL awaits and leaves both to the caller.
 
+## Decision — Ray, 2026-08-28 (AskUserQuestion, verbatim option label)
+
+> A: stop — keep the CLI in hk
+
+Chosen after Finding 4. The round-3 ruling ("own repo, after a spike here") is superseded by this: the binding is not built.
+
 ## Appendix — bench.py, verbatim (the scratchpad dies with the session)
 
 ```python

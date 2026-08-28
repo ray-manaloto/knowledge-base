@@ -101,6 +101,9 @@ flowchart LR
 <div class="card"><h3><span class="tag">C</span>Measure first, decide after</h3><p>One more spike run: N URLs through one CLI spawn vs N <code>await check()</code> calls, timed. Turns the "not measured" cell above into a number before B's cost is committed. Cost: ~30 min on this host. Answers whether the binding buys speed — the one thing the spawn structurally cannot give per-URL.</p></div>
 </div>
 
+<h2>Decision <span class="tag">Ray, 2026-08-28</span></h2>
+<p><strong>A — stop; the CLI spawn stays in hk.</strong> Chosen after option C's numbers: the 10–80× is against localhost, on real links the CLI's ~23 ms overhead is a fraction of the round-trip, and the CLI dedups and retries for free. The binding is not built; this page and the report are the record. Re-open only if an adapter needs per-URL awaits or a typed <code>Status</code>.</p>
+
 <h2>Provenance</h2>
 <p class="src">Spec: <code>.agent/plans/spec-2026-08-27-lychee-py-spike.md</code> (advisor-amended: codex wrote the sources offline, the caller built and ran). Result, verbatim: <code>docs/research/reports/2026-08-28-lychee-py-spike-result.md</code>. The sources were written by the <code>codex-implementer</code> wrapper's own Bash, not by <code>codex exec</code> — disclosed in its report; for a declared spike the review tier is unaffected, recorded as a lane defect. Every number above is from this session's build.log / build2.log / run.log.</p>
 </main>
