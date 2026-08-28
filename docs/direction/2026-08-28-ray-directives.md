@@ -248,3 +248,21 @@ three green `acceptance` runs, codex cold review ×2 + Opus silent-failure
 read) squash-merged as `05acca22`. The advisor's ruling stands: slice 3 is
 NOT closed — the container's install is scripted, not agent-driven; the
 agent-driven install arm is marketplace issue #2 (slice 3b).
+
+## Session opener, 2026-08-28 (session `kb-20260828.02`), verbatim
+
+> /i-have-adhd:i-have-adhd
+> /ponytail:ponytail ultra
+> /fable-orchestrator:orchestration use fable-advisor and codex-implementer lanes
+> /graphify
+> /kb-resume
+
+Resume answer: **"Start slice 3b, full order (Recommended)"** — the option text:
+*"Branch → directive §0 append → read #2 + artifact comments → spec in the
+marketplace repo → premise-verifier → fable-advisor → codex-implementer (xhigh)
+→ cross-family review."* Slice 3b = marketplace issue #2, the agent-driven
+install arm — Ray's clear-prep answer of session `kb-20260828.01`, verbatim:
+**"Slice 3b: agent-driven install arm (Recommended)"** — *"Marketplace #2 — two
+`claude -p` sessions in the container: an agent installs marketplace+plugin from
+the READMEs alone, a fresh session runs the question so the real SessionStart
+hook fires. Closes your definition of done. ~1 codex round."*
