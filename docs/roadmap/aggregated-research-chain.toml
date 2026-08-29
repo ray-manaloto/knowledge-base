@@ -17,6 +17,16 @@
 # run instead of silently skipped past.
 
 [[ticket]]
+issue = 602
+title = "Lane completion reports must force a caller re-run on any UNVERIFIED item"
+blockers = []
+
+[[ticket]]
+issue = 605
+title = "Register chenrui333/codex-docs — strict superset of agent-harness-docs's Codex coverage"
+blockers = []
+
+[[ticket]]
 issue = 573
 title = "Marketplace structure: plugins under plugins/, and the bin/ decision"
 blockers = []
