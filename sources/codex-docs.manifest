@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Community-maintained periodic mirror of OpenAI Codex CLI documentation, MIT, auto-synced every 6h via GitHub Actions. REPLACES only the docs/codex portion of sources/agent-harness-docs (#605): confirmed strict superset of that Codex content (both READMEs read live 2026-08-29) — covers developers.openai.com/codex/* pages, Codex cookbook/resources pages, markdown mirrored from openai/codex itself (README/CHANGELOG/docs/*.md/CLI-Rust docs), linked platform tool guides, CLI-materialized system skills, and a generated docs/codex_capabilities.json capability inventory. The restored sources/agent-harness-docs (see sources/agent-harness-docs.manifest) remains the only source for Cursor, OpenCode, and Pi documentation, with extraction tracked in #82.
+url = https://github.com/chenrui333/codex-docs
+ref = main
+commit = a7412e5e868caf20fbb595db63077b1f0cdc0339
+kind = docs
