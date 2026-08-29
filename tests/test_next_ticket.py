@@ -325,13 +325,18 @@ def test_preview_names_the_next_ready_entry_after_the_stale_one(
     assert "next after removal: #2 Next task" in result.value
 
 
-def test_preview_chases_past_a_closed_candidate_to_the_real_next_task(
+def test_preview_of_a_closed_candidate_matches_what_a_second_run_actually_reports(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """#2 would ALSO be a stale-chain candidate — the preview must not name it.
+    """[#1 CLOSED, #2 CLOSED, #3 OPEN] — the review's own discriminating fixture.
 
-    Without the chase-onward step, a reader cleaning up #1 would be pointed at
-    #2 — itself due for removal, not the real next task (#3).
+    An earlier version of the preview CHASED past #2 (also closed) to name #3
+    — a real second run, on the chain with #1 actually removed, reports
+    `STALE CHAIN — #2`, not `#3`. The preview must agree with the next run,
+    so it names #2 with a note instead. Proved two ways: the preview text
+    directly, and a genuine second `evaluate()` call against the cleaned-up
+    chain (same tracker state — removing #1 from the FILE never changes any
+    issue's tracker state).
     """
     chain = _write_chain(
         tmp_path,
@@ -353,12 +358,29 @@ def test_preview_chases_past_a_closed_candidate_to_the_real_next_task(
     out = f'{{"data": {{"repository": {body}}}}}'
     _stub(monkeypatch, 0, out)
 
-    result = next_ticket.evaluate(chain, tmp_path)
+    first_run = next_ticket.evaluate(chain, tmp_path)
 
-    assert isinstance(result, Ok)
-    assert result.value.startswith("STALE CHAIN — #1 Done, never removed is CLOSED")
-    assert "next after removal: #3 Real next task" in result.value
-    assert "#2" not in result.value
+    assert isinstance(first_run, Ok)
+    assert first_run.value.startswith("STALE CHAIN — #1 Done, never removed is CLOSED")
+    preview = "next after removal: #2 Also done, never removed — also CLOSED, remove it too"
+    assert preview in first_run.value
+    assert "#3" not in first_run.value
+
+    cleaned = _write_chain(
+        tmp_path,
+        [
+            {"issue": 2, "title": "Also done, never removed", "blockers": []},
+            {"issue": 3, "title": "Real next task", "blockers": []},
+        ],
+    )
+    body2 = "{" + _issue_json(2, "CLOSED") + ", " + _issue_json(3, "OPEN") + "}"
+    out2 = f'{{"data": {{"repository": {body2}}}}}'
+    _stub(monkeypatch, 0, out2)
+
+    second_run = next_ticket.evaluate(cleaned, tmp_path)
+
+    assert isinstance(second_run, Ok)
+    assert second_run.value.startswith("STALE CHAIN — #2 Also done, never removed is CLOSED")
 
 
 def test_preview_reports_nothing_ready_after_cleanup_when_none_remain(

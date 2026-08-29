@@ -18,11 +18,13 @@ shape here, now FOUR states: READY / BLOCKED / STALE CHAIN / COULD NOT ASK,
 each naming itself on its own first line so `/clear-prep` can quote the block
 verbatim without deciding which state it is looking at.
 
-NEVER SKIP A BLOCKED TICKET TO REACH A LATER ONE — the ordered walk in
-:func:`resolve` is unchanged from before: it looks only at BLOCKER states, in
-file order, and never skips over a blocked entry looking for a later ready one
-(an earlier blocked entry never suppresses a later ready one). What changed is
-narrower: right before the walk NAMES an entry — the `Ready` return, or the
+THE WALK KEEPS SCANNING PAST A BLOCKED ENTRY — an earlier blocked entry never
+suppresses a later ready one; :func:`resolve`'s loop looks only at BLOCKER
+states, in file order, and moves on to the next ticket whenever the current
+one has an open blocker. What it NEVER does is report some OTHER entry once
+the walk concludes nothing is ready: the fallback always names `tickets[0]`,
+never a "closest to ready" pick. What changed here is narrower still: right
+before the walk NAMES an entry — the `Ready` return, or the
 `Blocked` fallback that reports `tickets[0]` — it checks that ONE entry's own
 tracker state, in :func:`_name`. A CLOSED one is refused (STALE CHAIN) rather
 than reported READY or BLOCKED. This is deliberately NOT a scan for every
@@ -128,10 +130,12 @@ class StaleChain:
     replacement for it: the tool still never infers "done" on its own and
     still never removes the entry itself — it refuses to name it and stops.
 
-    `after_removal` is a PREVIEW, not a skip: what :func:`_preview_after_removal`
-    finds by continuing the walk past this entry, using the states already in
-    hand (no second lookup). The refusal above is unchanged — this field only
-    tells the reader what the refusal is worth fixing.
+    `after_removal` is a PREVIEW, not a skip: what a SECOND run would actually
+    report once this entry is gone, per :func:`_preview_after_removal`, using
+    the states already in hand (no second lookup). It may itself say "also
+    CLOSED, remove it too" — the preview must agree with what the next run
+    says, never promise an entry the next run would refuse. The refusal above
+    is unchanged — this field only tells the reader what it is worth fixing.
     """
 
     issue: int
@@ -360,19 +364,22 @@ def _open_blockers(ticket: Ticket, states: dict[int, IssueInfo]) -> tuple[IssueI
 def _preview_after_removal(
     tickets: tuple[Ticket, ...], removed: Ticket, states: dict[int, IssueInfo]
 ) -> str:
-    """What the tool would report as the next entry once `removed` is gone.
+    """What a SECOND run of :func:`resolve` would actually report once `removed` is gone.
 
-    Continues the SAME walk :func:`resolve` uses — the first entry (file
-    order) with no open blockers — over `tickets` with `removed` excluded, no
-    second lookup. Every entry before `removed` is provably not a candidate
-    already (either the main loop would have named one first, or — in the
-    fallback path — every entry has an open blocker), so a full scan minus
-    `removed` is equivalent to continuing from just past it.
+    Applies the exact same two rules :func:`_name` applies to the entry it
+    names — first entry (file order, `removed` excluded) with no open
+    blockers; CLOSED is refused, not reported — because that is what the next
+    run does. `removed` must be excluded explicitly (not just relied on being
+    CLOSED and therefore skipped below): once this function stops skipping
+    CLOSED candidates, `removed` itself — always CLOSED, that is why it is
+    `removed` — would otherwise be the first candidate found.
 
-    A candidate that is itself CLOSED is skipped rather than reported: a
-    reader cleaning up the file wants the real next task, not the next piece
-    of rubbish also waiting to be removed. If none remain, says so plainly
-    instead of leaving a dangling line.
+    A candidate that is ALSO CLOSED is named, not skipped past: an earlier
+    version of this function chased past it to find a later OPEN entry, which
+    made the preview promise something the next run would not agree with —
+    `[#1 CLOSED, #2 CLOSED, #3 OPEN]` previewed "#3" after removing #1, but a
+    real second run reports `STALE CHAIN — #2`, not #3. No second lookup: pure
+    over the `states` dict `_name` already has.
     """
     for ticket in tickets:
         if ticket.issue == removed.issue:
@@ -380,7 +387,7 @@ def _preview_after_removal(
         if _open_blockers(ticket, states):
             continue
         if states[ticket.issue].state == "CLOSED":
-            continue  # chase onward — a reader wants the real next task
+            return f"#{ticket.issue} {ticket.title} — also CLOSED, remove it too"
         return f"#{ticket.issue} {ticket.title}"
     return "nothing ready after cleanup"
 
@@ -471,7 +478,7 @@ def check_next_ticket(args: list[str], repo_root: Path) -> Result[str]:
 
 
 def main(args: list[str], repo_root: Path) -> int:
-    """`kb-setup next-ticket` — 0 for any of the three states, 2 on a bad request.
+    """`kb-setup next-ticket` — 0 for any of the four states, 2 on a bad request.
 
     Never non-zero for what it FINDS: BLOCKED and COULD NOT ASK are both
     successful reports, matching `session_state.main`'s reasoning exactly — a
