@@ -1,10 +1,10 @@
 ---
-name: kb-resume
+name: session-resume
 description: "Pick up where the last session left off in the knowledge-base repo: find the newest handoff and directive, read the real git/gate/PR state, and report the branch, what shipped, what is owed, the standing traps, and the next task. Use this as the FIRST thing after a /clear or at the start of any fresh session here, and whenever the user says resume, catch me up, where were we, what was I doing, what is next, or pastes nothing at all after clearing. It replaces copy/pasting a handoff prompt between sessions."
 argument-hint: "[optional: a specific handoff path, or a nudge like 'just the traps']"
 ---
 
-# kb-resume — start where the last session stopped
+# session-resume — start where the last session stopped
 
 `/clear-prep` writes a handoff. This reads it, and then checks it against the
 repo rather than believing it.
