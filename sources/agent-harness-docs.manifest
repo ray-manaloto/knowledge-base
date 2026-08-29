@@ -9,5 +9,5 @@
 # doing so would duplicate content already in the corpus from a fresher mirror.
 url = https://github.com/mrkhachaturov/agent-harness-docs
 ref = main
-commit = 33aef930acb2e56154a056dd7e1dfd08b9a3cf3e
+commit = 6d496c1ba128664a75dea9d8c650bb65d8337b76
 kind = docs
