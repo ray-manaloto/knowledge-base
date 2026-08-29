@@ -14,23 +14,25 @@ A FAILED TRACKER LOOKUP IS ITS OWN STATE, reused from #144's decision
 (`session_state.py:19-21`, literal at `:568`): "no ticket is ready" and "could
 not ask the tracker" are different sentences, and rendering the second as the
 first is exactly the false green `session_state` was built to remove. Same
-shape here, now FOUR states: READY / BLOCKED / CHAIN COMPLETE / COULD NOT ASK,
+shape here, now FOUR states: READY / BLOCKED / STALE CHAIN / COULD NOT ASK,
 each naming itself on its own first line so `/clear-prep` can quote the block
 verbatim without deciding which state it is looking at.
 
-NEVER SKIP A BLOCKED TICKET TO REACH A LATER ONE — but DO keep scanning past a
-blocked entry, or a CLOSED one, to find the first one that IS ready. Those
-sound like the same rule and are not: the ordered walk in :func:`resolve` skips
-over blocked entries AND entries whose own tracker state is CLOSED, looking for
-the first ready one (an earlier blocked or closed entry never suppresses a
-later ready one); what it never does is report some OTHER entry, chosen by
-proximity-to-ready or any other heuristic, once the walk concludes NOTHING is
-ready. In that case the answer is always the first entry whose own state is
-not CLOSED, because if THAT entry were ready the walk would already have
-returned it. When EVERY entry is CLOSED there is no such entry — that is CHAIN
-COMPLETE, not BLOCKED: "nothing is ready" and "nothing is left to do" are
-different sentences too, and collapsing them would report a finished chain as
-stuck forever.
+NEVER SKIP A BLOCKED TICKET TO REACH A LATER ONE — the ordered walk in
+:func:`resolve` is unchanged from before: it looks only at BLOCKER states, in
+file order, and never skips over a blocked entry looking for a later ready one
+(an earlier blocked entry never suppresses a later ready one). What changed is
+narrower: right before the walk NAMES an entry — the `Ready` return, or the
+`Blocked` fallback that reports `tickets[0]` — it checks that ONE entry's own
+tracker state, in :func:`_name`. A CLOSED one is refused (STALE CHAIN) rather
+than reported READY or BLOCKED. This is deliberately NOT a scan for every
+closed entry in the file: `docs/roadmap/aggregated-research-chain.toml`'s
+removal convention says a done ticket should already be gone from this file,
+and a tool that quietly worked around a forgotten removal — by skipping the
+stale entry and reporting the next one anyway — would be the thing most likely
+to make that removal never happen. Refusing to name it is the enforcement the
+convention needs, one removal-commit at a time; the NEXT run, after that
+commit, is what catches the next one.
 
 A SUCCESSFUL JSON PARSE IS NOT A SUCCESSFUL LOOKUP. Measured live against this
 repo's own tracker (`gh` 2.98.0): a `gh api graphql` call naming an issue that
@@ -101,41 +103,34 @@ class IssueInfo:
 
 @dataclass(frozen=True, slots=True)
 class Ready:
-    """The first non-CLOSED ticket whose blockers are all closed (or has none).
-
-    `stale` names every entry the walk skipped on the way here because ITS OWN
-    tracker state was CLOSED — advisory, rendered below the READY line, never
-    a reason to withhold the answer.
-    """
+    """The first ticket whose blockers are all closed (or has none)."""
 
     issue: int
     title: str
-    stale: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
 class Blocked:
-    """No ticket is ready; this is the first non-CLOSED one, and what's still open.
-
-    `stale` is the same advisory as :class:`Ready`'s — every entry skipped
-    because its own state was CLOSED, encountered anywhere in the walk that
-    produced this result.
-    """
+    """No ticket is ready; this is the FIRST one, and what is still open on it."""
 
     issue: int
     title: str
     open_blockers: tuple[IssueInfo, ...]
-    stale: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
-class ChainComplete:
-    """Every entry in the chain is CLOSED. Not a failure — the chain finished.
+class StaleChain:
+    """The entry :func:`resolve` was about to name is itself CLOSED — refused.
 
-    Distinct from :class:`Blocked` on purpose: "no ticket is ready yet" and
-    "there is no ticket left" are different sentences, and reporting the second
-    as the first would print a finished chain as permanently stuck.
+    Checked ONLY for the one entry about to be named, never by scanning the
+    rest of the chain for other closed entries — see :func:`_name`. This is
+    the enforcement pressure behind the chain file's removal convention, not a
+    replacement for it: the tool still never infers "done" on its own and
+    still never removes the entry itself — it refuses to name it and stops.
     """
+
+    issue: int
+    title: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,7 +140,7 @@ class CouldNotAsk:
     detail: str
 
 
-Outcome = Ready | Blocked | ChainComplete | CouldNotAsk
+Outcome = Ready | Blocked | StaleChain | CouldNotAsk
 
 
 def _parse_ticket(entry: object, index: int) -> Ticket | str:
@@ -347,14 +342,32 @@ def _parse_lookup(rc: int, out: str, alias_to_number: dict[str, int]) -> _Lookup
     return _Lookup(states)
 
 
+def _name(
+    ticket: Ticket, states: dict[int, IssueInfo], open_blockers: tuple[IssueInfo, ...]
+) -> Outcome:
+    """The outcome for naming `ticket` — refuses to name one the tracker says is CLOSED.
+
+    Checked ONLY here, for the one entry :func:`resolve` is about to report —
+    never by scanning the rest of the chain for other closed entries. That is
+    deliberate laziness, not an oversight: the next run, after the commit that
+    removes this entry, is what catches the next one.
+    """
+    if states[ticket.issue].state == "CLOSED":
+        return StaleChain(ticket.issue, ticket.title)
+    if not open_blockers:
+        return Ready(ticket.issue, ticket.title)
+    return Blocked(ticket.issue, ticket.title, open_blockers)
+
+
 def resolve(tickets: tuple[Ticket, ...], repo_root: Path) -> Outcome:
     """Walk the chain in file order; the FILE decides ordering, the TRACKER decides state.
 
-    Every ticket's OWN issue number enters the lookup alongside its blockers' —
+    The walk itself looks only at BLOCKER states, exactly as before. Every
+    ticket's OWN issue number still enters the lookup alongside its blockers' —
     :data:`needed` can never be empty once `tickets` is non-empty (which
-    `read_chain` already guarantees), so a lookup always runs. That is what lets
-    the walk below skip an entry whose own tracker state is CLOSED, rather than
-    trusting the chain file to have been kept in sync with the tracker.
+    `read_chain` already guarantees) — because `resolve` cannot know in advance
+    which entry it will end up naming, and a second lookup for just that one
+    entry is exactly the partial-success shape :class:`_Lookup` forbids.
     """
     needed = sorted({t.issue for t in tickets} | {b for t in tickets for b in t.blockers})
     alias_to_number = _aliases(needed)
@@ -364,48 +377,30 @@ def resolve(tickets: tuple[Ticket, ...], repo_root: Path) -> Outcome:
         return CouldNotAsk(lookup.detail)
     states = lookup.states
 
-    stale: list[int] = []
-    first_open: Ticket | None = None
     for ticket in tickets:
-        if states[ticket.issue].state == "CLOSED":
-            stale.append(ticket.issue)
-            continue
-        if first_open is None:
-            first_open = ticket
         open_blockers = tuple(states[b] for b in ticket.blockers if states[b].state != "CLOSED")
         if not open_blockers:
-            return Ready(ticket.issue, ticket.title, stale=tuple(stale))
-
-    if first_open is None:
-        return ChainComplete()
+            return _name(ticket, states, open_blockers)
 
     # Nothing was ready: the loop above would already have returned the first
-    # non-closed entry whose blockers are all closed, so `first_open` is
-    # provably blocked.
-    open_blockers = tuple(states[b] for b in first_open.blockers if states[b].state != "CLOSED")
-    return Blocked(first_open.issue, first_open.title, open_blockers, stale=tuple(stale))
-
-
-def _stale_lines(stale: tuple[int, ...], chain_path: Path) -> list[str]:
-    """Advisory lines for entries the walk skipped because their own state was CLOSED."""
-    return [f"stale: #{n} is CLOSED — remove it from {chain_path}" for n in stale]
+    # entry whose blockers are all closed, so `tickets[0]` is provably blocked.
+    first = tickets[0]
+    open_blockers = tuple(states[b] for b in first.blockers if states[b].state != "CLOSED")
+    return _name(first, states, open_blockers)
 
 
 def render(outcome: Outcome, chain_path: Path) -> str:
     """The paste-ready block. Each state names itself on its first line."""
     if isinstance(outcome, Ready):
-        lines = [f"READY — #{outcome.issue} {outcome.title}", f"chain file: {chain_path}"]
-        lines.extend(_stale_lines(outcome.stale, chain_path))
-        return "\n".join(lines)
+        return f"READY — #{outcome.issue} {outcome.title}\nchain file: {chain_path}"
     if isinstance(outcome, Blocked):
         lines = [f"BLOCKED — #{outcome.issue} {outcome.title}", "open blockers:"]
         lines.extend(f"  - #{b.number} {b.title}" for b in outcome.open_blockers)
-        lines.extend(_stale_lines(outcome.stale, chain_path))
         return "\n".join(lines)
-    if isinstance(outcome, ChainComplete):
+    if isinstance(outcome, StaleChain):
         return (
-            f"CHAIN COMPLETE — every entry in {chain_path} is closed; "
-            "remove them and add the next tickets"
+            f"STALE CHAIN — #{outcome.issue} {outcome.title} is CLOSED but still "
+            f"listed in {chain_path}; remove it, then re-run"
         )
     return f"COULD NOT ASK — {outcome.detail}\nchain file: {chain_path} — re-derive once resolved"
 

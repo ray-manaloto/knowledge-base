@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kb_setup import next_ticket
-from kb_setup.next_ticket import Blocked, ChainComplete, CouldNotAsk, IssueInfo, Ready
+from kb_setup.next_ticket import Blocked, CouldNotAsk, IssueInfo, Ready, StaleChain
 from kb_setup.result import Err, Ok, Rc, exit_code
 
 if TYPE_CHECKING:
@@ -141,7 +141,6 @@ def test_a_blockerless_entry_still_gets_looked_up_for_its_own_state(
 
     assert isinstance(result, Ok)
     assert result.value.startswith("READY — #1 No blockers")
-    assert "stale:" not in result.value
 
 
 # --------------------------------------------------------------------------
@@ -192,21 +191,27 @@ def test_nothing_ready_reports_the_first_blocked_entry_not_a_less_blocked_later_
 
 
 # --------------------------------------------------------------------------
-# §5 — a ticket whose OWN tracker state is CLOSED is skipped, not reported
-# READY forever; the skip is named on a `stale:` advisory line, in both the
-# READY and BLOCKED outcomes, and CHAIN COMPLETE fires when nothing is left
+# §5 — the tool refuses to NAME an entry the tracker says is CLOSED, rather
+# than skipping past it: the check fires only on the entry about to be
+# reported (the READY candidate, or the BLOCKED fallback's `tickets[0]`),
+# never by scanning the rest of the chain for other closed entries
 # --------------------------------------------------------------------------
 
 
-def test_a_closed_entry_is_skipped_and_named_stale_in_a_ready_report(
+def test_a_closed_ready_candidate_is_reported_stale_chain_not_ready(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """#1 is CLOSED (never removed from the chain) — #2 must win, #1 must be named."""
+    """#1 is CLOSED (never removed) and would otherwise be the READY candidate.
+
+    #2 is a perfectly good READY entry right behind it — the tool must NOT
+    quietly report #2 instead. That would make a forgotten removal harmless,
+    which removes the only pressure keeping the chain file honest.
+    """
     chain = _write_chain(
         tmp_path,
         [
             {"issue": 1, "title": "Done, never removed", "blockers": []},
-            {"issue": 2, "title": "Actually next", "blockers": []},
+            {"issue": 2, "title": "Would also be ready", "blockers": []},
         ],
     )
     body = "{" + _issue_json(1, "CLOSED") + ", " + _issue_json(2, "OPEN") + "}"
@@ -216,20 +221,21 @@ def test_a_closed_entry_is_skipped_and_named_stale_in_a_ready_report(
     result = next_ticket.evaluate(chain, tmp_path)
 
     assert isinstance(result, Ok)
-    assert result.value.startswith("READY — #2 Actually next")
-    assert "stale: #1 is CLOSED" in result.value
+    assert result.value.startswith("STALE CHAIN — #1 Done, never removed is CLOSED")
     assert str(chain) in result.value
+    assert "remove it, then re-run" in result.value
+    assert "#2" not in result.value
 
 
-def test_a_closed_entry_is_skipped_and_named_stale_in_a_blocked_report(
+def test_a_closed_blocked_fallback_is_reported_stale_chain_not_blocked(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """#1 is CLOSED; #2 is open but still blocked — BLOCKED on #2, #1 named stale."""
+    """Nothing is ready; `tickets[0]` (the BLOCKED fallback) is itself CLOSED."""
     chain = _write_chain(
         tmp_path,
         [
-            {"issue": 1, "title": "Done, never removed", "blockers": []},
-            {"issue": 2, "title": "Still blocked", "blockers": [100]},
+            {"issue": 1, "title": "Done, never removed", "blockers": [100]},
+            {"issue": 2, "title": "Also blocked", "blockers": [101]},
         ],
     )
     body = (
@@ -238,7 +244,9 @@ def test_a_closed_entry_is_skipped_and_named_stale_in_a_blocked_report(
         + ", "
         + _issue_json(2, "OPEN")
         + ", "
-        + _issue_json(100, "OPEN", "the blocker")
+        + _issue_json(100, "OPEN", "blocker A")
+        + ", "
+        + _issue_json(101, "OPEN", "blocker B")
         + "}"
     )
     out = f'{{"data": {{"repository": {body}}}}}'
@@ -247,33 +255,43 @@ def test_a_closed_entry_is_skipped_and_named_stale_in_a_blocked_report(
     result = next_ticket.evaluate(chain, tmp_path)
 
     assert isinstance(result, Ok)
-    assert result.value.startswith("BLOCKED — #2 Still blocked")
-    assert "- #100 the blocker" in result.value
-    assert "stale: #1 is CLOSED" in result.value
+    assert result.value.startswith("STALE CHAIN — #1 Done, never removed is CLOSED")
+    assert "BLOCKED" not in result.value
 
 
-def test_every_entry_closed_reports_chain_complete_not_blocked(
+def test_a_closed_entry_that_is_never_the_naming_candidate_goes_unmentioned(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Nothing left in the chain is a DIFFERENT state from nothing ready yet."""
+    """#1 is CLOSED but has an open blocker, so the walk never tries to name it.
+
+    Proves the check is lazy, not a scan: #1's CLOSED state is never even
+    consulted, and #2 is reported cleanly READY with no mention of #1 at all.
+    """
     chain = _write_chain(
         tmp_path,
         [
-            {"issue": 1, "title": "Done one", "blockers": []},
-            {"issue": 2, "title": "Done two", "blockers": []},
+            {"issue": 1, "title": "Closed but still blocked", "blockers": [100]},
+            {"issue": 2, "title": "Ready", "blockers": []},
         ],
     )
-    body = "{" + _issue_json(1, "CLOSED") + ", " + _issue_json(2, "CLOSED") + "}"
+    body = (
+        "{"
+        + _issue_json(1, "CLOSED")
+        + ", "
+        + _issue_json(2, "OPEN")
+        + ", "
+        + _issue_json(100, "OPEN", "still open")
+        + "}"
+    )
     out = f'{{"data": {{"repository": {body}}}}}'
     _stub(monkeypatch, 0, out)
 
     result = next_ticket.evaluate(chain, tmp_path)
 
     assert isinstance(result, Ok)
-    assert result.value.startswith("CHAIN COMPLETE")
-    assert str(chain) in result.value
-    assert "BLOCKED" not in result.value
-    assert "READY" not in result.value
+    assert result.value.startswith("READY — #2 Ready")
+    assert "STALE" not in result.value
+    assert "#1" not in result.value
 
 
 # --------------------------------------------------------------------------
@@ -532,46 +550,14 @@ def test_render_blocked_lists_every_open_blocker(tmp_path: Path) -> None:
     assert "- #569 Delete the code-generator wrapper" in text
 
 
-def test_render_ready_appends_a_stale_line_per_skipped_closed_entry(tmp_path: Path) -> None:
+def test_render_stale_chain_names_the_issue_and_says_remove_it(tmp_path: Path) -> None:
     chain = tmp_path / "chain.toml"
 
-    text = next_ticket.render(Ready(574, "Chain the handoff", stale=(569, 570)), chain)
+    text = next_ticket.render(StaleChain(569, "Delete the code-generator wrapper"), chain)
 
-    assert text.startswith("READY — #574 Chain the handoff")
-    assert f"stale: #569 is CLOSED — remove it from {chain}" in text
-    assert f"stale: #570 is CLOSED — remove it from {chain}" in text
-
-
-def test_render_blocked_appends_a_stale_line_per_skipped_closed_entry(tmp_path: Path) -> None:
-    chain = tmp_path / "chain.toml"
-    outcome = Blocked(
-        575,
-        "Prototype: packages",
-        (IssueInfo(569, "OPEN", "Delete the code-generator wrapper"),),
-        stale=(500,),
-    )
-
-    text = next_ticket.render(outcome, chain)
-
-    assert text.startswith("BLOCKED — #575 Prototype: packages")
-    assert f"stale: #500 is CLOSED — remove it from {chain}" in text
-
-
-def test_render_ready_with_no_stale_entries_has_no_stale_line(tmp_path: Path) -> None:
-    chain = tmp_path / "chain.toml"
-
-    text = next_ticket.render(Ready(574, "Chain the handoff"), chain)
-
-    assert "stale:" not in text
-
-
-def test_render_chain_complete_names_the_chain_path(tmp_path: Path) -> None:
-    chain = tmp_path / "chain.toml"
-
-    text = next_ticket.render(ChainComplete(), chain)
-
-    assert text.startswith("CHAIN COMPLETE")
+    assert text.startswith("STALE CHAIN — #569 Delete the code-generator wrapper is CLOSED")
     assert str(chain) in text
+    assert "remove it, then re-run" in text
     assert "BLOCKED" not in text
     assert "READY" not in text
 
