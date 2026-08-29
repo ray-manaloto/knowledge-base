@@ -17,11 +17,6 @@
 # run instead of silently skipped past.
 
 [[ticket]]
-issue = 570
-title = "The research CLI emits on the structured event stream"
-blockers = []
-
-[[ticket]]
 issue = 571
 title = "Tighten the trackers acceptance assertion so it can fail"
 blockers = []
