@@ -2,7 +2,7 @@
 # Claude plugin MARKETPLACE INDEX (not the plugins themselves) + docs/AGENTS.md. scope=study.
 url = https://github.com/2389-research/claude-plugins
 ref = main
-commit = 6b82b81af264234b9b722c8ef68ccbd57db4bc2a
+commit = 0550eb7713108040a6069c75a529bc613ab419ea
 kind = code
 # scope = study: an object of study (peer orchestration/memory tooling), not corpus
 # content we answer questions from. `scope` exists because pinned peer tools took
