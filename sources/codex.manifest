@@ -5,7 +5,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `"npm:@openai/codex"` (line ~177)
-#   pinned here:    0.150.1
+#   pinned here:    0.151.0
 # Note the tag prefix: releases are `rust-v<version>`, so `ref` is NOT the bare
 # version the two lines above name. Also: this manifest read 0.146.0 while
 # mise.toml ran 0.146.1, i.e. it was ALREADY drifting before the 0.147.0 bump —
@@ -30,8 +30,8 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/openai/codex
-ref = rust-v0.150.1
-commit = 90854393966b21e9ebfd21b122334eb09a20c93d
+ref = rust-v0.151.0
+commit = 78c290807ce710180111df227df3b7a4fe845452
 kind = code
 added = 2026-08-02
 # EXCLUDED FROM THE BUILD 2026-08-20 (Ray's ruling: skip any blocker, file it,
