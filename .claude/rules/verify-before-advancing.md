@@ -99,6 +99,46 @@ merge, start the next task, or report completion. If any check is red,
 that is the current task — investigate and resolve it (`zero-skip-policy.md`),
 do not defer past it.
 
+## An UNVERIFIED item in a lane report is not "done"
+
+A delegated lane's completion report can legitimately grade one of its own
+verification items UNVERIFIED / `claim-only` / not-run — that is the lane being
+honest about a real limit, not a failure to follow this rule. What this rule
+adds: **the caller does not get to treat the task as done because the lane
+graded it that way.** The caller MUST independently re-run that specific item
+and record the real result before advancing.
+
+**Why (#602):** on #572, `codex-implementer`'s sandbox had no network egress
+and could not run `mise run kb-plugin-validate` (it calls `schemastore.org`).
+The lane correctly reported the item as unverified rather than claiming
+success — exactly the honest behavior this rule wants. What made #572 land
+anyway was the caller *happening* to re-run the check afterward, which turned
+up a real defect: a `$comment` field that was schema-valid but failed this
+repo's `kb-plugin-validate` wrapper. Nothing required that re-run; it was luck.
+
+Where the real result gets recorded — never left as a bare "recorded":
+
+- A **gate-shaped** re-run with no extra arguments (lint/test/a plain validate
+  task) writes to `.agent/kb/gates/gates-<sha>.json` via `mise run kb-gates`,
+  per "Always" above — the same artifact a later claim about gates is already
+  checked against. A task that takes a required positional argument (e.g.
+  `mise run kb-plugin-validate -- <marketplace root>`) does NOT go through
+  `kb-gates` — it has no way to forward that argument — so re-run it directly
+  and record the result the delegated-subtask way below.
+- A **delegated-subtask** re-run records through
+  `mise run brain-remember -- --verdict clean|rework|failed …`, documented in
+  `orchestrator-routing/SKILL.md`'s "Close the loop" section — the outcome
+  that feeds the routing vault.
+
+An item the lane's report omits entirely — never mentioned, not even graded —
+is not an exemption either; it falls back to this file's opening rule: every
+applicable check, not a subset.
+
+An item still graded UNVERIFIED after the caller's own re-run attempt (e.g. the
+caller's environment also lacks network egress) is not silently waved through
+either — it follows the ordinary escalation path in `zero-skip-policy.md` rule
+3, not a quiet "the lane said it tried."
+
 ## Carry a fact's CONDITION, not just its source
 
 A figure that travels without its "true when" survives review — the citation
