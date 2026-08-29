@@ -17,11 +17,6 @@
 # run instead of silently skipped past.
 
 [[ticket]]
-issue = 605
-title = "Register chenrui333/codex-docs — strict superset of agent-harness-docs's Codex coverage"
-blockers = []
-
-[[ticket]]
 issue = 573
 title = "Marketplace structure: plugins under plugins/, and the bin/ decision"
 blockers = []
