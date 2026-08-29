@@ -282,9 +282,17 @@ extra-fields = "forbid"
 # the job's own TOML fields (`_create_config` calls `Config.merge_args`, whose
 # `_prepare_cli_config_args` sees only the CLI-level args passed alongside
 # `--all-jobs`, never a job's `output-model-type`), so a `[tool.datamodel-codegen]`
-# job silently drops every `Meta(...)` constraint unless these are named here.
-# Confirmed by generating with and without this pair: without it, every
-# `Annotated[..., Meta(...)]` in the committed models collapses to a bare type.
+# job silently drops every `Meta(...)` constraint unless they are named here.
+# Confirmed by generating with and without: every `Annotated[..., Meta(...)]` in
+# the committed models collapses to a bare type.
+#
+# Of the pair, `use-annotated` is the load-bearing one — it is what flips
+# `field-constraints`, so naming `field-constraints` alone changes nothing.
+# Measured by mutation arm rather than reasoned: dropping `field-constraints` by
+# itself SURVIVED the drift gate, while dropping `use-annotated` alone, and
+# dropping both, each killed it (`.agent/kb/arms/codegen-569.toml` A5/A6). Both
+# are kept because the pairing is what a reader checks against the docs, but do
+# not read this comment as saying either key alone would do.
 use-annotated = true
 field-constraints = true
 use-generic-base-class = true

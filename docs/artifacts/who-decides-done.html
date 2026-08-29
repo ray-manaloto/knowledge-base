@@ -1,0 +1,273 @@
+<title>Who Decides Done</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=Karla:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root{
+    --paper:#F7F8FA; --card:#FFFFFF; --ink:#14181F; --muted:#5F6875; --rule:#D9DEE6;
+    --file:#2D3A8C; --file-tint:#E7EAF7;
+    --tracker:#8A5A17; --tracker-tint:#F7EEDF;
+    --stop:#9E2B25; --stop-tint:#F8E8E7;
+    --display:"Spectral",Georgia,serif;
+    --body:"Karla",-apple-system,Segoe UI,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16.5px;line-height:1.62;margin:0}
+  .wrap{max-width:1140px;margin:0 auto;padding:0 26px 100px}
+  .col{max-width:70ch}
+  header{padding:60px 0 34px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 20px}
+  h1{font-family:var(--display);font-weight:600;font-size:clamp(2.4rem,5.6vw,3.9rem);line-height:1.02;margin:0 0 20px;letter-spacing:-.02em;text-wrap:balance}
+  .standfirst{font-family:var(--display);font-style:italic;font-size:1.32rem;line-height:1.45;color:var(--muted);margin:0;max-width:56ch}
+  h2{font-family:var(--display);font-weight:600;font-size:1.72rem;margin:62px 0 8px;text-wrap:balance}
+  h3{font-family:var(--body);font-weight:700;font-size:1.02rem;letter-spacing:.01em;margin:32px 0 4px}
+  p{margin:0 0 16px}
+  code{font-family:var(--mono);font-size:.85em;background:#EDF0F5;padding:1px 5px;border-radius:2px}
+  a{color:var(--file)}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:38px 0 10px}
+  .auth{background:var(--card);border:1px solid var(--rule);border-radius:5px;padding:22px 24px}
+  .auth.f{border-top:4px solid var(--file)}
+  .auth.t{border-top:4px solid var(--tracker)}
+  .auth h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;margin:0 0 10px}
+  .auth.f h4{color:var(--file)}
+  .auth.t h4{color:var(--tracker)}
+  .auth p{margin:0;font-size:.95rem}
+  .auth b{font-family:var(--display);font-size:1.22rem;font-weight:600;display:block;margin-bottom:8px}
+  figure{margin:38px 0 14px}
+  figcaption{font-size:.9rem;color:var(--muted);margin-top:13px;padding-left:15px;border-left:2px solid var(--rule)}
+  .quote{font-family:var(--display);font-size:1.16rem;line-height:1.5;background:var(--file-tint);border-left:4px solid var(--file);padding:20px 24px;margin:30px 0;border-radius:0 4px 4px 0}
+  .quote span{display:block;font-family:var(--mono);font-size:11.5px;font-style:normal;color:var(--muted);margin-top:12px;letter-spacing:.04em}
+  .alarm{background:var(--stop-tint);border-left:4px solid var(--stop);padding:18px 24px;margin:30px 0;border-radius:0 4px 4px 0}
+  .alarm p:last-child{margin-bottom:0}
+  .alarm strong{color:var(--stop)}
+  .opts{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:34px 0 12px}
+  .opt{background:var(--card);border:1px solid var(--rule);border-radius:5px;padding:20px 20px 22px;display:flex;flex-direction:column}
+  .opt.pick{border-color:var(--file);box-shadow:0 0 0 1px var(--file)}
+  .opt .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+  .opt.pick .tag{color:var(--file)}
+  .opt h5{font-family:var(--display);font-size:1.16rem;font-weight:600;margin:0 0 10px;line-height:1.25}
+  .opt pre{font-family:var(--mono);font-size:11px;line-height:1.55;background:#F2F4F8;border:1px solid var(--rule);border-radius:3px;padding:11px 12px;margin:0 0 12px;white-space:pre-wrap;word-break:break-word;color:var(--ink)}
+  .opt ul{margin:0;padding-left:17px;font-size:.88rem;color:var(--muted)}
+  .opt li{margin-bottom:5px}
+  .opt li.bad{color:var(--stop)}
+  .opt li.good{color:#1D6B4F}
+  .scroll{overflow-x:auto}
+  footer{margin-top:76px;padding-top:22px;border-top:1px solid var(--rule);font-size:.85rem;color:var(--muted)}
+  @media(max-width:860px){.split,.opts{grid-template-columns:1fr}}
+  svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+  svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+  svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+  svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+  svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+  svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+  svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+  svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+  svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+  svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+  svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+  svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+  svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+  svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+  svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
+</style>
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">knowledge-base · #574 · the open question</p>
+  <h1>Who Decides Done</h1>
+  <p class="standfirst">A tool reads two sources of truth. Only one of them is allowed to say a ticket is finished — and the question is what the tool should do when they disagree.</p>
+</header>
+
+<div class="col">
+<p><code>next-ticket</code> answers "what should I work on next" so <code>/clear-prep</code> never has to guess. It reads two things, and they are deliberately different kinds of thing.</p>
+</div>
+
+<div class="split">
+  <div class="auth f">
+    <h4>The chain file</h4>
+    <b>decides ORDER</b>
+    <p>21 entries, each naming an issue and the issues that block it. Committed and reviewed like any code. It has no idea what is finished — there is no <code>done</code> field.</p>
+  </div>
+  <div class="auth t">
+    <h4>The GitHub tracker</h4>
+    <b>decides STATUS</b>
+    <p>Says OPEN or CLOSED for any issue. It has no idea what order anything should be worked in.</p>
+  </div>
+</div>
+
+<div class="col">
+<p>Neither alone can answer the question. That split is the whole design — and it is where the problem lives.</p>
+
+<h2>What the tool asks, and what it doesn't</h2>
+</div>
+
+<figure>
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#EDF0F5','primaryTextColor':'#14181F','primaryBorderColor':'#5F6875','lineColor':'#4a4a4a','fontSize':'14px'}}}%%
+flowchart LR
+  F["chain file<br/>21 entries in order"] -->|"gives the ORDER"| T["next-ticket"]
+  T -->|"asks: are the BLOCKERS closed?"| G["GitHub tracker"]
+  G -->|"OPEN / CLOSED per blocker"| T
+  T -.->|"NEVER asks:<br/>is the ENTRY ITSELF closed?"| G
+  T ==> R["READY — #569"]
+  H["you"] -->|"remove a done entry<br/>in the commit that closes it"| F
+  classDef file fill:#E7EAF7,stroke:#2D3A8C,color:#14181F
+  classDef trk fill:#F7EEDF,stroke:#8A5A17,color:#14181F
+  classDef out fill:#FFFFFF,stroke:#5F6875,color:#14181F
+  class F,H file
+  class G trk
+  class T,R out
+</pre>
+<figcaption>The solid arrows are what happens today. The dotted arrow is the question the tool never asks — a ticket's own OPEN/CLOSED state. Because it never asks, a ticket you closed but forgot to delete from the file reads READY forever, with no signal of any kind.</figcaption>
+</figure>
+
+<div class="col">
+<h2>That gap is deliberate. It is written down</h2>
+
+<div class="quote">
+"A ticket that is done is expected to be REMOVED from this file in the commit that closes it — the tool does not infer 'done' from a ticket's own tracker state, only from its blockers'."
+<span>docs/roadmap/aggregated-research-chain.toml, lines 12–14</span>
+</div>
+
+<p>So this is not a bug someone forgot. It is a rule: <strong>the human decides done, by deleting the line.</strong> The tool is deliberately kept from having an opinion about it.</p>
+
+<p>That rule worked because a person read the tool's output and would notice a ticket they knew was finished.</p>
+
+<div class="alarm">
+<p><strong>Then that person was removed.</strong> <code>/clear-prep</code> now says to <em>"quote its output verbatim — never infer one"</em>. The reader who was the enforcement mechanism is now instructed not to think about it.</p>
+<p>So the contract still says "the human decides done", while nothing in the loop has a human deciding anything. That is the issue.</p>
+</div>
+
+<h2>The three ways out, and what each one moves</h2>
+
+<p>They are not three flavours of the same fix. They differ in <em>who ends up deciding a ticket is done</em> — which is exactly what the rule is about.</p>
+</div>
+
+<figure>
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#EDF0F5','primaryTextColor':'#14181F','primaryBorderColor':'#5F6875','lineColor':'#4a4a4a','fontSize':'14px'}}}%%
+flowchart TB
+  START["the entry the tool is about to name<br/>is CLOSED in the tracker"] --> O1
+  START --> O2
+  O1["OPTION 1 — refuse<br/>stop and say so"] --> D1["you delete the line,<br/>then re-run"]
+  D1 --> W1["decides done: YOU<br/>contract unchanged"]
+  O2["OPTION 2 — skip<br/>move on to the next entry"] --> D2["tool treats the entry<br/>as finished, on its own"]
+  D2 --> W2["decides done: THE TOOL<br/>contract broken"]
+  W1 --> C1["file cannot rot:<br/>nothing works until it is clean"]
+  W2 --> C2["file rots freely:<br/>stale lines are now harmless"]
+  classDef keep fill:#E7EAF7,stroke:#2D3A8C,color:#14181F
+  classDef break fill:#F8E8E7,stroke:#9E2B25,color:#14181F
+  classDef neutral fill:#FFFFFF,stroke:#5F6875,color:#14181F
+  class O1,D1,W1,C1 keep
+  class O2,D2,W2,C2 break
+  class START neutral
+</pre>
+<figcaption>The difference is not the message on screen — it is which side of the line the "done" decision ends up on. Skipping is the tool deciding a ticket is finished, which is the one thing the written rule forbids. Option 3, below, is option 1 with an extra line of output; it does not move the decision.</figcaption>
+</figure>
+
+<div class="opts">
+  <div class="opt">
+    <div class="tag">option 1 · committed as 07af2d52</div>
+    <h5>Refuse to name it</h5>
+    <pre>STALE CHAIN — #569 is CLOSED
+but still listed in
+…/aggregated-research-chain.toml;
+remove it, then re-run</pre>
+    <ul>
+      <li class="good">You still decide done</li>
+      <li class="good">Caught at the last moment it could mislead</li>
+      <li class="bad">Blocks the round until you edit one line</li>
+      <li class="bad">Names the problem, not the payoff</li>
+    </ul>
+  </div>
+  <div class="opt">
+    <div class="tag">option 2 · committed as b0f10076</div>
+    <h5>Skip it, mention it</h5>
+    <pre>READY — #570 The research CLI
+emits on the structured event
+stream
+stale: #569 is CLOSED — remove it
+from …/chain.toml</pre>
+    <ul>
+      <li class="good">Never blocks you</li>
+      <li class="bad">The tool decides done</li>
+      <li class="bad">An advisory line is easy to stop reading</li>
+    </ul>
+  </div>
+  <div class="opt pick">
+    <div class="tag">option 3 · SHIPPED · f82ee1c1</div>
+    <h5>Refuse, but show the payoff</h5>
+    <pre>STALE CHAIN — #569 is CLOSED …
+remove it, then re-run
+next after removal: #570 The
+research CLI emits on the
+structured event stream</pre>
+    <ul>
+      <li class="good">You still decide done</li>
+      <li class="good">The removal IS the next task, named</li>
+      <li class="good">An all-closed chain says so on the first run</li>
+      <li class="bad">Still blocks; one more line to maintain</li>
+    </ul>
+  </div>
+</div>
+
+<div class="col">
+<h2>What the two reviewers said</h2>
+
+<p>The advisor first told me to skip, then <em>reversed itself</em> once I gave it the sentence from the chain file. Its argument for reversing: making stale entries harmless removes the last pressure that will ever exist to clean the file up — and this repository's own tools already lean the other way. Two of them refuse rather than guess: one returns nothing instead of a partial list, another refuses instead of an empty answer.</p>
+
+<p>Separately, the implementing lane — which had not been told any of that — wrote into the code's own docstring that skipping the stale entry and reporting the next one anyway "would be the thing most likely" to go wrong. Two lanes reached the same place from different directions.</p>
+
+<div class="alarm">
+<p><strong>The honest counter-argument, which neither of them weighed.</strong> Option 1 stops your round. If a ticket is closed and still listed, you get no next task at all until you edit the file. That is a real cost paid every time, against a rot that is invisible and slow — and "the correct design" is easy to prefer when someone else pays for it.</p>
+</div>
+
+<h3>A third advisor, given that counter-argument, picked option 3</h3>
+
+<p>Its answer to the cost: the stop does not actually leave you without a next task — <strong>the removal IS the next task</strong>, and option 3 puts what you are unblocking on the same screen, so the cleanup commit and the resume become one step. The price of the stop drops to near zero without the refusal being weakened.</p>
+
+<p>It also refused a fourth shape I proposed — refuse on <em>any</em> closed entry anywhere in the file, not just the named one — on three grounds. It buys nothing, since a non-named closed entry is inert. It changes what the tool is, from "name the next ticket" into "audit the chain file", and a whole-file hygiene check belongs in a ship gate that fires at the closing commit, not in the query run at every <code>/clear-prep</code>. And it would hold the tool hostage to entries deep in a 21-ticket chain, several of which will legitimately close out of order.</p>
+
+<p>The risk it named as deciding: option 2's failure mode is <em>permanent and invisible</em> — the convention dies quietly and the file becomes a second, wrong source of truth. Option 3's is a visible one-commit pause with both the fix and the payoff on screen. Choose the design whose worst case is loud and cheap.</p>
+
+<h2>The preview shipped, then lied, then was fixed</h2>
+
+<p>Option 3 is in as <code>f82ee1c1</code>. It did not work on the first attempt, and the reason is worth keeping, because the instruction that caused it was mine.</p>
+
+<p>I told the implementer that when the entry after the stale one is <em>also</em> closed, the preview should chase past it — "a reader wants the real next task, not the next piece of rubbish." That sounds obviously right and it made the preview disagree with the tool. The naming rule <strong>refuses</strong> a closed entry; my preview rule <strong>skipped</strong> one. Opposite rules, so:</p>
+
+<div class="alarm">
+<p>With <code>[#1 closed, #2 closed, #3 open]</code> the tool printed <code>next after removal: #3</code>. You remove #1, exactly as instructed. You re-run. It says <code>STALE CHAIN — #2</code>.</p>
+<p>The refusal was correct both times. The promise attached to it was not.</p>
+</div>
+
+<p>The reviewer that caught it did so by <em>executing</em> the module against that fixture, not by reasoning about it — and control-armed the scope, confirming the two rules agree when only one entry is closed. The fix names what the next run will actually say, which turns out to be more useful than the chase ever was: <code>#2 … — also CLOSED, remove it too</code> lets you clean up both in one commit instead of discovering the second on the next run.</p>
+
+<p><strong>The mutation arms passed 9 of 9 on the code that carried this.</strong> They proved the chase step existed. They could not see that it disagreed with the rest of the module, because an arm mutates the code and asks whether a test notices — it has no way to ask whether the design was right. A clean sweep is a statement about the tests, never about the premise.</p>
+
+<h2>Nothing has changed yet</h2>
+
+<p>Issue #569 is still open, so today every one of the three designs prints the same thing: <code>READY — #569</code> — verified by running it. They only diverge the moment that pull request merges and closes it.</p>
+
+<div class="alarm">
+<p><strong>Corrected after publication.</strong> This section first said option 1 was uncommitted in the working tree. It is not: while this page was being read, the implementing lane landed it as <code>07af2d52</code>, on top of option 2's <code>b0f10076</code>. Both designs are now commits on the branch, in that order.</p>
+<p>That was my sequencing error, not the lane's — I sent it the corrected design before putting the question here, so it was already building option 1 while the question was still open. Nothing is lost: option 1 is in, option 2 is one revert away, option 3 is one addition. But the branch now leans toward option 1 by default, and a decision that gets made by whoever moved last is not a decision.</p>
+</div>
+
+<h3>A second correction — and then a third, which withdrew it</h3>
+
+<p>Option 1's card first claimed <em>"the file can never silently rot"</em>. I read the shipped code, found that the check fires only for the entry about to be <strong>named</strong>, and concluded that a CLOSED entry which still has an open blocker slips past in silence — so the enforcement was narrower than the argument for it assumed. I published that as a correction.</p>
+
+<p><strong>An advisor then refuted it, and it was right.</strong> That entry is <em>inert</em>. Blocker resolution reads tracker state by issue number, never chain-file presence, so a stale entry sitting mid-file contributes nothing to any output: it cannot be named, cannot mislead, cannot change what any other entry resolves to. And it is not silent forever — the moment its own blockers close, it becomes the first entry with all blockers closed, the check fires, and it is reported.</p>
+
+<p>So the enforcement is <em>deferred</em>, not partial. Every closed entry is caught at the last moment before it could ever appear in output. The file's bytes can carry dead weight; nothing the tool says ever does.</p>
+
+<p class="cite">Recorded rather than deleted, because the sequence is the point: a confident claim, a correction to it, and a correction to the correction. Two of the three were mine.</p>
+</div>
+
+<footer>
+<p>Facts on this page measured in this session: the chain file's 21 entries and its head entry #569 with no blockers; the contract sentence quoted at <code>docs/roadmap/aggregated-research-chain.toml:12-14</code>; option 2 committed as <code>b0f10076</code>, option 1 present uncommitted. The <code>/clear-prep</code> quote was read by the implementing lane at <code>.claude/skills/clear-prep/SKILL.md:41</code> and is not independently re-read here. Option 3 is mine and no advisor has judged it.</p>
+</footer>
+
+</div>

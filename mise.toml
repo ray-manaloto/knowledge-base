@@ -823,11 +823,11 @@ uv run kb-setup artifact-download --provider ${usage_provider?} --source ${usage
 # shadow class this replaced.
 [tasks.kb-codegen]
 description = "Regenerate every strict msgspec model from its JSON Schema"
-run = "uv run --project . --locked --group codegen datamodel-codegen --all-jobs"
+run = "uv run --project {{config_root}} --locked --group codegen datamodel-codegen --all-jobs"
 
 [tasks.kb-codegen-check]
 description = "Fail if any generated model differs from its schema"
-run = "uv run --project . --locked --group codegen datamodel-codegen --all-jobs --check"
+run = "uv run --project {{config_root}} --locked --group codegen datamodel-codegen --all-jobs --check"
 
 [tasks.kb-research-trackers]
 description = "Search one repository's GitHub issue and pull-request trackers"
