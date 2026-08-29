@@ -127,10 +127,16 @@ class StaleChain:
     the enforcement pressure behind the chain file's removal convention, not a
     replacement for it: the tool still never infers "done" on its own and
     still never removes the entry itself — it refuses to name it and stops.
+
+    `after_removal` is a PREVIEW, not a skip: what :func:`_preview_after_removal`
+    finds by continuing the walk past this entry, using the states already in
+    hand (no second lookup). The refusal above is unchanged — this field only
+    tells the reader what the refusal is worth fixing.
     """
 
     issue: int
     title: str
+    after_removal: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -342,18 +348,61 @@ def _parse_lookup(rc: int, out: str, alias_to_number: dict[str, int]) -> _Lookup
     return _Lookup(states)
 
 
+def _open_blockers(ticket: Ticket, states: dict[int, IssueInfo]) -> tuple[IssueInfo, ...]:
+    """`ticket`'s blockers that are not (yet) CLOSED — the walk's own readiness rule.
+
+    Factored out so :func:`resolve` and :func:`_preview_after_removal` apply the
+    exact same rule rather than retyping the expression twice more.
+    """
+    return tuple(states[b] for b in ticket.blockers if states[b].state != "CLOSED")
+
+
+def _preview_after_removal(
+    tickets: tuple[Ticket, ...], removed: Ticket, states: dict[int, IssueInfo]
+) -> str:
+    """What the tool would report as the next entry once `removed` is gone.
+
+    Continues the SAME walk :func:`resolve` uses — the first entry (file
+    order) with no open blockers — over `tickets` with `removed` excluded, no
+    second lookup. Every entry before `removed` is provably not a candidate
+    already (either the main loop would have named one first, or — in the
+    fallback path — every entry has an open blocker), so a full scan minus
+    `removed` is equivalent to continuing from just past it.
+
+    A candidate that is itself CLOSED is skipped rather than reported: a
+    reader cleaning up the file wants the real next task, not the next piece
+    of rubbish also waiting to be removed. If none remain, says so plainly
+    instead of leaving a dangling line.
+    """
+    for ticket in tickets:
+        if ticket.issue == removed.issue:
+            continue
+        if _open_blockers(ticket, states):
+            continue
+        if states[ticket.issue].state == "CLOSED":
+            continue  # chase onward — a reader wants the real next task
+        return f"#{ticket.issue} {ticket.title}"
+    return "nothing ready after cleanup"
+
+
 def _name(
-    ticket: Ticket, states: dict[int, IssueInfo], open_blockers: tuple[IssueInfo, ...]
+    ticket: Ticket,
+    tickets: tuple[Ticket, ...],
+    states: dict[int, IssueInfo],
+    open_blockers: tuple[IssueInfo, ...],
 ) -> Outcome:
     """The outcome for naming `ticket` — refuses to name one the tracker says is CLOSED.
 
     Checked ONLY here, for the one entry :func:`resolve` is about to report —
     never by scanning the rest of the chain for other closed entries. That is
     deliberate laziness, not an oversight: the next run, after the commit that
-    removes this entry, is what catches the next one.
+    removes this entry, is what catches the next one. `tickets` is used only
+    for the STALE CHAIN preview lookahead below — it plays no part in deciding
+    which entry is being named.
     """
     if states[ticket.issue].state == "CLOSED":
-        return StaleChain(ticket.issue, ticket.title)
+        preview = _preview_after_removal(tickets, ticket, states)
+        return StaleChain(ticket.issue, ticket.title, preview)
     if not open_blockers:
         return Ready(ticket.issue, ticket.title)
     return Blocked(ticket.issue, ticket.title, open_blockers)
@@ -378,15 +427,15 @@ def resolve(tickets: tuple[Ticket, ...], repo_root: Path) -> Outcome:
     states = lookup.states
 
     for ticket in tickets:
-        open_blockers = tuple(states[b] for b in ticket.blockers if states[b].state != "CLOSED")
+        open_blockers = _open_blockers(ticket, states)
         if not open_blockers:
-            return _name(ticket, states, open_blockers)
+            return _name(ticket, tickets, states, open_blockers)
 
     # Nothing was ready: the loop above would already have returned the first
     # entry whose blockers are all closed, so `tickets[0]` is provably blocked.
     first = tickets[0]
-    open_blockers = tuple(states[b] for b in first.blockers if states[b].state != "CLOSED")
-    return _name(first, states, open_blockers)
+    open_blockers = _open_blockers(first, states)
+    return _name(first, tickets, states, open_blockers)
 
 
 def render(outcome: Outcome, chain_path: Path) -> str:
@@ -400,7 +449,8 @@ def render(outcome: Outcome, chain_path: Path) -> str:
     if isinstance(outcome, StaleChain):
         return (
             f"STALE CHAIN — #{outcome.issue} {outcome.title} is CLOSED but still "
-            f"listed in {chain_path}; remove it, then re-run"
+            f"listed in {chain_path}; remove it, then re-run\n"
+            f"next after removal: {outcome.after_removal}"
         )
     return f"COULD NOT ASK — {outcome.detail}\nchain file: {chain_path} — re-derive once resolved"
 

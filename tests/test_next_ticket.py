@@ -224,7 +224,10 @@ def test_a_closed_ready_candidate_is_reported_stale_chain_not_ready(
     assert result.value.startswith("STALE CHAIN — #1 Done, never removed is CLOSED")
     assert str(chain) in result.value
     assert "remove it, then re-run" in result.value
-    assert "#2" not in result.value
+    # #2 legitimately appears in the preview line (it's the real next-ready
+    # entry once #1 is removed) — what must never happen is #2 on the NAMING
+    # line, i.e. #2 quietly substituted as the reported entry.
+    assert "#2" not in result.value.split("\n")[0]
 
 
 def test_a_closed_blocked_fallback_is_reported_stale_chain_not_blocked(
@@ -292,6 +295,136 @@ def test_a_closed_entry_that_is_never_the_naming_candidate_goes_unmentioned(
     assert result.value.startswith("READY — #2 Ready")
     assert "STALE" not in result.value
     assert "#1" not in result.value
+
+
+# --------------------------------------------------------------------------
+# §preview — STALE CHAIN's "next after removal" line previews what the tool
+# would report once the stale entry is gone, without a second lookup (#574
+# follow-up). Never a skip: the state stays STALE CHAIN either way.
+# --------------------------------------------------------------------------
+
+
+def test_preview_names_the_next_ready_entry_after_the_stale_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chain = _write_chain(
+        tmp_path,
+        [
+            {"issue": 1, "title": "Done, never removed", "blockers": []},
+            {"issue": 2, "title": "Next task", "blockers": []},
+        ],
+    )
+    body = "{" + _issue_json(1, "CLOSED") + ", " + _issue_json(2, "OPEN") + "}"
+    out = f'{{"data": {{"repository": {body}}}}}'
+    _stub(monkeypatch, 0, out)
+
+    result = next_ticket.evaluate(chain, tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.value.startswith("STALE CHAIN — #1 Done, never removed is CLOSED")
+    assert "next after removal: #2 Next task" in result.value
+
+
+def test_preview_chases_past_a_closed_candidate_to_the_real_next_task(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#2 would ALSO be a stale-chain candidate — the preview must not name it.
+
+    Without the chase-onward step, a reader cleaning up #1 would be pointed at
+    #2 — itself due for removal, not the real next task (#3).
+    """
+    chain = _write_chain(
+        tmp_path,
+        [
+            {"issue": 1, "title": "Done, never removed", "blockers": []},
+            {"issue": 2, "title": "Also done, never removed", "blockers": []},
+            {"issue": 3, "title": "Real next task", "blockers": []},
+        ],
+    )
+    body = (
+        "{"
+        + _issue_json(1, "CLOSED")
+        + ", "
+        + _issue_json(2, "CLOSED")
+        + ", "
+        + _issue_json(3, "OPEN")
+        + "}"
+    )
+    out = f'{{"data": {{"repository": {body}}}}}'
+    _stub(monkeypatch, 0, out)
+
+    result = next_ticket.evaluate(chain, tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.value.startswith("STALE CHAIN — #1 Done, never removed is CLOSED")
+    assert "next after removal: #3 Real next task" in result.value
+    assert "#2" not in result.value
+
+
+def test_preview_reports_nothing_ready_after_cleanup_when_none_remain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chain = _write_chain(
+        tmp_path,
+        [
+            {"issue": 1, "title": "Done, never removed", "blockers": []},
+            {"issue": 2, "title": "Still blocked", "blockers": [100]},
+        ],
+    )
+    body = (
+        "{"
+        + _issue_json(1, "CLOSED")
+        + ", "
+        + _issue_json(2, "OPEN")
+        + ", "
+        + _issue_json(100, "OPEN", "blocker A")
+        + "}"
+    )
+    out = f'{{"data": {{"repository": {body}}}}}'
+    _stub(monkeypatch, 0, out)
+
+    result = next_ticket.evaluate(chain, tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.value.startswith("STALE CHAIN — #1 Done, never removed is CLOSED")
+    assert "next after removal: nothing ready after cleanup" in result.value
+
+
+def test_preview_is_computed_for_the_fallback_naming_candidate_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The fallback-path STALE CHAIN carries a preview too.
+
+    `tickets[0]`, everything blocked — always "nothing ready after cleanup"
+    here, since the fallback is reached only when EVERY entry has an open
+    blocker.
+    """
+    chain = _write_chain(
+        tmp_path,
+        [
+            {"issue": 1, "title": "Done, never removed", "blockers": [100]},
+            {"issue": 2, "title": "Also blocked", "blockers": [101]},
+        ],
+    )
+    body = (
+        "{"
+        + _issue_json(1, "CLOSED")
+        + ", "
+        + _issue_json(2, "OPEN")
+        + ", "
+        + _issue_json(100, "OPEN", "blocker A")
+        + ", "
+        + _issue_json(101, "OPEN", "blocker B")
+        + "}"
+    )
+    out = f'{{"data": {{"repository": {body}}}}}'
+    _stub(monkeypatch, 0, out)
+
+    result = next_ticket.evaluate(chain, tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.value.startswith("STALE CHAIN — #1 Done, never removed is CLOSED")
+    assert "next after removal: nothing ready after cleanup" in result.value
 
 
 # --------------------------------------------------------------------------
@@ -552,12 +685,14 @@ def test_render_blocked_lists_every_open_blocker(tmp_path: Path) -> None:
 
 def test_render_stale_chain_names_the_issue_and_says_remove_it(tmp_path: Path) -> None:
     chain = tmp_path / "chain.toml"
+    outcome = StaleChain(569, "Delete the code-generator wrapper", "#570 The research CLI")
 
-    text = next_ticket.render(StaleChain(569, "Delete the code-generator wrapper"), chain)
+    text = next_ticket.render(outcome, chain)
 
     assert text.startswith("STALE CHAIN — #569 Delete the code-generator wrapper is CLOSED")
     assert str(chain) in text
     assert "remove it, then re-run" in text
+    assert "next after removal: #570 The research CLI" in text
     assert "BLOCKED" not in text
     assert "READY" not in text
 
