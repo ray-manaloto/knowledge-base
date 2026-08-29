@@ -1,0 +1,214 @@
+<title>Who Answers To That Name</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ground: #F2F3F1;
+    --panel: #FBFBFA;
+    --ink: #1E2321;
+    --muted: #69726E;
+    --rule: #D7DAD6;
+    --wrong: #A63D2F;
+    --right: #2A6F6B;
+    --plate: #FBFBFA;
+    --display: "Bricolage Grotesque", "Helvetica Neue", sans-serif;
+    --body: "Source Serif 4", Georgia, serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0.4rem 0 0;
+  }
+  h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.3rem;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .lede { font-size: 1.12rem; color: var(--muted); margin: 0; }
+  p { margin: 0; }
+  section { display: flex; flex-direction: column; gap: 0.9rem; }
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  code { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 0.06em 0.32em; }
+
+  figure { margin: 0; }
+  figure svg { display: block; width: 100%; max-width: 100%; height: auto; }
+  figcaption {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    line-height: 1.5;
+    color: var(--muted);
+    margin-top: 0.7rem;
+  }
+  .fig-scroll { overflow-x: auto; }
+
+  .verdicts { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+  .verdict { display: grid; grid-template-columns: 5.5rem 1fr; gap: 1rem; padding: 0.85rem 1rem; background: var(--panel); border-bottom: 1px solid var(--rule); align-items: baseline; }
+  .verdict:last-child { border-bottom: 0; }
+  .tag { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  .tag.bad { color: var(--wrong); }
+  .tag.ok { color: var(--right); }
+  .verdict p { font-size: 0.95rem; }
+
+  .evidence { font-family: var(--mono); font-size: 0.78rem; line-height: 1.7; background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--right); border-radius: 3px; padding: 0.9rem 1rem; overflow-x: auto; white-space: pre; color: var(--ink); }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Resume check · 2026-08-28 · measured this session</div>
+    <h1>Who answers to that name</h1>
+  </header>
+
+  <p class="lede">The round's first instruction is “run the research <em>through the installed plugin CLI</em>, not the repo-local one.” Typing <code>aggregated-research</code> in this repo does the opposite — and the plugin's own copy currently refuses to start.</p>
+
+  <hr>
+
+  <section>
+    <h2>Three things answer to one name</h2>
+    <p>A command name is not an identity. The shell hands it to the first directory on <code>PATH</code> that has a file by that name, and three different programs here are called <code>aggregated-research</code>.</p>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 720 400" role="img" aria-label="Typing aggregated-research resolves to the repo's own venv copy, which wins on PATH; the plugin's copy is further down PATH and, when reached, refuses because the mise-env wrapper reads CLAUDE_PLUGIN_DATA, which currently points at the codex plugin's data directory.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+            <marker id="ar-wrong" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#A63D2F"/>
+            </marker>
+          </defs>
+
+          <!-- typed command -->
+          <rect x="8" y="168" width="150" height="46" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="83" y="188" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">you type</text>
+          <text x="83" y="205" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">aggregated-research</text>
+
+          <!-- fan out -->
+          <line x1="158" y1="191" x2="200" y2="191" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="200" y1="70" x2="200" y2="322" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="200" y1="70" x2="248" y2="70" stroke="#A63D2F" stroke-width="2" marker-end="url(#ar-wrong)"/>
+          <line x1="200" y1="196" x2="248" y2="196" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+          <line x1="200" y1="322" x2="248" y2="322" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+
+          <text x="204" y="120" font-family="JetBrains Mono, monospace" font-size="10" fill="#A63D2F">1st on PATH</text>
+          <text x="204" y="246" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.65">later on PATH</text>
+          <text x="204" y="366" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.65">not on PATH</text>
+
+          <!-- candidate 1: repo venv -->
+          <rect x="256" y="46" width="256" height="50" rx="4" fill="none" stroke="#A63D2F" stroke-width="2"/>
+          <text x="268" y="66" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#A63D2F">.venv/bin/ — this repo's own copy</text>
+          <text x="268" y="83" font-family="JetBrains Mono, monospace" font-size="10" fill="#A63D2F">kb_setup.research.cli</text>
+          <line x1="512" y1="71" x2="596" y2="71" stroke="#A63D2F" stroke-width="2" marker-end="url(#ar-wrong)"/>
+          <text x="656" y="66" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#A63D2F">RUNS</text>
+          <text x="656" y="82" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#A63D2F">wrong one</text>
+
+          <!-- candidate 2: plugin cache -->
+          <rect x="256" y="172" width="256" height="50" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="268" y="192" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="currentColor">plugins/cache/…/eb3ba054916f/bin</text>
+          <text x="268" y="209" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.7">the installed plugin — what we want</text>
+
+          <!-- candidate 3: data shim -->
+          <rect x="256" y="298" width="256" height="50" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.55"/>
+          <text x="268" y="318" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">plugins/data/…/mise/shims/</text>
+          <text x="268" y="335" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.55">unreachable by name</text>
+
+          <!-- the second failure: env cross-wire -->
+          <line x1="384" y1="222" x2="384" y2="252" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+          <text x="394" y="242" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.7">reads</text>
+
+          <rect x="256" y="252" width="256" height="34" rx="4" fill="none" stroke="#A63D2F" stroke-width="1.5"/>
+          <text x="268" y="273" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#A63D2F">$CLAUDE_PLUGIN_DATA → codex-openai-codex</text>
+
+          <line x1="512" y1="269" x2="596" y2="269" stroke="#A63D2F" stroke-width="1.5" marker-end="url(#ar-wrong)"/>
+          <text x="656" y="264" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#A63D2F">REFUSES</text>
+          <text x="656" y="280" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#A63D2F">“nothing installed”</text>
+        </svg>
+      </div>
+      <figcaption>Two independent misroutings. The name resolves to the repo's copy because <code>.venv/bin</code> precedes the plugin's bin directory on <code>PATH</code>; and even called by its full path, the plugin's wrapper looks up its install under whatever <code>$CLAUDE_PLUGIN_DATA</code> happens to hold — here, another plugin's directory.</figcaption>
+    </figure>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>What was measured, and the control arm</h2>
+    <div class="evidence">$ command -v aggregated-research
+  …/knowledge-base/.venv/bin/aggregated-research     ← the repo's own copy
+
+$ head -4 …/.venv/bin/aggregated-research
+  from kb_setup.research.cli import main             ← this repo, not the plugin
+
+$ echo $CLAUDE_PLUGIN_DATA
+  ~/.claude/plugins/data/codex-openai-codex          ← another plugin's dir
+
+$ …/cache/ray-manaloto/aggregated-research/eb3ba054916f/bin/aggregated-research --help
+  aggregated-research: nothing installed under …/codex-openai-codex
+
+CONTROL ARM — same binary, corrected env:
+$ CLAUDE_PLUGIN_DATA=…/data/aggregated-research-ray-manaloto  <same path> --help
+  rc=0
+  aggregated-research &lt;verb&gt; [args...]
+    verbs: trackers</div>
+    <p>The probe discriminates: identical command, one variable changed, opposite answer. The plugin install is fine — <code>mise-env:8</code> trusts an inherited variable that belongs to whichever plugin last set it.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Where the handoff and the repo disagree</h2>
+    <div class="verdicts">
+      <div class="verdict">
+        <span class="tag ok">agrees</span>
+        <p>Branch, HEAD, clean tree, no open PR, 48 of 49 handoff citations verified.</p>
+      </div>
+      <div class="verdict">
+        <span class="tag bad">disagrees</span>
+        <p>Handoff: <em>“the plugin's bin directory is on PATH while enabled.”</em> True — but <strong>second</strong>. The name resolves to the repo-local copy, which is the exact thing this round was told not to use.</p>
+      </div>
+      <div class="verdict">
+        <span class="tag bad">disagrees</span>
+        <p>Handoff step 1 expects <code>--help</code> to work, and treats a failure as “the hook did not run.” The hook <em>did</em> run. The cause is a leaked environment variable, not a missing install.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>The choice</h2>
+    <p>The research itself is unblocked either way — one prefixed variable makes the plugin CLI run right now. What is open is whether the leak gets fixed in the plugin before the round starts, or is logged as a residual and worked around.</p>
+  </section>
+
+</div>

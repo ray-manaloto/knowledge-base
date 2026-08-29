@@ -37,9 +37,9 @@ the two env vars that looked like the answer are a Bash-subprocess marker and an
 operator enable-flag, set on the main thread too — so `kb-context` refused there
 100% of the time until 2026-08-22 (#451). If you are a subagent, report back.
 
-`$ARGUMENTS` is the next task, if the user named one. If it is empty, infer the
-next task from open issues and the prior handoff, and *say what you inferred* —
-a guess the user never saw is a guess nobody corrected.
+`$ARGUMENTS` is the next task if the user named one. Otherwise run
+`uv run kb-setup next-ticket` and quote its output verbatim — never infer one: a
+guess the user never saw is a guess nobody corrected (#574).
 
 Work top-to-bottom. The ordering in step 2 is not stylistic; it is the one thing
 in this skill that cannot be reordered without losing work.

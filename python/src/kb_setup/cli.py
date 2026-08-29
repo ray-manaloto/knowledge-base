@@ -77,7 +77,7 @@ def _print_usage() -> int:
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
-        "session-state [--no-pr] | context | "
+        "session-state [--no-pr] | context | next-ticket | "
         "session-select (--current | --sessions <id>... | --last N | "
         "--since <ISO> [--until <ISO>]) | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
@@ -452,6 +452,10 @@ def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
         from kb_setup import goal
 
         return goal.outcome_main(rest, repo_root)
+    if cmd == "next-ticket":
+        from kb_setup import next_ticket
+
+        return next_ticket.main(rest, repo_root)
     return None
 
 
@@ -575,7 +579,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | funnel | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
-        "session-state [--no-pr] | "
+        "session-state [--no-pr] | next-ticket | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
         "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "
         "remember [--audit] | cc | cc-doctor | "

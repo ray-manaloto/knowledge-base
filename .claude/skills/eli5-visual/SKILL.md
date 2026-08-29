@@ -5,6 +5,32 @@ description: Explain anything as a published visual artifact instead of terminal
 
 # eli5-visual — the explanation is a page, not a paragraph
 
+## Rule 0: light background, always. No dark-mode arm
+
+Ray, 2026-08-28, verbatim: *"i still have a hard time seeing it w black text on
+black background — can you use white background going forward and update the
+/eli5-visual also so it is fixed for good"*.
+
+Every page authored under this skill is **single-theme light**. No
+`@media (prefers-color-scheme: dark)` block, no `:root[data-theme="dark"]` block.
+`body` paints an explicit light `background` and a dark `color` — a transparent
+body borrows the viewer's ground, which is how a page with a correct dark palette
+still arrives unreadable.
+
+**The mechanism that actually broke, so it is not rediscovered:** a theme-aware
+page can still render dark-on-dark because **a literal hex inside an inline SVG
+attribute does not follow a CSS variable**. `fill="#A63D2F"` is that colour on
+every ground. Three pages shipped on 2026-08-28 with theme-correct CSS and
+hardcoded SVG inks before Ray reported it. Light-only removes the class: the
+ground is known, so literals are safe — but every diagram ink must still read on
+white (aim 4.5:1), and `currentColor` alone never rescues a diagram.
+
+This is the same failure family §2 below documents for mermaid, arriving through
+hand-authored SVG instead. **A page that renders unreadably is a failed
+explanation regardless of its content** — check contrast before publishing.
+
+---
+
 Ray's standing instruction, 2026-08-24, verbatim:
 
 > i am having a hard time understanding what any of your explanations

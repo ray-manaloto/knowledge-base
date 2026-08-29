@@ -798,14 +798,6 @@ arg "[alternatives]" var=#true help="Optional alternative technology names"
 '''
 run = "uv run kb-setup ecosystem-discovery-plan{% for alternative in usage.alternatives %} {{ alternative | quote }}{% endfor %}"
 
-[tasks.kb-source-groups-codegen]
-description = "Regenerate strict source-group msgspec models from JSON Schema"
-run = "uv run --group codegen python schemas/generate_source_groups.py"
-
-[tasks.kb-source-groups-codegen-check]
-description = "Fail if generated source-group models differ from the schema"
-run = "uv run --group codegen python -m schemas.check_source_groups_codegen"
-
 [tasks.kb-artifact-download]
 description = "Plan or apply one immutable provider artifact transfer with an atomic receipt"
 usage = '''
@@ -820,21 +812,22 @@ run = '''
 uv run kb-setup artifact-download --provider ${usage_provider?} --source ${usage_source?} --revision ${usage_revision?} --destination ${usage_destination?}{% if usage.receipt is string and usage.receipt != '' %} --receipt {{ usage.receipt | quote }}{% endif %}{% if usage.mode == "apply" %} --apply{% endif %}
 '''
 
-[tasks.kb-fetch-receipt-codegen]
-description = "Regenerate strict fetch-receipt msgspec models from JSON Schema"
-run = "uv run --group codegen python schemas/generate_fetch_receipt.py"
+# One job per checked-in msgspec model (source-groups, fetch-receipt,
+# session-select, research-record), declared in `[tool.datamodel-codegen]` in
+# pyproject.toml — nothing here names a schema or an output path. `--project .
+# --locked --group codegen` IS the version guard the four deleted wrappers used
+# to assert by hand (#569): `--locked` refuses to run when `uv.lock` disagrees
+# with `pyproject.toml`, and the binary is resolved from the locked environment,
+# never `$PATH` — so a stale mise-global/pipx `datamodel-codegen` shadowing the
+# pin can no longer run silently. Dropping any part of that trio reopens the
+# shadow class this replaced.
+[tasks.kb-codegen]
+description = "Regenerate every strict msgspec model from its JSON Schema"
+run = "uv run --project {{config_root}} --locked --group codegen datamodel-codegen --all-jobs"
 
-[tasks.kb-fetch-receipt-codegen-check]
-description = "Fail if generated fetch-receipt models differ from the schema"
-run = "uv run --group codegen python -m schemas.check_fetch_receipt_codegen"
-
-[tasks.kb-research-record-codegen]
-description = "Regenerate strict research-record msgspec models from JSON Schema"
-run = "uv run --group codegen python schemas/generate_research_record.py"
-
-[tasks.kb-research-record-codegen-check]
-description = "Fail if generated research-record models differ from the schema"
-run = "uv run --group codegen python -m schemas.check_research_record_codegen"
+[tasks.kb-codegen-check]
+description = "Fail if any generated model differs from its schema"
+run = "uv run --project {{config_root}} --locked --group codegen datamodel-codegen --all-jobs --check"
 
 [tasks.kb-research-trackers]
 description = "Search one repository's GitHub issue and pull-request trackers"
@@ -1384,6 +1377,19 @@ description = "Print the session's working state as a paste-ready handoff block:
 # Gathering and rendering are separate functions so a caller can read the state
 # without the markdown. Logic in kb_setup.session_state.
 run = "uv run kb-setup session-state"
+
+[tasks.kb-next-ticket]
+description = "Print the tracked chain's next ready ticket, or why not: mise run kb-next-ticket"
+# Interactive use only. `/clear-prep` calls `uv run kb-setup next-ticket` directly,
+# never this task — same reason as kb-session-state above: mise's output
+# redaction mangles digit runs, and this task's whole output is issue numbers (#574).
+# Reads docs/roadmap/aggregated-research-chain.toml (the ORDERING) against the
+# tracker's live issue state (the STATUS), via one batched `gh api graphql` call,
+# and reports exactly one of three states on its first line — READY, BLOCKED, or
+# COULD NOT ASK — reusing #144's decision that a failed tracker lookup is its own
+# state and never renders as "nothing ready". Never skips a blocked ticket to
+# report a later one instead. Logic in kb_setup.next_ticket.
+run = "uv run kb-setup next-ticket"
 
 [tasks.kb-goal-check]
 description = 'Mechanically check a /goal goal+rider pair: mise run kb-goal-check -- <path|pair-prefix|--text "...">'

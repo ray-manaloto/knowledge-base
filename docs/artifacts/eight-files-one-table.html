@@ -1,0 +1,263 @@
+<title>Eight Files, One Table</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    --paper:#FBFAF7; --ink:#1A1714; --muted:#6E6660; --rule:#DDD8D0;
+    --plate:#F4F1EB; --wrong:#A32B1E; --true:#155E58; --wrong-tint:#F6E9E7; --true-tint:#E4EFEE;
+    --display:"Bitter",Georgia,serif;
+    --body:"IBM Plex Sans",-apple-system,Segoe UI,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16.5px;line-height:1.6;margin:0}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+  .col{max-width:68ch}
+  header{padding:64px 0 40px;border-bottom:3px solid var(--ink);margin-bottom:44px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 18px}
+  h1{font-family:var(--display);font-weight:700;font-size:clamp(2.3rem,5.4vw,3.7rem);line-height:1.04;margin:0 0 18px;text-wrap:balance;letter-spacing:-.015em}
+  .standfirst{font-size:1.2rem;color:var(--muted);margin:0;max-width:60ch}
+  h2{font-family:var(--display);font-weight:700;font-size:1.65rem;line-height:1.2;margin:60px 0 6px;text-wrap:balance}
+  h3{font-family:var(--display);font-weight:500;font-size:1.16rem;margin:34px 0 4px}
+  .kicker{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+  p{margin:0 0 16px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--plate);padding:1px 5px;border-radius:2px}
+  a{color:var(--true)}
+  .lede{font-size:1.06rem}
+  .tally{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);margin:34px 0 8px}
+  .tally div{flex:1 1 150px;padding:18px 20px 16px;border-right:1px solid var(--rule)}
+  .tally div:last-child{border-right:0}
+  .tally b{display:block;font-family:var(--display);font-weight:700;font-size:2rem;line-height:1;font-variant-numeric:tabular-nums}
+  .tally span{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);display:block;margin-top:8px}
+  figure{margin:34px 0 12px}
+  figcaption{font-size:.9rem;color:var(--muted);margin-top:12px;padding-left:14px;border-left:2px solid var(--rule)}
+  .scroll{overflow-x:auto;background:#fff;border:1px solid var(--rule);border-radius:4px;padding:16px}
+  table{border-collapse:collapse;width:100%;font-size:.93rem}
+  th,td{text-align:left;padding:9px 14px 9px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:400}
+  td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mark{border-left:3px solid var(--wrong);background:var(--wrong-tint);padding:16px 20px;margin:26px 0;border-radius:0 3px 3px 0}
+  .keep{border-left:3px solid var(--true);background:var(--true-tint);padding:16px 20px;margin:26px 0;border-radius:0 3px 3px 0}
+  .mark p:last-child,.keep p:last-child{margin-bottom:0}
+  .mark strong{color:var(--wrong)}
+  .keep strong{color:var(--true)}
+  .cite{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  ol.seq{counter-reset:s;list-style:none;padding:0;margin:26px 0}
+  ol.seq li{counter-increment:s;position:relative;padding-left:52px;margin-bottom:20px}
+  ol.seq li::before{content:counter(s,decimal-leading-zero);position:absolute;left:0;top:1px;font-family:var(--mono);font-size:12px;color:var(--wrong);border:1px solid var(--rule);border-radius:50%;width:34px;height:34px;display:grid;place-items:center}
+  footer{margin-top:72px;padding-top:22px;border-top:1px solid var(--rule);font-size:.85rem;color:var(--muted)}
+  svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+  svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+  svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+  svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+  svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+  svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+  svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+  svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+  svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+  svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+  svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+  svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+  svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+  svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+  svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
+</style>
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">knowledge-base · ticket #569 · 2026-08-28</p>
+  <h1>Eight Files, One Table</h1>
+  <p class="standfirst">Four schemas were fed to a code generator by eight hand-written Python files. The generator already shipped both halves of what they did. Deleting them found a trap none of us knew was there.</p>
+</header>
+
+<div class="col">
+
+<div class="tally">
+  <div><b>628</b><span>lines deleted</span></div>
+  <div><b>167</b><span>lines added</span></div>
+  <div><b>9</b><span>files removed</span></div>
+  <div><b>6&#8202;→&#8202;2</b><span>mise tasks</span></div>
+</div>
+
+<p class="lede">Each of four JSON Schemas had a <code>generate_X.py</code> that shelled out to <code>datamodel-codegen</code>, and a <code>check_X_codegen.py</code> that generated to a temp directory and compared bytes. Every one of the four passed an <em>identical</em> flag list. The generator ships <code>--all-jobs</code>, which reads named jobs from <code>pyproject.toml</code>, and <code>--check</code>, which exits 1 on a difference. Both halves already existed.</p>
+
+<h2>What actually changed</h2>
+<p class="kicker">Before and after</p>
+
+<figure>
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F4F1EB','primaryTextColor':'#1A1714','primaryBorderColor':'#6E6660','lineColor':'#4a4a4a','fontSize':'14px'}}}%%
+flowchart LR
+  subgraph OLD["BEFORE — 8 hand-written files"]
+    direction TB
+    S1[4 JSON Schemas] --> G1["4 x generate_X.py<br/>identical flag list"]
+    G1 --> M1[4 generated models]
+    S1 --> C1["4 x check_X_codegen.py<br/>generate to tmpdir, diff bytes"]
+    C1 -.->|"rc 1 on drift"| T1[2 pytest tests]
+  end
+  subgraph NEW["AFTER — one config table"]
+    direction TB
+    S2[same 4 JSON Schemas] --> J["pyproject.toml<br/>tool.datamodel-codegen<br/>+ 4 job tables"]
+    J --> K1["mise run kb-codegen<br/>--all-jobs"]
+    J --> K2["mise run kb-codegen-check<br/>--all-jobs --check"]
+    K1 --> M2[same 4 generated models]
+    K2 -.->|"rc 1 on drift"| T2[1 pytest test]
+  end
+  OLD ==>|"delete 628 lines"| NEW
+  classDef old fill:#F6E9E7,stroke:#A32B1E,color:#1A1714
+  classDef new fill:#E4EFEE,stroke:#155E58,color:#1A1714
+  class G1,C1 old
+  class J,K1,K2 new
+</pre>
+<figcaption>The schemas and the generated models are unchanged and byte-identical. What disappears is the plumbing in the middle — and the temp-directory comparison, which it turns out was structurally wrong (see the second coupling below).</figcaption>
+</figure>
+
+<h2>The trap: a convenience that only fires on one path</h2>
+
+<p>Converting the config produced four models that <em>parsed fine</em> and had lost every constraint. Not a formatting difference — <code>Annotated[int, Meta(ge=0)]</code> collapsed to a bare <code>int</code>, across all four models, silently.</p>
+
+<figure>
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F4F1EB','primaryTextColor':'#1A1714','primaryBorderColor':'#6E6660','lineColor':'#4a4a4a','fontSize':'14px'}}}%%
+flowchart TB
+  A["output-model-type = msgspec.Struct"] --> B{"where was it declared?"}
+  B -->|"on the CLI, beside --input"| C["_prepare_cli_config_args<br/>sees it"]
+  B -->|"in a job table, under --all-jobs"| D["_prepare_cli_config_args<br/>sees only CLI-level args<br/>never a job's own fields"]
+  C --> E["auto-enables use-annotated<br/>which enables field-constraints"]
+  D --> F["nothing auto-enabled"]
+  E --> G["Annotated[int, Meta#40;ge=0#41;]"]
+  F --> H["int<br/>every constraint gone, no warning"]
+  classDef good fill:#E4EFEE,stroke:#155E58,color:#1A1714
+  classDef bad fill:#F6E9E7,stroke:#A32B1E,color:#1A1714
+  class C,E,G good
+  class D,F,H bad
+</pre>
+<figcaption>The generator auto-enables two options for msgspec output — but only when it can see the declaration among the command-line arguments. A job table's own fields never reach that function, so the convenience silently does not apply. The fix is to name both options explicitly in the base table.</figcaption>
+</figure>
+
+<div class="keep">
+<p><strong>Why it did not ship.</strong> The acceptance criterion was not "the config looks right", it was <em>generate every model and confirm <code>git status</code> reports nothing changed</em>. A byte-identity criterion cannot be satisfied by a plausible-looking config. The mechanism was then read out of the installed source rather than guessed at.</p>
+</div>
+
+<h2>Which key actually carries it</h2>
+
+<p>The comment written to record that trap said the constraints drop "unless <strong>these</strong> are named here" — naming both <code>use-annotated</code> and <code>field-constraints</code>. Half of that was wrong, and a mutation arm is what said so.</p>
+
+<ol class="seq">
+<li><strong>Drop <code>field-constraints</code> alone</strong> and expect the drift gate to catch it. It <em>survived</em> — the gate saw nothing.</li>
+<li><strong>Split the arm.</strong> Drop both keys: <em>died</em>. Drop <code>use-annotated</code> alone: <em>died</em>.</li>
+<li><strong>So <code>use-annotated</code> is the load-bearing one</strong> — it is what enables <code>field-constraints</code>, which does nothing on its own. The comment now says that, and cites the arm ids that measured it.</li>
+</ol>
+
+<div class="mark">
+<p><strong>The shape worth remembering.</strong> This was a comment <em>defending</em> a choice, written by the person who had just made it, at the moment they understood it best. Nobody re-reads a comment they agree with. It took an arm that was expected to pass — and did — to expose it.</p>
+</div>
+
+<h2>Two couplings, written down rather than rediscovered</h2>
+
+<h3>Generated bytes depend on the <em>output path</em></h3>
+<p>The generator runs its formatter with the working directory set to the job's output directory, and the formatter discovers its config by walking up from there. So the same generator, same flags, same schema, produces different bytes depending on where the output lives.</p>
+
+<div class="mark">
+<p>This is why the first probe of the change <strong>lied</strong>. Generating into a scratch directory outside the repository produced 88-column wrapping against the committed 100 — which read as "the native path cannot reproduce this". Re-run with the output inside the tree: byte-identical. A probe with a bound that changes the answer.</p>
+<p>It also retroactively condemns the deleted checkers: <em>generate to a temp directory and compare</em> is structurally wrong under this coupling. It only ever passed by coincidence. The native <code>--check</code> compares in place.</p>
+</div>
+
+<h3>The drift gate cannot see a formatter rewrite</h3>
+<p>Generation and checking run the <em>same</em> formatter pass. That has a direction it cannot fail in.</p>
+
+<figure>
+<svg viewBox="0 0 720 250" role="img" aria-label="Two failure directions: a stale committed file is caught by the drift gate, while a formatter change that rewrites generated code is agreed with by both generation and checking and ships green." style="max-width:100%;height:auto;color:#1A1714">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+    </marker>
+    <marker id="arR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="#A32B1E"/>
+    </marker>
+  </defs>
+
+  <text x="0" y="16" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.2" fill="#6E6660">CAUGHT</text>
+  <rect x="0" y="28" width="150" height="42" rx="3" fill="#E4EFEE" stroke="#155E58"/>
+  <text x="75" y="46" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12">schema edited,</text>
+  <text x="75" y="61" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12">model not regenerated</text>
+  <line x1="156" y1="49" x2="252" y2="49" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="204" y="42" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#6E6660">compare</text>
+  <rect x="258" y="28" width="150" height="42" rx="3" fill="#fff" stroke="#6E6660"/>
+  <text x="333" y="53" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12">bytes differ</text>
+  <line x1="414" y1="49" x2="510" y2="49" stroke="#155E58" stroke-width="1.4" marker-end="url(#ar)"/>
+  <rect x="516" y="28" width="150" height="42" rx="3" fill="#E4EFEE" stroke="#155E58"/>
+  <text x="591" y="53" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#155E58">rc 1 — red</text>
+
+  <line x1="0" y1="105" x2="720" y2="105" stroke="#DDD8D0" stroke-width="1"/>
+
+  <text x="0" y="140" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.2" fill="#A32B1E">NOT CAUGHT</text>
+  <rect x="0" y="152" width="150" height="56" rx="3" fill="#F6E9E7" stroke="#A32B1E"/>
+  <text x="75" y="173" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12">formatter bumped;</text>
+  <text x="75" y="188" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12">rewrites generated</text>
+  <text x="75" y="203" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12">code semantically</text>
+  <line x1="156" y1="180" x2="252" y2="180" stroke="#A32B1E" stroke-width="1.4" marker-end="url(#arR)"/>
+  <text x="204" y="173" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#A32B1E">both sides</text>
+  <rect x="258" y="152" width="150" height="56" rx="3" fill="#fff" stroke="#A32B1E"/>
+  <text x="333" y="174" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12">generate rewrites,</text>
+  <text x="333" y="189" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12">check rewrites the same</text>
+  <text x="333" y="204" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12">way — they agree</text>
+  <line x1="414" y1="180" x2="510" y2="180" stroke="#A32B1E" stroke-width="1.4" marker-end="url(#arR)"/>
+  <rect x="516" y="152" width="150" height="56" rx="3" fill="#F6E9E7" stroke="#A32B1E"/>
+  <text x="591" y="176" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#A32B1E">rc 0 — green</text>
+  <text x="591" y="194" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="#A32B1E">altered model ships</text>
+
+  <text x="0" y="238" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#6E6660">Containment for the second row is the models' own tests — not the drift gate.</text>
+</svg>
+<figcaption>The drift gate compares a fresh generation against the committed file. Because both sides run the same formatter, a formatter change that rewrites generated code is agreed with by both and passes. The remedy chosen was a comment naming the asymmetry, not machinery — a codegen-only formatter config would have rebuilt, in configuration, the very post-pass being deleted.</figcaption>
+</figure>
+
+<h2>What proves it</h2>
+
+<p>The acceptance criterion asked for the fail direction to be shown per job. Six mutation arms plus a control, run through the repository's own harness rather than a hand-written loop.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th>arm</th><th>mutation</th><th>result</th></tr></thead>
+<tbody>
+<tr><td class="n">C0</td><td>no-op comment in the test file <em>(control)</em></td><td class="n">HELD</td></tr>
+<tr><td class="n">A1</td><td><code>source_groups</code> — <code>schema_version</code> literal bumped</td><td class="n">DIED</td></tr>
+<tr><td class="n">A2</td><td><code>fetch_receipt</code> — same drift shape</td><td class="n">DIED</td></tr>
+<tr><td class="n">A3</td><td><code>session_select</code> — same drift shape</td><td class="n">DIED</td></tr>
+<tr><td class="n">A4</td><td><code>research_record</code> — a <code>Meta</code> bound loosened</td><td class="n">DIED</td></tr>
+<tr><td class="n">A5</td><td>both constraint keys dropped from the config</td><td class="n">DIED</td></tr>
+<tr><td class="n">A6</td><td><code>use-annotated</code> dropped alone</td><td class="n">DIED</td></tr>
+</tbody>
+</table>
+</div>
+
+<p class="cite">6/6 arms died, 1/1 controls held, tree restored clean. Measured this session. A5 in its first form — <code>field-constraints</code> dropped alone — SURVIVED, which is the finding above rather than a gap in the gate.</p>
+
+<div class="keep">
+<p><strong>A seventh direction, which no stale/restore cycle can see.</strong> Generate cleanly, then run the repository's <em>own</em> formatter over everything, then re-check. Result: <code>220 files left unchanged</code>, gate rc 0, tree clean — the generator's output is a fixed point of the repository's formatter. The first attempt at this probe was a no-op: the formatter's fix path is scoped to files git reports as modified, so on a clean tree it formatted <em>nothing</em> and could not have detected anything.</p>
+</div>
+
+<h2>Found on the way, outside the ticket</h2>
+
+<div class="scroll">
+<table>
+<thead><tr><th>what</th><th>where</th></tr></thead>
+<tbody>
+<tr><td>A test docstring asserted one generator "still calls a bare <code>datamodel-codegen</code>" and is "exposed to a stale pipx shadow". It was not — it used the identical hardened form. Four hand-maintained copies is what produces a refuted comment nobody re-reads.</td><td class="cite">deleted with its file</td></tr>
+<tr><td>One of the four schemas had a generator, a checker and a test — and <strong>no task at all</strong>. Hand-run or never run.</td><td class="cite">closed by the consolidation</td></tr>
+<tr><td>A bump procedure recorded that a version move "MUST move four places at once … this row, the pyproject pin, all three generator constants." Those constants no longer exist. It is two places now.</td><td class="cite">currency.toml</td></tr>
+<tr><td>The same mapping was restated in a second file, which went un-updated when the first got its correction. A revision restated in two places gets amended in one.</td><td class="cite">the source manifest</td></tr>
+<tr><td>That manifest also claimed <code>pinned here: 0.74.0</code> nine lines above a machine-read <code>ref = 0.75.1</code>. The values were right; only the prose restating them had rotted.</td><td class="cite">the source manifest</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Every one of those is the same failure: a fact written down correctly, and then invalidated by a later change that had no reason to look at it.</p>
+
+<footer>
+<p>Commits <code>bf11c0c1</code> and <code>21202cc8</code> on <code>round/2026-08-28-agent-team-through-plugin</code>. Cold cross-family review returned 0 P1. Figures and counts measured in the session that produced them; the generator is <code>datamodel-code-generator 0.75.1</code> as installed, read from source rather than from its documentation.</p>
+</footer>
+
+</div>
+</div>

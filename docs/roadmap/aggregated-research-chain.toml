@@ -1,0 +1,122 @@
+# The tracked ticket chain for the aggregated-research build (#574).
+#
+# One entry per ticket, in the order they should be worked.
+# The FILE is the ordering; the TRACKER (GitHub Issues) is the status.
+#
+# `mise run kb-next-ticket` (or, from `/clear-prep`, `uv run kb-setup next-ticket`
+# directly) reads this file against the live tracker and reports the first ticket
+# whose `blockers` are all CLOSED. Adding, removing or re-ordering a ticket is an
+# ordinary reviewed commit — that is what makes the chain survive sessions the
+# way transcripts do not. `blockers` holds ISSUE numbers; a blocker need not be an
+# entry in this file (a dependency outside this chain resolves the same way). A
+# ticket that is done is expected to be REMOVED from this file in the commit that
+# closes it — the tool does not infer "done" from a ticket's own tracker state,
+# only from its blockers'; it will, however, REFUSE to name an entry the tracker
+# says is CLOSED (a STALE CHAIN report naming that one entry) rather than
+# reporting it READY or BLOCKED, so a forgotten removal is caught on the next
+# run instead of silently skipped past.
+
+[[ticket]]
+issue = 569
+title = "Delete the code-generator wrapper; run the generator from its own CLI"
+blockers = []
+
+[[ticket]]
+issue = 570
+title = "The research CLI emits on the structured event stream"
+blockers = []
+
+[[ticket]]
+issue = 571
+title = "Tighten the trackers acceptance assertion so it can fail"
+blockers = []
+
+[[ticket]]
+issue = 572
+title = "Config hygiene: $schema and inline comments, and the provisional spine budgets file"
+blockers = []
+
+[[ticket]]
+issue = 573
+title = "Marketplace structure: plugins under plugins/, and the bin/ decision"
+blockers = []
+
+[[ticket]]
+issue = 574
+title = "Chain the handoff: a tracked ticket chain and a next-ticket task"
+blockers = []
+
+[[ticket]]
+issue = 575
+title = "Prototype: packages — generate models from the upstream protobuf and hit the real endpoint"
+blockers = [569]
+
+[[ticket]]
+issue = 576
+title = "Prototype: codesearch feasibility — can a headless client reach it at all"
+blockers = []
+
+[[ticket]]
+issue = 577
+title = "Prototype: breadth — which declared sources are reachable, and how many adapters that is"
+blockers = []
+
+[[ticket]]
+issue = 578
+title = "links verb — validate that cited links resolve"
+blockers = [570, 571]
+
+[[ticket]]
+issue = 579
+title = "packages verb — package metadata as a second source"
+blockers = [578, 575]
+
+[[ticket]]
+issue = 580
+title = "codesearch verb — cross-repository code search (conditional on its prototype)"
+blockers = [578, 576]
+
+[[ticket]]
+issue = 581
+title = "breadth verb — first source"
+blockers = [578, 577]
+
+[[ticket]]
+issue = 582
+title = "breadth verb — remaining sources"
+blockers = [581]
+
+[[ticket]]
+issue = 583
+title = "report step — turn records into one readable document"
+blockers = [579]
+
+[[ticket]]
+issue = 584
+title = "Lane contract: schema-constrained structured output from one shared schema"
+blockers = [569]
+
+[[ticket]]
+issue = 585
+title = "Spine: dispatch and verify loop, with the cheap-lane seam left unimplemented"
+blockers = [583, 584, 572]
+
+[[ticket]]
+issue = 586
+title = "Spine: tune the provisional budgets against real runs"
+blockers = [585]
+
+[[ticket]]
+issue = 587
+title = "Package the CLI: its own package, pinned per project"
+blockers = [570, 573, 582]
+
+[[ticket]]
+issue = 588
+title = "Release mechanics: build, publish and install the CLI by version"
+blockers = [587]
+
+[[ticket]]
+issue = 589
+title = "Definition of done: an empty project installs the marketplace and gets valid results"
+blockers = [588, 583]
