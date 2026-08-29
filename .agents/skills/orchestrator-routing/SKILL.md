@@ -99,6 +99,27 @@ max two respec rounds, then surface to the user.
 Never fall back to a weaker lane for a correctness-critical subtask without flagging the quality risk.
 Verification and review do **not** relax under fallback — a substitute lane makes them matter more.
 
+## codex sandbox limits (know these before you dispatch, not mid-round)
+
+Two limits are inherent to the `codex-implementer` sandbox, not lane bugs — expect
+them rather than rediscovering them:
+
+1. **`workspace-write` cannot create new git refs/branches.** An early attempt
+   at what became #604 (this session's own record — the #604-era handoff, not
+   the merged PR body, which does not carry this) had `codex-implementer`
+   correctly dissent rather than guess when asked to create a ref; the version
+   that shipped as #604 used a pre-created branch instead. Remedy: the
+   architect pre-creates the branch outside the sandbox, before dispatch —
+   never ask the lane to branch for you.
+2. **No network egress.** On #572, a spec verification command needing network
+   access (`mise run kb-plugin-validate`, which calls `schemastore.org`) came back
+   unverified rather than a false success — the lane's self-report was honest, per
+   the "never proof" line above.
+   Any spec verification step needing network access will report the same way
+   from this lane. That is not the end of the task: `verify-before-advancing.md`'s
+   "An UNVERIFIED item in a lane report is not 'done'" section is what happens
+   next — the caller re-runs the item independently and records the real result.
+
 ## Close the loop — record the outcome (feeds the vault)
 
 After you have **verified** a delegated subtask (not before — the verdict only exists
