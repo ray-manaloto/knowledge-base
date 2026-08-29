@@ -2030,6 +2030,20 @@ note = """rumdl publishes ANNOTATED tags, so `git ls-remote --tags --refs` retur
 # different one, so a bump MUST move four places at once: this row, the
 # pyproject pin, all three generator constants. #393 is about that class.
 #
+# ⚠️ SUPERSEDED 2026-08-28 (#569): the three (by then four, with
+# research-record) `schemas/generate_*.py` / `schemas/check_*_codegen.py`
+# wrapper pairs above are DELETED. There is no more per-generator
+# `GENERATOR_VERSION` constant to move — the native `--all-jobs`/`--all-jobs
+# --check` reads every job from `[tool.datamodel-codegen.jobs.*]` in
+# pyproject.toml, and the version guard is now the `uv run --project . --locked
+# --group codegen` trio in `mise run kb-codegen`/`kb-codegen-check`: `--locked`
+# refuses to run against anything but the pinned, locked binary, so there is no
+# path left where the version moves silently. A bump now moves TWO places: this
+# row's `expected`, and the `codegen` dependency-group pin in pyproject.toml —
+# no generator constants remain to chase. The `schemas/generate_*.py ->
+# python/src/kb_setup/generated/*.py` mapping above is a historical record of
+# what shipped at the 2026-08-19 investigation, not the current layout.
+#
 # NOT a `[tools]` pin: it is a `codegen` dependency-group entry in the root
 # pyproject.toml, reached as `uv run datamodel-codegen`. Same shape as
 # `[tool.ruff]` / `[tool.ty]`, so it takes `expected` rather than pretending

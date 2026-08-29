@@ -613,3 +613,20 @@ def test_receipt_json_has_canonical_order_and_no_unknown_fields(tmp_path: Path) 
     assert raw == (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
     with pytest.raises(msgspec.ValidationError):
         msgspec.json.decode(raw[:-2] + b',"unknown":true}\n', type=FetchReceipt)
+
+
+def test_paired_skills_are_exact_and_route_only_through_mise() -> None:
+    """Unrelated to codegen; moved from test_fetch_receipt_codegen.py (#569).
+
+    That file's removal must not silently drop this assertion.
+    """
+    root = Path(__file__).resolve().parents[1]
+    agents = root / ".agents/skills/artifact-download/SKILL.md"
+    claude = root / ".claude/skills/artifact-download/SKILL.md"
+    assert agents.read_bytes() == claude.read_bytes()
+    text = agents.read_text(encoding="utf-8")
+    assert "mise run kb-artifact-download" in text
+    assert "no provider adapter" in text
+    assert "destination [plan|apply] [receipt]" in text
+    assert "requires `--apply`" not in text
+    assert "hf-xet" not in text.lower()
