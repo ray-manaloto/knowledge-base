@@ -17,11 +17,6 @@
 # run instead of silently skipped past.
 
 [[ticket]]
-issue = 571
-title = "Tighten the trackers acceptance assertion so it can fail"
-blockers = []
-
-[[ticket]]
 issue = 572
 title = "Config hygiene: $schema and inline comments, and the provisional spine budgets file"
 blockers = []
