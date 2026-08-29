@@ -265,6 +265,7 @@ def main(argv: list[str], repo_root: Path) -> int:
                     "trackers.bad_out_flag",
                     f"kb-research-trackers: {err.message}",
                     adapter="trackers",
+                    outcome="bad_request",
                 )
                 return exit_code(err)
             out_path = Path(rest[i + 1])
@@ -277,13 +278,15 @@ def main(argv: list[str], repo_root: Path) -> int:
     started_at = time.perf_counter()
     result = search(repo, term, run=_run_gh)
     duration_s = time.perf_counter() - started_at
-    event_repo = repo[:200]
+    event_repo = repo[:201]
     event_term = term[:_MAX_TERM_LENGTH]
     if not isinstance(result, Ok):
         if isinstance(result, External):
             outcome = "external"
         elif result.rc is Rc.BAD_REQUEST:
             outcome = "bad_request"
+        elif result.rc is Rc.NOT_RUN:
+            outcome = "not_run"
         else:
             outcome = "error"
         events.fail(

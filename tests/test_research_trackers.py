@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import io
+import json
 import subprocess
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -13,6 +15,7 @@ import pytest
 from kb_setup.generated.research_record import AdapterRecord, Arm, Hit, Kind, Null, Tier
 from kb_setup.research import trackers
 from kb_setup.result import Err, External, Ok, Rc
+from kb_setup.sinks import stdout_sink
 
 FIXTURES = Path(__file__).parent / "fixtures" / "research"
 NOW = datetime(2026, 8, 28, 2, 7, 38, tzinfo=UTC)
@@ -444,6 +447,35 @@ def test_main_bad_request_keeps_stdout_empty(
     assert returncode == 2
     assert captured.out == ""
     assert captured.err.startswith("ERROR: kb-research-trackers: repository must be OWNER/REPO")
+
+
+def test_main_failure_events_keep_queryable_outcomes_and_full_valid_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    jsonl_path = tmp_path / "events.jsonl"
+    buf = io.StringIO()
+    repo = f"{'a' * 100}/{'b' * 100}"
+    monkeypatch.setattr(trackers, "_run_gh", lambda _argv: (0, "not json", ""))
+
+    with stdout_sink(stream=buf, jsonl_path=jsonl_path, offload=False):
+        trackers.main(["not-a-repo", "x"], tmp_path)
+        trackers.main(["owner/repo", "--out"], tmp_path)
+        trackers.main([repo, "x"], tmp_path)
+
+    rows = [json.loads(line) for line in jsonl_path.read_text(encoding="utf-8").splitlines()]
+    bad_request, bad_out_flag, not_run = rows
+    assert bad_request["event"] == "trackers.search_failed"
+    assert bad_request["adapter"] == "trackers"
+    assert bad_request["repo"] == "not-a-repo"
+    assert bad_request["term"] == "x"
+    assert bad_request["outcome"] == "bad_request"
+    assert isinstance(bad_request["duration_s"], float)
+    assert bad_request["duration_s"] >= 0
+    assert bad_out_flag["event"] == "trackers.bad_out_flag"
+    assert bad_out_flag["outcome"] == "bad_request"
+    assert not_run["event"] == "trackers.search_failed"
+    assert not_run["repo"] == repo
+    assert not_run["outcome"] == "not_run"
 
 
 def test_main_external_failure_keeps_child_stdout_off_process_stdout(
