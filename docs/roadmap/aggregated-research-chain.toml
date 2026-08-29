@@ -17,11 +17,6 @@
 # run instead of silently skipped past.
 
 [[ticket]]
-issue = 573
-title = "Marketplace structure: plugins under plugins/, and the bin/ decision"
-blockers = []
-
-[[ticket]]
 issue = 574
 title = "Chain the handoff: a tracked ticket chain and a next-ticket task"
 blockers = []
