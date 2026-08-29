@@ -13,11 +13,14 @@ all. Chain files are real files under `tmp_path`, read by the real `tomllib`.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import pytest
 from kb_setup import next_ticket
-from kb_setup.next_ticket import Blocked, CouldNotAsk, IssueInfo, Ready
+from kb_setup.next_ticket import Blocked, ChainComplete, CouldNotAsk, IssueInfo, Ready
 from kb_setup.result import Err, Ok, Rc, exit_code
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def _write_chain(tmp_path: Path, tickets: list[dict[str, object]]) -> Path:
@@ -62,7 +65,17 @@ def test_first_ready_entry_wins_even_when_an_earlier_one_is_blocked(
             {"issue": 2, "title": "Ready one", "blockers": [101]},
         ],
     )
-    body = "{" + _issue_json(100, "OPEN") + ", " + _issue_json(101, "CLOSED") + "}"
+    body = (
+        "{"
+        + _issue_json(1, "OPEN")
+        + ", "
+        + _issue_json(2, "OPEN")
+        + ", "
+        + _issue_json(100, "OPEN")
+        + ", "
+        + _issue_json(101, "CLOSED")
+        + "}"
+    )
     out = f'{{"data": {{"repository": {body}}}}}'
     _stub(monkeypatch, 0, out)
 
@@ -89,7 +102,17 @@ def test_the_first_ready_entry_wins_over_a_later_also_ready_one(
             {"issue": 2, "title": "Second, also ready", "blockers": [101]},
         ],
     )
-    body = "{" + _issue_json(100, "CLOSED") + ", " + _issue_json(101, "CLOSED") + "}"
+    body = (
+        "{"
+        + _issue_json(1, "OPEN")
+        + ", "
+        + _issue_json(2, "OPEN")
+        + ", "
+        + _issue_json(100, "CLOSED")
+        + ", "
+        + _issue_json(101, "CLOSED")
+        + "}"
+    )
     out = f'{{"data": {{"repository": {body}}}}}'
     _stub(monkeypatch, 0, out)
 
@@ -99,21 +122,26 @@ def test_the_first_ready_entry_wins_over_a_later_also_ready_one(
     assert result.value.startswith("READY — #1 First, also ready")
 
 
-def test_a_trivially_ready_entry_needs_no_lookup_at_all(
+def test_a_blockerless_entry_still_gets_looked_up_for_its_own_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """When NOTHING in the chain has a blocker, `_gh` must never be called."""
+    """A ticket with no blockers still needs `gh` — for its OWN state (D1/D2, #574).
+
+    The prior behaviour (`_gh` never called, `tickets[0]` reported READY on
+    blockers alone) is what let a CLOSED ticket that was never removed from the
+    chain read READY forever. `_gh` must now be reachable, and reporting it must
+    reflect the tracker's answer for the ticket's own issue.
+    """
     chain = _write_chain(tmp_path, [{"issue": 1, "title": "No blockers", "blockers": []}])
-
-    def boom(_args: object, _root: object) -> tuple[int, str]:
-        pytest.fail("_gh was called with no blockers anywhere in the chain")
-
-    monkeypatch.setattr(next_ticket, "_gh", boom)
+    body = "{" + _issue_json(1, "OPEN") + "}"
+    out = f'{{"data": {{"repository": {body}}}}}'
+    _stub(monkeypatch, 0, out)
 
     result = next_ticket.evaluate(chain, tmp_path)
 
     assert isinstance(result, Ok)
     assert result.value.startswith("READY — #1 No blockers")
+    assert "stale:" not in result.value
 
 
 # --------------------------------------------------------------------------
@@ -139,6 +167,10 @@ def test_nothing_ready_reports_the_first_blocked_entry_not_a_less_blocked_later_
     )
     body = (
         "{"
+        + _issue_json(1, "OPEN")
+        + ", "
+        + _issue_json(2, "OPEN")
+        + ", "
         + _issue_json(100, "OPEN", "blocker A")
         + ", "
         + _issue_json(101, "OPEN", "blocker B")
@@ -157,6 +189,91 @@ def test_nothing_ready_reports_the_first_blocked_entry_not_a_less_blocked_later_
     assert "- #100 blocker A" in result.value
     # #102 is closed — it must not be listed as an open blocker.
     assert "#102" not in result.value
+
+
+# --------------------------------------------------------------------------
+# §5 — a ticket whose OWN tracker state is CLOSED is skipped, not reported
+# READY forever; the skip is named on a `stale:` advisory line, in both the
+# READY and BLOCKED outcomes, and CHAIN COMPLETE fires when nothing is left
+# --------------------------------------------------------------------------
+
+
+def test_a_closed_entry_is_skipped_and_named_stale_in_a_ready_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1 is CLOSED (never removed from the chain) — #2 must win, #1 must be named."""
+    chain = _write_chain(
+        tmp_path,
+        [
+            {"issue": 1, "title": "Done, never removed", "blockers": []},
+            {"issue": 2, "title": "Actually next", "blockers": []},
+        ],
+    )
+    body = "{" + _issue_json(1, "CLOSED") + ", " + _issue_json(2, "OPEN") + "}"
+    out = f'{{"data": {{"repository": {body}}}}}'
+    _stub(monkeypatch, 0, out)
+
+    result = next_ticket.evaluate(chain, tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.value.startswith("READY — #2 Actually next")
+    assert "stale: #1 is CLOSED" in result.value
+    assert str(chain) in result.value
+
+
+def test_a_closed_entry_is_skipped_and_named_stale_in_a_blocked_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1 is CLOSED; #2 is open but still blocked — BLOCKED on #2, #1 named stale."""
+    chain = _write_chain(
+        tmp_path,
+        [
+            {"issue": 1, "title": "Done, never removed", "blockers": []},
+            {"issue": 2, "title": "Still blocked", "blockers": [100]},
+        ],
+    )
+    body = (
+        "{"
+        + _issue_json(1, "CLOSED")
+        + ", "
+        + _issue_json(2, "OPEN")
+        + ", "
+        + _issue_json(100, "OPEN", "the blocker")
+        + "}"
+    )
+    out = f'{{"data": {{"repository": {body}}}}}'
+    _stub(monkeypatch, 0, out)
+
+    result = next_ticket.evaluate(chain, tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.value.startswith("BLOCKED — #2 Still blocked")
+    assert "- #100 the blocker" in result.value
+    assert "stale: #1 is CLOSED" in result.value
+
+
+def test_every_entry_closed_reports_chain_complete_not_blocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nothing left in the chain is a DIFFERENT state from nothing ready yet."""
+    chain = _write_chain(
+        tmp_path,
+        [
+            {"issue": 1, "title": "Done one", "blockers": []},
+            {"issue": 2, "title": "Done two", "blockers": []},
+        ],
+    )
+    body = "{" + _issue_json(1, "CLOSED") + ", " + _issue_json(2, "CLOSED") + "}"
+    out = f'{{"data": {{"repository": {body}}}}}'
+    _stub(monkeypatch, 0, out)
+
+    result = next_ticket.evaluate(chain, tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.value.startswith("CHAIN COMPLETE")
+    assert str(chain) in result.value
+    assert "BLOCKED" not in result.value
+    assert "READY" not in result.value
 
 
 # --------------------------------------------------------------------------
@@ -234,6 +351,25 @@ def test_errors_key_present_is_could_not_ask_even_when_every_alias_resolved() ->
     assert lookup.states is None
 
 
+def test_an_empty_errors_array_is_not_its_own_trigger() -> None:
+    """`"errors": []` is NOT the same as `errors` present with content (P3, #574).
+
+    `_errors_detail`'s docstring used to claim "present at all" is the trigger,
+    which an empty array contradicts — `not []` is `True`, so the check already
+    falls through to the per-alias state. Every alias resolves here, so the
+    lookup must succeed despite the (empty) `errors` key being present.
+    """
+    body = (
+        '{"data": {"repository": {"a": {"number": 1, "state": "OPEN", "title": "x"}}}, '
+        '"errors": []}'
+    )
+
+    lookup = next_ticket._parse_lookup(0, body, {"a": 1})
+
+    assert lookup.states is not None
+    assert lookup.states[1].state == "OPEN"
+
+
 # --------------------------------------------------------------------------
 # §5 — rc 0 with a `null` state for a requested issue produces could-not-ask
 # --------------------------------------------------------------------------
@@ -287,7 +423,9 @@ def test_an_out_of_chain_blocker_still_resolves(
     """999 blocks #1 but has no `[[ticket]]` entry of its own in this file."""
     chain = _write_chain(tmp_path, [{"issue": 1, "title": "T", "blockers": [999]}])
     out = (
-        '{"data": {"repository": {"'
+        '{"data": {"repository": {'
+        + _issue_json(1, "OPEN")
+        + ', "'
         + _alias(999)
         + '": {"number": 999, "state": "CLOSED", "title": "elsewhere"}}}}'
     )
@@ -304,7 +442,9 @@ def test_an_out_of_chain_blocker_still_open_reports_its_title(
 ) -> None:
     chain = _write_chain(tmp_path, [{"issue": 1, "title": "T", "blockers": [999]}])
     out = (
-        '{"data": {"repository": {"'
+        '{"data": {"repository": {'
+        + _issue_json(1, "OPEN")
+        + ', "'
         + _alias(999)
         + '": {"number": 999, "state": "OPEN", "title": "outside the chain"}}}}'
     )
@@ -392,6 +532,50 @@ def test_render_blocked_lists_every_open_blocker(tmp_path: Path) -> None:
     assert "- #569 Delete the code-generator wrapper" in text
 
 
+def test_render_ready_appends_a_stale_line_per_skipped_closed_entry(tmp_path: Path) -> None:
+    chain = tmp_path / "chain.toml"
+
+    text = next_ticket.render(Ready(574, "Chain the handoff", stale=(569, 570)), chain)
+
+    assert text.startswith("READY — #574 Chain the handoff")
+    assert f"stale: #569 is CLOSED — remove it from {chain}" in text
+    assert f"stale: #570 is CLOSED — remove it from {chain}" in text
+
+
+def test_render_blocked_appends_a_stale_line_per_skipped_closed_entry(tmp_path: Path) -> None:
+    chain = tmp_path / "chain.toml"
+    outcome = Blocked(
+        575,
+        "Prototype: packages",
+        (IssueInfo(569, "OPEN", "Delete the code-generator wrapper"),),
+        stale=(500,),
+    )
+
+    text = next_ticket.render(outcome, chain)
+
+    assert text.startswith("BLOCKED — #575 Prototype: packages")
+    assert f"stale: #500 is CLOSED — remove it from {chain}" in text
+
+
+def test_render_ready_with_no_stale_entries_has_no_stale_line(tmp_path: Path) -> None:
+    chain = tmp_path / "chain.toml"
+
+    text = next_ticket.render(Ready(574, "Chain the handoff"), chain)
+
+    assert "stale:" not in text
+
+
+def test_render_chain_complete_names_the_chain_path(tmp_path: Path) -> None:
+    chain = tmp_path / "chain.toml"
+
+    text = next_ticket.render(ChainComplete(), chain)
+
+    assert text.startswith("CHAIN COMPLETE")
+    assert str(chain) in text
+    assert "BLOCKED" not in text
+    assert "READY" not in text
+
+
 def test_render_could_not_ask_names_the_chain_path_and_says_re_derive(tmp_path: Path) -> None:
     chain = tmp_path / "chain.toml"
 
@@ -415,11 +599,14 @@ def test_unexpected_arguments_are_refused(tmp_path: Path) -> None:
 
 
 def test_main_prints_the_value_and_exits_ok(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "docs" / "roadmap").mkdir(parents=True)
     chain = tmp_path / next_ticket.DEFAULT_CHAIN
     chain.write_text('[[ticket]]\nissue = 1\ntitle = "T"\nblockers = []\n', encoding="utf-8")
+    body = "{" + _issue_json(1, "OPEN") + "}"
+    out = f'{{"data": {{"repository": {body}}}}}'
+    _stub(monkeypatch, 0, out)
 
     rc = next_ticket.main([], tmp_path)
 

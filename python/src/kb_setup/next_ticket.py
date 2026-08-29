@@ -14,18 +14,23 @@ A FAILED TRACKER LOOKUP IS ITS OWN STATE, reused from #144's decision
 (`session_state.py:19-21`, literal at `:568`): "no ticket is ready" and "could
 not ask the tracker" are different sentences, and rendering the second as the
 first is exactly the false green `session_state` was built to remove. Same
-three-state shape here: READY / BLOCKED / COULD NOT ASK, each naming itself on
-its own first line so `/clear-prep` can quote the block verbatim without
-deciding which state it is looking at.
+shape here, now FOUR states: READY / BLOCKED / CHAIN COMPLETE / COULD NOT ASK,
+each naming itself on its own first line so `/clear-prep` can quote the block
+verbatim without deciding which state it is looking at.
 
 NEVER SKIP A BLOCKED TICKET TO REACH A LATER ONE — but DO keep scanning past a
-blocked entry to find the first one that IS ready. Those sound like the same
-rule and are not: the ordered walk in :func:`resolve` skips over blocked entries
-looking for the first ready one (an earlier blocked entry never suppresses a
+blocked entry, or a CLOSED one, to find the first one that IS ready. Those
+sound like the same rule and are not: the ordered walk in :func:`resolve` skips
+over blocked entries AND entries whose own tracker state is CLOSED, looking for
+the first ready one (an earlier blocked or closed entry never suppresses a
 later ready one); what it never does is report some OTHER entry, chosen by
 proximity-to-ready or any other heuristic, once the walk concludes NOTHING is
-ready. In that case the answer is always the first entry, because if the first
-entry were ready the walk would already have returned it.
+ready. In that case the answer is always the first entry whose own state is
+not CLOSED, because if THAT entry were ready the walk would already have
+returned it. When EVERY entry is CLOSED there is no such entry — that is CHAIN
+COMPLETE, not BLOCKED: "nothing is ready" and "nothing is left to do" are
+different sentences too, and collapsing them would report a finished chain as
+stuck forever.
 
 A SUCCESSFUL JSON PARSE IS NOT A SUCCESSFUL LOOKUP. Measured live against this
 repo's own tracker (`gh` 2.98.0): a `gh api graphql` call naming an issue that
@@ -96,19 +101,41 @@ class IssueInfo:
 
 @dataclass(frozen=True, slots=True)
 class Ready:
-    """The first ticket whose blockers are all closed (or has none)."""
+    """The first non-CLOSED ticket whose blockers are all closed (or has none).
+
+    `stale` names every entry the walk skipped on the way here because ITS OWN
+    tracker state was CLOSED — advisory, rendered below the READY line, never
+    a reason to withhold the answer.
+    """
 
     issue: int
     title: str
+    stale: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
 class Blocked:
-    """No ticket is ready; this is the FIRST one, and what is still open on it."""
+    """No ticket is ready; this is the first non-CLOSED one, and what's still open.
+
+    `stale` is the same advisory as :class:`Ready`'s — every entry skipped
+    because its own state was CLOSED, encountered anywhere in the walk that
+    produced this result.
+    """
 
     issue: int
     title: str
     open_blockers: tuple[IssueInfo, ...]
+    stale: tuple[int, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ChainComplete:
+    """Every entry in the chain is CLOSED. Not a failure — the chain finished.
+
+    Distinct from :class:`Blocked` on purpose: "no ticket is ready yet" and
+    "there is no ticket left" are different sentences, and reporting the second
+    as the first would print a finished chain as permanently stuck.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,7 +145,7 @@ class CouldNotAsk:
     detail: str
 
 
-Outcome = Ready | Blocked | CouldNotAsk
+Outcome = Ready | Blocked | ChainComplete | CouldNotAsk
 
 
 def _parse_ticket(entry: object, index: int) -> Ticket | str:
@@ -257,8 +284,11 @@ def _not_found_culprit(errors: object, alias_to_number: dict[str, int]) -> int |
 def _errors_detail(errors: object, alias_to_number: dict[str, int]) -> str | None:
     """`None` when there is nothing to report; a could-not-ask message otherwise.
 
-    An `errors` key present at all is its OWN could-not-ask trigger — this is
-    checked before any per-alias state, never derived from one.
+    A NON-EMPTY `errors` array is its OWN could-not-ask trigger — checked
+    before any per-alias state, never derived from one. An `errors` key that is
+    absent, or present as an empty array, carries no error and falls through to
+    the per-alias check below, which is what actually catches it if the lookup
+    genuinely failed.
     """
     if not errors:
         return None
@@ -320,14 +350,13 @@ def _parse_lookup(rc: int, out: str, alias_to_number: dict[str, int]) -> _Lookup
 def resolve(tickets: tuple[Ticket, ...], repo_root: Path) -> Outcome:
     """Walk the chain in file order; the FILE decides ordering, the TRACKER decides state.
 
-    A ticket with no blockers needs no lookup at all — if that describes the
-    very first entry, :data:`needed` is empty and nothing is asked of `gh`.
+    Every ticket's OWN issue number enters the lookup alongside its blockers' —
+    :data:`needed` can never be empty once `tickets` is non-empty (which
+    `read_chain` already guarantees), so a lookup always runs. That is what lets
+    the walk below skip an entry whose own tracker state is CLOSED, rather than
+    trusting the chain file to have been kept in sync with the tracker.
     """
-    needed = sorted({b for t in tickets for b in t.blockers})
-    if not needed:
-        first = tickets[0]
-        return Ready(first.issue, first.title)
-
+    needed = sorted({t.issue for t in tickets} | {b for t in tickets for b in t.blockers})
     alias_to_number = _aliases(needed)
     rc, out = _lookup(alias_to_number, repo_root)
     lookup = _parse_lookup(rc, out, alias_to_number)
@@ -335,26 +364,49 @@ def resolve(tickets: tuple[Ticket, ...], repo_root: Path) -> Outcome:
         return CouldNotAsk(lookup.detail)
     states = lookup.states
 
+    stale: list[int] = []
+    first_open: Ticket | None = None
     for ticket in tickets:
+        if states[ticket.issue].state == "CLOSED":
+            stale.append(ticket.issue)
+            continue
+        if first_open is None:
+            first_open = ticket
         open_blockers = tuple(states[b] for b in ticket.blockers if states[b].state != "CLOSED")
         if not open_blockers:
-            return Ready(ticket.issue, ticket.title)
+            return Ready(ticket.issue, ticket.title, stale=tuple(stale))
+
+    if first_open is None:
+        return ChainComplete()
 
     # Nothing was ready: the loop above would already have returned the first
-    # entry whose blockers are all closed, so `tickets[0]` is provably blocked.
-    first = tickets[0]
-    open_blockers = tuple(states[b] for b in first.blockers if states[b].state != "CLOSED")
-    return Blocked(first.issue, first.title, open_blockers)
+    # non-closed entry whose blockers are all closed, so `first_open` is
+    # provably blocked.
+    open_blockers = tuple(states[b] for b in first_open.blockers if states[b].state != "CLOSED")
+    return Blocked(first_open.issue, first_open.title, open_blockers, stale=tuple(stale))
+
+
+def _stale_lines(stale: tuple[int, ...], chain_path: Path) -> list[str]:
+    """Advisory lines for entries the walk skipped because their own state was CLOSED."""
+    return [f"stale: #{n} is CLOSED — remove it from {chain_path}" for n in stale]
 
 
 def render(outcome: Outcome, chain_path: Path) -> str:
     """The paste-ready block. Each state names itself on its first line."""
     if isinstance(outcome, Ready):
-        return f"READY — #{outcome.issue} {outcome.title}\nchain file: {chain_path}"
+        lines = [f"READY — #{outcome.issue} {outcome.title}", f"chain file: {chain_path}"]
+        lines.extend(_stale_lines(outcome.stale, chain_path))
+        return "\n".join(lines)
     if isinstance(outcome, Blocked):
         lines = [f"BLOCKED — #{outcome.issue} {outcome.title}", "open blockers:"]
         lines.extend(f"  - #{b.number} {b.title}" for b in outcome.open_blockers)
+        lines.extend(_stale_lines(outcome.stale, chain_path))
         return "\n".join(lines)
+    if isinstance(outcome, ChainComplete):
+        return (
+            f"CHAIN COMPLETE — every entry in {chain_path} is closed; "
+            "remove them and add the next tickets"
+        )
     return f"COULD NOT ASK — {outcome.detail}\nchain file: {chain_path} — re-derive once resolved"
 
 

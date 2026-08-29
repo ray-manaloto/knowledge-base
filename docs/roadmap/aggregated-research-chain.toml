@@ -4,14 +4,17 @@
 # The FILE is the ordering; the TRACKER (GitHub Issues) is the status.
 #
 # `mise run kb-next-ticket` (or, from `/clear-prep`, `uv run kb-setup next-ticket`
-# directly) reads this file against the live tracker and reports the first ticket
-# whose `blockers` are all CLOSED. Adding, removing or re-ordering a ticket is an
-# ordinary reviewed commit — that is what makes the chain survive sessions the
-# way transcripts do not. `blockers` holds ISSUE numbers; a blocker need not be an
-# entry in this file (a dependency outside this chain resolves the same way). A
-# ticket that is done is expected to be REMOVED from this file in the commit that
-# closes it — the tool does not infer "done" from a ticket's own tracker state,
-# only from its blockers'.
+# directly) reads this file against the live tracker and reports the first
+# ticket, in file order, whose OWN issue is not CLOSED and whose `blockers` are
+# all CLOSED. Adding, removing or re-ordering a ticket is an ordinary reviewed
+# commit — that is what makes the chain survive sessions the way transcripts do
+# not. `blockers` holds ISSUE numbers; a blocker need not be an entry in this
+# file (a dependency outside this chain resolves the same way). A ticket that is
+# done is expected to be REMOVED from this file in the commit that closes it —
+# but the tool no longer trusts that convention alone: it looks up EVERY entry's
+# own tracker state too, skips a closed one with a `stale:` advisory line rather
+# than reporting it READY forever, and reports CHAIN COMPLETE once every entry
+# in the file is closed.
 
 [[ticket]]
 issue = 569
