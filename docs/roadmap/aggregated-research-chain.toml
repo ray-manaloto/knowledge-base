@@ -17,11 +17,6 @@
 # run instead of silently skipped past.
 
 [[ticket]]
-issue = 574
-title = "Chain the handoff: a tracked ticket chain and a next-ticket task"
-blockers = []
-
-[[ticket]]
 issue = 575
 title = "Prototype: packages — generate models from the upstream protobuf and hit the real endpoint"
 blockers = [569]
