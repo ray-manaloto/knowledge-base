@@ -2,6 +2,6 @@
 # Plugin catalog — reusable agents/skills (T2).
 url = https://github.com/anthropics/claude-plugins-community
 ref = main
-commit = 086db464d0e8f648627aaef2aa8bd4775d1d85a4
+commit = a727be1c7bd6064419b6f60d71993a19198adc17
 kind = code
 added = 2026-07-22

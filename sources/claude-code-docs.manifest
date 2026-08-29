@@ -2,5 +2,5 @@
 # Auto-updating mirror of the full Claude Code documentation site, plus content/github/anthropic-sdk-{python,typescript} and their per-package changelogs. REPLACES sources/agent-harness-docs (Ray, 2026-08-24): it is a strict superset, and it carries content/en/docs/claude-code/changelog.md, which is the file currency.toml's [tool.claude-code] review notes read release notes from. 3,775 .md at registration.
 url = https://github.com/thevibeworks/claude-code-docs
 ref = main
-commit = 6b2327de2c214ef0e77bb6509af899f931bfd99b
+commit = 4e012b30684aab8f2cf2b6bda2e27abc5e3c5543
 kind = docs
