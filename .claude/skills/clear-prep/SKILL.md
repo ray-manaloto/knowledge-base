@@ -37,10 +37,6 @@ the two env vars that looked like the answer are a Bash-subprocess marker and an
 operator enable-flag, set on the main thread too — so `kb-context` refused there
 100% of the time until 2026-08-22 (#451). If you are a subagent, report back.
 
-`$ARGUMENTS` is the next task if the user named one. Otherwise run
-`uv run kb-setup next-ticket` and quote its output verbatim — never infer one: a
-guess the user never saw is a guess nobody corrected (#574).
-
 Work top-to-bottom. The ordering in step 2 is not stylistic; it is the one thing
 in this skill that cannot be reordered without losing work.
 
@@ -62,11 +58,15 @@ in this skill that cannot be reordered without losing work.
 
 ## 0. Resolve next-task ambiguity FIRST (Ray, 2026-07-08)
 
-**Before writing anything, drive the next task to zero ambiguity by asking the
-user via `AskUserQuestion`** — and keep asking across rounds until nothing
-material is unresolved. Every question goes through that tool, including a plain
-yes/no; a question in prose at the end of a message is easy to miss and gives
-the user nothing to click (`clarify-before-acting.md`).
+**The next task is GENERATED, not chosen.** `$ARGUMENTS` if the user named one;
+otherwise `uv run kb-setup next-ticket`, quoted VERBATIM — offering options it
+already answered is inferring one with extra steps (Ray, 2026-08-29, handed a
+menu built from a definite answer: *"shouldnt this be generated now?"*). **When
+its output is an IMPERATIVE — `STALE CHAIN … remove it, then re-run` — that is
+work, not a status: do it, re-run, hand over what comes back.** This rule lived
+in the preamble and lost to the numbered step below; it now leads that step.
+**Then drive whatever REMAINS to zero ambiguity via `AskUserQuestion`** — every
+question through it, yes/no included; prose gives the user nothing to click.
 
 **On a model-invoked run this step is also the consent gate.** The skill can
 trigger itself (`disable-model-invocation: false` — Ray, 2026-08-21: *"flip the
@@ -466,7 +466,7 @@ This repo can measure its own skills, so use that rather than taste:
 
 ## Checklist
 
-- [ ] Next-task ambiguity driven to zero via `AskUserQuestion`; answers encoded verbatim.
+- [ ] Next task GENERATED (`next-ticket`, verbatim; an imperative EXECUTED then re-run); only what remains asked.
 - [ ] Nothing-lost check passed: auto-memory + handoff + persisted reports reconstruct the working context.
 - [ ] Working state snapshotted; open PR/CI state known.
 - [ ] Session-local background tasks, agents and wakeups inventoried; stale ones stopped.
