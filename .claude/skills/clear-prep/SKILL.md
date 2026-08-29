@@ -400,10 +400,10 @@ wrong one.
 **The pointer is now a skill, so there is nothing to paste:**
 
 ```text
-/kb-resume
+/session-resume
 ```
 
-`kb-resume` finds the newest handoff itself, reads the newest directive with it,
+`session-resume` finds the newest handoff itself, reads the newest directive with it,
 and — the part a pasted path cannot do — CHECKS both against the repo, reporting
 any place they disagree. Ray, 2026-08-19: *"we need to automate this better so
 that i can just run a slash command and/or skill on the next session that just
@@ -420,8 +420,8 @@ rather than the newest:
 Read and follow .agent/plans/session-<date>.md
 ```
 
-(`/kb-resume <path>` does the same and keeps the repo checks.) On a fresh clone
-`.agent/` is gitignored and there is no handoff to point at; `/kb-resume` falls
+(`/session-resume <path>` does the same and keeps the repo checks.) On a fresh clone
+`.agent/` is gitignored and there is no handoff to point at; `/session-resume` falls
 back to the newest tracked `docs/direction/*.md` plus `git log`, so it stays the
 right prompt to print either way.
 
@@ -429,7 +429,7 @@ right prompt to print either way.
 never by clearing yourself.** This is the "asks the user" half of the banner,
 and it is the last act of the skill whether a human typed `/clear-prep` or an
 agent invoked it on its own at ~20% context: one question, options *"/clear now
-(then `/kb-resume`)"* and *"not yet — keep going in this session"*, with the
+(then `/session-resume`)"* and *"not yet — keep going in this session"*, with the
 handoff path and the resume line in the question text so the answer is one
 click. Only the user runs `/clear`; an agent that invoked this skill has
 prepared for it. On *"not yet"*, resume the work you were doing — the handoff
@@ -442,7 +442,7 @@ deferral, which is the point: re-asking on the very next turn is the nagging
 this skill must not become, but a deferral that never expires is the other
 failure, and it is the one that leaves a session writing its handoff at the end
 of the window instead of the start. On *"/clear now"*, stop: the next thing that
-happens is the user's `/clear` and then `/kb-resume`.
+happens is the user's `/clear` and then `/session-resume`.
 
 ## Keeping this skill honest over time
 
@@ -478,7 +478,7 @@ This repo can measure its own skills, so use that rather than taste:
 - [ ] Auto-memory written + `MEMORY.md` pointer added.
 - [ ] Handoff written and self-verified (paths, `file:line`, task names, gate rcs, inherited numbers labelled).
 - [ ] Branch is not `main`; commit made if appropriate — then the handoff's HEAD re-pinned to it (step 5).
-- [ ] Resume prompt printed — `/kb-resume` (skipped on 2026-08-19; the next session had no idea where to start).
+- [ ] Resume prompt printed — `/session-resume` (skipped on 2026-08-19; the next session had no idea where to start).
 - [ ] Step 7's `AskUserQuestion` was PUT to the user and the answer recorded — `/clear now` **or** `not yet`; both are valid outcomes, and only the user ever clears.
 
 ## See also
