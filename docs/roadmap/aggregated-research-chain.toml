@@ -17,11 +17,6 @@
 # run instead of silently skipped past.
 
 [[ticket]]
-issue = 569
-title = "Delete the code-generator wrapper; run the generator from its own CLI"
-blockers = []
-
-[[ticket]]
 issue = 570
 title = "The research CLI emits on the structured event stream"
 blockers = []
