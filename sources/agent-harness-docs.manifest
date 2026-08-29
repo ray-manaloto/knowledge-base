@@ -1,0 +1,13 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Restored 2026-08-29: accidentally deleted in an unrelated merge (#482), with
+# no stated rationale. Its docs/codex, docs/cursor, docs/opencode, docs/pi
+# content has no other source and is tracked for future extraction in #82.
+# docs/claude-code/ here is SUPERSEDED by sources/claude-code-docs.manifest
+# (a strict superset for that portion, per that manifest's own comment) and
+# was already extracted once under #76 (sources/extractions/claude-code-docs-
+# mirror-docs.json) — do NOT re-extract docs/claude-code/ from this source;
+# doing so would duplicate content already in the corpus from a fresher mirror.
+url = https://github.com/mrkhachaturov/agent-harness-docs
+ref = main
+commit = 33aef930acb2e56154a056dd7e1dfd08b9a3cf3e
+kind = docs
