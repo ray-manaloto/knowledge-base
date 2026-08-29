@@ -443,7 +443,7 @@ def test_main_bad_request_keeps_stdout_empty(
 
     assert returncode == 2
     assert captured.out == ""
-    assert captured.err.startswith("kb-research-trackers: repository must be OWNER/REPO")
+    assert captured.err.startswith("ERROR: kb-research-trackers: repository must be OWNER/REPO")
 
 
 def test_main_external_failure_keeps_child_stdout_off_process_stdout(
@@ -465,4 +465,4 @@ def test_main_external_failure_keeps_child_stdout_off_process_stdout(
 
     assert returncode == 1
     assert captured.out == ""
-    assert captured.err == "kb-research-trackers: gh: Not Found (HTTP 404)\n"
+    assert captured.err == "ERROR: kb-research-trackers: gh: Not Found (HTTP 404)\n"

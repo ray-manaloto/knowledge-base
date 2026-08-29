@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import re
 import subprocess
-import sys
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
 import msgspec
 
+from kb_setup import events
 from kb_setup.generated.research_record import AdapterRecord, Arm, Hit, Kind, Null, Tier
 from kb_setup.result import Err, External, Ok, Rc, Result, exit_code, external_from_returncode
 
@@ -260,7 +261,11 @@ def main(argv: list[str], repo_root: Path) -> int:
         if rest[i] == "--out":
             if i + 1 >= len(rest):
                 err = Err("--out requires a path", rc=Rc.BAD_REQUEST)
-                print(f"kb-research-trackers: {err.message}", file=sys.stderr)
+                events.fail(
+                    "trackers.bad_out_flag",
+                    f"kb-research-trackers: {err.message}",
+                    adapter="trackers",
+                )
                 return exit_code(err)
             out_path = Path(rest[i + 1])
             i += 2
@@ -269,9 +274,27 @@ def main(argv: list[str], repo_root: Path) -> int:
         i += 1
     term = " ".join(term_words)
 
+    started_at = time.perf_counter()
     result = search(repo, term, run=_run_gh)
+    duration_s = time.perf_counter() - started_at
+    event_repo = repo[:200]
+    event_term = term[:_MAX_TERM_LENGTH]
     if not isinstance(result, Ok):
-        print(f"kb-research-trackers: {result.message}", file=sys.stderr)
+        if isinstance(result, External):
+            outcome = "external"
+        elif result.rc is Rc.BAD_REQUEST:
+            outcome = "bad_request"
+        else:
+            outcome = "error"
+        events.fail(
+            "trackers.search_failed",
+            f"kb-research-trackers: {result.message}",
+            adapter="trackers",
+            repo=event_repo,
+            term=event_term,
+            duration_s=duration_s,
+            outcome=outcome,
+        )
         return exit_code(result)
 
     record = result.value
@@ -280,7 +303,24 @@ def main(argv: list[str], repo_root: Path) -> int:
     if out_path is not None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(text + "\n")
-        print(f"[aggregated-research] wrote {out_path}")
+        events.say(
+            "trackers.wrote",
+            f"[aggregated-research] wrote {out_path}",
+            adapter="trackers",
+            repo=event_repo,
+            term=event_term,
+            duration_s=duration_s,
+            outcome="ok",
+            path=out_path,
+        )
     else:
-        print(text)
+        events.say(
+            "trackers.result",
+            text,
+            adapter="trackers",
+            repo=event_repo,
+            term=event_term,
+            duration_s=duration_s,
+            outcome="ok",
+        )
     return exit_code(result)
