@@ -19,6 +19,26 @@
 # reporting it READY or BLOCKED, so a forgotten removal is caught on the next
 # run instead of silently skipped past.
 
+# PLACED FIRST DELIBERATELY (Ray, 2026-08-30, verbatim): "update
+# docs/roadmap/aggregated-research-chain.toml to point to the new github issue so
+# that it is instructed to have codex lanes run after /clear-prep and /clear on
+# the next session to review the session for anything missed/incorrect/vague".
+#
+# #638 is not a build ticket — it is the session record for `kb-20260830.001`,
+# and its §10 assigns the work: run CODEX LANES over it and re-verify every
+# "measured this session" claim, the two inferred answers Ray never explicitly
+# confirmed, and anything vague enough to be implemented two ways. Ray expects
+# the findings to trigger another /grilling round BEFORE /to-spec.
+#
+# It sits ahead of #581 because the whole upgrade-protocol design rests on that
+# session's facts, several of which were CORRECTED mid-session — so the review is
+# a prerequisite for trusting any of them, not a parallel nicety. #581 is
+# unblocked and stays next in line after it.
+[[ticket]]
+issue = 638
+title = "session kb-20260830.001 record — codex-lane review for missed/incorrect/vague, then re-grill"
+blockers = []
+
 [[ticket]]
 issue = 581
 title = "breadth verb — first source"

@@ -1,0 +1,245 @@
+<title>Upgrade Protocol — Round 3</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>body{background:#F7F5F2;color:#1C1A17;font-family:system-ui,sans-serif;margin:0}</style>
+<style id="css"></style>
+<div id="app"></div>
+
+<script id="answers" type="application/json">{"a":{},"notes":{},"freeform":"","saved":null}</script>
+
+<script>
+const CSS = `
+  :root{
+    --ground:#F7F5F2; --panel:#FFFFFF; --ink:#1C1A17; --muted:#61594F;
+    --faint:#948B80; --rule:#E2DCD3; --accent:#0F5C57; --accent-wash:#E6F0EE;
+    --rec:#9A5B12; --rec-wash:#FAF0DF;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);
+    font-family:"Source Sans 3",system-ui,sans-serif;font-size:17px;line-height:1.6;
+    margin:0;padding:0 20px 120px}
+  .wrap{max-width:860px;margin:0 auto}
+  header{padding:64px 0 28px;border-bottom:2px solid var(--ink);margin-bottom:8px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--rec);margin:0 0 16px;font-weight:600}
+  h1{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;
+    font-size:clamp(34px,5.4vw,54px);line-height:1;letter-spacing:-.03em;margin:0 0 16px}
+  .thesis{color:var(--muted);margin:0;max-width:58ch}
+  .qcard{background:var(--panel);border:1px solid var(--rule);padding:24px 24px 20px;margin:26px 0}
+  .qnum{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--faint);font-weight:600;margin:0 0 6px}
+  h2{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:600;font-size:24px;
+    line-height:1.2;letter-spacing:-.01em;margin:0 0 10px}
+  .qbody{color:var(--muted);margin:0 0 18px;font-size:16px}
+  label.opt{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;margin:0 0 8px;
+    border:1px solid var(--rule);cursor:pointer;background:#FCFBF9;transition:border-color .12s}
+  label.opt:hover{border-color:var(--accent)}
+  label.opt:has(input:checked){border-color:var(--accent);background:var(--accent-wash)}
+  label.opt input{margin:4px 0 0;flex:none;accent-color:var(--accent);width:16px;height:16px}
+  .otxt{font-size:15.5px;line-height:1.45}
+  .otxt b{font-weight:600}
+  .otxt .sub{color:var(--muted);display:block;margin-top:2px;font-size:14.5px}
+  .rec{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
+    text-transform:uppercase;font-weight:600;background:var(--rec-wash);color:var(--rec);
+    padding:1px 6px;margin-left:6px;vertical-align:1px}
+  textarea,input[type=text]{width:100%;font-family:"Source Sans 3",system-ui,sans-serif;
+    font-size:15.5px;padding:10px 12px;border:1px solid var(--rule);background:#FCFBF9;
+    color:var(--ink);resize:vertical}
+  textarea:focus,input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+  .flabel{font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--muted);font-weight:600;display:block;margin:16px 0 6px}
+  .bar{position:sticky;bottom:0;background:var(--ground);border-top:2px solid var(--ink);
+    padding:16px 0;margin-top:34px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  button{font-family:"Source Sans 3",system-ui,sans-serif;font-size:16px;font-weight:600;
+    padding:11px 22px;border:1px solid var(--ink);background:var(--ink);color:var(--ground);
+    cursor:pointer}
+  button.ghost{background:transparent;color:var(--ink)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .status{font-size:14.5px;color:var(--muted)}
+  .status.err{color:#8F2D2D}
+  .status.ok{color:var(--accent);font-weight:600}
+  .ro{background:var(--rec-wash);border-left:3px solid var(--rec);padding:14px 18px;margin:20px 0;
+    font-size:15px}
+  pre.dump{background:var(--panel);border:1px solid var(--rule);padding:16px;font-family:var(--mono);
+    font-size:12.5px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;margin:12px 0 0}
+  code{font-family:var(--mono);font-size:.87em;background:#EEEAE4;padding:1px 5px}
+`;
+document.getElementById('css').textContent = CSS;
+
+const QS = [
+  {
+    id:'q9', n:'Question 9', title:'What becomes the single source of truth for a version?', multi:false,
+    body:'MEASURED: every tracked tool version exists in 3 to 5 places. currency.toml expected is a pure hand-typed copy. The graphify fork SHA lives in FOUR tracked files, and six ref_binding rows in currency.toml exist only to go find them.',
+    opts:[
+      {v:'mandatory-only', t:'mise.toml and pyproject.toml are the only places a version is ever typed', s:'Everything else - manifests, currency expected, lock rows, stamps - is derived or generated from those two. Your stated goal, taken literally.', rec:true},
+      {v:'plus-lock', t:'The two mandatory files plus their lockfiles; everything else derived', s:'Same, but accepts that mise.lock and uv.lock are generated-but-authoritative and cannot be cheaply re-derived.'},
+      {v:'db', t:'The workflow database is the source of truth; config files are projections', s:'Consistent with choosing an engine. Inverts the repo: a reviewer would read a projection, not the truth.'}
+    ]
+  },
+  {
+    id:'q10', n:'Question 10', title:'The 23 state files nobody shares', multi:false,
+    body:'MEASURED: docs/currency/ holds 23 TRACKED JSON state files - 18 watch-state, 3 watch-reviewed, upstream-baseline, docs-fingerprints. Each has exactly ONE reader; sampled content is empty objects. Separately: upstream-baseline.json is behind its own pins on 5 tools, and graphify-out/.currency-stamp.json is ABSENT despite SIX readers - I verified that myself (ls fails on it while graph.json succeeds, so the probe discriminates).',
+    opts:[
+      {v:'to-db', t:'All of it moves into the workflow database', s:'State belongs in the state store. 23 tracked files stop being review diffs nobody reads.', rec:true},
+      {v:'delete', t:'Delete them and re-derive on demand', s:'If they are empty and single-reader they may carry no information at all. Cheapest, and irreversible if one mattered.'},
+      {v:'keep', t:'Keep them as files', s:'Tracked state is greppable and survives with no database. It is also 23 more files to maintain.'}
+    ]
+  },
+  {
+    id:'q11', n:'Question 11', title:'currency.toml has 22 readers and ~85% prose judgment', multi:false,
+    body:'MEASURED: 22 modules read it. About 85% is irreplaceable per-tool judgment plus the comments recording WHY. It is NOT cheap to merge - but stripping the hand-copied expected field and the 23 state files shrinks it materially with nothing lost.',
+    opts:[
+      {v:'strip', t:'Strip what duplicates; keep the judgment where it is', s:'Removes copied versions and state; leaves tag prefixes, version patterns and platform gates in a file built to hold them. Smallest risk - but it does not reduce the file COUNT, which is what you asked for.', rec:true},
+      {v:'inline', t:'Move surviving judgment into mise.toml / pyproject.toml and delete currency.toml', s:'Achieves the file-count goal. Needs verifying that mise.toml tolerates unknown keys against its own published schema - I have NOT checked that yet and will before you act on it.'},
+      {v:'rewrite', t:'Full rewrite; accept losing the prose', s:'You said assume everything we have is wrong. This is that at face value: 22 readers repointed, judgment re-derived or re-authored.'}
+    ]
+  },
+  {
+    id:'q12', n:'Question 12', title:'The manifests split cleanly - do you want the split?', multi:false,
+    body:'MEASURED: 97 files match sources/*.manifest (I re-counted: 97). Only 16 are TOOL manifests duplicating a version pin. The other 81 are pure corpus sources - research repos with no pin anywhere else. Two different things wearing one filename pattern.',
+    opts:[
+      {v:'split', t:'Yes - the 16 tool manifests get generated from the pins; the 81 corpus manifests stay authored', s:'The upgrade protocol owns tools. Corpus ingestion keeps its own lifecycle.', rec:true},
+      {v:'all-generated', t:'All 97 come under the protocol', s:'One mechanism for everything with an upstream. Makes this a corpus upgrader too - a materially bigger program.'},
+      {v:'leave', t:'Leave all 97 authored; only the pins consolidate', s:'Smallest blast radius. The 16 keep duplicating a version that now lives elsewhere as well.'}
+    ]
+  }
+];
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function readState(){
+  try{ return JSON.parse(document.getElementById('answers').textContent); }
+  catch(e){ return {a:{},notes:{},freeform:'',saved:null}; }
+}
+
+function renderApp(st, mode){
+  const ro = mode === 'readonly';
+  let h = '<div class="wrap"><header>'
+    + '<p class="eyebrow">knowledge-base &middot; grilling round 3 &middot; 2026-08-30</p>'
+    + '<h1>Round 3 &mdash; consolidation, on measured ground</h1>'
+    + '<p class="thesis">An Opus sweep inventoried 48 files; every number below is measured, not estimated. Every question has a free-text box for when the choices are not enough, and there is a catch-all at the bottom for anything this round missed.</p>'
+    + '</header>';
+
+  if (ro) h += '<div class="ro"><b>Read-only view.</b> Saving is unavailable here, so use <b>Copy answers</b> at the bottom and paste them back into the session instead.</div>';
+
+  if (st.saved) h += '<div class="ro" style="border-left-color:#0F5C57;background:#E6F0EE"><b>Answers saved.</b> Last saved '+esc(st.saved)+'. Editing and saving again replaces them.</div>';
+
+  for (const q of QS){
+    h += '<section class="qcard"><p class="qnum">'+esc(q.n)+(q.multi?' &middot; select all that apply':'')+'</p>'
+      + '<h2>'+esc(q.title)+'</h2><p class="qbody">'+esc(q.body)+'</p>';
+    for (const o of q.opts){
+      const type = q.multi ? 'checkbox' : 'radio';
+      const cur = st.a[q.id];
+      const on = q.multi ? Array.isArray(cur) && cur.includes(o.v) : cur === o.v;
+      h += '<label class="opt"><input type="'+type+'" name="'+q.id+'" value="'+esc(o.v)+'"'
+        + (on?' checked':'') + (ro?' disabled':'') + '>'
+        + '<span class="otxt"><b>'+esc(o.t)+'</b>'+(o.rec?'<span class="rec">recommended</span>':'')
+        + '<span class="sub">'+esc(o.s)+'</span></span></label>';
+    }
+    h += '<label class="flabel" for="n_'+q.id+'">If none of those are right — say what is</label>'
+      + '<textarea id="n_'+q.id+'" rows="2" placeholder="Your own answer, or a caveat on the one you picked"'
+      + (ro?' readonly':'') + '>'+esc(st.notes[q.id]||'')+'</textarea>';
+    h += '</section>';
+  }
+
+  h += '<section class="qcard"><p class="qnum">Anything this round missed</p>'
+    + '<h2>What am I not asking?</h2>'
+    + '<p class="qbody">These four are the questions I think are blocking. If the real blocker is something else — a constraint, a tool you want used, a thing you already know is wrong — put it here and it reshapes the next round.</p>'
+    + '<textarea id="freeform" rows="7" placeholder="Free form. Anything at all."'
+    + (ro?' readonly':'') + '>'+esc(st.freeform||'')+'</textarea></section>';
+
+  h += '<div class="bar">'
+    + (ro?'':'<button id="save">Save answers</button>')
+    + '<button id="copy" class="ghost">Copy answers</button>'
+    + '<span class="status" id="status"></span></div>'
+    + '<pre class="dump" id="dump" hidden></pre>'
+    + '</div>';
+  return h;
+}
+
+function collect(){
+  const st = {a:{},notes:{},freeform:'',saved:null};
+  for (const q of QS){
+    const els = [...document.querySelectorAll('input[name="'+q.id+'"]')];
+    if (q.multi) st.a[q.id] = els.filter(e=>e.checked).map(e=>e.value);
+    else { const c = els.find(e=>e.checked); if (c) st.a[q.id] = c.value; }
+    const n = document.getElementById('n_'+q.id);
+    if (n && n.value.trim()) st.notes[q.id] = n.value.trim();
+  }
+  const f = document.getElementById('freeform');
+  st.freeform = f ? f.value.trim() : '';
+  return st;
+}
+
+function asText(st){
+  let out = 'GRILLING ROUND 3 — ANSWERS\n\n';
+  for (const q of QS){
+    const cur = st.a[q.id];
+    const chosen = q.multi
+      ? (Array.isArray(cur)&&cur.length ? cur.map(v=>(q.opts.find(o=>o.v===v)||{}).t||v).join('; ') : '(none selected)')
+      : (cur ? ((q.opts.find(o=>o.v===cur)||{}).t||cur) : '(none selected)');
+    out += q.n + ' — ' + q.title + '\n  -> ' + chosen + '\n';
+    if (st.notes[q.id]) out += '  note: ' + st.notes[q.id] + '\n';
+    out += '\n';
+  }
+  out += 'ANYTHING MISSED\n' + (st.freeform || '(nothing added)') + '\n';
+  return out;
+}
+
+function renderDoc(st){
+  const head = document.head.innerHTML
+    .replace(/<style id="css">[\s\S]*?<\/style>/, '<style id="css"></style>');
+  const json = JSON.stringify(st).replace(/</g,'\\u003c');
+  return '<!doctype html>\n<html lang="en">\n<head>\n' + head + '\n</head>\n<body>\n'
+    + '<div id="app"></div>\n'
+    + '<script id="answers" type="application/json">' + json + '<\/script>\n'
+    + '<script>' + BOOT + '<\/script>\n'
+    + '</body>\n</html>';
+}
+
+const BOOT = document.currentScript.textContent;
+
+function wire(mode){
+  const st = readState();
+  document.getElementById('app').innerHTML = renderApp(st, mode);
+  const status = document.getElementById('status');
+
+  const copyBtn = document.getElementById('copy');
+  copyBtn.addEventListener('click', () => {
+    const text = asText(collect());
+    const dump = document.getElementById('dump');
+    dump.textContent = text; dump.hidden = false;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text)
+        .then(()=>{ status.className='status ok'; status.textContent='Copied — paste it back into the session.'; })
+        .catch(()=>{ status.className='status'; status.textContent='Clipboard blocked — the text is below, select and copy it.'; });
+    } else { status.className='status'; status.textContent='The text is below, select and copy it.'; }
+  });
+
+  const saveBtn = document.getElementById('save');
+  if (!saveBtn) return;
+  saveBtn.addEventListener('click', async () => {
+    const ns = await claude.use('artifact');
+    if (!ns) { status.className='status err'; status.textContent='Saving is unavailable in this view — use Copy answers instead.'; return; }
+    const st2 = collect();
+    st2.saved = new Date().toISOString().replace('T',' ').slice(0,16) + ' UTC';
+    saveBtn.disabled = true; status.className='status'; status.textContent='Saving...';
+    try {
+      await ns.publish(renderDoc(st2));
+    } catch (e) {
+      saveBtn.disabled = false;
+      const code = (e && e.code) || 'upstream_error';
+      if (code === 'conflict') { status.className='status'; status.textContent='Someone saved first — this view is reloading to their version.'; return; }
+      if (code === 'not_writer' || code === 'not_granted' || code === 'consent_required' || code === 'capability_disabled') {
+        status.className='status err'; status.textContent='This view is read-only — use Copy answers instead.'; return;
+      }
+      status.className='status err'; status.textContent='Could not save ('+code+'). Use Copy answers so nothing is lost.';
+    }
+  });
+}
+
+(function(){
+  wire('write');
+  claude.use('artifact').then(ns => { if (!ns) wire('readonly'); }).catch(()=>wire('readonly'));
+})();
+</script>

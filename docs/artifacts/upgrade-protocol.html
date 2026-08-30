@@ -1,0 +1,229 @@
+<title>The Upgrade Protocol</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    --ground:#F7F5F2;
+    --panel:#FFFFFF;
+    --ink:#1C1A17;
+    --muted:#61594F;
+    --faint:#948B80;
+    --rule:#E2DCD3;
+    --machine:#0F5C57;
+    --machine-wash:#E6F0EE;
+    --agent:#9A5B12;
+    --agent-wash:#FAF0DF;
+    --broken:#8F2D2D;
+    --broken-wash:#FBECEC;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);color:var(--ink);
+    font-family:"Source Sans 3",system-ui,-apple-system,sans-serif;
+    font-size:17px;line-height:1.6;margin:0;padding:0 20px 96px;
+  }
+  .wrap{max-width:1040px;margin:0 auto}
+
+  header{padding:76px 0 36px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--agent);margin:0 0 18px;font-weight:600}
+  h1{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;
+    font-size:clamp(40px,6.4vw,68px);line-height:.98;letter-spacing:-.03em;
+    margin:0 0 20px;text-wrap:balance}
+  .thesis{font-size:clamp(18px,2.2vw,21px);line-height:1.5;color:var(--muted);
+    margin:0;max-width:58ch}
+
+  h2{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:600;
+    font-size:31px;line-height:1.15;letter-spacing:-.015em;margin:66px 0 6px;
+    text-wrap:balance}
+  h2 + .sub{color:var(--muted);margin:0 0 24px;max-width:62ch}
+  h3{font-family:var(--mono);font-size:11.5px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--muted);margin:34px 0 10px;font-weight:600}
+  p{margin:0 0 16px;max-width:64ch}
+  code{font-family:var(--mono);font-size:.86em;background:#EEEAE4;
+    padding:1px 5px;border-radius:2px}
+
+  figure{margin:24px 0 10px;background:var(--panel);border:1px solid var(--rule);
+    padding:24px 20px 6px;overflow-x:auto}
+  figcaption{font-size:14.5px;color:var(--muted);line-height:1.5;
+    border-top:1px solid var(--rule);margin-top:18px;padding:13px 0 15px;max-width:74ch}
+  .mermaid{background:var(--panel);text-align:center}
+  svg{max-width:100%;height:auto;display:block;margin:0 auto}
+
+  .stages{width:100%;border-collapse:collapse;margin:20px 0 6px;font-size:15px}
+  .stages th{text-align:left;font-family:var(--mono);font-size:10.5px;font-weight:600;
+    letter-spacing:.11em;text-transform:uppercase;color:var(--muted);
+    border-bottom:1.5px solid var(--ink);padding:0 12px 8px 0}
+  .stages td{border-bottom:1px solid var(--rule);padding:9px 12px 9px 0;
+    vertical-align:top;background:var(--panel)}
+  .stages td.n{font-family:var(--mono);font-size:12.5px;color:var(--faint);width:2.2em}
+  .who{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+    text-transform:uppercase;font-weight:600;padding:2px 7px;white-space:nowrap}
+  .who.m{background:var(--machine-wash);color:var(--machine)}
+  .who.a{background:var(--agent-wash);color:var(--agent)}
+  .who.q{background:var(--broken-wash);color:var(--broken)}
+
+  .q{border-left:3px solid var(--agent);background:var(--agent-wash);
+    padding:16px 20px;margin:20px 0}
+  .q p:last-child{margin-bottom:0}
+  .q .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--agent);font-weight:600;display:block;margin-bottom:7px}
+
+  pre.proto{background:var(--panel);border:1px solid var(--rule);padding:18px 20px;
+    font-family:var(--mono);font-size:13.5px;line-height:1.75;overflow-x:auto;margin:20px 0}
+  .cm{color:var(--faint)}
+  .kw{color:var(--machine);font-weight:600}
+  .fl{color:var(--agent)}
+
+  footer{margin-top:70px;border-top:2px solid var(--ink);padding-top:20px;
+    font-size:13.5px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">knowledge-base &middot; design understanding &middot; 2026-08-30</p>
+  <h1>The Upgrade Protocol</h1>
+  <p class="thesis">Upgrading a dependency is not an edit. It is a pipeline of about a dozen
+  stages, and today an agent hand-carries every one of them. This is what I understand you
+  want built &mdash; and the four places I could be wrong.</p>
+</header>
+
+<h2>What a single upgrade actually has to do</h2>
+<p class="sub">Every stage below was exercised by hand in this session, on five tools. That
+is the evidence this table rests on &mdash; not a design sketch.</p>
+
+<table class="stages">
+  <thead><tr><th>#</th><th>Stage</th><th>Who</th><th>The command that already exists</th></tr></thead>
+  <tbody>
+    <tr><td class="n">1</td><td>Detect what is behind</td><td><span class="who m">machine</span></td><td><code>mise outdated -b --local -J</code> · <code>uv tree --outdated</code></td></tr>
+    <tr><td class="n">2</td><td>Move the pin</td><td><span class="who m">machine</span></td><td><code>mise use</code> / <code>uv add</code> &mdash; never a hand edit</td></tr>
+    <tr><td class="n">3</td><td>Move the lockfile</td><td><span class="who m">machine</span></td><td><code>mise lock &lt;tool&gt;</code> <strong>scoped</strong> · <code>uv lock</code></td></tr>
+    <tr><td class="n">4</td><td>Resolve the upstream tag &rarr; commit</td><td><span class="who m">machine</span></td><td><code>gh api .../git/ref/tags</code>, dereferencing annotated tags</td></tr>
+    <tr><td class="n">5</td><td>Write <code>sources/&lt;dep&gt;.manifest</code></td><td><span class="who m">machine</span></td><td>&mdash; today: hand-edited</td></tr>
+    <tr><td class="n">6</td><td>Sync <code>currency.toml</code></td><td><span class="who q">unclear</span></td><td>only 5 blocks hardcode a version; the rest derive</td></tr>
+    <tr><td class="n">7</td><td>Re-clone at the new SHA</td><td><span class="who m">machine</span></td><td><code>mise run kb-build</code></td></tr>
+    <tr><td class="n">8</td><td>AST extraction</td><td><span class="who m">machine</span></td><td>free, no LLM</td></tr>
+    <tr><td class="n">9</td><td>Deep / semantic extraction</td><td><span class="who a">AGENT</span></td><td>the fan-out &mdash; real tokens, not free to redo</td></tr>
+    <tr><td class="n">10</td><td>Cluster + label</td><td><span class="who m">machine</span></td><td><code>mise run kb-label</code> &mdash; deterministic hub labels</td></tr>
+    <tr><td class="n">11</td><td>Derived views (wiki/graphml/svg)</td><td><span class="who m">machine</span></td><td><code>mise run kb-artifacts</code></td></tr>
+    <tr><td class="n">12</td><td>Reflect &rarr; LESSONS</td><td><span class="who q">unclear</span></td><td><code>kb-reflect</code> is deterministic; the <em>memory it reads</em> is authored</td></tr>
+    <tr><td class="n">13</td><td>Gates + per-tool validation</td><td><span class="who m">machine</span></td><td><code>kb-gates</code>; the per-tool half does not exist yet</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Eleven of thirteen are already machine work.</strong> The gap is not capability &mdash;
+every command exists. The gap is that nothing <em>sequences</em> them, so an agent is the
+sequencer, and an agent forgets stage 3.</p>
+
+<h2>The shape you asked for</h2>
+<p class="sub">Three layers, each a thin seam over the one below. The flags are the only place
+agent work enters.</p>
+
+<pre class="proto"><span class="cm"># layer 1 — the skill, the only thing an agent calls</span>
+/upgrade <span class="kw">&lt;dependency&gt;</span> <span class="fl">--deep-extract --reflect --artifacts</span>
+
+       <span class="cm">│  a seam. no logic.</span>
+       ▼
+<span class="cm"># layer 2 — the mise task</span>
+mise run upgrade -- <span class="kw">&lt;dependency&gt;</span> <span class="fl">--deep-extract ...</span>
+
+       <span class="cm">│  a seam. one command. zero bash logic.</span>
+       ▼
+<span class="cm"># layer 3 — the python module, where all logic lives</span>
+kb_setup.upgrade.run(<span class="kw">dependency</span>, <span class="fl">deep_extract=</span>, <span class="fl">reflect=</span>, <span class="fl">artifacts=</span>)
+
+<span class="cm"># and the wrapper, same three layers</span>
+/upgrade-all              <span class="cm">→ every dependency that stage 1 reports behind</span>
+/upgrade a,b,c            <span class="cm">→ an explicit list</span>
+</pre>
+
+<figure>
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'background':'#FFFFFF','primaryColor':'#FFFFFF','primaryTextColor':'#1C1A17','primaryBorderColor':'#C9C0B4','lineColor':'#61594F','fontFamily':'Source Sans 3, system-ui, sans-serif','fontSize':'14px'}}}%%
+flowchart LR
+  DET["1 · detect<br/><i>mise + uv, JSON</i>"]
+  PIN["2-3 · pin + lock<br/><i>mise use / uv add<br/>mise lock SCOPED</i>"]
+  MAN["4-6 · manifest<br/><i>tag to commit<br/>+ currency</i>"]
+  GRAPH["7-8 · clone + AST<br/><i>kb-build</i>"]
+  DEEP["9 · deep extract"]
+  VIEWS["10-11 · label + views<br/><i>kb-label, kb-artifacts</i>"]
+  REF["12 · reflect"]
+  GATE["13 · gates +<br/>per-tool validation"]
+
+  DET --> PIN --> MAN --> GRAPH --> DEEP --> VIEWS --> REF --> GATE
+
+  classDef machine fill:#E6F0EE,stroke:#0F5C57,color:#1C1A17;
+  classDef agent fill:#FAF0DF,stroke:#9A5B12,color:#1C1A17,stroke-width:2px;
+  classDef unclear fill:#FBECEC,stroke:#8F2D2D,color:#1C1A17;
+  class DET,PIN,GRAPH,VIEWS,GATE machine;
+  class DEEP agent;
+  class MAN,REF unclear;
+</pre>
+<figcaption>Green is deterministic and already has a command. Amber is the one stage that
+genuinely needs an agent. Red is where I am <em>not sure</em> which it is &mdash; and those two
+are the subject of the questions below, because getting them wrong is what makes an
+&ldquo;automated&rdquo; pipeline quietly need a human anyway.</figcaption>
+</figure>
+
+<h2>Why every previous attempt failed</h2>
+<p class="sub">Your read is that small changes keep not working. The evidence from today
+says something sharper than &ldquo;too small&rdquo;.</p>
+
+<p>Each stage has its own checker, and <strong>each checker reads a different file</strong>.
+<code>mise ls --current</code> reads <code>mise.toml</code>. The currency engine reaches versions
+through <code>mise_key</code>, also <code>mise.toml</code>. <strong>Nothing reads
+<code>mise.lock</code></strong> &mdash; so today a bump moved the pin, the manifests and the
+binary, and all seven gates went green over a lockfile still holding the old checksums.</p>
+
+<p>That is not a missing feature. It is the absence of <em>one object</em> that knows a
+dependency has a set of artifacts and that all of them must agree. Every fix so far has added
+another checker to the pile instead of adding that object &mdash; which is exactly the pattern
+you are describing as broken.</p>
+
+<div class="q">
+  <span class="lbl">The design consequence</span>
+  <p>If there is one thing to carry from the current system into a rewrite, it is
+  <strong>not</strong> the code. It is <code>currency.toml</code>'s ~2,100 lines of per-tool
+  judgment &mdash; tag prefixes, version patterns, platform gates, and comments recording
+  <em>why</em>. A generated mapping would recreate the config and lose the judgment, and a wrong
+  tag scheme produces permanent false drift, which trains readers to ignore the report.</p>
+</div>
+
+<h2>Four things I could be wrong about</h2>
+<p class="sub">These are the grilling questions. I am not dispatching a plan until they are
+settled, because each one changes what gets built.</p>
+
+<h3>1 · Where the state lives</h3>
+<p>A pipeline that can stop at stage 9 and resume needs to know where it stopped. Three
+answers, and they are not close to equivalent: <strong>derive it</strong> from the filesystem
+every time (no state to corrupt, but every query re-reads everything);
+<strong>a per-dependency record</strong> in the repo (resumable, reviewable, and it becomes the
+typed status enum &mdash; but it can lie); or <strong>a real workflow engine with a database</strong>
+(durable, retryable, and a new operational dependency for a repo that currently has none).</p>
+
+<h3>2 · Whether &ldquo;latest&rdquo; is ever an agent decision</h3>
+<p>Today an advisor deliberately deferred two minor linter bumps because they gate ~100
+markdown files, and said to read the release notes first. If upgrading is zero-agent, that
+judgment has nowhere to go &mdash; so either the pipeline gains a &ldquo;risky, needs review&rdquo;
+verdict, or it upgrades blindly and the gates catch it after the fact.</p>
+
+<h3>3 · What atomicity means</h3>
+<p>One dependency, one commit, one PR? Or one batch? It decides whether a failing stage rolls
+back, and whether a 30-dependency sweep produces one PR or thirty.</p>
+
+<h3>4 · What the code generator can actually own</h3>
+<p>You want generation over hand-writing. <code>mise</code> and <code>uv</code> emit JSON but
+publish no schema &mdash; <code>uv</code>'s own output declares <code>{"version": "preview"}</code>
+and contains zero <code>latest</code> fields. So the schemas would have to be authored here
+before anything could be generated from them.</p>
+
+<footer>
+  <p>Source: <code>docs/artifacts/upgrade-protocol.html</code>, tracked. Every stage in the
+  table was exercised by hand this session on uv, rumdl, biome, fnox and ctx7; the
+  <code>mise.lock</code> blind spot and the seven-green-gates figure are measured, not
+  illustrative. See <code>docs/artifacts/lockfile-blind-spot.html</code> for that evidence, and
+  issue #636 for the umbrella this design would close.</p>
+</footer>
+
+</div>
