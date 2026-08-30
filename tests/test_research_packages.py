@@ -174,6 +174,42 @@ def test_known_hit_reports_versions_licenses_links_and_direct_dependencies() -> 
     packages.validate(record)
 
 
+def test_upstream_license_and_link_strings_are_bounded_before_record_use() -> None:
+    long_license = "L" * 101
+    long_url = "https://example.test/" + ("u" * 2048)
+    transport = _transport(
+        {
+            _PACKAGE_PATH: (
+                200,
+                {
+                    "versions": [
+                        {
+                            "versionKey": {"version": "2.34.2"},
+                            "isDefault": True,
+                        }
+                    ]
+                },
+            ),
+            _VERSION_PATH: (
+                200,
+                {
+                    "licenses": [long_license],
+                    "links": [{"url": long_url}],
+                },
+            ),
+            _DEPENDENCIES_PATH: (200, {"nodes": []}),
+        },
+        [],
+    )
+
+    record = _record(packages.lookup("pypi", "requests", transport=transport, now=NOW))
+
+    assert record.packages is not None
+    assert record.packages.licenses == ["L" * 100]
+    assert record.packages.cited_links == [long_url[:2048]]
+    packages.validate(record)
+
+
 @pytest.mark.parametrize(
     ("system", "name", "primary_path", "control_path"),
     [
@@ -230,6 +266,8 @@ def test_known_miss_is_control_armed_with_encoded_package_paths(
         ("unknown", "requests", "system must be one of"),
         ("SYSTEM_UNSPECIFIED", "requests", "not a queryable"),
         ("pypi", "   ", "name is required"),
+        ("pypi", ".", "must not consist only of dots"),
+        ("pypi", "..", "must not consist only of dots"),
         ("pypi", "x" * 201, "at most 200"),
     ],
 )
@@ -277,6 +315,76 @@ def test_empty_versions_skip_version_and_dependency_requests() -> None:
     packages.validate(record)
 
 
+@pytest.mark.parametrize(
+    ("version_entry", "message"),
+    [
+        ({"isDefault": True}, "omitted the selected version key"),
+        (
+            {"versionKey": {"version": ""}, "isDefault": True},
+            "empty selected version",
+        ),
+        (
+            {"versionKey": {"version": "v" * 101}, "isDefault": True},
+            "exceeds 100 characters",
+        ),
+    ],
+    ids=["missing-key", "empty-version", "oversized-version"],
+)
+def test_invalid_selected_versions_are_not_run(
+    version_entry: dict[str, object],
+    message: str,
+) -> None:
+    seen: list[str] = []
+    transport = _transport(
+        {_PACKAGE_PATH: (200, {"versions": [version_entry]})},
+        seen,
+    )
+
+    result = packages.lookup("pypi", "requests", transport=transport, now=NOW)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert message in result.message
+    assert seen == [_PACKAGE_PATH]
+
+
+def test_package_without_a_marked_default_version_is_not_run() -> None:
+    seen: list[str] = []
+    transport = _transport(
+        {
+            _PACKAGE_PATH: (
+                200,
+                {
+                    "versions": [
+                        {"versionKey": {"version": "1.0.0"}},
+                        {"versionKey": {"version": "2.0.0"}},
+                    ]
+                },
+            )
+        },
+        seen,
+    )
+
+    result = packages.lookup("pypi", "requests", transport=transport, now=NOW)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "did not identify a default version" in result.message
+    assert seen == [_PACKAGE_PATH]
+
+
+def test_package_endpoint_failure_is_not_run_instead_of_a_null() -> None:
+    seen: list[str] = []
+    transport = _transport({_PACKAGE_PATH: (503, {})}, seen)
+
+    result = packages.lookup("pypi", "requests", transport=transport, now=NOW)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "HTTP 503" in result.message
+    assert seen == [_PACKAGE_PATH]
+
+
 def test_default_version_failure_is_not_run_instead_of_a_null() -> None:
     seen: list[str] = []
     package_path = "/v3/systems/NPM/packages/react"
@@ -309,6 +417,67 @@ def test_default_version_failure_is_not_run_instead_of_a_null() -> None:
     assert result.rc is Rc.NOT_RUN
     assert "HTTP 503" in result.message
     assert seen == [package_path, version_path]
+
+
+def test_dependencies_endpoint_failure_is_not_run() -> None:
+    seen: list[str] = []
+    transport = _transport(
+        {
+            _PACKAGE_PATH: (
+                200,
+                {
+                    "versions": [
+                        {
+                            "versionKey": {"version": "2.34.2"},
+                            "isDefault": True,
+                        }
+                    ]
+                },
+            ),
+            _VERSION_PATH: (200, {}),
+            _DEPENDENCIES_PATH: (502, {}),
+        },
+        seen,
+    )
+
+    result = packages.lookup("pypi", "requests", transport=transport, now=NOW)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "HTTP 502" in result.message
+    assert seen == [_PACKAGE_PATH, _VERSION_PATH, _DEPENDENCIES_PATH]
+
+
+def test_dependency_resolution_error_is_not_reported_as_zero_dependencies() -> None:
+    seen: list[str] = []
+    transport = _transport(
+        {
+            _PACKAGE_PATH: (
+                200,
+                {
+                    "versions": [
+                        {
+                            "versionKey": {"version": "2.34.2"},
+                            "isDefault": True,
+                        }
+                    ]
+                },
+            ),
+            _VERSION_PATH: (200, {}),
+            _DEPENDENCIES_PATH: (
+                200,
+                {"nodes": [], "error": "dependency graph unavailable"},
+            ),
+        },
+        seen,
+    )
+
+    result = packages.lookup("pypi", "requests", transport=transport, now=NOW)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "dependency graph unavailable" in result.message
+    assert seen == [_PACKAGE_PATH, _VERSION_PATH, _DEPENDENCIES_PATH]
 
 
 def test_transport_and_decode_failures_are_not_run() -> None:

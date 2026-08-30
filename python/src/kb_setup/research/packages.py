@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -32,8 +33,11 @@ _HTTP_TIMEOUT = 30.0
 _MAX_NAME_LENGTH = 200
 _MAX_VERSION_LENGTH = 100
 _MAX_LICENSES = 20
+_MAX_LICENSE_LENGTH = 100
 _MAX_CITED_LINKS = 20
+_MAX_CITED_LINK_LENGTH = 2048
 _EXPECTED_POSITIONAL_ARGS = 2
+_ONLY_DOTS = re.compile(r"^\.+$")
 
 type _Transport = httpx2.BaseTransport | None
 
@@ -72,6 +76,8 @@ def _inputs(system: str, name: str) -> tuple[DepsDevV3System, str] | Err:
     normalized_name = name.strip()
     if not normalized_name:
         return Err("a package name is required", rc=Rc.BAD_REQUEST)
+    if _ONLY_DOTS.fullmatch(normalized_name):
+        return Err("package name must not consist only of dots", rc=Rc.BAD_REQUEST)
     if len(normalized_name) > _MAX_NAME_LENGTH:
         return Err(
             f"the package name must be at most {_MAX_NAME_LENGTH} characters",
@@ -162,10 +168,12 @@ def _get_package(client: httpx2.Client, path: str) -> DepsDevV3Package | Err | N
 
 
 def _selected_version(versions: list[DepsDevV3PackageVersion]) -> str | Err | None:
-    """Return the default version, the final fallback, or no version at all."""
+    """Return the explicitly marked default version or no version at all."""
     if not versions:
         return None
-    selected = next((entry for entry in versions if entry.is_default is True), versions[-1])
+    selected = next((entry for entry in versions if entry.is_default is True), None)
+    if selected is None:
+        return Err("deps.dev package response did not identify a default version", rc=Rc.NOT_RUN)
     version_key = selected.version_key
     if isinstance(version_key, UnsetType) or isinstance(version_key.version, UnsetType):
         return Err("deps.dev package response omitted the selected version key", rc=Rc.NOT_RUN)
@@ -182,7 +190,11 @@ def _selected_version(versions: list[DepsDevV3PackageVersion]) -> str | Err | No
 def _version_fields(version: DepsDevV3Version) -> tuple[list[str], list[str]]:
     """Narrow optional wire fields into the bounded shared-record shape."""
     raw_licenses = version.licenses
-    licenses = [] if isinstance(raw_licenses, UnsetType) else list(raw_licenses)[:_MAX_LICENSES]
+    licenses = (
+        []
+        if isinstance(raw_licenses, UnsetType)
+        else [license_text[:_MAX_LICENSE_LENGTH] for license_text in raw_licenses[:_MAX_LICENSES]]
+    )
     raw_links = version.links
     links = [] if isinstance(raw_links, UnsetType) else list(raw_links)
     cited_links: list[str] = []
@@ -190,7 +202,7 @@ def _version_fields(version: DepsDevV3Version) -> tuple[list[str], list[str]]:
         url = link.url
         if isinstance(url, UnsetType):
             continue
-        cited_links.append(url)
+        cited_links.append(url[:_MAX_CITED_LINK_LENGTH])
         if len(cited_links) == _MAX_CITED_LINKS:
             break
     return licenses, cited_links
@@ -226,6 +238,12 @@ def _package_fields(
     dependencies = _fetch(client, dependencies_path, DepsDevV3Dependencies)
     if isinstance(dependencies, Err):
         return dependencies
+    dependency_error = dependencies.error
+    if not isinstance(dependency_error, UnsetType) and dependency_error:
+        return Err(
+            f"deps.dev dependency resolution failed: {dependency_error}",
+            rc=Rc.NOT_RUN,
+        )
     raw_nodes = dependencies.nodes
     nodes = [] if isinstance(raw_nodes, UnsetType) else list(raw_nodes)
     direct_dependency_count = sum(
@@ -358,17 +376,6 @@ def _validate_null(record: AdapterRecord) -> None:
         raise msgspec.ValidationError("a packages null_result must have exactly one package arm")
 
 
-def _validate_packages(record: AdapterRecord) -> None:
-    """Defend non-negative package counters beyond generated constraints."""
-    if record.packages is None:
-        return
-    if record.packages.version_count < 0:
-        raise msgspec.ValidationError("version_count must be non-negative")
-    direct_count = record.packages.direct_dependency_count
-    if direct_count is not None and direct_count < 0:
-        raise msgspec.ValidationError("direct_dependency_count must be non-negative")
-
-
 def validate(record: AdapterRecord) -> None:
     """Enforce generated-field and semantic cross-field contract invariants."""
     msgspec.json.decode(msgspec.json.encode(record), type=AdapterRecord)
@@ -384,7 +391,6 @@ def validate(record: AdapterRecord) -> None:
 
     _validate_presence(record)
     _validate_null(record)
-    _validate_packages(record)
 
 
 def main(argv: list[str], repo_root: Path) -> int:
