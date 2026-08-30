@@ -844,6 +844,11 @@ description = "Look up a package's versions, licences and dependencies from deps
 run = "uv run kb-setup research-packages"
 timeout = "10m"
 
+[tasks.kb-research-codesearch]
+description = "Search code across GitHub repositories via grep.app's MCP endpoint"
+run = "uv run kb-setup research-codesearch"
+timeout = "10m"
+
 [tasks.kb-research]
 description = "aggregated-research plugin CLI: mise run kb-research -- <verb> [args...]"
 run = "uv run aggregated-research"

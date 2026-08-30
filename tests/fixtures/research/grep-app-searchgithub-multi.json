@@ -1,0 +1,10 @@
+{
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Repository: mifi/lossless-cut\nPath: src/renderer/src/hooks/useUserSettingsRoot.ts\nURL: https://github.com/mifi/lossless-cut/blob/master/src/renderer/src/hooks/useUserSettingsRoot.ts\nLicense: GPL-2.0\n\nSnippets:\n--- Snippet 1 (Line 54) ---\n  const [lastAppVersion, setLastAppVersion] = useState(...)\nRepository: facebook/react\nPath: packages/react-dom/src/client/ReactDOMHostConfig.js\nURL: https://github.com/facebook/react/blob/main/packages/react-dom/src/client/ReactDOMHostConfig.js\nLicense: MIT\n\nSnippets:\n--- Snippet 1 (Line 10) ---\n  const [state, setState] = useState(initial)\n"
+      }
+    ]
+  }
+}
