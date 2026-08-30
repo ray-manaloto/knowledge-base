@@ -13,7 +13,7 @@ from pathlib import Path
 import msgspec
 
 from kb_setup import events
-from kb_setup.generated.research_record import AdapterRecord, Arm, Hit, Kind, Null, Tier
+from kb_setup.generated.research_record import AdapterRecord, Arm, Hit, Kind, Null, Tier, Trackers
 from kb_setup.result import Err, External, Ok, Rc, Result, exit_code, external_from_returncode
 
 _GH_TIMEOUT = 120
@@ -207,8 +207,11 @@ def search(
             tier=Tier.cheap,
             question=f"{repo} {term}",
             command=_display_command(searches[0][1]),
-            has_issues=repo_response.has_issues,
-            has_discussions=repo_response.has_discussions,
+            trackers=Trackers(
+                has_issues=repo_response.has_issues,
+                has_discussions=repo_response.has_discussions,
+            ),
+            links=None,
             ran_at=_ran_at(now),
             total_count=total_count,
             hits=hits,
@@ -232,7 +235,7 @@ def validate(record: AdapterRecord) -> None:
 
     arm_kinds = [arm.kind for arm in record.null_result.arms]
     expected = {Kind.pr}
-    if record.has_issues:
+    if record.trackers is not None and record.trackers.has_issues:
         expected.add(Kind.issue)
     if len(arm_kinds) != len(set(arm_kinds)) or set(arm_kinds) != expected:
         raise msgspec.ValidationError("null_result must have one unique arm per searched channel")

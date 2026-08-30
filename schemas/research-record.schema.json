@@ -9,8 +9,8 @@
     "tier",
     "question",
     "command",
-    "has_issues",
-    "has_discussions",
+    "trackers",
+    "links",
     "ran_at",
     "total_count",
     "hits",
@@ -21,8 +21,18 @@
     "tier": {"$ref": "#/$defs/Tier"},
     "question": {"type": "string", "minLength": 1, "maxLength": 512},
     "command": {"type": "string", "minLength": 1, "maxLength": 1024},
-    "has_issues": {"type": "boolean"},
-    "has_discussions": {"type": "boolean"},
+    "trackers": {
+      "anyOf": [
+        {"$ref": "#/$defs/Trackers"},
+        {"type": "null"}
+      ]
+    },
+    "links": {
+      "anyOf": [
+        {"$ref": "#/$defs/Links"},
+        {"type": "null"}
+      ]
+    },
     "ran_at": {"$ref": "#/$defs/UtcTimestamp"},
     "total_count": {"type": "integer", "minimum": 0},
     "hits": {
@@ -84,6 +94,43 @@
           "maxItems": 2,
           "items": {"$ref": "#/$defs/Arm"}
         }
+      }
+    },
+    "Trackers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["has_issues", "has_discussions"],
+      "properties": {
+        "has_issues": {"type": "boolean"},
+        "has_discussions": {"type": "boolean"}
+      }
+    },
+    "Links": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checked", "broken_count", "results"],
+      "properties": {
+        "checked": {"type": "integer", "minimum": 0},
+        "broken_count": {"type": "integer", "minimum": 0},
+        "results": {
+          "type": "array",
+          "maxItems": 60,
+          "items": {"$ref": "#/$defs/LinkResult"}
+        }
+      }
+    },
+    "LinkResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "ok", "status_text"],
+      "properties": {
+        "url": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "ok": {"type": "boolean"},
+        "status_text": {"type": "string", "maxLength": 200},
+        "status_details": {"type": ["string", "null"], "maxLength": 600},
+        "line": {"type": ["integer", "null"]},
+        "column": {"type": ["integer", "null"]},
+        "duration_ms": {"type": ["number", "null"]}
       }
     }
   }

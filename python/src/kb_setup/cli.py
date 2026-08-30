@@ -77,6 +77,7 @@ def _print_usage() -> int:
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
+        "research-links <URL...> [--out PATH] | "
         "session-state [--no-pr] | context | next-ticket | "
         "session-select (--current | --sessions <id>... | --last N | "
         "--since <ISO> [--until <ISO>]) | "
@@ -485,6 +486,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup.research import trackers
 
         return trackers.main(rest, repo_root)
+    if cmd == "research-links":
+        from kb_setup.research import links
+
+        return links.main(rest, repo_root)
     if cmd == "gates":
         from kb_setup import gates
 
@@ -579,6 +584,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | funnel | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
+        "research-links <URL...> [--out PATH] | "
         "session-state [--no-pr] | next-ticket | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
         "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "
