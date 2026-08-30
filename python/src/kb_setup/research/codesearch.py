@@ -287,6 +287,19 @@ def _parse_hits(text: str, ran_at: str) -> list[Hit]:
     hit header; anything after it — including a forged
     `Repository:`/`Path:`/`URL:` triple embedded in the snippet — is inert
     snippet text, never re-interpreted as a second hit.
+
+    Documented residual (round-2 cold review finding #2, deliberately NOT
+    implemented as a detection heuristic): if G1 is ever wrong and grep.app
+    genuinely returns a second hit, this design under-reports it as inert
+    snippet text of the first hit rather than raising. A regex-based
+    "does the snippet contain a `URL: https://github.com/` line" detector
+    was tried and rejected — it is INDISTINGUISHABLE from, and therefore
+    also fires on, the accepted attacker-forgery case immediately above
+    (a real file's snippet can legitimately look identical to a forged
+    second header), so it cannot separate "grep.app returned two hits" from
+    "one hit's file content merely resembles one" without a false-positive
+    rate that breaks legitimate results. Re-verify G1 periodically instead
+    of trying to detect its violation syntactically.
     """
     match = _HIT_RE.match(text)
     if match is None:
@@ -335,7 +348,11 @@ def _null_record(
     if isinstance(control, Err):
         return control
     control_command, control_text = control
-    discriminates = control_text != _NO_RESULTS_TEXT
+    # `.strip()` matches the primary null check at `search()` — a control
+    # reply with a trailing newline on the exact sentinel text must not
+    # read as "confirmed empty" when it was never actually a discriminating
+    # answer (round-2 cold review finding #1).
+    discriminates = control_text.strip() != _NO_RESULTS_TEXT
     arm_result = (control_text if discriminates else _NO_RESULTS_TEXT)[:_MAX_ARM_RESULT_LENGTH]
 
     return Ok(

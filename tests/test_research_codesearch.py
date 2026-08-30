@@ -163,6 +163,30 @@ def test_null_control_preserves_the_callers_repo_and_language() -> None:
     codesearch.validate(record)
 
 
+def test_control_response_with_trailing_whitespace_still_discriminates() -> None:
+    # The primary null check strips before comparing (`search()`); the
+    # control arm must do the same, or a control reply with a trailing
+    # newline on the exact sentinel reads as "confirmed empty" without ever
+    # having been a discriminating answer (round-2 cold review finding #1).
+    seen: list[dict[str, Any]] = []
+    transport = _transport(
+        {
+            "zzzqxnotarealidentifier9384756kb": (200, _sse(_mcp_result(_NO_RESULTS))),
+            "useState(": (200, _sse(_mcp_result(_NO_RESULTS + "\n"))),
+        },
+        seen,
+    )
+
+    record = _record(
+        codesearch.search("zzzqxnotarealidentifier9384756kb", transport=transport, now=NOW)
+    )
+
+    assert record.null_result is not None
+    arm = record.null_result.arms[0]
+    assert arm.discriminates is False
+    codesearch.validate(record)
+
+
 def test_control_query_also_returning_no_results_does_not_discriminate() -> None:
     seen: list[dict[str, Any]] = []
     transport = _transport(
