@@ -10,16 +10,6 @@ outcome: "useful"
 
 ## Answer
 
-## Question
-
-#577 (parent #568, aggregated-research build order position 4/5, "breadth"):
-are the aggregated-research plugin's four declared dependencies (firecrawl,
-exa, context7, last30days) reachable from a headless, non-Claude-session
-process, and does one transport/record shape serve all four — which sizes
-whether `breadth` is one adapter ticket or more.
-
-## Answer
-
 All four sources are headlessly reachable, but split into three distinct
 transport classes rather than one: an installed-CLI-binary class (firecrawl,
 context7 — env-var auth and stored-login auth respectively), a direct-HTTP
