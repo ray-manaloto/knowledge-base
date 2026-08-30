@@ -18,11 +18,6 @@
 # run instead of silently skipped past.
 
 [[ticket]]
-issue = 575
-title = "Prototype: packages — generate models from the upstream protobuf and hit the real endpoint"
-blockers = [569]
-
-[[ticket]]
 issue = 576
 title = "Prototype: codesearch feasibility — can a headless client reach it at all"
 blockers = []
