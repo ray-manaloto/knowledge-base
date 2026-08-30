@@ -12,7 +12,7 @@ from pathlib import Path
 
 import msgspec
 import pytest
-from kb_setup.generated.research_record import AdapterRecord, Arm, Hit, Kind, Null, Tier
+from kb_setup.generated.research_record import AdapterRecord, Arm, Hit, Kind, Null, Tier, Trackers
 from kb_setup.research import trackers
 from kb_setup.result import Err, External, Ok, Rc
 from kb_setup.sinks import stdout_sink
@@ -78,8 +78,9 @@ def test_jdx_search_reads_channels_first_and_searches_only_pull_requests(
     record = _search_with_stub(REPO_JDX, term)
 
     assert seen == [_repo_argv(REPO_JDX), _search_argv(REPO_JDX, "pr", term)]
-    assert record.has_issues is False
-    assert record.has_discussions is True
+    assert record.trackers is not None
+    assert record.trackers.has_issues is False
+    assert record.trackers.has_discussions is True
     assert record.total_count == 9
     assert [hit.kind for hit in record.hits] == [Kind.pr]
     assert record.hits[0].snippet == "First line Second line"
@@ -120,8 +121,9 @@ def test_jdx_null_proves_channel_read_controls_search_and_arms(
 
     The issue term and arm fixtures are deliberately present. Removing the
     repository-channel read therefore runs to completion but (a) searches the
-    forbidden issue channel, (b) records has_issues=True, and (c) emits an issue
-    arm. Each assertion below independently detects one part of that break.
+    forbidden issue channel, (b) records trackers.has_issues=True, and (c)
+    emits an issue arm. Each assertion below independently detects one part of
+    that break.
     """
     term = "zzzqqqnotaterm"
     issue_term = _search_argv(REPO_JDX, "issue", term)
@@ -144,7 +146,8 @@ def test_jdx_null_proves_channel_read_controls_search_and_arms(
     assert seen[0] == _repo_argv(REPO_JDX)
     assert issue_term not in seen
     assert issue_arm not in seen
-    assert record.has_issues is False
+    assert record.trackers is not None
+    assert record.trackers.has_issues is False
     assert record.null_result is not None
     assert [arm.kind for arm in record.null_result.arms] == [Kind.pr]
     assert record.null_result.arms[0].result == "total_count=1005"
@@ -306,8 +309,8 @@ def _contract_record(
         tier=Tier.cheap,
         question="owner/repo term",
         command="gh api -X GET search/issues -f q=repo:owner/repo is:pr term",
-        has_issues=has_issues,
-        has_discussions=False,
+        trackers=Trackers(has_issues=has_issues, has_discussions=False),
+        links=None,
         ran_at="2026-08-28T02:07:38Z",
         total_count=len(hits or []),
         hits=hits or [],

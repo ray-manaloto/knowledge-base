@@ -1,0 +1,5 @@
+# lychee config for the `research links` adapter — isolated from lychee.toml
+# (root), whose excludes are tuned for this repo's own docs corpus (doppler,
+# file:// citations, MCP endpoints, npmjs, example.com, loopback) and are not
+# appropriate defaults for arbitrary cited research URLs. See #578.
+no_progress = true

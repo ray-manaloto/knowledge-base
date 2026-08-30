@@ -834,6 +834,11 @@ description = "Search one repository's GitHub issue and pull-request trackers"
 run = "uv run kb-setup research-trackers"
 timeout = "10m"
 
+[tasks.kb-research-links]
+description = "Check that a set of cited URLs resolve, via the pinned lychee checker"
+run = "uv run kb-setup research-links"
+timeout = "10m"
+
 [tasks.kb-research]
 description = "aggregated-research plugin CLI: mise run kb-research -- <verb> [args...]"
 run = "uv run aggregated-research"

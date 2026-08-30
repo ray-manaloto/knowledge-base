@@ -1,0 +1,36 @@
+{
+  "total": 2,
+  "unique": 2,
+  "successful": 0,
+  "unknown": 0,
+  "unsupported": 0,
+  "timeouts": 0,
+  "redirects": 0,
+  "remaps": 0,
+  "excludes": 2,
+  "errors": 0,
+  "cached": 0,
+  "success_map": {},
+  "error_map": {},
+  "timeout_map": {},
+  "suggestion_map": {},
+  "redirect_map": {},
+  "excluded_map": {
+    "lycheetest.txt": [
+      {
+        "url": "https://this-domain-really-should-not-exist-9284712.invalid/",
+        "status": {"text": "Excluded", "details": "This is due to your 'exclude' values"},
+        "span": {"line": 2, "column": 1},
+        "duration": {"secs": 0, "nanos": 1375}
+      },
+      {
+        "url": "https://example.com/",
+        "status": {"text": "Excluded", "details": "This is due to your 'exclude' values"},
+        "span": {"line": 1, "column": 1},
+        "duration": {"secs": 0, "nanos": 5958}
+      }
+    ]
+  },
+  "duration": {"secs": 0, "nanos": 692959},
+  "detailed_stats": true
+}
