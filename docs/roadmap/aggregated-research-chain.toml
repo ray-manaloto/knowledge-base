@@ -1,4 +1,5 @@
-# The tracked ticket chain for the aggregated-research build (#574).
+# The tracked ticket chain for the aggregated-research build (#574), and for
+# repo-internal enablers of it (e.g. #616, the review-CLI invocation wrapper).
 #
 # One entry per ticket, in the order they should be worked.
 # The FILE is the ordering; the TRACKER (GitHub Issues) is the status.
@@ -29,6 +30,11 @@ blockers = []
 [[ticket]]
 issue = 577
 title = "Prototype: breadth — which declared sources are reachable, and how many adapters that is"
+blockers = []
+
+[[ticket]]
+issue = 616
+title = "Wrap the cold-review CLI invocation (agy-delegate/codex exec) in a mise task + kb_setup module; decide the deny-hook scope"
 blockers = []
 
 [[ticket]]
