@@ -86,7 +86,7 @@ dev = [
   "mcp2cli==3.6.0",
 ]
 
-codegen = ["datamodel-code-generator==0.75.1"]
+codegen = ["datamodel-code-generator[protobuf]==0.75.1"]
 
 [build-system]
 requires = ["hatchling"]
@@ -236,7 +236,7 @@ cpy = "cpy"
 [tool.uv.sources]
 graphifyy = { git = "https://github.com/ray-manaloto/graphify", rev = "0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956" }
 
-# Every strict msgspec model generated from a JSON Schema, as datamodel-codegen's
+# Every strict msgspec model generated from a committed schema, as datamodel-codegen's
 # own `--all-jobs`/`--all-jobs --check` batch (0.75.1). Replaces four
 # hand-written generate_*.py/check_*.py pairs (#569) — this table plus the two
 # `mise run kb-codegen*` tasks IS the generator now; nothing else invokes it.
@@ -322,3 +322,20 @@ input = "schemas/research-record.schema.json"
 output = "python/src/kb_setup/generated/research_record.py"
 custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
 """Generated research-record models; edit the schema and rerun the generator."""'''
+
+[tool.datamodel-codegen.jobs.packages]
+input = "schemas/deps-dev-api-v3.proto"
+output = "python/src/kb_setup/generated/packages.py"
+input-file-type = "protobuf"
+schema-version = "auto"
+# Protobuf comments otherwise become `Annotated[..., Meta(description=...)]`.
+# They add prose rather than wire constraints, and several upstream comments
+# exceed this repository's generated-code line budget. Keep the generated
+# contract to the protobuf field types and names.
+use-annotated = false
+field-constraints = false
+# Emit enum members, rather than raw strings, as protobuf field defaults.
+set-default-enum-member = true
+custom-template-dir = "schemas/templates/deps-dev"
+custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
+"""Generated deps.dev package models; edit the pinned protobuf and rerun the generator."""'''
