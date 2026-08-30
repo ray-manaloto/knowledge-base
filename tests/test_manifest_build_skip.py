@@ -83,12 +83,17 @@ def test_every_committed_manifest_still_loads() -> None:
     # ruling to skip any blocker, file it, and triage after the graphify
     # extraction; all four are registered in #417, which also records that
     # `codegraph` is the one whose `scope = corpus` makes it real aggregate loss.
+    # `deps-dev` is #575: a schema-only provenance pin, never intended as a
+    # corpus-ingestion source (`google/deps.dev`'s Go source is not wanted in
+    # the graph) — `build = skip` here is deliberate from the manifest's first
+    # commit, not a later exclusion of a source that used to build.
     assert {m.name for m in loaded if m.build == "skip"} == {
         "GitNexus",
         "codebase-memory-mcp",
         "codegraph",
         "codex",
         "colibri",
+        "deps-dev",
     }
 
 
