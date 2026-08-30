@@ -23,11 +23,6 @@ title = "Prototype: packages — generate models from the upstream protobuf and 
 blockers = [569]
 
 [[ticket]]
-issue = 616
-title = "Wrap the cold-review CLI invocation (agy-delegate/codex exec) in a mise task + kb_setup module; decide the deny-hook scope"
-blockers = []
-
-[[ticket]]
 issue = 576
 title = "Prototype: codesearch feasibility — can a headless client reach it at all"
 blockers = []
@@ -35,6 +30,11 @@ blockers = []
 [[ticket]]
 issue = 577
 title = "Prototype: breadth — which declared sources are reachable, and how many adapters that is"
+blockers = []
+
+[[ticket]]
+issue = 616
+title = "Wrap the cold-review CLI invocation (agy-delegate/codex exec) in a mise task + kb_setup module; decide the deny-hook scope"
 blockers = []
 
 [[ticket]]
