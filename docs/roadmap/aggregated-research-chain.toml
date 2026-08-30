@@ -20,11 +20,6 @@
 # run instead of silently skipped past.
 
 [[ticket]]
-issue = 580
-title = "codesearch verb — cross-repository code search (conditional on its prototype)"
-blockers = []
-
-[[ticket]]
 issue = 581
 title = "breadth verb — first source"
 blockers = []
