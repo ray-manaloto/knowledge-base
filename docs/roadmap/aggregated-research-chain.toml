@@ -1,5 +1,7 @@
 # The tracked ticket chain for the aggregated-research build (#574), and for
 # repo-internal enablers of it (e.g. #616, the review-CLI invocation wrapper).
+# #616 is deliberately placed LAST (Ray, 2026-08-30): get the aggregated-research
+# plugin build done first, deny-hook scope decision after.
 #
 # One entry per ticket, in the order they should be worked.
 # The FILE is the ordering; the TRACKER (GitHub Issues) is the status.
@@ -16,16 +18,6 @@
 # says is CLOSED (a STALE CHAIN report naming that one entry) rather than
 # reporting it READY or BLOCKED, so a forgotten removal is caught on the next
 # run instead of silently skipped past.
-
-[[ticket]]
-issue = 577
-title = "Prototype: breadth — which declared sources are reachable, and how many adapters that is"
-blockers = []
-
-[[ticket]]
-issue = 616
-title = "Wrap the cold-review CLI invocation (agy-delegate/codex exec) in a mise task + kb_setup module; decide the deny-hook scope"
-blockers = []
 
 [[ticket]]
 issue = 578
@@ -45,7 +37,7 @@ blockers = [578]
 [[ticket]]
 issue = 581
 title = "breadth verb — first source"
-blockers = [578, 577]
+blockers = [578]
 
 [[ticket]]
 issue = 582
@@ -86,3 +78,8 @@ blockers = [587]
 issue = 589
 title = "Definition of done: an empty project installs the marketplace and gets valid results"
 blockers = [588, 583]
+
+[[ticket]]
+issue = 616
+title = "Wrap the cold-review CLI invocation (agy-delegate/codex exec) in a mise task + kb_setup module; decide the deny-hook scope"
+blockers = []
