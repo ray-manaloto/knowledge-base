@@ -9,7 +9,7 @@ from msgspec import UNSET, UnsetType, field
 from msgspec import Struct as _Struct
 
 
-class Struct(_Struct, forbid_unknown_fields=True, rename="camel"):
+class Struct(_Struct, rename="camel"):
     """Generated deps.dev protobuf contract type."""
 
 
