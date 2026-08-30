@@ -2116,19 +2116,22 @@ version_pattern = '^(\d+\.\d+\.\d+)$'
 # names ctx7 as the doc fetcher, and the first-party `context7-cli` skill in
 # upstash/context7 drives this exact binary.
 #
-# DELIBERATELY NO `github` KEY. The original reason is now historical: when this
-# was written, `upstash/context7`'s `v1.0.x` plugin / MCP server tags were not
-# comparable with the CLI's npm `0.5.8` version. Re-measured 2026-08-30 after
-# the npm pin moved to `0.5.9`: upstream now publishes CLI tags as
-# `ctx7@<version>`, matching npm CLI versions, so the non-comparable-tags premise
-# has expired.
+# DELIBERATELY NO `github` KEY. Historical evidence: when this was written,
+# `upstash/context7`'s `v1.0.x` plugin / MCP server tags were not comparable with
+# the CLI's npm `0.5.8` version. Re-measured 2026-08-30 after the npm pin moved
+# to `0.5.9`: upstream now also publishes CLI releases tagged
+# `ctx7@<version>`. Without a prefix, however, a GitHub upstream check still
+# resolves to the plugin's `v1.0.30`, not the CLI's `0.5.9`; the version-
+# comparability problem remains real unless a `tag_prefix` is declared.
 #
-# The separate engine constraint has not: it has no `npm` source field
-# (`config.py:176-295` offers `pypi` and `github` only), so this block still
-# remains installed-vs-pinned only and keeps no `github` key. The new CLI tags
-# make a prefixed GitHub check a future option, but the engine reads GitHub
-# Releases rather than raw Git tags; qualifying and wiring that option is out of
-# scope here.
+# The engine's GitHub route filters and strips a declared prefix, so
+# `github = "upstash/context7"` plus `tag_prefix = "ctx7@"` appears feasible;
+# `ctx7@0.5.9` is a published GitHub Release, not merely a raw git tag. It is
+# deliberately not wired here: enabling an upstream check is a behavior change
+# that needs its own end-to-end verification round rather than riding along on
+# a version-pin bump. The engine's lack of an `npm` source is therefore no
+# longer the operative reason for omitting the check, because the `github`
+# route exists.
 mise_key = "npm:ctx7"
 binary = "ctx7"
 version_pattern = '^(\d+\.\d+\.\d+)$'

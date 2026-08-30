@@ -1,0 +1,350 @@
+<title>The Lockfile Blind Spot</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Karla:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    --ground:#F6F7F9;
+    --panel:#FFFFFF;
+    --ink:#16202B;
+    --muted:#5A6875;
+    --faint:#8B98A5;
+    --rule:#DCE2E8;
+    --rule-strong:#C3CCD6;
+    --miss:#A3342A;
+    --miss-wash:#FBEFEE;
+    --ok:#1F6B4A;
+    --ok-wash:#EDF5F1;
+    --lock:#8A5A12;
+    --lock-wash:#FBF3E4;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:"Karla",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+    font-size:16.5px;
+    line-height:1.62;
+    margin:0;
+    padding:0 20px 96px;
+  }
+  .wrap{max-width:1000px;margin:0 auto}
+  .col{max-width:64ch}
+
+  header{padding:72px 0 40px;border-bottom:2px solid var(--ink)}
+  .eyebrow{
+    font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted);margin:0 0 20px;
+  }
+  h1{
+    font-family:"Newsreader",Georgia,serif;
+    font-weight:600;font-size:clamp(38px,6vw,62px);line-height:1.04;
+    letter-spacing:-.018em;margin:0 0 22px;text-wrap:balance;
+  }
+  .thesis{
+    font-family:"Newsreader",Georgia,serif;
+    font-size:clamp(19px,2.4vw,23px);line-height:1.5;color:var(--muted);
+    margin:0;max-width:60ch;font-style:italic;
+  }
+
+  h2{
+    font-family:"Newsreader",Georgia,serif;
+    font-weight:600;font-size:29px;line-height:1.2;letter-spacing:-.012em;
+    margin:64px 0 6px;text-wrap:balance;
+  }
+  h2 + .sub{color:var(--muted);margin:0 0 26px;max-width:62ch}
+  h3{
+    font-family:var(--mono);font-size:12px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted);
+    margin:34px 0 10px;font-weight:600;
+  }
+  p{margin:0 0 16px;max-width:64ch}
+  strong{font-weight:700}
+  code{font-family:var(--mono);font-size:.87em;background:#EDF0F3;
+    padding:1px 5px;border-radius:3px;color:#0E1720}
+
+  figure{
+    margin:26px 0 10px;background:var(--panel);
+    border:1px solid var(--rule);border-radius:2px;
+    padding:26px 22px 8px;overflow-x:auto;
+  }
+  figcaption{
+    font-size:14px;color:var(--muted);line-height:1.5;
+    border-top:1px solid var(--rule);margin-top:20px;padding:14px 0 16px;
+    max-width:72ch;
+  }
+  .mermaid{background:var(--panel);text-align:center}
+  svg{max-width:100%;height:auto;display:block;margin:0 auto}
+
+  .ledger{
+    width:100%;border-collapse:collapse;margin:22px 0 6px;font-size:14.5px;
+    font-variant-numeric:tabular-nums;
+  }
+  .ledger th{
+    text-align:left;font-family:var(--mono);font-size:11px;font-weight:600;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+    border-bottom:1.5px solid var(--ink);padding:0 14px 8px 0;
+  }
+  .ledger td{
+    border-bottom:1px solid var(--rule);padding:10px 14px 10px 0;
+    vertical-align:top;background:var(--panel);
+  }
+  .ledger td.num{font-family:var(--mono);font-size:13.5px;white-space:nowrap}
+  .tag{
+    display:inline-block;font-family:var(--mono);font-size:10.5px;
+    letter-spacing:.07em;text-transform:uppercase;font-weight:600;
+    padding:2px 7px;border-radius:2px;white-space:nowrap;
+  }
+  .tag.ok{background:var(--ok-wash);color:var(--ok)}
+  .tag.miss{background:var(--miss-wash);color:var(--miss)}
+  .tag.lock{background:var(--lock-wash);color:var(--lock)}
+
+  .callout{
+    border-left:3px solid var(--miss);background:var(--miss-wash);
+    padding:18px 22px;margin:26px 0;border-radius:0 2px 2px 0;
+  }
+  .callout p:last-child{margin-bottom:0}
+  .callout .lbl{
+    font-family:var(--mono);font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--miss);font-weight:600;
+    display:block;margin-bottom:8px;
+  }
+  .callout.good{border-left-color:var(--ok);background:var(--ok-wash)}
+  .callout.good .lbl{color:var(--ok)}
+
+  footer{
+    margin-top:76px;border-top:2px solid var(--ink);padding-top:22px;
+    font-size:13.5px;color:var(--muted);
+  }
+  footer p{max-width:70ch}
+  .src{font-family:var(--mono);font-size:12.5px}
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">knowledge-base &middot; currency sweep &middot; 2026-08-30</p>
+  <h1>The Lockfile Blind Spot</h1>
+  <p class="thesis">Seven gates went green on a commit that could not have merged. Every gate was
+  honest. None of them read the file that was wrong.</p>
+</header>
+
+<h2>A version pin lives in four places</h2>
+<p class="sub">Bumping a tool is not one edit. It is four edits that must agree, and the
+tools that check them do not all read the same files.</p>
+
+<p>This repo pins its CLI tools in <code>mise.toml</code>. But a pin has three
+companions: <code>mise.lock</code> holds the per-platform download URL and checksum for
+every platform (not just this Mac), <code>sources/&lt;tool&gt;.manifest</code> pins the
+upstream tag the corpus is built from, and <code>currency.toml</code> records what the
+drift engine expects to see.</p>
+
+<figure>
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'background':'#FFFFFF','primaryColor':'#FFFFFF','primaryTextColor':'#16202B','primaryBorderColor':'#C3CCD6','lineColor':'#5A6875','fontFamily':'Karla, system-ui, sans-serif','fontSize':'14px'}}}%%
+flowchart LR
+  BUMP["a pin bump"]
+
+  subgraph MUST["the four artifacts it must move"]
+    direction TB
+    MT["mise.toml<br/><i>the pin</i>"]
+    ML["mise.lock<br/><i>per-platform URL + checksum</i>"]
+    MAN["sources/*.manifest<br/><i>upstream tag + SHA</i>"]
+    CUR["currency.toml<br/><i>expected version</i>"]
+  end
+
+  BUMP --> MT
+  BUMP --> ML
+  BUMP --> MAN
+  BUMP --> CUR
+
+  MT -.->|"read by"| LS["mise ls --current"]
+  MT -.->|"read by"| ENG["currency engine"]
+  MAN -.->|"read by"| ENG
+  CUR -.->|"read by"| ENG
+  ML -.->|"read by"| NOBODY["nothing in the gate set"]
+
+  classDef moved fill:#EDF5F1,stroke:#1F6B4A,color:#16202B;
+  classDef missed fill:#FBEFEE,stroke:#A3342A,color:#16202B;
+  classDef plain fill:#FFFFFF,stroke:#C3CCD6,color:#16202B;
+  class MT,MAN,CUR moved;
+  class ML,NOBODY missed;
+  class BUMP,LS,ENG plain;
+</pre>
+<figcaption>Three of the four artifacts were moved and are read by a verifier. The fourth,
+<code>mise.lock</code>, was not moved &mdash; and no gate reads it, so nothing objected.
+<code>mise ls --current</code> reports the pin from <code>mise.toml</code>, which is why
+&ldquo;the new binaries are installed&rdquo; was true and still missed this.</figcaption>
+</figure>
+
+<div class="callout">
+  <span class="lbl">What made this invisible</span>
+  <p>The verification I ran was <em>correct</em>. <code>mise ls --current</code> confirmed
+  all five new versions were genuinely installed, which rules out the vacuous-green failure
+  it was chosen to rule out. It just answers a different question than
+  &ldquo;is the lockfile consistent?&rdquo; &mdash; and no gate in the bundle asks that one.</p>
+</div>
+
+<h3>The probe that did find it, and its control arm</h3>
+<p><code>mise lock --dry-run --json</code> reported exactly the five bumped tools as pending
+movement. Run against <code>hk</code>, <code>gh</code> and <code>python</code> &mdash; pins
+this change never touched &mdash; it returned <code>[]</code>. A probe that returns both
+answers is evidence; one that has only ever returned the alarming answer is not.</p>
+
+<h2>The first fix was worse than the bug</h2>
+<p class="sub">A bare <code>mise lock</code> regenerates everything it can reach. What it
+reached included a dependency closure this change has no business touching.</p>
+
+<figure>
+<svg viewBox="0 0 720 300" role="img" aria-label="Bare mise lock rewrites 2951 lines and drops macOS x64 conda coverage from 89 packages to 72; scoping it to the five bumped tools rewrites 274 lines and leaves conda untouched.">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A6875"/>
+    </marker>
+  </defs>
+
+  <text x="0" y="16" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#5A6875" letter-spacing="1.4">BARE — mise lock</text>
+  <rect x="0" y="28" width="560" height="30" fill="#FBEFEE" stroke="#A3342A" stroke-width="1"/>
+  <text x="12" y="48" font-family="JetBrains Mono, monospace" font-size="13" fill="#A3342A">2951 lines rewritten</text>
+  <text x="572" y="48" font-family="Karla, sans-serif" font-size="12.5" fill="#5A6875">1342 + / 1609 −</text>
+
+  <text x="14" y="80" font-family="Karla, sans-serif" font-size="13" fill="#16202B">the 5 bumped tools</text>
+  <text x="14" y="100" font-family="Karla, sans-serif" font-size="13" fill="#A3342A">+ the conda closure re-solved</text>
+  <text x="14" y="120" font-family="Karla, sans-serif" font-size="13" fill="#A3342A">+ conda:coreutils failed to resolve for Windows</text>
+
+  <text x="300" y="100" font-family="JetBrains Mono, monospace" font-size="12.5" fill="#A3342A">macos-x64</text>
+  <text x="300" y="120" font-family="JetBrains Mono, monospace" font-size="15" fill="#A3342A">89</text>
+  <line x1="330" y1="115" x2="368" y2="115" stroke="#5A6875" stroke-width="1.2" marker-end="url(#ar)"/>
+  <text x="376" y="120" font-family="JetBrains Mono, monospace" font-size="15" fill="#A3342A">72 packages</text>
+  <text x="300" y="140" font-family="Karla, sans-serif" font-size="12" fill="#5A6875">a platform this host cannot test</text>
+
+  <line x1="0" y1="168" x2="720" y2="168" stroke="#DCE2E8" stroke-width="1"/>
+
+  <text x="0" y="196" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#5A6875" letter-spacing="1.4">SCOPED — mise lock uv rumdl biome fnox npm:ctx7</text>
+  <rect x="0" y="208" width="52" height="30" fill="#EDF5F1" stroke="#1F6B4A" stroke-width="1"/>
+  <text x="12" y="228" font-family="JetBrains Mono, monospace" font-size="13" fill="#1F6B4A">274</text>
+  <text x="64" y="228" font-family="Karla, sans-serif" font-size="12.5" fill="#5A6875">lines rewritten &mdash; 137 + / 137 −, symmetric</text>
+
+  <text x="14" y="260" font-family="Karla, sans-serif" font-size="13" fill="#16202B">the 5 bumped tools</text>
+  <text x="14" y="280" font-family="Karla, sans-serif" font-size="13" fill="#1F6B4A">zero conda lines touched &middot; convergence probe now returns []</text>
+</svg>
+<figcaption>The two runs differ only in whether tool names were passed. Bare, the command
+re-solved the conda dependency closure as a side effect and silently shrank macOS-Intel
+coverage by 17 packages &mdash; a regression on a platform this machine cannot verify, caused
+by a change that touches no conda tool. <code>mise lock</code> accepts tool arguments; the
+scoped run is the whole fix.</figcaption>
+</figure>
+
+<h2>Expired, or merely solvable?</h2>
+<p class="sub">The second finding was an error in my own instruction, not in the code the
+lane wrote. The word I chose was wrong, and the wrong word would have outlived me.</p>
+
+<p>A comment in <code>currency.toml</code> explained why the <code>ctx7</code> tool has no
+upstream version check: the repo it comes from publishes two differently-versioned things,
+so a naive tag lookup returns the wrong one. Upstream has since started publishing
+<code>ctx7@&lt;version&gt;</code> tags, so I told the lane the old reasoning had
+<strong>expired</strong>.</p>
+
+<figure>
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'background':'#FFFFFF','primaryColor':'#FFFFFF','primaryTextColor':'#16202B','primaryBorderColor':'#C3CCD6','lineColor':'#5A6875','fontFamily':'Karla, system-ui, sans-serif','fontSize':'14px'}}}%%
+flowchart TB
+  REPO["upstash/context7<br/><i>one repo, two release trains</i>"]
+  REPO --> T1["v1.0.30<br/><i>the plugin / MCP server</i>"]
+  REPO --> T2["ctx7@0.5.9<br/><i>the CLI we pin</i>"]
+
+  T1 --> NOPFX
+  T2 --> NOPFX
+  T1 --> PFX
+  T2 --> PFX
+
+  NOPFX{{"upstream check<br/>with no tag_prefix"}}
+  PFX{{"upstream check<br/>with tag_prefix = ctx7@"}}
+
+  NOPFX --> WRONG["resolves v1.0.30<br/><b>compares 1.0.30 against 0.5.9</b>"]
+  PFX --> RIGHT["resolves 0.5.9<br/><b>correct</b>"]
+
+  classDef bad fill:#FBEFEE,stroke:#A3342A,color:#16202B;
+  classDef good fill:#EDF5F1,stroke:#1F6B4A,color:#16202B;
+  classDef plain fill:#FFFFFF,stroke:#C3CCD6,color:#16202B;
+  class WRONG,NOPFX bad;
+  class RIGHT,PFX good;
+  class REPO,T1,T2 plain;
+</pre>
+<figcaption>The old reasoning is not expired &mdash; it is exactly as true as it ever was on
+the left-hand path. What changed is that a right-hand path now exists. &ldquo;Expired&rdquo;
+tells a future reader the problem is gone; &ldquo;solvable, via a prefix nobody has declared
+yet&rdquo; tells them what to actually do.</figcaption>
+</figure>
+
+<div class="callout">
+  <span class="lbl">Why the distinction is load-bearing</span>
+  <p>A comment saying a hazard expired is a comment that stops anyone from checking. The
+  mechanism that solves it &mdash; <code>tag_prefix</code> &mdash; is a real field
+  (<code class="src">config.py:199</code>, consumed at
+  <code class="src">upstream.py:572-574</code>) already declared in the block
+  <em>immediately above</em> this one. So the honest comment does not close the question; it
+  hands the next reader a two-line fix and says why this change did not take it.</p>
+</div>
+
+<h2>What is measured, and what is not</h2>
+<p class="sub">Every row below was produced this session. The right-hand column says by
+what &mdash; because a number without its probe is an opinion.</p>
+
+<table class="ledger">
+  <thead>
+    <tr><th>Claim</th><th>Status</th><th>How it was settled</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>All six manifest tags point at the SHAs recorded</td>
+      <td><span class="tag ok">verified</span></td>
+      <td>Re-derived from <code>gh api .../git/ref/tags</code>, dereferencing annotated tag objects. Control arm: a fabricated tag returned a miss.</td>
+    </tr>
+    <tr>
+      <td>Five bumped tools are at upstream latest</td>
+      <td><span class="tag ok">verified</span></td>
+      <td>Two independent routes agreed &mdash; <code>mise outdated --bump</code> and <code>mise latest</code>. Control arm: <code>python</code> returned its own pin unchanged.</td>
+    </tr>
+    <tr>
+      <td>Thirteen other pins already at latest</td>
+      <td><span class="tag ok">verified</span></td>
+      <td><code>mise latest</code> on each; <code>typos</code> and <code>agnix</code> came back <em>behind</em>, which is the control.</td>
+    </tr>
+    <tr>
+      <td><code>uv.lock</code> unchanged under uv 0.12.7</td>
+      <td><span class="tag ok">verified</span></td>
+      <td><code>uv sync --locked</code> re-run; file hash unchanged.</td>
+    </tr>
+    <tr>
+      <td>Gates green against the installed binaries</td>
+      <td><span class="tag ok">verified</span></td>
+      <td>7/7 <code>rc=0</code> read from the run's own JSON artifact, keyed to the commit, per-gate <code>dirty: false</code>.</td>
+    </tr>
+    <tr>
+      <td><code>mise.lock</code> now converged</td>
+      <td><span class="tag lock">partial</span></td>
+      <td>The five bumped tools converge. One stale <code>aqua:openai/codex</code> entry at <code>0.149.1</code> remains &mdash; pre-existing, orphaned when codex moved to the npm backend. Filed, not fixed here.</td>
+    </tr>
+    <tr>
+      <td>A prefixed upstream check for ctx7 would work end to end</td>
+      <td><span class="tag miss">assumed</span></td>
+      <td>The mechanism was read in the code; the check was never run against the live engine. Which is why nothing was wired.</td>
+    </tr>
+    <tr>
+      <td>macOS-Intel conda coverage under a bare re-lock</td>
+      <td><span class="tag miss">not verifiable here</span></td>
+      <td>This host is arm64. The 89&rarr;72 drop was read out of the generated file, not exercised &mdash; which is the argument for not generating it.</td>
+    </tr>
+  </tbody>
+</table>
+
+<footer>
+  <p>Source: <code class="src">docs/artifacts/lockfile-blind-spot.html</code>, tracked in the
+  repo. Findings from a cold review of <code class="src">b2d51b53</code> by a Claude Opus
+  lane &mdash; announced as a substitution, because <code>grok</code> is not installed on this
+  machine and the Gemini lane needs a permission flag that auto-approves everything. A
+  Claude reviewer against a codex-authored diff is a different family, but it is not the
+  first-choice cross-family lens.</p>
+</footer>
+
+</div>
