@@ -25,6 +25,7 @@ class Kind(StrEnum):
     issue = "issue"
     pr = "pr"
     package = "package"
+    codesearch = "codesearch"
 
 
 type UtcTimestamp = Annotated[

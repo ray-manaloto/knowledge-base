@@ -61,7 +61,7 @@
     },
     "Kind": {
       "type": "string",
-      "enum": ["issue", "pr", "package"]
+      "enum": ["issue", "pr", "package", "codesearch"]
     },
     "UtcTimestamp": {
       "type": "string",
