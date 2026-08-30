@@ -1,0 +1,396 @@
+<title>What To Pin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap">
+<style>
+  :root {
+    --paper:     #FCFBF9;
+    --card:      #FFFFFF;
+    --rule:      #E4E1DA;
+    --ink:       #191B1F;
+    --ink-soft:  #5A616C;
+    --pick:      #1B5E4A;
+    --alt:       #6B5A17;
+    --stop:      #9E3F22;
+    --cost:      #2B4E77;
+    --pick-wash: #E7F1EC;
+    --alt-wash:  #F8F3E2;
+    --stop-wash: #F9EDE8;
+    --cost-wash: #EAF0F7;
+
+    --display: "Inter Tight", "Helvetica Neue", Arial, sans-serif;
+    --body:    "Newsreader", Georgia, serif;
+    --mono:    "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: var(--body); font-size: 17.5px; line-height: 1.6;
+    margin: 0; padding: 0 20px 96px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+  .col  { max-width: 68ch; }
+
+  header.mast { padding: 54px 0 24px; margin-bottom: 40px; border-bottom: 3px solid var(--ink); }
+  .kicker {
+    font-family: var(--display); font-size: 12px; font-weight: 600;
+    letter-spacing: .15em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 12px;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 700;
+    font-size: clamp(38px, 6vw, 60px); line-height: 1.02;
+    letter-spacing: -.025em; margin: 0 0 16px; text-wrap: balance;
+  }
+  .standfirst { font-size: 20px; line-height: 1.48; color: var(--ink-soft); max-width: 60ch; margin: 0; }
+
+  section { margin: 0 0 62px; }
+  h2 {
+    font-family: var(--display); font-weight: 700; font-size: 27px;
+    letter-spacing: -.018em; margin: 0 0 8px; text-wrap: balance;
+  }
+  .eyebrow {
+    font-family: var(--display); font-size: 11px; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft);
+    margin: 0 0 8px; display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+  p { margin: 0 0 15px; }
+  strong { font-weight: 600; }
+  code, .m {
+    font-family: var(--mono); font-size: .86em; background: #F2F1EC;
+    border: 1px solid var(--rule); border-radius: 3px; padding: 1px 5px;
+  }
+
+  /* the verdict banner */
+  .verdict {
+    background: var(--card); border: 1px solid var(--rule);
+    border-top: 5px solid var(--pick); border-radius: 5px;
+    padding: 26px 28px; margin: 26px 0;
+  }
+  .verdict .lab {
+    font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--pick);
+    display: block; margin-bottom: 10px;
+  }
+  .verdict pre { margin: 12px 0 16px; }
+  .verdict p:last-child { margin-bottom: 0; }
+
+  pre {
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.55;
+    background: #F7F6F2; color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 4px;
+    padding: 14px 16px; overflow-x: auto; margin: 0 0 14px;
+  }
+  pre .c { color: #6E7681; }
+
+  /* pro/con columns */
+  .pc { display: grid; gap: 16px; margin: 20px 0; }
+  @media (min-width: 780px) { .pc { grid-template-columns: 1fr 1fr; } }
+  .pc > div {
+    background: var(--card); border: 1px solid var(--rule);
+    border-radius: 4px; padding: 17px 19px;
+  }
+  .pc .pro { border-left: 4px solid var(--pick); }
+  .pc .con { border-left: 4px solid var(--stop); }
+  .pc h4 {
+    font-family: var(--display); font-size: 12px; font-weight: 700;
+    letter-spacing: .12em; text-transform: uppercase; margin: 0 0 10px;
+  }
+  .pc .pro h4 { color: var(--pick); }
+  .pc .con h4 { color: var(--stop); }
+  .pc ul { margin: 0; padding-left: 19px; font-size: 15.5px; line-height: 1.5; }
+  .pc li { margin-bottom: 8px; }
+  .pc li:last-child { margin-bottom: 0; }
+
+  .scroll { overflow-x: auto; margin: 22px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; background: var(--card); }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft);
+    border-bottom: 2px solid var(--ink); white-space: nowrap;
+  }
+  td.num { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  tr.win td { background: var(--pick-wash); }
+  tr.dead td { color: var(--ink-soft); }
+
+  .note {
+    border-left: 4px solid var(--cost); background: var(--cost-wash);
+    padding: 18px 20px; border-radius: 0 4px 4px 0; margin: 22px 0;
+  }
+  .note .lab {
+    font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--cost);
+    display: block; margin-bottom: 7px;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note.warn { border-left-color: var(--stop); background: var(--stop-wash); }
+  .note.warn .lab { color: var(--stop); }
+  .note.corr { border-left-color: var(--alt); background: var(--alt-wash); }
+  .note.corr .lab { color: var(--alt); }
+
+  figure {
+    margin: 26px 0; background: var(--card); border: 1px solid var(--rule);
+    border-radius: 4px; padding: 22px 20px 15px;
+  }
+  figure > svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-size: 14.5px; line-height: 1.5; color: var(--ink-soft);
+    margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--rule);
+  }
+
+  .prov {
+    border-top: 2px solid var(--ink); margin-top: 70px; padding-top: 18px;
+    font-size: 14px; color: var(--ink-soft);
+  }
+  .prov h2 { font-size: 18px; margin-bottom: 11px; color: var(--ink); }
+  .prov ul { margin: 0; padding-left: 20px; }
+  .prov li { margin-bottom: 7px; }
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="kicker">knowledge-base · dependency-upgrade protocol · 30 August 2026</p>
+  <h1>What To Pin</h1>
+  <p class="standfirst">Two codex lanes researched the state machine library and the DBOS pin set. Both came back with a clear answer. Then a resolve I ran myself found a cost neither of them reported.</p>
+</header>
+
+<section class="col">
+  <div class="verdict">
+    <span class="lab">The proposal — two lines</span>
+<pre><span class="c"># in [project].dependencies, as FLOORS, per pyproject.toml:20-24</span>
+  <span class="c"># Durable workflows + the bundled dbos CLI. SQLite system DB is in the base package.</span>
+  "dbos&gt;=2.31.0",
+  <span class="c"># States.from_enum() consumes our generated StrEnum; async callbacks native.</span>
+  "python-statemachine&gt;=3.2.1",</pre>
+    <p><strong>Nothing goes in <code>mise.toml</code>.</strong> Both are Python libraries, and the <code>dbos</code> CLI ships inside the same wheel — a mise entry would create a second installation and a second version surface for one tool.</p>
+    <p>Both resolve cleanly on Python 3.14. I verified that myself rather than taking it from a report; the lane could not, because its sandbox had no DNS.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">The finding neither lane reported</p>
+    <h2>You get PostgreSQL whether you want it or not</h2>
+    <p>The design wants SQLite. The DBOS lane established — correctly, and from the released 2.31.0 tag rather than <code>main</code> — that SQLite is fully supported and needs no extra. All true.</p>
+    <p>But a dependency tree is not a configuration. I resolved the two lines against Python 3.14 and read what actually arrives.</p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 880 250" role="img" aria-label="Resolving dbos and python-statemachine on Python 3.14 produces 12 packages. Five are already in the project lock. Seven are new: dbos, python-statemachine, sqlalchemy, greenlet, websockets, psycopg and psycopg-binary. The last two are PostgreSQL drivers that arrive unconditionally even though the design uses SQLite.">
+      <text x="20" y="22" font-family="Inter Tight, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5" fill="#5A616C">12 PACKAGES RESOLVE · 5 ALREADY HELD · 7 NEW</text>
+
+      <rect x="20" y="36" width="316" height="36" fill="#F1F0EB" stroke="#8D8D94"/>
+      <text x="34" y="59" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#5A616C">5 already in uv.lock</text>
+
+      <rect x="336" y="36" width="188" height="36" fill="#E7F1EC" stroke="#1B5E4A" stroke-width="1.6"/>
+      <text x="350" y="59" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#191B1F">3 we asked for</text>
+
+      <rect x="524" y="36" width="132" height="36" fill="#EAF0F7" stroke="#2B4E77" stroke-width="1.6"/>
+      <text x="538" y="59" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#191B1F">2 support</text>
+
+      <rect x="656" y="36" width="204" height="36" fill="#F9EDE8" stroke="#9E3F22" stroke-width="2"/>
+      <text x="670" y="59" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#191B1F">2 postgres drivers</text>
+
+      <text x="350" y="94" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#1B5E4A">dbos · python-statemachine</text>
+      <text x="350" y="111" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#1B5E4A">sqlalchemy</text>
+
+      <text x="538" y="94" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#2B4E77">greenlet</text>
+      <text x="538" y="111" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#2B4E77">websockets</text>
+
+      <text x="670" y="94" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#9E3F22">psycopg</text>
+      <text x="670" y="111" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#9E3F22">psycopg-binary</text>
+
+      <line x1="656" y1="120" x2="656" y2="146" stroke="#9E3F22" stroke-width="1.6"/>
+      <line x1="656" y1="146" x2="860" y2="146" stroke="#9E3F22" stroke-width="1.6"/>
+      <text x="670" y="166" font-family="Newsreader, serif" font-size="14" font-weight="600" fill="#9E3F22">not optional</text>
+      <text x="670" y="185" font-family="Newsreader, serif" font-size="13.5" fill="#191B1F">not behind an extra</text>
+      <text x="670" y="203" font-family="Newsreader, serif" font-size="13.5" fill="#191B1F">not switched off by</text>
+      <text x="670" y="221" font-family="Newsreader, serif" font-size="13.5" fill="#191B1F">choosing SQLite</text>
+
+      <text x="20" y="94" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#5A616C">click · python-dateutil · pyyaml · six · typing-extensions</text>
+      <text x="20" y="130" font-family="Newsreader, serif" font-size="14" font-weight="600" fill="#191B1F">The five we already hold are free.</text>
+      <text x="20" y="152" font-family="Newsreader, serif" font-size="13.5" fill="#5A616C">The seven new ones are the real cost of</text>
+      <text x="20" y="170" font-family="Newsreader, serif" font-size="13.5" fill="#5A616C">this decision, and two of them are a</text>
+      <text x="20" y="188" font-family="Newsreader, serif" font-size="13.5" fill="#5A616C">database driver the design never uses.</text>
+      <text x="20" y="216" font-family="Newsreader, serif" font-size="13.5" font-weight="600" fill="#2B4E77">psycopg-binary is a large compiled wheel.</text>
+    </svg>
+    <figcaption><strong>Measured, not read.</strong> <code>uv pip compile</code> against <code>--python-version 3.14</code>, then the result diffed against this project&rsquo;s <code>uv.lock</code>. Control arms: <code>dbos&gt;=999.0.0</code> is reported unsatisfiable (so the resolver discriminates, and incidentally confirms <code>2.32.0a4</code> is the highest available), and the lock probe finds <code>msgspec</code> present while a bogus name is absent.</figcaption>
+  </figure>
+
+  <div class="col">
+    <div class="note warn">
+      <span class="lab">What this does and does not mean</span>
+      <p>It is <strong>not a blocker</strong>. <code>psycopg</code> installs fine and is simply never imported when the system database URL is a <code>sqlite:///</code> one. Nothing breaks.</p>
+      <p>It <strong>is</strong> a cost worth naming before we pay it: two packages, one of them a large compiled wheel, in every environment and every lockfile, forever, for a database this design does not use. If that is unacceptable, the honest alternative is the no-library option below plus a hand-rolled durable-step wrapper — which is more code and less recovery, and I would not recommend it for this.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Proposal 1 · the state machine</p>
+    <h2><code>python-statemachine&gt;=3.2.1</code></h2>
+    <p>Six candidates were scored against your requirement in order: <strong>does it accept an enum it did not define</strong>, then Python 3.14 metadata, then native async, then persistence. Only one row satisfies every hard axis.</p>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>library</th><th>ver</th><th>py3.14</th><th>async</th><th>takes OUR enum?</th><th>verdict</th></tr>
+      </thead>
+      <tbody>
+        <tr class="win">
+          <td><strong>python-statemachine</strong></td>
+          <td class="num">3.2.1</td>
+          <td><strong>Yes</strong> — classifier <code>3.14</code></td>
+          <td>Native</td>
+          <td><strong>Yes</strong> — <code>States.from_enum()</code></td>
+          <td><strong>Recommend</strong></td>
+        </tr>
+        <tr>
+          <td>transitions</td>
+          <td class="num">0.9.3</td>
+          <td><strong>Not claimed</strong> — <code>Requires-Python</code> is null, classifiers stop at 3.13</td>
+          <td>Native (<code>AsyncMachine</code>)</td>
+          <td>Yes</td>
+          <td>Best alternate; blocked on the 3.14 claim</td>
+        </tr>
+        <tr>
+          <td><em>no library</em> — generated enum + transition table</td>
+          <td class="num">stdlib</td>
+          <td>Yes</td>
+          <td>Native (<code>async def</code>)</td>
+          <td>Exact fit by construction</td>
+          <td>Strong fallback; contradicts your stated requirement</td>
+        </tr>
+        <tr>
+          <td>sismic</td>
+          <td class="num">1.6.11</td>
+          <td>Yes</td>
+          <td>No native async guards</td>
+          <td><strong>Poor</strong> — statechart names are strings its schema owns</td>
+          <td>Solves a different problem</td>
+        </tr>
+        <tr class="dead">
+          <td>Automat</td>
+          <td class="num">25.4.16</td>
+          <td>Not claimed</td>
+          <td>No</td>
+          <td><strong>No</strong> — states are opaque library tokens</td>
+          <td>Wrong ownership model</td>
+        </tr>
+        <tr class="dead">
+          <td>statesman</td>
+          <td class="num">1.0.5</td>
+          <td><strong>No</strong> — <code>Requires-Python &lt;3.13</code></td>
+          <td>Native</td>
+          <td>No — demands its own base class</td>
+          <td>Dead here on interpreter metadata alone</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pc col">
+    <div class="pro">
+      <h4>Why this one</h4>
+      <ul>
+        <li><code>States.from_enum(GeneratedState, use_enum_instance=False)</code> takes our <strong>generated</strong> <code>StrEnum</code> and leaves it external — exactly your requirement, and the axis that eliminates three candidates.</li>
+        <li><code>use_enum_instance=False</code> stores the raw string in the row, which is the safer SQLite boundary than a pickled enum instance.</li>
+        <li>Async callbacks and guards are native, so a step can await without a shim.</li>
+        <li>Ships an official SQLite-backed model example, so the persistence hook is documented rather than inferred.</li>
+        <li>Released and last-committed 2026-08-01; 9 open issues.</li>
+      </ul>
+    </div>
+    <div class="con">
+      <h4>What it costs, and the risk</h4>
+      <ul>
+        <li>A new direct dependency where the repo&rsquo;s standing rule prefers a few lines of our own.</li>
+        <li>Two configuration choices must be made deliberately or the defaults bite: use <code>StateMachine</code>, not the <code>StateChart</code> error policy, and keep <code>catch_errors_as_events=False</code> so a callback failure propagates to the DBOS step instead of being swallowed as an event.</li>
+        <li><strong>The one risk that would change this:</strong> no upstream source documents the full combination — our generated <code>StrEnum</code> + Python 3.14.7 + a SQLite row + DBOS retry/replay. That is an integration probe nobody has run, and it should be the first task of whatever ticket adopts this.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Proposal 2 · the workflow engine</p>
+    <h2><code>dbos&gt;=2.31.0</code>, and nothing in <code>mise.toml</code></h2>
+  </div>
+
+  <div class="col">
+    <div class="note corr">
+      <span class="lab">Correction — I told you the opposite earlier</span>
+      <p>I said DBOS <em>defaults to PostgreSQL</em> and that SQLite would be the hard part. <strong>That is false for the released 2.31.0.</strong> SQLite is the <em>default</em> system store — the config reference defaults the URL to <code>sqlite:///[application_name].sqlite</code> when none is given. PostgreSQL is the production <em>recommendation</em>, not the default.</p>
+      <p>The proof is in the released tag, not on <code>main</code>: <code>dbos/_sys_db_sqlite.py</code> exists at <code>2.31.0</code> and defines <code>SQLiteSystemDatabase</code>. That distinction mattered — an earlier lane found #638 had cited a &ldquo;merged SQLite PR&rdquo; that does not exist, so <code>main</code>-only evidence was not going to be good enough.</p>
+    </div>
+  </div>
+
+  <div class="pc col">
+    <div class="pro">
+      <h4>Why the line is what it is</h4>
+      <ul>
+        <li><strong>No extra needed.</strong> The synchronous SQLite system database is in the base package; Python&rsquo;s own <code>sqlite3</code> driver serves the <code>sqlite:///</code> URL. Control arm: the same probe does find the real <code>otel</code> and <code>validation</code> extras, so it can see extras that exist.</li>
+        <li><strong><code>aiosqlite</code> is a different thing</strong> — it is for an <em>async application datasource</em> (<code>sqlite+aiosqlite:///</code>), not the system store. Add it only if we adopt that, and then replace the line rather than adding a second.</li>
+        <li><strong>Nothing in <code>mise.toml</code>:</strong> the <code>dbos</code> CLI (<code>dbos migrate</code>, <code>dbos workflow</code>, <code>dbos start</code>) is a console entry point in the same wheel.</li>
+        <li>A floor, not an exact pin — house style, and no DBOS-specific reason to make it an exception.</li>
+      </ul>
+    </div>
+    <div class="con">
+      <h4>What it costs</h4>
+      <ul>
+        <li><strong>Seven new packages</strong>, including the two PostgreSQL drivers above.</li>
+        <li><strong>SQLAlchemy arrives</strong> as a hard dependency. That is fine but it is a large surface, and it means the schema&rsquo;s DDL will in practice be written through SQLAlchemy rather than raw SQL.</li>
+        <li><code>use_listen_notify</code> must be false with SQLite — a documented constraint that will bite whoever configures it if it is not in the ticket.</li>
+        <li><strong>End-to-end install on 3.14 is proven only as far as resolution.</strong> I resolved it; I did not install it. A clean-environment install is the honest next arm and belongs in the adopting ticket.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="col">
+  <p class="eyebrow">The conflict both lanes surfaced independently</p>
+  <h2>Every floor-pinned dependency is invisible to our own currency engine</h2>
+  <p>This started as my error — I wrote a spec premise saying this project pins exactly. A lane refused the spec and cited <code>pyproject.toml:20-24</code>, which says the opposite. It was right. But correcting it exposed something larger.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Fact</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>The house style is a <strong>floor</strong> — <em>&ldquo;an exact pin here is exported as someone else&rsquo;s constraint. Reproducibility for us is uv.lock.&rdquo;</em></td><td><code>pyproject.toml:20-24</code></td></tr>
+        <tr><td>The currency engine reads <code>[project].dependencies</code> and matches <strong>only an exact <code>==</code></strong></td><td><code>currency/sync.py:168</code>, called at <code>:151</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>A lane called <code>_python_project_pin()</code> live on every direct dependency. The result is a clean control-armed demonstration, not an argument:</p>
+
+<pre>anthropic:   ('', ())        <span class="c">&lt;- floor, invisible</span>
+httpx2:      ('', ())        <span class="c">&lt;- floor, invisible</span>
+structlog:   ('', ())        <span class="c">&lt;- floor, invisible</span>
+graphifyy:   ('0.9.50', ('all',))                  <span class="c">&lt;- exact, seen</span>
+skillopt:    ('93bdf3d770b99128daf35278218e5a666fe392f3', ())  <span class="c">&lt;- VCS, seen</span>
+dbos:        ('', ())        <span class="c">&lt;- what our new floor would be</span></pre>
+
+  <div class="note">
+    <span class="lab">Why this is the most useful thing on the page</span>
+    <p>An earlier lane measured that <strong>15 of 33 direct dependencies have no currency mapping</strong> and reported it as a coverage gap. This is the <em>mechanism</em>. Three of those fifteen — <code>anthropic</code>, <code>httpx2</code>, <code>structlog</code> — are unmapped for exactly one reason: they are floors, and the parser only recognises <code>==</code>.</p>
+    <p><strong>My recommendation, and the lane reached it independently: change the engine, not the policy.</strong> Treat the presence of a floor in <code>[project].dependencies</code> as proof the project owns the dependency, then read the concrete resolved version from <code>uv.lock</code>. That keeps the consumer-safe exported floor and gets the real version from the file that already carries reproducibility.</p>
+    <p>The alternative — pin <code>==</code> just to satisfy the parser — exports a hard constraint onto every downstream consumer to work around our own tooling. That is the tail wagging the dog, and it is what I would have unknowingly recommended if the lane had not refused my spec.</p>
+  </div>
+</section>
+
+<div class="prov col">
+  <h2>Provenance</h2>
+  <ul>
+    <li><strong>Measured by me, this session</strong>, with control arms stated: PyPI current versions — <code>dbos</code> 2.31.0 (<code>&gt;=3.10</code>), <code>python-statemachine</code> 3.2.1 (<code>&gt;=3.10</code>), <code>transitions</code> 0.9.3 (<code>Requires-Python</code> null); bogus package → <code>HTTPError</code>. Resolution on <code>--python-version 3.14</code> → 12 packages, both requested at their current versions; <code>dbos&gt;=999.0.0</code> → unsatisfiable. Diff against <code>uv.lock</code> → 5 held, 7 new; <code>msgspec</code> present and a bogus name absent as the lock-probe control.</li>
+    <li><strong>Lane-reported, not re-run by me</strong>: the six-candidate comparison and its per-library metadata; the <code>_python_project_pin</code> live-call output; the DBOS SQLite release proof at the <code>2.31.0</code> tag; the <code>otel</code>/<code>validation</code> extras control. Each carries its own control arm in its report.</li>
+    <li><strong>Not established by anyone</strong>: an end-to-end <em>install</em> of either package on 3.14.7 (resolution only), and any DBOS-specific integration with a state machine library. Both belong in the adopting ticket as its first task, not in this page as an assumption.</li>
+    <li><strong>Corrected on this page</strong>: I previously told the reader DBOS defaults to PostgreSQL. It does not. The correction is marked in place above rather than silently applied.</li>
+    <li><strong>Nothing here has been applied.</strong> No file was edited; these are lines to paste, not lines that exist.</li>
+  </ul>
+</div>
+
+</div>

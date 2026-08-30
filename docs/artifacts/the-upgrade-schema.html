@@ -1,0 +1,414 @@
+<title>The Upgrade Schema</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root {
+    --paper:      #FAFAF8;
+    --card:       #FFFFFF;
+    --rule:       #E2E0DA;
+    --ink:        #17191C;
+    --ink-soft:   #585F६B;
+    --ink-soft:   #585F6B;
+    --core:       #1D4E6F;
+    --absorb:     #7A4E12;
+    --runtime:    #2F6046;
+    --core-wash:    #E9F0F5;
+    --absorb-wash:  #F8F1E4;
+    --runtime-wash: #E8F1EC;
+    --danger:     #A0451F;
+
+    --display: "IBM Plex Sans Condensed", "Helvetica Neue", Arial, sans-serif;
+    --body:    "Source Serif 4", Georgia, serif;
+    --mono:    "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 20px 96px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .col  { max-width: 68ch; }
+
+  header.mast { border-bottom: 3px solid var(--ink); padding: 52px 0 20px; margin-bottom: 38px; }
+  .kicker {
+    font-family: var(--display); font-size: 12px; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 12px;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 700;
+    font-size: clamp(36px, 5.6vw, 58px); line-height: 1.03;
+    letter-spacing: -.015em; margin: 0 0 16px; text-wrap: balance;
+  }
+  .standfirst { font-size: 19.5px; line-height: 1.5; color: var(--ink-soft); max-width: 62ch; margin: 0; }
+
+  section { margin: 0 0 60px; }
+  h2 {
+    font-family: var(--display); font-weight: 700; font-size: 26px;
+    letter-spacing: -.008em; margin: 0 0 8px; text-wrap: balance;
+  }
+  .eyebrow {
+    font-family: var(--display); font-size: 11px; font-weight: 600;
+    letter-spacing: .17em; text-transform: uppercase; color: var(--ink-soft);
+    margin: 0 0 8px; display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+  p { margin: 0 0 15px; }
+  strong { font-weight: 600; }
+  code, .m {
+    font-family: var(--mono); font-size: .87em; background: #F1F0EB;
+    border: 1px solid var(--rule); border-radius: 3px; padding: 1px 5px;
+  }
+
+  /* table cards */
+  .tcard {
+    background: var(--card); border: 1px solid var(--rule);
+    border-left: 5px solid var(--core); border-radius: 4px;
+    padding: 20px 22px; margin: 0 0 18px;
+  }
+  .tcard.absorb  { border-left-color: var(--absorb); }
+  .tcard.runtime { border-left-color: var(--runtime); }
+  .tcard h3 {
+    font-family: var(--mono); font-weight: 600; font-size: 19px;
+    margin: 0 0 4px; color: var(--ink);
+  }
+  .tcard .role {
+    font-family: var(--display); font-size: 12px; font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--core); margin: 0 0 12px;
+  }
+  .tcard.absorb  .role { color: var(--absorb); }
+  .tcard.runtime .role { color: var(--runtime); }
+  .tcard p { font-size: 15.5px; line-height: 1.55; }
+  .tcard p:last-child { margin-bottom: 0; }
+
+  pre {
+    font-family: var(--mono); font-size: 13px; line-height: 1.55;
+    background: #F7F6F2; color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 4px;
+    padding: 14px 16px; overflow-x: auto; margin: 0 0 14px;
+  }
+  pre .c { color: #6E7681; }
+  pre .k { color: var(--core); font-weight: 600; }
+  pre .t { color: var(--absorb); font-weight: 600; }
+
+  figure {
+    margin: 28px 0; background: var(--card); border: 1px solid var(--rule);
+    border-radius: 4px; padding: 22px 20px 16px;
+  }
+  figure > svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-size: 14.5px; line-height: 1.5; color: var(--ink-soft);
+    margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--rule);
+  }
+  .mermaid { background: var(--card); color: var(--ink); overflow-x: auto; text-align: center; }
+
+  /* Verbatim from .claude/skills/eli5-visual/SKILL.md §2 — the renderer replaces
+     .mermaid with an SVG it names itself, so .mermaid-scoped rules all miss. */
+  svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+  svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+  svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+  svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+  svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+  svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+  svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+  svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+  svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+  svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+  svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+  svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+  svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+  svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+  svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
+
+  .scroll { overflow-x: auto; margin: 20px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; background: var(--card); }
+  th, td { text-align: left; padding: 10px 13px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-family: var(--display); font-size: 11.5px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft);
+    border-bottom: 2px solid var(--ink); white-space: nowrap;
+  }
+  td.num { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 13.5px; }
+  tr:last-child td { border-bottom: none; }
+
+  .note {
+    border-left: 4px solid var(--absorb); background: var(--absorb-wash);
+    padding: 17px 20px; border-radius: 0 4px 4px 0; margin: 22px 0;
+  }
+  .note .lab {
+    font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--absorb);
+    display: block; margin-bottom: 7px;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note.risk { border-left-color: var(--danger); background: #F8EDE7; }
+  .note.risk .lab { color: var(--danger); }
+  .note.ok { border-left-color: var(--core); background: var(--core-wash); }
+  .note.ok .lab { color: var(--core); }
+
+  .prov {
+    border-top: 2px solid var(--ink); margin-top: 68px; padding-top: 18px;
+    font-size: 14px; color: var(--ink-soft);
+  }
+  .prov h2 { font-size: 18px; margin-bottom: 11px; color: var(--ink); }
+  .prov ul { margin: 0; padding-left: 20px; }
+  .prov li { margin-bottom: 7px; }
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="kicker">knowledge-base · dependency-upgrade protocol · 30 August 2026</p>
+  <h1>The Upgrade Schema</h1>
+  <p class="standfirst">Eight tables. Two hold truth read out of files, three hold judgment rescued from a file being deleted, three hold what happened during a run. Every column here exists because something in the repo would otherwise lose information.</p>
+</header>
+
+<section class="col">
+  <p class="eyebrow">Why eight and not two</p>
+  <h2>The two-table sketch was not survivable</h2>
+  <p>The original design was <code>dep</code> plus <code>dep_stage</code>. It grew for three reasons, each forced by something real rather than by taste.</p>
+  <p><strong>You ruled the file gets deleted</strong> — <em>&ldquo;then add the necessary tables to support what would be lost&rdquo;.</em> <code>currency.toml</code> is not a list of versions; it declares checks, watches, review history and fork state. Those cannot be columns on <code>dep</code>, because they are one-to-many.</p>
+  <p><strong>A manifest can outnumber its dependency.</strong> <code>codex</code> owns two today. So manifests are rows, and the foreign key points from the manifest to the dependency, never the other way.</p>
+  <p><strong>The authorization gates were being dropped silently.</strong> The existing engine has six pre-apply gates that decide whether a bump may proceed. The two-table sketch had nowhere to record their verdicts, which would have quietly removed the safety bar rather than porting it.</p>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">The shape</p>
+    <h2>How the eight relate</h2>
+  </div>
+  <figure>
+    <pre class="mermaid">%%{init: {'theme':'base','themeVariables':{'darkMode':false,'background':'#FFFFFF','primaryColor':'#f2f2f4','primaryTextColor':'#1b1b1b','primaryBorderColor':'#8d8d94','lineColor':'#4a4a4a','fontFamily':'IBM Plex Sans Condensed, sans-serif','fontSize':'14px','clusterBkg':'#fafafa','clusterBorder':'#b8b8be'}}}%%
+erDiagram
+  dep ||--o{ manifest : "owner_dep"
+  dep ||--o{ probe : "declared checks"
+  dep ||--o{ watch : "tracked issues"
+  dep ||--o| fork : "optional, all-or-nothing"
+  watch ||--o{ watch_review : "re-probe log"
+  dep ||--o{ upgrade_run : "one per attempt"
+  upgrade_run ||--o{ stage_event : "append-only"
+  upgrade_run ||--o{ gate_result : "six per run"
+  manifest ||--o{ stage_event : "scopes source stages"</pre>
+    <figcaption><strong>Read the crow&rsquo;s feet as the argument.</strong> Every one-to-many here is a relation that a column on <code>dep</code> could not hold — which is precisely why the table exists. The two dotted-optional edges (<code>fork</code>, and <code>manifest</code> on <code>stage_event</code>) are where the schema admits that not every dependency has one.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Group 1 · truth, read out of files</p>
+    <h2>What a dependency is</h2>
+    <p>Neither of these tables owns a version. Both are populated <em>from</em> <code>mise.toml</code>, <code>pyproject.toml</code> and the 97 manifests, and the upgrade task writes new pins back into those files.</p>
+  </div>
+
+  <div class="tcard">
+    <h3>dep</h3>
+    <p class="role">one row per dependency · 33 direct today</p>
+<pre><span class="k">CREATE TABLE</span> dep (
+  name             <span class="t">TEXT PRIMARY KEY</span>,
+  kind             <span class="t">TEXT NOT NULL</span>,   <span class="c">-- generated enum: mise | python | manifest_only</span>
+  mise_key         <span class="t">TEXT</span>,            <span class="c">-- the [tools] key, when kind='mise'</span>
+  python_package   <span class="t">TEXT</span>,            <span class="c">-- the distribution name, when kind='python'</span>
+  binary           <span class="t">TEXT</span>,            <span class="c">-- what lands on PATH; often != name</span>
+  pypi             <span class="t">TEXT</span>,            <span class="c">-- installable truth for latest</span>
+  github           <span class="t">TEXT</span>,            <span class="c">-- owner/repo; narrative only</span>
+  tag_prefix       <span class="t">TEXT</span>,            <span class="c">-- 'v' | 'rust-v' | '' — codex needs this</span>
+  pin              <span class="t">TEXT</span>,            <span class="c">-- OBSERVED from the file, never authoritative</span>
+  latest           <span class="t">TEXT</span>,            <span class="c">-- last resolved upstream version</span>
+  latest_checked   <span class="t">TEXT</span>,            <span class="c">-- ISO-8601; a stale latest must be visible</span>
+  expected         <span class="t">TEXT</span>,            <span class="c">-- hand-synced fallback where no pin is machine-readable</span>
+  source_only      <span class="t">INTEGER NOT NULL DEFAULT 0</span>,
+  os_gate          <span class="t">TEXT</span>,            <span class="c">-- e.g. 'macos' — absence is SKIP, never DRIFT</span>
+  version_args     <span class="t">TEXT</span>,            <span class="c">-- argv to ask the binary its version</span>
+  version_pattern  <span class="t">TEXT</span>,            <span class="c">-- regex pulling the version out of that output</span>
+  note             <span class="t">TEXT</span>             <span class="c">-- prose judgment; see the note-splitting rule below</span>
+);</pre>
+    <p><strong>The load-bearing column is <code>pin</code>, and it is the one that must never be trusted.</strong> It records what the file said when the database was last populated. If it disagrees with the file, the file wins and the row is stale — that direction is the whole design.</p>
+    <p><code>latest_checked</code> is not decoration: without it, a <code>latest</code> resolved three weeks ago is indistinguishable from one resolved this morning, and the engine reports &ldquo;current&rdquo; on evidence it never re-took.</p>
+  </div>
+
+  <div class="tcard">
+    <h3>manifest</h3>
+    <p class="role">one row per <code>sources/*.manifest</code> · 97 today</p>
+<pre><span class="k">CREATE TABLE</span> manifest (
+  name        <span class="t">TEXT PRIMARY KEY</span>,   <span class="c">-- the file stem</span>
+  owner_dep   <span class="t">TEXT REFERENCES</span> dep(name),  <span class="c">-- NULLABLE. see below</span>
+  url         <span class="t">TEXT NOT NULL</span>,
+  ref         <span class="t">TEXT NOT NULL</span>,      <span class="c">-- 'rust-v0.151.0' or 'main' — different clocks</span>
+  commit_sha  <span class="t">TEXT NOT NULL</span>,
+  kind        <span class="t">TEXT NOT NULL</span>,      <span class="c">-- generated enum: code | docs</span>
+  scope       <span class="t">TEXT</span>,
+  build       <span class="t">TEXT NOT NULL</span>,      <span class="c">-- generated enum: include | skip | defer</span>
+  reason      <span class="t">TEXT</span>,               <span class="c">-- mandatory when build != 'include'</span>
+  note        <span class="t">TEXT</span>
+);</pre>
+    <p><strong><code>owner_dep</code> is nullable on purpose, and that nullability is a finding rather than a convenience.</strong> Of the 97 manifests, 35 map to a pinned dependency, 50 are dependency-shaped but unpinned, and 12 are not dependencies at all. A <code>NOT NULL</code> here would force 62 rows to invent an owner.</p>
+    <p><strong>Why the key is on this table and not on <code>dep</code>.</strong> <code>codex</code> owns <code>codex.manifest</code> (<code>ref = rust-v0.151.0</code>, <code>openai/codex</code>) and <code>codex-docs.manifest</code> (<code>ref = main</code>, a different repository). A single <code>syncs_manifest</code> column on the dependency row could hold exactly one of those. Both were read fresh; this is a live one-to-many, not a projected one.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Group 2 · judgment, rescued from the file being deleted</p>
+    <h2>What <code>currency.toml</code> was actually holding</h2>
+    <p>The file has 22 readers and is roughly 85% prose judgment. Deleting it without these three tables would drop behaviour, not just configuration.</p>
+  </div>
+
+  <div class="tcard absorb">
+    <h3>probe</h3>
+    <p class="role">one row per declared check</p>
+<pre><span class="k">CREATE TABLE</span> probe (
+  id          <span class="t">INTEGER PRIMARY KEY</span>,
+  dep         <span class="t">TEXT NOT NULL REFERENCES</span> dep(name),
+  kind        <span class="t">TEXT NOT NULL</span>,   <span class="c">-- GENERATED enum, see the hedge below</span>
+  path        <span class="t">TEXT</span>,
+  pattern     <span class="t">TEXT</span>,
+  field       <span class="t">TEXT</span>,
+  tracks      <span class="t">TEXT</span>,
+  expect      <span class="t">TEXT</span>,
+  params_json <span class="t">TEXT</span>,           <span class="c">-- the escape hatch, present from day one</span>
+  note        <span class="t">TEXT</span>            <span class="c">-- WHY this check exists; often the only record</span>
+);</pre>
+    <p>One table rather than seven, because every one of these is the same shape: a declared check, some parameters, and a judgment note. The current <code>extra_probes</code>, <code>backend_probes</code>, <code>ref_binding</code>, <code>docs_watch</code>, artifact, input-glob and skill-stamp constructs all collapse into it. Per-kind validation lives in code, not in the table.</p>
+  </div>
+
+  <div class="tcard absorb">
+    <h3>watch</h3>
+    <p class="role">one row per tracked upstream issue</p>
+<pre><span class="k">CREATE TABLE</span> watch (
+  id     <span class="t">INTEGER PRIMARY KEY</span>,
+  dep    <span class="t">TEXT NOT NULL REFERENCES</span> dep(name),
+  kind   <span class="t">TEXT NOT NULL</span>,   <span class="c">-- generated enum: issue | local</span>
+  ref    <span class="t">TEXT NOT NULL</span>,   <span class="c">-- issue number, or a local identifier</span>
+  repo   <span class="t">TEXT</span>,
+  note   <span class="t">TEXT</span>            <span class="c">-- the finding itself, not a description of it</span>
+);</pre>
+  </div>
+
+  <div class="tcard absorb">
+    <h3>watch_review</h3>
+    <p class="role">one row per re-probe of a watch · the append-only log</p>
+<pre><span class="k">CREATE TABLE</span> watch_review (
+  id       <span class="t">INTEGER PRIMARY KEY</span>,
+  watch    <span class="t">INTEGER NOT NULL REFERENCES</span> watch(id),
+  version  <span class="t">TEXT NOT NULL</span>,   <span class="c">-- WHICH release this was cleared against</span>
+  reviewed <span class="t">TEXT NOT NULL</span>,   <span class="c">-- ISO-8601</span>
+  method   <span class="t">TEXT NOT NULL</span>,   <span class="c">-- how it was re-probed; recoverable later</span>
+  verdict  <span class="t">TEXT NOT NULL</span>,   <span class="c">-- generated enum</span>
+  evidence <span class="t">TEXT</span>
+);</pre>
+
+    <div class="note">
+      <span class="lab">This table is the answer to the prose question</span>
+      <p>The advisor previously called losing <code>currency.toml</code>&rsquo;s prose the most-regretted risk, and proposed a single <code>note</code> column. Re-examined against the real file, that is wrong for <em>half</em> of it: the re-probe history is roughly 900 lines of append-only log wearing a blob&rsquo;s clothes.</p>
+      <p>Two things break concretely if it stays a blob. A gate that must answer <strong>&ldquo;cleared against WHICH release?&rdquo;</strong> cannot version-compare free text — a defect this repo has already hit once. And the recorded <em>method</em> of a past probe becomes unfindable, so the next reviewer re-invents it.</p>
+      <p>So the split is: <strong>history becomes rows; condition-carrying rationale stays one <code>note</code> per owning row.</strong> &ldquo;Why sha256 and not stat&rdquo; is judgment and belongs in prose. &ldquo;Cleared at 0.9.48 on 12 August by re-reading llm.py&rdquo; is a record and belongs in a row.</p>
+    </div>
+  </div>
+
+  <div class="tcard absorb">
+    <h3>fork</h3>
+    <p class="role">optional · at most one row per dependency</p>
+<pre><span class="k">CREATE TABLE</span> fork (
+  dep           <span class="t">TEXT PRIMARY KEY REFERENCES</span> dep(name),
+  upstream      <span class="t">TEXT NOT NULL</span>,
+  base_ref      <span class="t">TEXT NOT NULL</span>,
+  base_commit   <span class="t">TEXT NOT NULL</span>,
+  pr            <span class="t">TEXT</span>,
+  reason        <span class="t">TEXT NOT NULL</span>,
+  clears_when   <span class="t">TEXT NOT NULL</span>   <span class="c">-- the condition that retires the fork</span>
+);</pre>
+    <p>A table rather than six nullable columns on <code>dep</code>, because these fields are <strong>all-or-nothing</strong>: a fork without a <code>base_commit</code> or without a <code>clears_when</code> is not a partially-described fork, it is a broken record. A separate table lets the database say so; six nullable columns cannot.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Group 3 · what happened during a run</p>
+    <h2>The state machine&rsquo;s tables</h2>
+    <p>These three are the runtime. Their enums are the <strong>code-generated</strong> ones, and a state machine library owns which transitions between them are legal.</p>
+  </div>
+
+  <div class="tcard runtime">
+    <h3>upgrade_run</h3>
+    <p class="role">one row per attempt · the DBOS workflow instance</p>
+<pre><span class="k">CREATE TABLE</span> upgrade_run (
+  id            <span class="t">INTEGER PRIMARY KEY</span>,
+  dep           <span class="t">TEXT NOT NULL REFERENCES</span> dep(name),
+  from_version  <span class="t">TEXT NOT NULL</span>,
+  to_version    <span class="t">TEXT NOT NULL</span>,
+  state         <span class="t">TEXT NOT NULL</span>,   <span class="c">-- GENERATED enum; the machine's current node</span>
+  batch         <span class="t">TEXT</span>,             <span class="c">-- groups the runs that become one PR</span>
+  started       <span class="t">TEXT NOT NULL</span>,
+  ended         <span class="t">TEXT</span>
+);</pre>
+  </div>
+
+  <div class="tcard runtime">
+    <h3>stage_event</h3>
+    <p class="role">append-only · current state is derived, never updated in place</p>
+<pre><span class="k">CREATE TABLE</span> stage_event (
+  id        <span class="t">INTEGER PRIMARY KEY</span>,
+  run       <span class="t">INTEGER NOT NULL REFERENCES</span> upgrade_run(id),
+  stage     <span class="t">TEXT NOT NULL</span>,   <span class="c">-- GENERATED enum</span>
+  state     <span class="t">TEXT NOT NULL</span>,   <span class="c">-- GENERATED enum, incl. skipped_tokens</span>
+  manifest  <span class="t">TEXT REFERENCES</span> manifest(name),  <span class="c">-- see the two-clock note</span>
+  ts        <span class="t">TEXT NOT NULL</span>,
+  evidence  <span class="t">TEXT</span>            <span class="c">-- path to the artifact that settled it</span>
+);</pre>
+    <p><strong>Append-only, not update-in-place.</strong> <code>pending → running → failed → reverted</code> is the evidence; collapsing it to a current-state column throws away the reason a dependency was rejected the moment it is rejected.</p>
+
+    <div class="note ok">
+      <span class="lab">The two-clock problem, and why no enum split is needed</span>
+      <p><code>codex</code>&rsquo;s code manifest follows a release tag; its docs manifest follows another project&rsquo;s <code>main</code>. One bump cannot advance both, so &ldquo;source synced&rdquo; is genuinely two different claims.</p>
+      <p>The fix is <strong>scoping, not a bigger enum</strong>: <code>stage_event.manifest</code> is required for the source-facing stages and forbidden for the dependency-level ones. The workflow fans out one sub-run per owned manifest, and the two clocks become two event streams under one run. The state machine is unchanged.</p>
+    </div>
+  </div>
+
+  <div class="tcard runtime">
+    <h3>gate_result</h3>
+    <p class="role">one row per authorization gate per run · six per run today</p>
+<pre><span class="k">CREATE TABLE</span> gate_result (
+  id             <span class="t">INTEGER PRIMARY KEY</span>,
+  run            <span class="t">INTEGER NOT NULL REFERENCES</span> upgrade_run(id),
+  gate           <span class="t">TEXT NOT NULL</span>,   <span class="c">-- GENERATED enum, from decide.py's six</span>
+  verdict        <span class="t">TEXT NOT NULL</span>,   <span class="c">-- pass | ambiguous — never a silent third state</span>
+  question       <span class="t">TEXT</span>,             <span class="c">-- what a human was asked, if anything</span>
+  detail         <span class="t">TEXT</span>,
+  recommendation <span class="t">TEXT</span>,
+  answer         <span class="t">TEXT</span>,             <span class="c">-- what the human said</span>
+  ts             <span class="t">TEXT NOT NULL</span>
+);</pre>
+    <p>This table exists because a cold review found the two-table sketch had nowhere to put it. The existing engine will not apply a bump unless six gates pass, and it <strong>fails closed</strong> — anything unreadable is ambiguity, not consent. Dropping the table would have dropped the bar with it, invisibly.</p>
+  </div>
+</section>
+
+<section class="col">
+  <p class="eyebrow">The hedge</p>
+  <h2>What will be wrong about this in three months</h2>
+
+  <div class="note risk">
+    <span class="lab">Named in advance: <code>probe</code>&rsquo;s parameter union</span>
+    <p>This repo invented roughly eight distinct probe kinds in six weeks. The ninth will not fit <code>path</code> / <code>pattern</code> / <code>field</code> / <code>tracks</code> / <code>expect</code>, and the tempting fix — add a column — is a migration every time.</p>
+    <p><strong>The hedge is already in the DDL:</strong> <code>params_json</code> ships from day one, and the <code>kind</code> enum plus its per-kind validator are code-generated. A ninth probe kind then becomes a regenerated enum member and a new validator branch, not a schema migration.</p>
+  </div>
+
+  <p>That is the general pattern in this schema and it is worth stating once: <strong>every enum here is generated, so adding a member is a codegen run rather than a hand-edit</strong> — which is exactly what your state-machine requirement asks for, applied beyond the state machine itself.</p>
+</section>
+
+<div class="prov col">
+  <h2>Provenance</h2>
+  <ul>
+    <li><strong>Measured this session</strong>, at <span class="m">56b98d8af809</span>: 97 manifests · <code>sources/codex.manifest:33</code> <span class="m">ref = rust-v0.151.0</span> on <code>openai/codex</code> · <code>sources/codex-docs.manifest:4</code> <span class="m">ref = main</span> on <code>chenrui333/codex-docs</code> · control arm <code>sources/rumdl.manifest</code>, one manifest, a version tag.</li>
+    <li><strong>Lane-reported, not re-read by me</strong>: the A/B/C partition of 35/50/12, <code>currency.toml</code>&rsquo;s 22 readers and ~85% prose figure, the six authorization gates in <code>decide.py</code>, and the ~900-line re-probe history. Each carries a control arm in its own report; treat them as strong leads.</li>
+    <li><strong>The table list, the note-splitting rule, the <code>stage_event.manifest</code> scoping and the <code>params_json</code> hedge</strong> are <span class="m">fable-advisor</span>&rsquo;s verdict this session, read against <code>currency.toml</code>, <code>config.py</code>, <code>decide.py</code> and <code>manifest.py</code>. The DDL, the column comments and the failure reasoning are mine.</li>
+    <li><strong>Not yet decided, and deliberately absent from this page</strong>: which state machine library owns the transitions, and the exact DBOS pin set. Both are being researched by codex lanes right now; neither is guessed here.</li>
+    <li><strong>Column names are a proposal.</strong> Nothing in this schema has been built. It exists to be argued with before a spec rests on it.</li>
+  </ul>
+</div>
+
+</div>
