@@ -243,6 +243,7 @@ def check(
             command=_display_command(argv),
             trackers=None,
             links=links,
+            packages=None,
             ran_at=_ran_at(now),
             total_count=len(results),
             hits=[],

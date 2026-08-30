@@ -15,7 +15,7 @@ from kb_setup.result import Rc
 #: The verbs this entry point knows. Slice 2+ appends here, not to an
 #: if-chain — see `.claude/rules/mise-tasks-only.md` and the spec's ban on
 #: pre-building future dispatch.
-_VERBS = ("trackers", "links")
+_VERBS = ("trackers", "links", "packages")
 
 _USAGE = f"aggregated-research <verb> [args...]\n  verbs: {', '.join(_VERBS)}"
 

@@ -311,6 +311,7 @@ def _contract_record(
         command="gh api -X GET search/issues -f q=repo:owner/repo is:pr term",
         trackers=Trackers(has_issues=has_issues, has_discussions=False),
         links=None,
+        packages=None,
         ran_at="2026-08-28T02:07:38Z",
         total_count=len(hits or []),
         hits=hits or [],

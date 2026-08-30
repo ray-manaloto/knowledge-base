@@ -24,6 +24,7 @@ class Kind(StrEnum):
 
     issue = "issue"
     pr = "pr"
+    package = "package"
 
 
 type UtcTimestamp = Annotated[
@@ -75,6 +76,30 @@ class LinkResult(Struct):
     duration_ms: float | UnsetType | None = UNSET
 
 
+type LatestVersion = Annotated[str, Meta(max_length=100)]
+
+
+type License = Annotated[str, Meta(max_length=100)]
+
+
+type DirectDependencyCount = Annotated[int, Meta(ge=0)]
+
+
+type CitedLink = Annotated[str, Meta(max_length=2048)]
+
+
+class Packages(Struct):
+    """Generated source-group contract type."""
+
+    system: Annotated[str, Meta(max_length=40, min_length=1)]
+    name: Annotated[str, Meta(max_length=200, min_length=1)]
+    version_count: Annotated[int, Meta(ge=0)]
+    latest_version: LatestVersion | None
+    licenses: Annotated[list[License], Meta(max_length=20)]
+    direct_dependency_count: DirectDependencyCount | None
+    cited_links: Annotated[list[CitedLink], Meta(max_length=20)]
+
+
 class Links(Struct):
     """Generated source-group contract type."""
 
@@ -92,6 +117,7 @@ class AdapterRecord(Struct):
     command: Annotated[str, Meta(max_length=1024, min_length=1)]
     trackers: Trackers | None
     links: Links | None
+    packages: Packages | None
     ran_at: UtcTimestamp
     total_count: Annotated[int, Meta(ge=0)]
     hits: Annotated[list[Hit], Meta(max_length=60)]

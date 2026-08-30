@@ -11,6 +11,7 @@
     "command",
     "trackers",
     "links",
+    "packages",
     "ran_at",
     "total_count",
     "hits",
@@ -30,6 +31,12 @@
     "links": {
       "anyOf": [
         {"$ref": "#/$defs/Links"},
+        {"type": "null"}
+      ]
+    },
+    "packages": {
+      "anyOf": [
+        {"$ref": "#/$defs/Packages"},
         {"type": "null"}
       ]
     },
@@ -54,7 +61,7 @@
     },
     "Kind": {
       "type": "string",
-      "enum": ["issue", "pr"]
+      "enum": ["issue", "pr", "package"]
     },
     "UtcTimestamp": {
       "type": "string",
@@ -131,6 +138,46 @@
         "line": {"type": ["integer", "null"]},
         "column": {"type": ["integer", "null"]},
         "duration_ms": {"type": ["number", "null"]}
+      }
+    },
+    "Packages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system",
+        "name",
+        "version_count",
+        "latest_version",
+        "licenses",
+        "direct_dependency_count",
+        "cited_links"
+      ],
+      "properties": {
+        "system": {"type": "string", "minLength": 1, "maxLength": 40},
+        "name": {"type": "string", "minLength": 1, "maxLength": 200},
+        "version_count": {"type": "integer", "minimum": 0},
+        "latest_version": {
+          "anyOf": [
+            {"type": "string", "maxLength": 100},
+            {"type": "null"}
+          ]
+        },
+        "licenses": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {"type": "string", "maxLength": 100}
+        },
+        "direct_dependency_count": {
+          "anyOf": [
+            {"type": "integer", "minimum": 0},
+            {"type": "null"}
+          ]
+        },
+        "cited_links": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {"type": "string", "maxLength": 2048}
+        }
       }
     }
   }
