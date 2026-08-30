@@ -30,7 +30,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/astral-sh/uv
-ref = 0.12.5
-commit = 210d1f6785e95a8c8c0d53e284408c9be1134700
+ref = 0.12.7
+commit = 61291a8ca5477a9ca653f14d2ac5665587c263fa
 kind = code
 added = 2026-08-02

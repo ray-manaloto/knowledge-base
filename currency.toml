@@ -663,7 +663,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.10"
+expected = "2026.8.14"
 # ADDED 2026-08-08 (#242). The same SKIP-whose-reason-stopped-being-true hole
 # `[tool.hk]` records below, one tool over: `sources/mise.manifest` existed and
 # this table never named it, so `sync.py` reported a clean SKIP while the
@@ -2116,15 +2116,19 @@ version_pattern = '^(\d+\.\d+\.\d+)$'
 # names ctx7 as the doc fetcher, and the first-party `context7-cli` skill in
 # upstash/context7 drives this exact binary.
 #
-# DELIBERATELY NO `github` KEY, and that is the whole point of this comment.
-# `upstash/context7` is one repo publishing TWO differently-versioned things:
-# the Claude plugin / MCP server (tags `v1.0.30`) and this CLI (npm `0.5.8`).
-# Pointing an upstream check at those tags would compare 0.5.8 against 1.0.30 —
-# the exact non-comparable-pin failure `[tool.skillopt]` already reports as
-# UNKNOWN. The engine has no `npm` source field (`config.py:176-295` offers
-# `pypi` and `github` only), so there is no honest upstream check available for
-# an npm-only tool. Step 1 still verifies installed-vs-pinned, which is the part
-# that can be checked truthfully; upstream stays unchecked rather than wrong.
+# DELIBERATELY NO `github` KEY. The original reason is now historical: when this
+# was written, `upstash/context7`'s `v1.0.x` plugin / MCP server tags were not
+# comparable with the CLI's npm `0.5.8` version. Re-measured 2026-08-30 after
+# the npm pin moved to `0.5.9`: upstream now publishes CLI tags as
+# `ctx7@<version>`, matching npm CLI versions, so the non-comparable-tags premise
+# has expired.
+#
+# The separate engine constraint has not: it has no `npm` source field
+# (`config.py:176-295` offers `pypi` and `github` only), so this block still
+# remains installed-vs-pinned only and keeps no `github` key. The new CLI tags
+# make a prefixed GitHub check a future option, but the engine reads GitHub
+# Releases rather than raw Git tags; qualifying and wiring that option is out of
+# scope here.
 mise_key = "npm:ctx7"
 binary = "ctx7"
 version_pattern = '^(\d+\.\d+\.\d+)$'

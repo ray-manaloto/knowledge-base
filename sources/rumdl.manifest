@@ -23,7 +23,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/rvben/rumdl
-ref = v0.2.60
-commit = 50dbfef7cf08f1d28633b684c0884490a63094e3
+ref = v0.2.62
+commit = 96c8520425eaf1b6d362e4a98754adf6ee604acb
 kind = code
 added = 2026-08-02

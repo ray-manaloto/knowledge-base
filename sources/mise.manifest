@@ -36,7 +36,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/jdx/mise
-ref = v2026.8.10
-commit = c2a0cb9da890c54852245406c1597df9c3a7e63b
+ref = v2026.8.14
+commit = 2a3ea19922f26b0320b73ee392360317b5219a99
 kind = code
 added = 2026-08-02

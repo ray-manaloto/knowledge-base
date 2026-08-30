@@ -1,6 +1,6 @@
 # Source manifest — reproducible-by-reference (Invariant 3).
-# upstash/context7 publishes TWO differently-versioned things from one repo: the Claude plugin/MCP server (tags v1.0.x) and this CLI (npm 0.5.8, the version this repo pins) -- tags do not correspond to the CLI at all, so this is pinned to a branch head by necessity. See currency.toml [tool.ctx7].
+# upstash/context7 publishes separately versioned packages; ctx7 CLI tags now use ctx7@<version>, so this manifest tracks the tag matching the npm pin. See currency.toml [tool.ctx7].
 url = https://github.com/upstash/context7
-ref = master
-commit = 63a40c6a6a95ba7b4bf8823e6d817454a84be572
+ref = ctx7@0.5.9
+commit = 0ff958c9f038d66be030ab72094cef0e4ca40bf3
 kind = code
