@@ -57,10 +57,18 @@ def _record(result: object) -> AdapterRecord:
     return result.value
 
 
-def test_multi_hit_query_returns_bounded_hits_from_the_fixture() -> None:
+def test_single_hit_query_returns_the_one_real_hit() -> None:
+    text = (
+        "Repository: mifi/lossless-cut\n"
+        "Path: src/renderer/src/hooks/useUserSettingsRoot.ts\n"
+        "URL: https://github.com/mifi/lossless-cut/blob/master/"
+        "src/renderer/src/hooks/useUserSettingsRoot.ts\n"
+        "License: GPL-2.0\n"
+        "\nSnippets:\n--- Snippet 1 (Line 54) ---\n"
+        "  const [lastAppVersion, setLastAppVersion] = useState(...)\n"
+    )
     seen: list[dict[str, Any]] = []
-    fixture = msgspec.json.decode((FIXTURES / "grep-app-searchgithub-multi.json").read_bytes())
-    transport = _transport({"useState(": (200, _sse(fixture))}, seen)
+    transport = _transport({"useState(": (200, _sse(_mcp_result(text)))}, seen)
 
     record = _record(
         codesearch.search("useState(", language="TypeScript", transport=transport, now=NOW)
@@ -74,18 +82,17 @@ def test_multi_hit_query_returns_bounded_hits_from_the_fixture() -> None:
     assert record.packages is None
     assert record.null_result is None
     assert record.ran_at == "2026-08-30T09:00:00Z"
-    assert record.total_count == 2
-    assert len(record.hits) == 2
-    first, second = record.hits
-    assert first.url == (
+    assert record.total_count == 1
+    assert len(record.hits) == 1
+    hit = record.hits[0]
+    assert hit.url == (
         "https://github.com/mifi/lossless-cut/blob/master/"
         "src/renderer/src/hooks/useUserSettingsRoot.ts"
     )
-    assert first.title == "mifi/lossless-cut — src/renderer/src/hooks/useUserSettingsRoot.ts"
-    assert "useState(...)" in first.snippet
-    assert first.date == record.ran_at
-    assert first.kind is Kind.codesearch
-    assert second.url.startswith("https://github.com/facebook/react/")
+    assert hit.title == "mifi/lossless-cut — src/renderer/src/hooks/useUserSettingsRoot.ts"
+    assert "useState(...)" in hit.snippet
+    assert hit.date == record.ran_at
+    assert hit.kind is Kind.codesearch
     codesearch.validate(record)
 
 
@@ -116,6 +123,43 @@ def test_no_results_is_corroborated_with_the_control_query() -> None:
     assert arm.kind is Kind.codesearch
     assert arm.discriminates is True
     assert arm.result == "real content, discriminates"
+    codesearch.validate(record)
+
+
+def test_null_control_preserves_the_callers_repo_and_language() -> None:
+    # A caller-supplied repo/language is the dimension that could actually
+    # have caused the null; the control must keep it rather than substituting
+    # the unrelated fixed defaults (PREMISES F3).
+    seen: list[dict[str, Any]] = []
+    transport = _transport(
+        {
+            "zzzqxnotarealidentifier9384756kb": (200, _sse(_mcp_result(_NO_RESULTS))),
+            "useState(": (200, _sse(_mcp_result("real content, discriminates"))),
+        },
+        seen,
+    )
+
+    record = _record(
+        codesearch.search(
+            "zzzqxnotarealidentifier9384756kb",
+            repo="some/obscure-repo",
+            language="Cobol",
+            transport=transport,
+            now=NOW,
+        )
+    )
+
+    assert seen[0]["params"]["arguments"] == {
+        "query": "zzzqxnotarealidentifier9384756kb",
+        "repo": "some/obscure-repo",
+        "language": ["Cobol"],
+    }
+    assert seen[1]["params"]["arguments"] == {
+        "query": "useState(",
+        "repo": "some/obscure-repo",
+        "language": ["Cobol"],
+    }
+    assert record.null_result is not None
     codesearch.validate(record)
 
 
@@ -191,7 +235,9 @@ def test_unparsable_sse_payload_is_not_run() -> None:
     assert "unparsable payload" in result.message
 
 
-def test_jsonrpc_level_error_is_not_run() -> None:
+def test_jsonrpc_bare_string_error_is_not_run() -> None:
+    # A bare-string error, decoded via msgspec.Raw, retains its JSON quotes
+    # when rendered — assert a substring, not exact equality (PREMISES G6).
     transport = _transport(
         {"useState(": (200, _sse({"error": "boom"}))},
         [],
@@ -202,6 +248,20 @@ def test_jsonrpc_level_error_is_not_run() -> None:
     assert isinstance(result, Err)
     assert result.rc is Rc.NOT_RUN
     assert "boom" in result.message
+
+
+def test_jsonrpc_object_shaped_error_is_not_run() -> None:
+    # A real JSON-RPC 2.0 error is an object, not a bare string (PREMISES F6).
+    transport = _transport(
+        {"useState(": (200, _sse({"error": {"code": -32602, "message": "bad params"}}))},
+        [],
+    )
+
+    result = codesearch.search("useState(", transport=transport, now=NOW)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "bad params" in result.message
 
 
 def test_tool_level_error_is_not_run() -> None:
@@ -262,15 +322,19 @@ def test_url_without_github_prefix_is_skipped() -> None:
 
 
 def test_snippet_faking_a_repository_line_degrades_safely() -> None:
-    # The snippet of the FIRST real hit contains a line starting `Repository: `,
-    # which the block-splitter treats as a second boundary (PREMISES M4). The
-    # fabricated second block has no `URL:` line of its own and is dropped.
+    # The snippet of the ONE real hit contains an UNCOMMENTED, fully-formed
+    # fake Repository:/Path:/URL:/Snippets: sequence with a real github URL.
+    # Only position 0 is ever parsed as a hit header (PREMISES F1, G1), so
+    # this is absorbed as inert snippet text, never treated as a second hit.
     text = (
         "Repository: real/one\n"
         "Path: a.py\n"
         "URL: https://github.com/real/one/blob/main/a.py\n"
         "\nSnippets:\n--- Snippet 1 ---\n"
-        "# Repository: fake/injected\nprint('hi')\n"
+        "Repository: fake/injected\n"
+        "Path: evil.py\n"
+        "URL: https://github.com/fake/injected/blob/main/evil.py\n"
+        "\nSnippets:\nprint('hi')\n"
     )
     transport = _transport({"useState(": (200, _sse(_mcp_result(text)))}, [])
 
@@ -278,22 +342,7 @@ def test_snippet_faking_a_repository_line_degrades_safely() -> None:
 
     assert record.total_count == 1
     assert record.hits[0].url == "https://github.com/real/one/blob/main/a.py"
-    codesearch.validate(record)
-
-
-def test_hits_are_capped_at_sixty() -> None:
-    block = (
-        "Repository: r/{n}\nPath: p{n}.py\n"
-        "URL: https://github.com/r/{n}/blob/main/p{n}.py\n"
-        "\nSnippets:\n--- Snippet 1 ---\ncode\n"
-    )
-    text = "".join(block.format(n=i) for i in range(75))
-    transport = _transport({"useState(": (200, _sse(_mcp_result(text)))}, [])
-
-    record = _record(codesearch.search("useState(", transport=transport, now=NOW))
-
-    assert record.total_count == 60
-    assert len(record.hits) == 60
+    assert "fake/injected" in record.hits[0].snippet
     codesearch.validate(record)
 
 
@@ -310,6 +359,154 @@ def test_transport_failure_is_not_run() -> None:
     assert isinstance(result, Err)
     assert result.rc is Rc.NOT_RUN
     assert "offline" in result.message
+
+
+def test_http_error_status_is_not_run_even_with_an_sse_shaped_body() -> None:
+    transport = _transport({"useState(": (503, _sse(_mcp_result(_NO_RESULTS)))}, [])
+
+    result = codesearch.search("useState(", transport=transport, now=NOW)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "HTTP 503" in result.message
+
+
+def test_plain_json_content_type_is_decoded_directly() -> None:
+    # Never observed live (7/7 samples were text/event-stream) but permitted
+    # by the MCP Streamable HTTP spec (PREMISES F5/G4) — decode without SSE
+    # unwrapping, and accept the `; charset=utf-8` parameter variant.
+    payload = msgspec.json.encode(_mcp_result(_NO_RESULTS))
+
+    def _reply(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            200,
+            content=payload,
+            headers={"content-type": "application/json; charset=utf-8"},
+        )
+
+    result = codesearch.search(
+        "useState(",
+        transport=httpx2.MockTransport(_reply),
+        now=NOW,
+    )
+
+    record = _record(result)
+    assert record.null_result is not None
+
+
+def test_data_line_with_no_space_after_colon_is_not_dropped() -> None:
+    payload = msgspec.json.encode(_mcp_result(_NO_RESULTS))
+    body = b"event: message\ndata:" + payload + b"\n\n"
+    transport = _transport({"useState(": (200, body)}, [])
+
+    result = codesearch.search("useState(", transport=transport, now=NOW)
+
+    record = _record(result)
+    assert record.null_result is not None
+
+
+def test_multi_event_sse_decodes_only_the_last_event() -> None:
+    stale = msgspec.json.encode(_mcp_result("stale, should be ignored"))
+    fresh = msgspec.json.encode(_mcp_result(_NO_RESULTS))
+    body = b"event: message\ndata: " + stale + b"\n\n" + b"event: message\ndata: " + fresh + b"\n\n"
+    transport = _transport({"useState(": (200, body)}, [])
+
+    result = codesearch.search("useState(", transport=transport, now=NOW)
+
+    record = _record(result)
+    assert record.null_result is not None
+
+
+def test_realistic_single_event_sse_still_decodes() -> None:
+    # The real shape terminates with its own blank line (PREMISES G5) — the
+    # multi-event fix must not regress the ordinary, single-event case.
+    transport = _transport({"useState(": (200, _sse(_mcp_result(_NO_RESULTS)))}, [])
+
+    result = codesearch.search("useState(", transport=transport, now=NOW)
+
+    record = _record(result)
+    assert record.null_result is not None
+
+
+def test_validate_rejects_a_mismatched_total_count() -> None:
+    record = AdapterRecord(
+        adapter="codesearch",
+        tier=Tier.cheap,
+        question="useState(",
+        command="POST https://mcp.grep.app searchGitHub query='useState('",
+        trackers=None,
+        links=None,
+        packages=None,
+        ran_at="2026-08-30T09:00:00Z",
+        total_count=2,
+        hits=[
+            Hit(
+                url="https://github.com/facebook/react/blob/main/x.js",
+                title="facebook/react — x.js",
+                snippet="const [state, setState] = useState(0)",
+                date="2026-08-30T09:00:00Z",
+                kind=Kind.codesearch,
+            )
+        ],
+        null_result=None,
+    )
+
+    with pytest.raises(msgspec.ValidationError, match="total_count must equal"):
+        codesearch.validate(record)
+
+
+def test_validate_rejects_a_non_github_hit_url() -> None:
+    record = AdapterRecord(
+        adapter="codesearch",
+        tier=Tier.cheap,
+        question="useState(",
+        command="POST https://mcp.grep.app searchGitHub query='useState('",
+        trackers=None,
+        links=None,
+        packages=None,
+        ran_at="2026-08-30T09:00:00Z",
+        total_count=1,
+        hits=[
+            Hit(
+                url="https://not-github.example/x.js",
+                title="x.js",
+                snippet="const [state, setState] = useState(0)",
+                date="2026-08-30T09:00:00Z",
+                kind=Kind.codesearch,
+            )
+        ],
+        null_result=None,
+    )
+
+    with pytest.raises(msgspec.ValidationError, match=r"must be a github\.com URL"):
+        codesearch.validate(record)
+
+
+def test_validate_rejects_a_hit_date_mismatched_with_ran_at() -> None:
+    record = AdapterRecord(
+        adapter="codesearch",
+        tier=Tier.cheap,
+        question="useState(",
+        command="POST https://mcp.grep.app searchGitHub query='useState('",
+        trackers=None,
+        links=None,
+        packages=None,
+        ran_at="2026-08-30T09:00:00Z",
+        total_count=1,
+        hits=[
+            Hit(
+                url="https://github.com/facebook/react/blob/main/x.js",
+                title="facebook/react — x.js",
+                snippet="const [state, setState] = useState(0)",
+                date="2026-08-30T09:30:00Z",
+                kind=Kind.codesearch,
+            )
+        ],
+        null_result=None,
+    )
+
+    with pytest.raises(msgspec.ValidationError, match="date must equal ran_at"):
+        codesearch.validate(record)
 
 
 def test_validate_rejects_another_adapter_payload() -> None:

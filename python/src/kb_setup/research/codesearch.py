@@ -31,6 +31,7 @@ from kb_setup.result import Err, External, Ok, Rc, Result, exit_code
 
 _ENDPOINT = "https://mcp.grep.app"
 _HTTP_TIMEOUT = 30.0
+_HTTP_OK = 200
 _HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json, text/event-stream",
@@ -43,7 +44,6 @@ _MAX_COMMAND_LENGTH = 1024
 _MAX_TITLE_LENGTH = 512
 _MAX_SNIPPET_LENGTH = 600
 _MAX_URL_LENGTH = 2048
-_MAX_HITS = 60
 _MAX_ARM_RESULT_LENGTH = 600
 _GITHUB_PREFIX = "https://github.com/"
 
@@ -54,16 +54,24 @@ _CONTROL_QUERY = "useState("
 _CONTROL_LANGUAGE = "TypeScript"
 _EXPECTED_POSITIONAL_ARGS = 1
 
-_SNIPPETS_MARKER = "Snippets:"
-#: One block per hit starts with a `Repository: ` line. A code snippet inside
-#: one real block can itself contain a line matching this pattern, splitting
-#: one real hit into two blocks at parse time (PREMISES M4). This degrades
-#: safely under the "no `URL:` line -> skip" rule below: the fabricated
-#: second block never has its own `URL:` line, so it is dropped.
-_BLOCK_SPLIT = re.compile(r"(?=^Repository: )", re.MULTILINE)
-_REPO_RE = re.compile(r"^Repository: (.+)$", re.MULTILINE)
-_PATH_RE = re.compile(r"^Path: (.+)$", re.MULTILINE)
-_URL_RE = re.compile(r"^URL: (.+)$", re.MULTILINE)
+#: grep.app never returns more than one hit per query (verified live, 7/7
+#: samples — PREMISES G1). Only the text at position 0 is ever parsed as a
+#: hit header, anchored with `\A` rather than `re.MULTILINE`: nothing after
+#: it is ever re-scanned for a second `Repository:`/`Path:`/`URL:` triple, so
+#: attacker-controlled snippet content that fakes one is just inert snippet
+#: text (truncated like everything else), never a second hit. `License:` is
+#: present in all 7 live samples but modeled as optional here — untested-but
+#: -safe permissiveness, not an observed variant.
+_HIT_RE = re.compile(
+    r"\ARepository: (?P<repo>[^\n]+)\n"
+    r"Path: (?P<path>[^\n]+)\n"
+    r"URL: (?P<url>[^\n]+)\n"
+    r"(?:License: [^\n]+\n)?"
+    r"\n"
+    r"Snippets:\n"
+    r"(?P<snippet>.*)",
+    re.DOTALL,
+)
 
 type _Transport = httpx2.BaseTransport | None
 
@@ -85,14 +93,18 @@ class _McpToolResult(msgspec.Struct, rename="camel"):
 class _McpResponse(msgspec.Struct):
     """The one JSON-RPC response shape this adapter reads.
 
-    `jsonrpc`/`id` are deliberately NOT fields: the feasibility spike's
-    real-hit transcript omits them, unlike its two null-path transcripts
-    (PREMISES M2). `error`'s observed shape is unknown; its mere presence is
-    treated as NOT_RUN, never decoded further.
+    `jsonrpc`/`id` are deliberately NOT fields: `msgspec.Struct` decoding
+    drops unknown fields, and both are present in real responses (verified
+    live, 7/7 samples — PREMISES G2; the feasibility spike's real-hit
+    transcript that looked like it omitted them was merely truncated).
+    `error` is typed `msgspec.Raw` rather than `str` because a real JSON-RPC
+    2.0 error is an OBJECT (`{code, message, data}`), not a bare string; `Raw`
+    decodes either shape without raising (verified live, PREMISES G6), and
+    its bytes are rendered for the error message in `_mcp_text`.
     """
 
     result: _McpToolResult | UnsetType = UNSET
-    error: str | UnsetType = UNSET
+    error: msgspec.Raw | UnsetType = UNSET
 
 
 def _inputs(
@@ -175,16 +187,43 @@ def _post(
         return Err(f"grep.app request failed for `{command}`: {exc}", rc=Rc.NOT_RUN)
 
 
+_JSON_CONTENT_TYPE = "application/json"
+_DATA_PREFIX = "data:"
+
+
+def _sse_data_lines(chunk: str) -> list[str]:
+    """Strip an optional single space after `data:` (the SSE spec makes it optional)."""
+    return [
+        line[len(_DATA_PREFIX) :].removeprefix(" ")
+        for line in chunk.splitlines()
+        if line.startswith(_DATA_PREFIX)
+    ]
+
+
 def _joined_sse_payload(response: httpx2.Response, command: str) -> str | Err:
-    """Collect every `data: ` line and join multi-line events (PREMISES A1)."""
-    prefix = "data: "
-    lines = [line[len(prefix) :] for line in response.text.splitlines() if line.startswith(prefix)]
-    if not lines:
-        return Err(
-            f"grep.app returned a non-SSE response for `{command}`: {response.text[:200]!r}",
-            rc=Rc.NOT_RUN,
-        )
-    return "\n".join(lines)
+    """Collect the LAST SSE event's `data:` line(s), or read a plain JSON body.
+
+    Never confirmed live (7/7 samples were `text/event-stream`) but permitted
+    by this adapter's own `Accept` header and the MCP Streamable HTTP spec —
+    a defensive path, not a proven one.
+    """
+    content_type = response.headers.get("content-type", "")
+    if content_type.split(";", 1)[0].strip() == _JSON_CONTENT_TYPE:
+        return response.text
+
+    # A real response terminates with its own blank line
+    # ("event: message\ndata: {...}\n\n" — PREMISES G5), so a naive
+    # `text.split("\n\n")[-1]` yields an empty trailing chunk on every real
+    # call. Take the last chunk that actually carries a `data:` line instead.
+    chunks = [chunk for chunk in response.text.split("\n\n") if chunk.strip()]
+    for chunk in reversed(chunks):
+        lines = _sse_data_lines(chunk)
+        if lines:
+            return "\n".join(lines)
+    return Err(
+        f"grep.app returned a non-SSE response for `{command}`: {response.text[:200]!r}",
+        rc=Rc.NOT_RUN,
+    )
 
 
 def _decode_mcp_response(joined: str, command: str) -> _McpResponse | Err:
@@ -198,7 +237,11 @@ def _decode_mcp_response(joined: str, command: str) -> _McpResponse | Err:
 def _mcp_text(parsed: _McpResponse, command: str) -> str | Err:
     """Extract the concatenated text content, or fail on either error shape."""
     if not isinstance(parsed.error, UnsetType):
-        return Err(f"grep.app returned an error for `{command}`: {parsed.error}", rc=Rc.NOT_RUN)
+        # bytes(raw) for a bare-string error retains its JSON quotes
+        # (`"boom"` -> `'"boom"'`), which is fine here: this is a rendered
+        # message, not a value compared for equality (PREMISES G6).
+        error_text = bytes(parsed.error).decode("utf-8", errors="replace")
+        return Err(f"grep.app returned an error for `{command}`: {error_text}", rc=Rc.NOT_RUN)
     if isinstance(parsed.result, UnsetType):
         return Err(f"grep.app returned an error for `{command}`: no result", rc=Rc.NOT_RUN)
     text = "".join(entry.text for entry in parsed.result.content if entry.type == "text")
@@ -219,6 +262,11 @@ def _search_once(
     response = _post(client, query, repo=repo, language=language, command=command)
     if isinstance(response, Err):
         return response
+    if response.status_code != _HTTP_OK:
+        return Err(
+            f"grep.app returned HTTP {response.status_code} for `{command}`",
+            rc=Rc.NOT_RUN,
+        )
     joined = _joined_sse_payload(response, command)
     if isinstance(joined, Err):
         return joined
@@ -232,48 +280,58 @@ def _search_once(
 
 
 def _parse_hits(text: str, ran_at: str) -> list[Hit]:
-    """Split a non-null result blob into bounded `Hit` records."""
-    hits: list[Hit] = []
-    blocks = [block for block in _BLOCK_SPLIT.split(text) if block.strip()]
-    for block in blocks:
-        url_match = _URL_RE.search(block)
-        if url_match is None:
-            continue
-        url = url_match.group(1).strip()
-        if not url.startswith(_GITHUB_PREFIX) or len(url) > _MAX_URL_LENGTH:
-            continue
+    """Parse the single hit anchored at position 0, or return no hits.
 
-        repo_match = _REPO_RE.search(block)
-        path_match = _PATH_RE.search(block)
-        repo_name = repo_match.group(1).strip() if repo_match else ""
-        path = path_match.group(1).strip() if path_match else ""
-        marker_index = block.find(_SNIPPETS_MARKER)
-        snippet = (
-            block[marker_index + len(_SNIPPETS_MARKER) :].strip() if marker_index != -1 else ""
-        )
+    grep.app never returns more than one hit per query (verified live, 7/7
+    samples — PREMISES G1). Only the text at position 0 is ever read as a
+    hit header; anything after it — including a forged
+    `Repository:`/`Path:`/`URL:` triple embedded in the snippet — is inert
+    snippet text, never re-interpreted as a second hit.
+    """
+    match = _HIT_RE.match(text)
+    if match is None:
+        return []
+    url = match.group("url").strip()
+    if not url.startswith(_GITHUB_PREFIX) or len(url) > _MAX_URL_LENGTH:
+        return []
 
-        hits.append(
-            Hit(
-                url=url,
-                title=f"{repo_name} — {path}"[:_MAX_TITLE_LENGTH],
-                snippet=snippet[:_MAX_SNIPPET_LENGTH],
-                date=ran_at,
-                kind=Kind.codesearch,
-            )
+    repo_name = match.group("repo").strip()
+    path = match.group("path").strip()
+    snippet = match.group("snippet").strip()
+
+    return [
+        Hit(
+            url=url,
+            title=f"{repo_name} — {path}"[:_MAX_TITLE_LENGTH],
+            snippet=snippet[:_MAX_SNIPPET_LENGTH],
+            date=ran_at,
+            kind=Kind.codesearch,
         )
-        if len(hits) == _MAX_HITS:
-            break
-    return hits
+    ]
 
 
 def _null_record(
     client: httpx2.Client,
-    query: str,
+    identity: tuple[str, str | None, str | None],
     command: str,
     now: datetime | None,
 ) -> Result[AdapterRecord]:
-    """Corroborate a "no results" text with the fixed known-good control query."""
-    control = _search_once(client, _CONTROL_QUERY, repo=None, language=_CONTROL_LANGUAGE)
+    """Corroborate a "no results" text with the fixed known-good control QUERY.
+
+    `identity` is the caller's own `(query, repo, language)`. The control
+    keeps `repo`/`language` — the dimension that could actually have caused
+    the null — and swaps in only the query, the one dimension proven live to
+    return real content. Using a fixed, unrelated language here would
+    discriminate the wrong thing: a caller's typo'd `--repo` or obscure
+    `--language` would always read as "confirmed empty" even though the
+    control never tested that filter. When the caller passed no language at
+    all, fall back to `_CONTROL_LANGUAGE` (unchanged from prior behavior) so
+    the control still has a known-good pairing with `_CONTROL_QUERY`; there
+    is no equivalent default for `repo`.
+    """
+    query, repo, language = identity
+    control_language = language if language is not None else _CONTROL_LANGUAGE
+    control = _search_once(client, _CONTROL_QUERY, repo=repo, language=control_language)
     if isinstance(control, Err):
         return control
     control_command, control_text = control
@@ -332,8 +390,13 @@ def search(
         command, text = primary
         ran_at = _ran_at(now)
 
-        if text == _NO_RESULTS_TEXT:
-            return _null_record(client, normalized_query, command, now)
+        if text.strip() == _NO_RESULTS_TEXT:
+            return _null_record(
+                client,
+                (normalized_query, normalized_repo, normalized_language),
+                command,
+                now,
+            )
 
         hits = _parse_hits(text, ran_at)
         if not hits:
@@ -392,9 +455,15 @@ def validate(record: AdapterRecord) -> None:
         raise msgspec.ValidationError("a codesearch record must not carry links")
     if record.packages is not None:
         raise msgspec.ValidationError("a codesearch record must not carry packages")
+    if record.total_count != len(record.hits):
+        raise msgspec.ValidationError("total_count must equal the number of hits")
     for hit in record.hits:
         if hit.kind is not Kind.codesearch:
             raise msgspec.ValidationError("every codesearch hit must have kind=codesearch")
+        if not hit.url.startswith(_GITHUB_PREFIX):
+            raise msgspec.ValidationError("every codesearch hit url must be a github.com URL")
+        if hit.date != record.ran_at:
+            raise msgspec.ValidationError("every codesearch hit date must equal ran_at")
 
     _validate_presence(record)
     _validate_null(record)
