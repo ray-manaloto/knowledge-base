@@ -813,7 +813,7 @@ uv run kb-setup artifact-download --provider ${usage_provider?} --source ${usage
 '''
 
 # One job per checked-in msgspec model (source-groups, fetch-receipt,
-# session-select, research-record), declared in `[tool.datamodel-codegen]` in
+# session-select, research-record, packages), declared in `[tool.datamodel-codegen]` in
 # pyproject.toml — nothing here names a schema or an output path. `--project .
 # --locked --group codegen` IS the version guard the four deleted wrappers used
 # to assert by hand (#569): `--locked` refuses to run when `uv.lock` disagrees
@@ -822,11 +822,11 @@ uv run kb-setup artifact-download --provider ${usage_provider?} --source ${usage
 # pin can no longer run silently. Dropping any part of that trio reopens the
 # shadow class this replaced.
 [tasks.kb-codegen]
-description = "Regenerate every strict msgspec model from its JSON Schema"
+description = "Regenerate every strict msgspec model from its committed schema"
 run = "uv run --project {{config_root}} --locked --group codegen datamodel-codegen --all-jobs"
 
 [tasks.kb-codegen-check]
-description = "Fail if any generated model differs from its schema"
+description = "Fail if any generated model differs from its committed schema"
 run = "uv run --project {{config_root}} --locked --group codegen datamodel-codegen --all-jobs --check"
 
 [tasks.kb-research-trackers]

@@ -1,0 +1,19 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+#
+# PROVENANCE-ONLY SCHEMA PIN (#575). The committed generator input is the exact
+# `api/v3/api.proto` copy at `schemas/deps-dev-api-v3.proto`; this manifest does
+# not enroll the deps.dev Go repository in corpus ingestion.
+#
+# `api.proto` imports Google API annotations. Their committed supporting copies
+# are pinned independently to googleapis/googleapis commit
+# 9af1fae615707962433f1d7338e707cde4d9e55e:
+#   google/api/annotations.proto -> schemas/deps-dev-google-api-annotations.proto
+#   google/api/http.proto        -> schemas/deps-dev-google-api-http.proto
+url = https://github.com/google/deps.dev
+ref = main
+commit = dc936a45c6574bb6e6bd5433de8c74e4cdff1276
+kind = docs
+scope = study
+added = 2026-08-29
+build = skip
+skip_reason = #575: schema-only vendor pin for reproducible protobuf generation; not a corpus-ingestion source

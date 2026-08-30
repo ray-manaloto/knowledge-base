@@ -407,9 +407,14 @@ Tools the plugin will wrap — each needs a prototype before a module is written
 - <https://github.com/modelcontextprotocol/python-sdk> — the `mcp` PyPI package,
   2.1.1 (2026-08-25, re-derived as latest). The client for `mcp.grep.app`, which
   has **zero** Python packages of its own.
-- Google Open Source Insights / `deps.dev` — keyless HTTP, no official client;
-  Google's own docs say *"use any HTTP client."* No repo to pin; the API is the
-  artifact.
+- [google/deps.dev](https://github.com/google/deps.dev) — keyless HTTP plus a
+  published API v3 protobuf. The schema-only provenance pin and committed
+  generator input landed for #575; `build = skip` keeps the Go repository out
+  of ordinary corpus ingestion.
+- [googleapis/googleapis](https://github.com/googleapis/googleapis) — canonical
+  `google/api/annotations.proto` and `google/api/http.proto` dependencies for
+  the deps.dev schema, pinned in `sources/deps-dev.manifest` comments for #575.
+  Registered here rather than as another corpus-ingestion manifest.
 
 Prior art for the two we would otherwise have written from scratch:
 
