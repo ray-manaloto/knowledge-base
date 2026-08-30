@@ -18,11 +18,6 @@
 # run instead of silently skipped past.
 
 [[ticket]]
-issue = 576
-title = "Prototype: codesearch feasibility — can a headless client reach it at all"
-blockers = []
-
-[[ticket]]
 issue = 577
 title = "Prototype: breadth — which declared sources are reachable, and how many adapters that is"
 blockers = []
@@ -45,7 +40,7 @@ blockers = [578, 575]
 [[ticket]]
 issue = 580
 title = "codesearch verb — cross-repository code search (conditional on its prototype)"
-blockers = [578, 576]
+blockers = [578]
 
 [[ticket]]
 issue = 581
