@@ -839,6 +839,11 @@ description = "Check that a set of cited URLs resolve, via the pinned lychee che
 run = "uv run kb-setup research-links"
 timeout = "10m"
 
+[tasks.kb-research-packages]
+description = "Look up a package's versions, licences and dependencies from deps.dev"
+run = "uv run kb-setup research-packages"
+timeout = "10m"
+
 [tasks.kb-research]
 description = "aggregated-research plugin CLI: mise run kb-research -- <verb> [args...]"
 run = "uv run aggregated-research"

@@ -30,6 +30,7 @@ dependencies = [
   # verified 2026-08-17, 200 for a real model against 404 for a bogus one.
   "anthropic>=1.0.0",
   "graphifyy[all]==0.9.50",
+  "httpx2>=2.12.0",
   "msgspec==0.21.1",
   "skillopt @ git+https://github.com/microsoft/SkillOpt@93bdf3d770b99128daf35278218e5a666fe392f3",
   "structlog>=26.1",

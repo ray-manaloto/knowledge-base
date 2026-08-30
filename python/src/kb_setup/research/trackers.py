@@ -212,6 +212,7 @@ def search(
                 has_discussions=repo_response.has_discussions,
             ),
             links=None,
+            packages=None,
             ran_at=_ran_at(now),
             total_count=total_count,
             hits=hits,

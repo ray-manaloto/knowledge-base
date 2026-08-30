@@ -220,6 +220,7 @@ def _contract_record(
             else sum(1 for r in rs if not r.ok),
             results=rs,
         ),
+        packages=None,
         ran_at="2026-08-28T02:07:38Z",
         total_count=len(rs),
         hits=[],
