@@ -1969,8 +1969,11 @@ retires (1), and nothing retires (2) short of a version-sorted listing."""
 mise_key = "rumdl"
 binary = "rumdl"
 github = "rvben/rumdl"
-# `mise exec -- rumdl --version` prints `rumdl 0.2.60` — the house form, name
-# anchored, as at `[tool.agnix]` / `[tool.ruff]` / `[tool.ty]`.
+# `mise exec -- rumdl --version` prints `rumdl 0.2.62` — the house form, name
+# anchored, as at `[tool.agnix]` / `[tool.ruff]` / `[tool.ty]`. Re-probed at the
+# 0.2.60 -> 0.2.62 bump, 2026-08-30: the SHAPE is what `version_pattern` matches
+# and it is unchanged, so this quote tracks the current version rather than
+# recording a measurement of that version's behaviour.
 version_pattern = '^rumdl (\d+\.\d+\.\d+)'
 manifest = "sources/rumdl.manifest"
 

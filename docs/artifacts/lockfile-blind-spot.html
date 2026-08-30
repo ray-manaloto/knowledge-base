@@ -128,15 +128,31 @@
   honest. None of them read the file that was wrong.</p>
 </header>
 
-<h2>A version pin lives in four places</h2>
-<p class="sub">Bumping a tool is not one edit. It is four edits that must agree, and the
-tools that check them do not all read the same files.</p>
+<h2>A version pin lives in more places than one</h2>
+<p class="sub">Bumping a tool is not one edit. It is a set of edits that must agree &mdash;
+a different set per tool &mdash; and the checkers do not all read the same files.</p>
 
-<p>This repo pins its CLI tools in <code>mise.toml</code>. But a pin has three
-companions: <code>mise.lock</code> holds the per-platform download URL and checksum for
-every platform (not just this Mac), <code>sources/&lt;tool&gt;.manifest</code> pins the
-upstream tag the corpus is built from, and <code>currency.toml</code> records what the
-drift engine expects to see.</p>
+<div class="callout" style="border-left-color:var(--lock);background:var(--lock-wash)">
+  <span class="lbl" style="color:var(--lock)">Corrected after publication &middot; 2026-08-30</span>
+  <p>The first version of this page said a pin lives in <em>four</em> places and drew all four
+  as moving on every bump. A cold review refuted that, and it was worth refuting: <strong>five
+  of the six pins this branch moved required no <code>currency.toml</code> edit at all.</strong>
+  <code>biome</code> appears in that file zero times; <code>uv</code>, <code>rumdl</code>,
+  <code>fnox</code> and <code>ctx7</code> are tracked by <code>mise_key</code>, which reads the
+  pin out of <code>mise.toml</code>, so there is nothing to move. Only five blocks in the whole
+  file carry a hardcoded <code>expected</code>.</p>
+  <p>The overclaim was not harmless. A reader acting on it would add a redundant
+  <code>expected</code> and create a second spelling of a version that already has one &mdash;
+  the exact hazard the derived-pin design exists to prevent. The diagram below is the corrected
+  one; the page's thesis about <code>mise.lock</code> is unchanged.</p>
+</div>
+
+<p>This repo pins its CLI tools in <code>mise.toml</code>. A pin has up to three companions,
+and which ones apply is <em>per tool</em>: <code>mise.lock</code> holds the per-platform
+download URL and checksum for every platform (not just this Mac),
+<code>sources/&lt;tool&gt;.manifest</code> pins the upstream tag the corpus is built from, and
+<code>currency.toml</code> records an expected version <em>only for the few tools that
+hardcode one</em>.</p>
 
 <figure>
 <pre class="mermaid">
@@ -144,36 +160,40 @@ drift engine expects to see.</p>
 flowchart LR
   BUMP["a pin bump"]
 
-  subgraph MUST["the four artifacts it must move"]
-    direction TB
-    MT["mise.toml<br/><i>the pin</i>"]
-    ML["mise.lock<br/><i>per-platform URL + checksum</i>"]
-    MAN["sources/*.manifest<br/><i>upstream tag + SHA</i>"]
-    CUR["currency.toml<br/><i>expected version</i>"]
-  end
+  MT["mise.toml<br/><i>the pin — always</i>"]
+  ML["mise.lock<br/><i>per-platform URL + checksum<br/>always, while lockfile = true</i>"]
+  MAN["sources/*.manifest<br/><i>upstream tag + SHA<br/>if the tool has one</i>"]
+  CUR["currency.toml<br/><i>expected version<br/>only if hardcoded — 5 blocks</i>"]
 
-  BUMP --> MT
-  BUMP --> ML
-  BUMP --> MAN
-  BUMP --> CUR
+  BUMP -->|"always"| MT
+  BUMP -->|"always"| ML
+  BUMP -->|"per tool"| MAN
+  BUMP -->|"rarely"| CUR
 
   MT -.->|"read by"| LS["mise ls --current"]
-  MT -.->|"read by"| ENG["currency engine"]
+  MT -.->|"mise_key reads the pin"| ENG["currency engine"]
   MAN -.->|"read by"| ENG
   CUR -.->|"read by"| ENG
   ML -.->|"read by"| NOBODY["nothing in the gate set"]
 
   classDef moved fill:#EDF5F1,stroke:#1F6B4A,color:#16202B;
   classDef missed fill:#FBEFEE,stroke:#A3342A,color:#16202B;
+  classDef cond fill:#FBF3E4,stroke:#8A5A12,color:#16202B;
   classDef plain fill:#FFFFFF,stroke:#C3CCD6,color:#16202B;
-  class MT,MAN,CUR moved;
+  class MT,MAN moved;
+  class CUR cond;
   class ML,NOBODY missed;
   class BUMP,LS,ENG plain;
 </pre>
-<figcaption>Three of the four artifacts were moved and are read by a verifier. The fourth,
-<code>mise.lock</code>, was not moved &mdash; and no gate reads it, so nothing objected.
-<code>mise ls --current</code> reports the pin from <code>mise.toml</code>, which is why
-&ldquo;the new binaries are installed&rdquo; was true and still missed this.</figcaption>
+<figcaption>Green moved and is read by a verifier. Amber is conditional &mdash; for five of the
+six pins on this branch there was nothing in <code>currency.toml</code> to move, because a
+<code>mise_key</code> block derives the expected version from <code>mise.toml</code> rather
+than restating it. Red is the gap: <code>mise.lock</code> always applies here, was not moved,
+and no gate reads it. <code>mise ls --current</code> reports the pin from
+<code>mise.toml</code>, which is why &ldquo;the new binaries are installed&rdquo; was true and
+still missed this. The sharpest form of the irony: the one tool whose <code>currency.toml</code>
+expected version <em>did</em> move &mdash; <code>mise</code> itself &mdash; is the one tool with
+no <code>mise.lock</code> entry at all.</figcaption>
 </figure>
 
 <div class="callout">
