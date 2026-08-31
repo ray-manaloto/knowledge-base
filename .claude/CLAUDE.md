@@ -31,7 +31,7 @@ fine — `gh pr view` is how you resolve whether a bare `#42` is an issue or a P
 - Without being reminded, on ANY session model: non-trivial implementation runs the fable-orchestrator architect-as-orchestrator flow — invoke the fable-orchestrator:orchestration skill before delegating and follow it as authoritative for routing, verification, review tiers, and advisor consults.
 - fable-orchestrator: implementation lane = codex
 - fable-orchestrator: codex effort = xhigh
-- fable-orchestrator: **always consult `fable-advisor` before any `codex-implementer` dispatch** (Ray, 2026-08-27, verbatim in `docs/direction/2026-08-27-ray-directives.md`).
+- fable-orchestrator: **always consult an advisor before any `codex-implementer` dispatch** (Ray, 2026-08-27, verbatim in `docs/direction/2026-08-27-ray-directives.md`, originally naming `fable-advisor`). **Until the Claude subscription resets, that advisor is this repo's own `kb-codex-advisor`** (`.claude/agents/kb-codex-advisor.md`), not `fable-advisor` — Ray, 2026-08-31, verbatim: *"claude subscription tokens are running out / until they reset on wednesday have all work done by codex lanes / replace fable-adviser w a codex adviser using the model/effort of gpt-5.6-sol/xhigh"*. `kb-codex-advisor` shells `codex exec` at `xhigh` per `.claude/rules/ai-cli-invocation.md`, so consulting it spends no Claude tokens. `fable-advisor` (the plugin's own) and this repo's Claude-backed `kb-advisor` are unchanged and resume once the reset lands — see `.claude/agents/kb-advisor.md`.
 
 The first line is the **trigger**, and it is **deliberately UN-gated** (Ray, 2026-08-24).
 The plugin ships it Fable-gated — its changelog: *"sessions on other models skip the flow
