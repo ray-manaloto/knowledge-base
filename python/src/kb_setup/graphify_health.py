@@ -155,6 +155,11 @@ class ExpectedMetadataOnly(msgspec.Struct, frozen=True, forbid_unknown_fields=Tr
     source_name: str
     relative_path: str
     content_sha256: str
+    #: `sources/<source_name>.manifest`'s `commit` this entry was derived at.
+    #: Checked by `kb-manifest-audit`'s tier 1 against the manifest's CURRENT
+    #: `commit` — a bump that never re-hashes this entry (the `b2d51b53` class)
+    #: is exactly what a mismatch here catches, offline, before the next build.
+    pinned_commit: str
     skipped_disposition: str
 
 
@@ -171,6 +176,9 @@ class ExpectedPartialExtraction(msgspec.Struct, frozen=True, forbid_unknown_fiel
     source_name: str
     relative_path: str
     content_sha256: str
+    #: `sources/<source_name>.manifest`'s `commit` this entry was derived at.
+    #: See `ExpectedMetadataOnly.pinned_commit` — same field, same check.
+    pinned_commit: str
     #: The line the warning names. Pinned so a parser whose failure MOVES stops
     #: matching this entry rather than silently reusing its approval.
     first_error_line: int
@@ -203,6 +211,9 @@ class ExpectedUnsupportedLanguage(msgspec.Struct, frozen=True, forbid_unknown_fi
     source_name: str
     relative_path: str
     content_sha256: str
+    #: `sources/<source_name>.manifest`'s `commit` this entry was derived at.
+    #: See `ExpectedMetadataOnly.pinned_commit` — same field, same check.
+    pinned_commit: str
     #: The lower-cased suffix Graphify groups the warning by, e.g. `.r`. Stored
     #: rather than derived from `relative_path` because the warning is matched on
     #: THIS, and a file whose extension case differs (`.R` on disk, `.r` in the
@@ -220,6 +231,9 @@ class ExpectedUnclassifiedFile(msgspec.Struct, frozen=True, forbid_unknown_field
     source_name: str
     relative_path: str
     content_sha256: str
+    #: `sources/<source_name>.manifest`'s `commit` this entry was derived at.
+    #: See `ExpectedMetadataOnly.pinned_commit` — same field, same check.
+    pinned_commit: str
     classification: str
 
 

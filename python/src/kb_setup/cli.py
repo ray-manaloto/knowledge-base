@@ -62,7 +62,7 @@ def _print_usage() -> int:
         "kb-setup: build | update <name> | watch | prose | query <question> [--prose] | "
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
-        "insights [--top N] | graph-size | funnel | "
+        "insights [--top N] | graph-size | funnel | manifest-audit | "
         "telemetry-prune | serve | "
         "merge <chunk> | label | "
         "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
@@ -199,6 +199,13 @@ def _run(argv: list[str] | None = None) -> int:
         # `cli.py`) — one more `if cmd == ...` arm is the intended shape here,
         # not a ceiling to work around with a new grouping helper.
         return funnel.main(repo_root, rest)
+    if cmd == "manifest-audit":
+        from kb_setup import manifest_audit
+
+        # Same bare-arm precedent as `funnel` just above: a different question
+        # (registry <-> manifest pin agreement + coverage), no graph write, no
+        # `_GRAPH_WRITERS` membership.
+        return manifest_audit.main(repo_root, rest)
     if cmd in {"insights", "graph-size", "telemetry-prune"}:
         return _dispatch_graph_hygiene(repo_root, cmd, rest)
     if cmd == "serve":

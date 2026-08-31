@@ -371,6 +371,11 @@ def test_checked_artifact_binds_source_commit(
 
 
 _SKIPPED = "data json (not a config/manifest)"
+#: A fixture value for the `pinned_commit` field `kb-manifest-audit` added to
+#: all four registry structs (#kb-manifest-audit). These fixtures are not tied
+#: to a real `sources/*.manifest`, so any 40-hex string is fine — only its
+#: TYPE and PRESENCE matter to the code under test here.
+_PINNED_COMMIT = "f" * 40
 _WARNING = (
     "  warning: 1 source file(s) produced zero nodes and are absent from the graph: "
     "plugin.json. A re-run will retry them (empties are no longer cached); if it persists, "
@@ -400,6 +405,7 @@ def _metadata_inventory(
             source_name="reviewed-source",
             relative_path="plugin.json",
             content_sha256=digest or hashlib.sha256(path.read_bytes()).hexdigest(),
+            pinned_commit=_PINNED_COMMIT,
             skipped_disposition=_SKIPPED,
         ),
     )
@@ -451,6 +457,7 @@ def _eight_file_inventory(directory: Path) -> tuple[ExpectedMetadataOnly, ...]:
                 source_name="reviewed-source",
                 relative_path=relative_path,
                 content_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                pinned_commit=_PINNED_COMMIT,
                 skipped_disposition=_SKIPPED,
             )
         )
@@ -555,6 +562,7 @@ def _partial_review(
                 source_name="reviewed-source",
                 relative_path=_ASTRO_PATH,
                 content_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                pinned_commit=_PINNED_COMMIT,
                 first_error_line=1,
                 extracted_nodes=extracted_nodes,
                 lost_symbols=25,
@@ -746,6 +754,7 @@ def test_metadata_skip_mutations_do_not_approve(
                 source_name="reviewed-source",
                 relative_path="missing.json",
                 content_sha256=inventory[0].content_sha256,
+                pinned_commit=_PINNED_COMMIT,
                 skipped_disposition=_SKIPPED,
             ),
         )
@@ -796,6 +805,7 @@ def _manifest_inventory(
             source_name="reviewed-source",
             relative_path="Cargo.toml",
             content_sha256=digest or hashlib.sha256(path.read_bytes()).hexdigest(),
+            pinned_commit=_PINNED_COMMIT,
             skipped_disposition=disposition or EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         ),
     )
@@ -860,6 +870,7 @@ def test_package_manifest_zero_node_mutations_do_not_approve(
                 source_name="reviewed-source",
                 relative_path="elsewhere/go.mod",
                 content_sha256=inventory[0].content_sha256,
+                pinned_commit=_PINNED_COMMIT,
                 skipped_disposition=EXPECTED_PACKAGE_MANIFEST_NO_NAME,
             ),
         )
@@ -893,12 +904,14 @@ def test_metadata_inventory_may_not_mix_manifest_and_json_routes(tmp_path: Path)
             source_name="reviewed-source",
             relative_path="plugin.json",
             content_sha256=hashlib.sha256(json_path.read_bytes()).hexdigest(),
+            pinned_commit=_PINNED_COMMIT,
             skipped_disposition=_SKIPPED,
         ),
         ExpectedMetadataOnly(
             source_name="reviewed-source",
             relative_path="Cargo.toml",
             content_sha256=hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+            pinned_commit=_PINNED_COMMIT,
             skipped_disposition=EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         ),
     )
@@ -944,6 +957,7 @@ def test_detection_policy_requires_exact_reviewed_source_path_and_hash(tmp_path:
         source_name="Attacca",
         relative_path=".github/BOILERPLATE_VERSION",
         content_sha256=hashlib.sha256(marker.read_bytes()).hexdigest(),
+        pinned_commit=_PINNED_COMMIT,
         classification="reviewed-version-marker",
     )
 
@@ -968,6 +982,7 @@ def test_claudeignore_requires_exact_source_root_hash_utf8_size_and_grammar(
         source_name="Attacca",
         relative_path=".claudeignore",
         content_sha256=hashlib.sha256(ignored.read_bytes()).hexdigest(),
+        pinned_commit=_PINNED_COMMIT,
         classification="reviewed-root-ignore-metadata",
     )
 
@@ -977,6 +992,7 @@ def test_claudeignore_requires_exact_source_root_hash_utf8_size_and_grammar(
         source_name="Attacca",
         relative_path=".claudeignore",
         content_sha256=hashlib.sha256(ignored.read_bytes()).hexdigest(),
+        pinned_commit=_PINNED_COMMIT,
         classification="reviewed-root-ignore-metadata",
     )
     rejected = graphify_sdk.source_detection_policy(tmp_path, "Attacca", (hostile,))
@@ -1067,6 +1083,7 @@ def _unsupported_review(
                 source_name="reviewed-source",
                 relative_path=relative,
                 content_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                pinned_commit=_PINNED_COMMIT,
                 language=".r",
                 lost_symbols=1,
                 reason="graphify has no tree-sitter-r dispatch (#1689)",
