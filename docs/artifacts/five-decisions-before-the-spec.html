@@ -35,6 +35,10 @@
   ol.opts{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:5px;font-size:15.5px}
   .rec{background:var(--accent-wash);border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 3px 3px 0;font-size:15.5px}
   .rec b{color:var(--accent)}
+  .ans{background:#1a1714;color:#f4f1ec;border-left:3px solid var(--accent);padding:12px 15px;
+     border-radius:0 3px 3px 0;font-size:15.5px}
+  .ans b{color:#7fd4bf}
+  .ans code,.ans .mono{background:#302a25;color:#f4f1ec}
   .flag{background:var(--warn-wash);border-left:3px solid var(--warn);padding:10px 14px;border-radius:0 3px 3px 0;font-size:15.5px}
   .flag b{color:var(--warn)}
   figure{margin:0;background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:20px 22px}
@@ -55,10 +59,13 @@
   <p class="lede">A cold lane read four prior reports and the design page, settled
   <strong>11</strong> questions it could answer from the repo, and left <strong>five</strong> that
   need you. Ranked by what a wrong answer costs.</p>
-  <p class="flag" style="margin-top:14px"><b>Updated after publication.</b> Decision 1 is
-  <strong>answered</strong> — enrollment first. Decision 4 is <strong>answered</strong> — the spec
-  waits. Decision 2 carries a new finding that removes an option somebody proposed. Nothing below has
-  been silently rewritten; the original recommendations are still visible beside the updates.</p>
+  <p class="flag" style="margin-top:14px"><b>Updated after publication — four of five now answered.</b>
+  <strong>1</strong> — enrollment first. <strong>4</strong> — the spec waits.
+  <strong>3</strong> — dissolved by measurement, not decided: the “red gates” it worried about are green
+  (2026-08-31). <strong>5</strong> — Ray’s call: “full” means <em>every pin site</em>, 35, not the 18
+  mapped. Only <strong>2</strong> is still open. Decision 2 also carries a finding that removes an
+  option somebody proposed. Nothing below has been silently rewritten; every superseded claim is still
+  visible beside its correction.</p>
 </header>
 
 <div class="card">
@@ -118,8 +125,12 @@
 <figcaption>The difference is which direction the default runs. An include-list makes silence mean
 “not covered”; an exclude-list makes silence mean “covered”. Measured this session: all seven named
 tools appear in <span class="mono">mise.toml</span>’s <span class="mono">[tools]</span> table, so
-option 1 needs no new data source. The “15 of 33 unmapped” figure behind this is
-<strong>inherited</strong> from a prior report, not re-derived here.</figcaption>
+option 1 needs no new data source. The “15 of 33 unmapped” figure behind this was
+<strong>inherited</strong> when this figure was drawn and has since been <strong>re-derived and
+confirmed</strong> (2026-08-31): denominator = 20 mise <span class="mono">[tools]</span> + 13 distinct
+pyproject packages. The re-derivation added one thing the figure cannot show —
+<span class="mono">[tool.mise]</span> and <span class="mono">[tool.claude-code]</span> are tracked but
+match nothing in either pin file, so they sit outside the 33 altogether.</figcaption>
 </figure>
 
 <div class="card">
@@ -189,10 +200,19 @@ option 1 needs no new data source. The “15 of 33 unmapped” figure behind thi
   <p><span class="lbl">Stakes</span>The design treats “gates pass” as the signal a bump is safe. If
   the baseline is already red for unrelated reasons, the protocol’s first real run fails on
   pre-existing defects — <strong>and reads as a failure of the new design.</strong></p>
-  <div class="flag"><b>Inherited, not re-measured.</b> The <span class="mono">hk-test</span>
-  40-passed / 6-failed figure and the absent currency stamp come from a prior report. The lane
-  could not run gate tasks and <strong>did not re-run them</strong>; neither have I. Treat as
-  unverified until someone runs <span class="mono">kb-gates</span>.</div>
+  <div class="flag" style="opacity:.62"><b>Was: inherited, not re-measured.</b> The
+  <span class="mono">hk-test</span> 40-passed / 6-failed figure and the absent currency stamp came
+  from a prior report. Nobody had re-run them. <b>Superseded 2026-08-31 — kept for the record.</b></div>
+  <div class="ans"><b>ANSWERED — by measurement, not judgement.</b>
+  <span class="mono">mise run kb-gates</span> at <span class="mono">d08baaa7</span>:
+  <b>all 7 rc=0, every row <span class="mono">dirty:false</span></b> — and the specific number was
+  <span class="mono">hk-test: 46 passed, 0 failed (floor 40)</span>. Note 40 + 6 = 46: the prior report
+  saw the right test count and misattributed six of them as failures.
+  <b>There is no red baseline, so it blocks nothing.</b>
+  <p style="margin:8px 0 0">The residual — <span class="mono">kb-build</span> IS red, but it is not one
+  of the seven gates. <b>Ray, 2026-08-31: it stays out</b> (≈55 min, network, re-clones every pinned
+  source; a transient DNS failure would become a blocked ship). A new seconds-long
+  <b>manifest-audit gate</b> catches the same class before a build ever runs.</p></div>
 </div>
 
 <div class="card">
@@ -211,6 +231,21 @@ option 1 needs no new data source. The “15 of 33 unmapped” figure behind thi
   the MVP’s success criterion <strong>cannot be met as written on day one regardless of how
   decision 1 goes</strong> — some legitimate gap always exists. Whoever writes acceptance criteria
   needs a definition of “full” a gate can actually check.</p>
+  <div class="ans"><b>ANSWERED — Ray, 2026-08-31: every pin site. 35, not 18.</b>
+  “Full” means literally full. The denominator was re-derived this session and is
+  <span class="mono">20 mise [tools] + 13 distinct pyproject packages = 33</span>, of which
+  <b>18 are covered</b> by a reachable <span class="mono">currency.toml [tool.X]</span> table.
+  Plus <span class="mono">[tool.mise]</span> and <span class="mono">[tool.claude-code]</span>, which
+  have neither a <span class="mono">mise_key</span> nor a <span class="mono">python_package</span> and
+  so sit <em>outside</em> the 33 while being real tracked tools — hence <b>35</b>.
+  <p style="margin:8px 0 0"><b>The cost, accepted knowingly:</b> the criterion reads <b>18/35 on day
+  one</b> and stays red until the 15 are mapped. That is a roadmap, not a defect — the alternative
+  definitions all pass immediately by declaring the gap out of scope.</p>
+  <p style="margin:8px 0 0"><b>The uncovered 15, by name.</b> mise (7):
+  <span class="mono">biome, gh, gitleaks, pkl, python, taplo, typos</span>. pyproject (8):
+  <span class="mono">anthropic, httpx2, mcp2cli, msgspec, pytest, pytest-xdist, structlog,
+  trafilatura</span>. <b><span class="mono">biome</span> is on this list and is also the manifest
+  currently breaking <span class="mono">kb-build</span></b> — the same gap seen from two sides.</p></div>
 </div>
 
 <div class="prov">
@@ -220,8 +255,8 @@ option 1 needs no new data source. The “15 of 33 unmapped” figure behind thi
     <tr><td>All 7 tools present in <code>mise.toml [tools]</code></td><td><b style="color:var(--accent)">CONFIRMED</b> — ran it this session</td></tr>
     <tr><td>Second tracked subtree under <code>graphify-out/</code>, 5 files</td><td><b style="color:var(--accent)">CONFIRMED</b> — <span class="mono">git ls-files</span>, this session</td></tr>
     <tr><td><code>do-not.md</code> permits exactly one exception</td><td><b style="color:var(--accent)">CONFIRMED</b> — read at <code>:70</code>, <code>:79</code></td></tr>
-    <tr><td>15 of 33 dependencies unmapped</td><td><b style="color:var(--muted)">INHERITED</b> — prior report, not re-derived</td></tr>
-    <tr><td><span class="mono">hk-test</span> 40 pass / 6 fail</td><td><b style="color:var(--muted)">INHERITED</b> — nobody re-ran it</td></tr>
+    <tr><td>15 of 33 dependencies unmapped</td><td><b style="color:var(--accent)">RE-DERIVED 2026-08-31 — HOLDS</b>. Reproduced exactly: denominator = 20 mise <code>[tools]</code> + 13 distinct pyproject packages; covered = has a reachable <code>currency.toml [tool.X]</code> table. The suspicion that it conflated corpus sources with dependencies is <b>REFUTED</b> — the 97 tracked manifests play no part in reaching 33. One thing it hides: <code>[tool.mise]</code> and <code>[tool.claude-code]</code> sit outside the 33 entirely, so 33 is not the full population.</td></tr>
+    <tr><td><span class="mono">hk-test</span> 40 pass / 6 fail</td><td><b style="color:var(--warn)">REFUTED 2026-08-31</b> — re-run: <code>hk-test: 46 passed, 0 failed (floor 40)</code>, and all 7 gates rc=0 at <code>d08baaa7</code> with every row <code>dirty:false</code>. 40 + 6 = 46, so the prior report saw the right test count and misattributed six as failures. <b>This is why decision 3 dissolved rather than being decided.</b></td></tr>
     <tr><td>A public comment cites the wrong upstream PR number</td><td><b style="color:var(--warn)">REFUTED</b> — settled after publication. The comment is <strong>correct</strong>: it names <code>#441 “SQLite Support”</code> (merged 2025-08-27, confirmed) as the answer and cites <code>#680</code> only as the wrong number it is refuting. The lane read a refutation as an endorsement. Nothing needs fixing.</td></tr>
   </table>
 </div>
@@ -231,5 +266,6 @@ option 1 needs no new data source. The “15 of 33 unmapped” figure behind thi
   5 questions, 11 candidates settled rather than asked). Built from four prior cold reports plus
   <span class="mono">clear-to-spec.html</span> — which was itself written from only one of those
   four, which is why these five exist at all.
+  <br><br>Decisions <b>3</b> and <b>5</b> answered in session <span class="mono">kb-20260830.005</span>, 2026-08-31. Decision 3 by running <span class="mono">mise run kb-gates</span> at <span class="mono">d08baaa7</span> (7/7 rc=0, all <span class="mono">dirty:false</span>); decision 5 by Ray, with the denominator re-derived from <span class="mono">mise.toml</span>, <span class="mono">pyproject.toml</span> and <span class="mono">currency.toml</span> via <span class="mono">tomllib</span> rather than grep — report at <span class="mono">.agent/kb/reports/agents/dep-inventory.md</span>.
 </footer>
 </div>

@@ -43,11 +43,118 @@
 
 <div class="wrap">
 <header>
-  <p class="eyebrow">Root cause · session kb-20260830.004 · 2026-08-31</p>
+  <p class="eyebrow">Root cause · sessions kb-20260830.004 → .005 · updated 2026-08-31</p>
   <h1>Why kb-build Is Red</h1>
-  <p class="lede">Not a graphify bug. Not the stderr policy. <strong>A source manifest whose author
-  wrote “extraction deferred” in a comment and never set the key that defers it.</strong></p>
+  <p class="lede">Not a graphify bug. Not the stderr policy. <strong>A package manifest that
+  produces zero nodes and was never registered as expected — and it was never one manifest.
+  It is a class of eleven, of which exactly one is still unguarded.</strong></p>
 </header>
+
+<div class="break" style="border-left-color:#0f5c7a;background:#e6f1f6;border-color:#b8d3e0">
+  <p style="margin-bottom:6px"><b style="color:#0f5c7a">Update — the build was run, and failed again.</b>
+  The two edits this page originally prescribed were made. <code>mise run kb-build</code> then ran to
+  completion and failed at <span class="mono">2026-08-31T12:15:42Z</span> with the identical error on a
+  different source: <code>biome</code>. Fixing one instance let extraction reach the next.</p>
+  <p style="margin-bottom:0">That reframed the finding as a class — and the first attempt to size that
+  class was wrong in the alarming direction. It reported 34 <code>Cargo.toml</code> files with “the rest
+  unaudited”, implying an open-ended queue of red builds at ~55 minutes each. <b>The audit takes about
+  thirty seconds and the queue has one item.</b></p>
+</div>
+</div>
+
+<div class="wide scroll">
+<figure>
+<svg viewBox="0 0 1000 320" role="img" aria-label="A triage of the 475 Cargo.toml files under sources. 464 contain a package section and extract to real nodes. The remaining 11 are bare workspace roots that extract to zero nodes and emit a warning. Of those 11, four are excluded by a build key set to defer or skip, six are registered in graph.py, and exactly one — biome — is neither, so its warning is unapproved and the build fails closed.">
+  <defs><marker id="t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#3d4854"/></marker>
+  <marker id="tr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#a32d1e"/></marker></defs>
+
+  <rect x="10" y="130" width="155" height="64" rx="3" fill="#fff" stroke="#8d99a6" stroke-width="1.3"/>
+  <text x="24" y="155" font-family="Roboto Mono, monospace" font-size="15" font-weight="500" fill="#12161c">475</text>
+  <text x="24" y="172" font-family="Roboto Mono, monospace" font-size="10.5" fill="#3d4854">Cargo.toml</text>
+  <text x="24" y="186" font-family="Work Sans, sans-serif" font-size="11" fill="#5f6b78">under sources/</text>
+
+  <line x1="167" y1="155" x2="223" y2="76" stroke="#8d99a6" stroke-width="1.3" marker-end="url(#t)"/>
+  <line x1="167" y1="172" x2="223" y2="228" stroke="#8d99a6" stroke-width="1.3" marker-end="url(#t)"/>
+
+  <rect x="225" y="40" width="195" height="56" rx="3" fill="#fff" stroke="#1d6b4f" stroke-width="1.4"/>
+  <text x="238" y="63" font-family="Roboto Mono, monospace" font-size="14" font-weight="500" fill="#1d6b4f">464</text>
+  <text x="272" y="63" font-family="Work Sans, sans-serif" font-size="12" fill="#12161c">with [package]</text>
+  <text x="238" y="82" font-family="Work Sans, sans-serif" font-size="11.5" fill="#3d4854">extract → real nodes, silent</text>
+
+  <rect x="225" y="205" width="195" height="56" rx="3" fill="#fbecea" stroke="#a32d1e" stroke-width="1.5"/>
+  <text x="238" y="228" font-family="Roboto Mono, monospace" font-size="14" font-weight="500" fill="#a32d1e">11</text>
+  <text x="266" y="228" font-family="Work Sans, sans-serif" font-size="12" fill="#12161c">bare [workspace]</text>
+  <text x="238" y="247" font-family="Work Sans, sans-serif" font-size="11.5" fill="#3d4854">extract → 0 nodes, warns</text>
+
+  <text x="196" y="128" font-family="Work Sans, sans-serif" font-size="10.5" fill="#5f6b78" text-anchor="middle">shape</text>
+
+  <line x1="422" y1="228" x2="486" y2="168" stroke="#8d99a6" stroke-width="1.3" marker-end="url(#t)"/>
+  <line x1="422" y1="233" x2="486" y2="228" stroke="#8d99a6" stroke-width="1.3" marker-end="url(#t)"/>
+  <line x1="422" y1="240" x2="486" y2="288" stroke="#a32d1e" stroke-width="1.6" marker-end="url(#tr)"/>
+  <text x="452" y="196" font-family="Work Sans, sans-serif" font-size="10.5" fill="#5f6b78" text-anchor="middle">disposition</text>
+
+  <rect x="490" y="144" width="230" height="48" rx="3" fill="#fff" stroke="#8d99a6" stroke-width="1.3"/>
+  <text x="503" y="167" font-family="Roboto Mono, monospace" font-size="13" font-weight="500" fill="#12161c">4</text>
+  <text x="521" y="167" font-family="Roboto Mono, monospace" font-size="10.5" fill="#3d4854">build = defer / skip</text>
+  <text x="503" y="183" font-family="Work Sans, sans-serif" font-size="11" fill="#5f6b78">never extracted at all</text>
+
+  <rect x="490" y="204" width="230" height="48" rx="3" fill="#fff" stroke="#8d99a6" stroke-width="1.3"/>
+  <text x="503" y="227" font-family="Roboto Mono, monospace" font-size="13" font-weight="500" fill="#12161c">6</text>
+  <text x="521" y="227" font-family="Work Sans, sans-serif" font-size="11.5" fill="#3d4854">registered in graph.py</text>
+  <text x="503" y="243" font-family="Work Sans, sans-serif" font-size="11" fill="#5f6b78">warning pre-approved by hash</text>
+
+  <rect x="490" y="264" width="230" height="48" rx="3" fill="#fbecea" stroke="#a32d1e" stroke-width="1.8"/>
+  <text x="503" y="287" font-family="Roboto Mono, monospace" font-size="13" font-weight="500" fill="#a32d1e">1</text>
+  <text x="521" y="287" font-family="Work Sans, sans-serif" font-size="11.5" font-weight="600" fill="#a32d1e">neither → biome</text>
+  <text x="503" y="303" font-family="Work Sans, sans-serif" font-size="11" fill="#a32d1e">no build key, not registered</text>
+
+  <line x1="722" y1="168" x2="776" y2="180" stroke="#8d99a6" stroke-width="1.3" marker-end="url(#t)"/>
+  <line x1="722" y1="228" x2="776" y2="196" stroke="#8d99a6" stroke-width="1.3" marker-end="url(#t)"/>
+  <line x1="722" y1="288" x2="776" y2="288" stroke="#a32d1e" stroke-width="1.6" marker-end="url(#tr)"/>
+
+  <rect x="778" y="160" width="212" height="52" rx="3" fill="#fff" stroke="#1d6b4f" stroke-width="1.4"/>
+  <text x="791" y="182" font-family="Work Sans, sans-serif" font-size="12.5" font-weight="600" fill="#1d6b4f">build stays green</text>
+  <text x="791" y="199" font-family="Work Sans, sans-serif" font-size="11" fill="#3d4854">10 of the 11 land here</text>
+
+  <rect x="778" y="264" width="212" height="48" rx="3" fill="#fbecea" stroke="#a32d1e" stroke-width="1.8"/>
+  <text x="791" y="286" font-family="Work Sans, sans-serif" font-size="12.5" font-weight="600" fill="#a32d1e">fail closed → RED</text>
+  <text x="791" y="302" font-family="Work Sans, sans-serif" font-size="11" fill="#a32d1e">one unapproved warning is enough</text>
+</svg>
+<figcaption>Every one of the 475 was classified this session, unbounded — no <code>head</code>, no
+<code>-maxdepth</code>. The discriminator is <b>not the file's shape</b>: <code>uv</code>'s
+<code>Cargo.toml</code> is just as bare as <code>biome</code>'s. What separates green from red is
+whether the source is <b>excluded by a build key or registered by hash</b>. Ten of the eleven are;
+one is not.</figcaption>
+</figure>
+</div>
+
+<div class="wrap">
+<section>
+  <p class="eyebrow">The audit, in full</p>
+  <h2>Eleven files, ten sources, one hole</h2>
+  <p>Every bare <code>[workspace]</code> root under <code>sources/</code>, with the two things that
+  can protect it. Read this session from <code>sources/*.manifest</code> and
+  <code>python/src/kb_setup/graph.py</code>.</p>
+  <div class="scroll"><table>
+    <tr><th>source</th><th><code>build</code> key</th><th>registered</th><th>verdict</th></tr>
+    <tr><td class="mono">ast-grep</td><td class="mono">defer</td><td>—</td><td>excluded</td></tr>
+    <tr><td class="mono">codex</td><td class="mono">skip</td><td>—</td><td>excluded</td></tr>
+    <tr><td class="mono">GitNexus</td><td class="mono">skip</td><td>—</td><td>excluded (2 fixture files)</td></tr>
+    <tr><td class="mono">logbook</td><td>—</td><td>yes</td><td>approved</td></tr>
+    <tr><td class="mono">pensyve</td><td>—</td><td>yes</td><td>approved</td></tr>
+    <tr><td class="mono">ruff</td><td>—</td><td>yes</td><td>approved</td></tr>
+    <tr><td class="mono">taplo</td><td>—</td><td>yes</td><td>approved</td></tr>
+    <tr><td class="mono">typos</td><td>—</td><td>yes</td><td>approved</td></tr>
+    <tr><td class="mono">uv</td><td>—</td><td>yes</td><td>approved</td></tr>
+    <tr><td class="mono"><b style="color:#a32d1e">biome</b></td><td>—</td><td>—</td>
+        <td><b style="color:#a32d1e">UNGUARDED — the current red</b></td></tr>
+  </table></div>
+  <div class="note" style="margin-top:14px"><b>The limit of this audit, stated:</b> it covers
+  <code>Cargo.toml</code> only. The approver registry also holds <code>pyproject.toml</code>,
+  <code>plugin.json</code>, <code>.claudeignore</code> and various fixtures — the zero-node mechanism
+  is not Rust-specific. Eleven is a <i>slice</i> of the class, not the class. That is the argument for
+  a gate rather than a tenth hand-check.</div>
+</section>
 </div>
 
 <div class="wide scroll">
@@ -105,7 +212,7 @@ The control arm is the blue box — the mechanism is not broken, it simply was n
 <div class="wrap">
 
 <div class="break">
-  <p class="eyebrow" style="color:#a32d1e">The shape of the defect</p>
+  <p class="eyebrow" style="color:#a32d1e">The mechanism · worked on the first instance</p>
   <h2 style="color:#a32d1e">A comment is prose. The parser reads keys.</h2>
   <p><code>sources/ast-grep.manifest</code> carries <strong>only</strong> <code>url</code>,
   <code>ref</code>, <code>commit</code>, <code>kind</code> — verified this session. Its comment says
@@ -119,7 +226,7 @@ The control arm is the blue box — the mechanism is not broken, it simply was n
 
 <section>
   <p class="eyebrow">The thing that will bite next</p>
-  <h2>One more is already broken, and the class is exactly three</h2>
+  <h2>The pin that lives in two files — fourteen times</h2>
   <p>Commit <code>b2d51b53</code> (“bump five patch-level CLI pins”) bumped <strong>six</strong>
   manifests and touched <code>graph.py</code> <strong>zero</strong> times — both measured this
   session. But <code>graph.py</code> registers a content hash for a source's <code>Cargo.toml</code>,
@@ -152,8 +259,8 @@ The control arm is the blue box — the mechanism is not broken, it simply was n
 </section>
 
 <section>
-  <p class="eyebrow">Correction</p>
-  <h2>A premise I gave the lane was wrong, and it was my own display bound</h2>
+  <p class="eyebrow">Corrections · first and second</p>
+  <h2>Twice in one session, I measured a proxy for the thing</h2>
   <p>I told the lane six sources carry a <code>Cargo.toml</code>, naming them. The real number is
   <strong>34</strong>. I had run the search piped through <code>head -6</code> and reported the first
   six as the complete set — a <strong>display bound reported as a finding</strong>, which is the exact
@@ -170,29 +277,63 @@ The control arm is the blue box — the mechanism is not broken, it simply was n
 </section>
 
 <section>
-  <p class="eyebrow">What to do</p>
-  <h2>Two edits, neither of them in graphify</h2>
+  <p class="eyebrow">What to do — revised after the second failed build</p>
+  <h2>One edit unblocks the build. One gate stops the class.</h2>
+  <p>The two edits this section originally listed were made, and the build failed anyway. Their
+  replacement is not a third edit of the same kind.</p>
   <ol>
-    <li><strong><code>sources/ast-grep.manifest</code></strong> — add <code>build = defer</code> (or
-    <code>skip</code>) with a reason, matching what <code>codex.manifest</code> already does. Or, if it
-    is wanted in the corpus now, register its <code>Cargo.toml</code> as expected-metadata-only.</li>
-    <li><strong><code>python/src/kb_setup/graph.py</code></strong> — refresh the <code>uv</code>
-    <code>Cargo.toml</code> hash before the next build, or it fails there instead.</li>
+    <li><strong><code>sources/biome.manifest</code></strong> — give it a <code>build</code> key, or
+    register its <code>Cargo.toml</code> hash. <b>The audit above says this is the last one</b>, so
+    unlike the previous two this edit has a green build behind it rather than another name.</li>
+    <li><strong>A gate that runs the audit without a build.</strong> Enumerate every source's bare
+    package manifests and require each to be excluded or registered. It takes seconds; discovering the
+    same fact by building takes about 55 minutes and yields exactly one name per run.</li>
   </ol>
-  <div class="note" style="margin-top:6px"><b>And when the build is finally run:</b> set
+  <div class="note" style="margin-top:6px"><b>That gate has a second job already waiting for it.</b>
+  Fourteen sources carry a pin in two files — the manifest and <code>graph.py</code> — with nothing
+  forcing them to move together, which is the defect in the section above. Registration-coverage and
+  hash-freshness are the same check asked at two moments, so one gate answers both findings.</div>
+  <div class="note" style="margin-top:10px"><b>And when the build is run:</b> set
   <code>GRAPHIFY_NO_BACKUP=1</code>, or a successful run writes another dated snapshot of roughly
-  778 MB beside the one already there. Nothing rotates them.</div>
+  778 MB beside the one already there. Nothing rotates them. Until a green build exists, the existing
+  778 MB snapshot is the only near-copy of a graph this repo cannot currently rebuild — so it stays.</div>
   <p style="margin-top:12px;margin-bottom:0"><b>A plain re-run will not fix this.</b> graphify's
   warning says empties are retried, but this is a deterministic structural zero-node result, not the
   transient it describes — so the message's own advice is misleading here.</p>
 </section>
 
+<section>
+  <p class="eyebrow">Correction · third</p>
+  <h2>“The rest are unaudited” was a guess wearing a measurement's clothes</h2>
+  <p>After the second failed build, the finding was written up as an open-ended queue: 34
+  <code>Cargo.toml</code> files exist, 14 sources are registered, <i>the rest are unaudited</i> — and
+  the explicit advice was <b>do not fix <code>biome</code> and re-run</b>, because each build buys only
+  one more name. Every number in that sentence was real. The conclusion drawn from them was not, because
+  nobody ran the audit it was recommending.</p>
+  <p>Running it costs about thirty seconds and closes the set: 475 files, 464 with a
+  <code>[package]</code>, <b>11 bare</b>, and 10 of those 11 already excluded or registered. The queue
+  was never open-ended. The advice inverted as a result — fixing <code>biome</code> is now the cheap
+  path to a green build, not a wasted 55 minutes.</p>
+  <p style="margin-bottom:0">This is the same failure the section above already records twice, at a
+  larger scale: a <code>head -6</code> reported as a population, three constants reported as a registry,
+  and now an unrun audit reported as an unbounded tail. <b>Each time the error was reasoning outward
+  from a partial measurement instead of completing it.</b> The control arm that broke the pattern here
+  was an accident — <code>uv</code> was chosen as the “has a real <code>[package]</code>” control and
+  turned out to be just as bare as <code>biome</code>, which is what exposed that the file's shape was
+  never the discriminator at all.</p>
+</section>
+
 <footer>
-  Measured in session <span class="mono">kb-20260830.004</span>. Read this session:
-  <span class="mono">sources/ast-grep.manifest</span>, <span class="mono">sources/codex.manifest:53</span>,
-  <span class="mono">sources/uv.manifest</span>, <span class="mono">python/src/kb_setup/graph.py:255</span>,
-  <span class="mono">graphify_health.py:226,304</span>, <span class="mono">graphify-out/.build-failure.json</span>,
-  and <span class="mono">git show --name-only b2d51b53</span>. Diagnosis by a codex lane; every claim
-  above re-verified here before publication.
+  Diagnosed in session <span class="mono">kb-20260830.004</span>; audited and corrected in
+  <span class="mono">kb-20260830.005</span>. Read or run this session:
+  <span class="mono">sources/*.manifest</span> (all <code>build</code> keys, by value not presence),
+  <span class="mono">python/src/kb_setup/graph.py:255-275</span>,
+  <span class="mono">graphify-out/.build-failure.json</span>, and an unbounded classification of all
+  475 <span class="mono">Cargo.toml</span> files under <span class="mono">sources/</span>.
+  Gate state at <span class="mono">d08baaa7</span>: all 7 rc=0, every row
+  <span class="mono">dirty:false</span> — including <span class="mono">hk-test: 46 passed, 0 failed</span>,
+  which refutes the inherited “40 passed / 6 failed” this page's planning cited.
+  Every claim above was re-verified here before republication; the three corrections are kept in place
+  rather than edited away.
 </footer>
 </div>
