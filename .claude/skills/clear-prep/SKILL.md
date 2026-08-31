@@ -430,14 +430,14 @@ writing its handoff at the end of the window instead of the start.
 PWF="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/cache/planning-with-files/planning-with-files/3.12.0}"
 sh "$PWF/scripts/check-complete.sh"   # phases still in_progress? then DO NOT archive
 mkdir -p .planning/.archive && mv .planning/<id> .planning/.archive/<id>
+grep -qx '<id>' .planning/.active_plan 2>/dev/null && rm .planning/.active_plan
 ```
 
 **Archiving an UNFINISHED plan destroys the thing the plugin exists for** — its
 `SessionStart` hook (matcher `startup|resume|clear|compact`) restores a live plan
 after exactly the `/clear` you are preparing, and in gated mode the Stop hook is
-still counting its phases. So check first; an incomplete plan is a normal state
-and stays. Then clear `.planning/.active_plan` **only if it names `<id>`** — one
-global pointer, and a parallel `PLAN_ID` session may have repointed it.
+still counting its phases. So check first — an incomplete plan is normal and stays.
+The `.active_plan` guard matters: one global pointer a parallel `PLAN_ID` may hold.
 
 Two details are load-bearing. Nothing creates `.archive/`, so without `mkdir -p`
 the first archive fails and an `&&` chain silently leaves the plan selected. And

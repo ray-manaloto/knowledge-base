@@ -59,7 +59,12 @@ THE TWO TIERS, split by evidence availability — the core design decision:
   entry's file and compares `content_sha256` (plus, for `ExpectedMetadataOnly`
   entries, re-runs the exact zero-node predicate `graphify_sdk` already owns);
   and scans each BUILT source's clone for an unregistered zero-node package
-  manifest. **Clone absent -> SKIP**, its own state, never collapsed into OK.
+  manifest. **All clones absent -> SKIP**, its own state. Note the MIXED case,
+  which is the normal one on most machines: with some clones present and some
+  absent, `elif verified_sources` wins and tier 2 reports OK, so the per-source
+  skips reach stdout via `render` but NOT the sidecar. That is intended and
+  pinned by `test_tier2_ok_when_some_clones_present_and_some_absent`; this line
+  claimed "never collapsed into OK" absolutely, which was false for that case.
 
 A DELIBERATE ASYMMETRY, do not "fix" it: tier 1 flags DRIFT on a pin bump even
 when the file is byte-identical upstream. That is the correct direction to be
@@ -227,11 +232,14 @@ def _entries_by_source() -> dict[str, list[tuple[str, RegistryEntry]]]:
 def _tier1(manifests: dict[str, mf.Manifest]) -> Tier1Report:
     """Tier 1: every registry entry's `pinned_commit` against its manifest's `commit`.
 
-    Iterates MANIFESTS (per the spec's constraint), not registry entries: a
-    manifest with zero entries trivially passes tier 1 (it has nothing to
-    check), which is exactly what lets a brand-new, wholly unregistered source
-    — the `biome` case — reach tier 2's coverage scan instead of being silently
-    invisible here.
+    Iterates REGISTRY ENTRIES grouped by source (`_entries_by_source`); the
+    `manifests` argument is a lookup table, not the loop. This docstring said
+    the opposite — "iterates MANIFESTS, not registry entries" — until a cold
+    Gemini lane read it against line 239 (2026-08-31). The CONCLUSION it drew
+    still holds, which is why the error survived: a manifest with zero entries
+    is never visited here, so a brand-new wholly unregistered source — the
+    `biome` case — falls through to tier 2's coverage scan rather than being
+    silently invisible. Same outcome, different mechanism; state the mechanism.
     """
     by_source = _entries_by_source()
     mismatches: list[str] = []

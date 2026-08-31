@@ -667,6 +667,10 @@ def test_render_does_not_flag_an_ok_outcome():
     """
     results = [gates.GateResult("alpha", 0, _SHA, "t", outcome="OK")]
     out = gates.render(results, sha=_SHA, path=Path("x.json"))
+    # Positive assertion FIRST: two bare `not in` checks are also satisfied by a
+    # `render` that returns "", so without this the arm could not fail for the
+    # right reason. Caught by a cold Gemini lane, 2026-08-31.
+    assert "PASS" in out
     assert "differs from a clean pass" not in out.lower()
     assert "alpha=OK" not in out
 
