@@ -136,10 +136,10 @@ what should not outlive the session and note anything deliberately left running.
 A stale wakeup firing after the handoff re-triggers work that is already done.
 
 **If a `planning-with-files` plan is active, its files are gather inputs.** From
-the dir `resolve-plan-dir.sh` prints: `progress.md` is the round's narration, and
-`task_plan.md`'s decisions journal is the reasoning behind what shipped. Both feed
-the handoff; neither replaces it — the plan dies with the clone (`.planning/` is
-gitignored) and carries no gate evidence, receipt, or generated next task.
+the dir `resolve-plan-dir.sh` prints: `progress.md` is the round's narration,
+`task_plan.md`'s decisions journal the reasoning behind what shipped. Both feed
+the handoff; neither replaces it — the plan dies with the clone and carries no
+gate evidence, receipt, or generated next task.
 
 **Do not block `/clear` on anything that runs without this session.** GitHub
 Actions runs and bots like Renovate execute on GitHub's schedule whether you
@@ -227,16 +227,14 @@ reflected in docs):
    addition needs an offsetting trim; prefer collapsing duplication into a
    pointer over deleting a load-bearing fact.
 2. **`.claude/rules/*.md`** when a lesson generalises past this round.
-   `.claude/CLAUDE.md` for anything about the issue tracker or the executor
-   lanes.
-3. **Cross-references.** Grep for anything renamed, moved, deleted or re-timed:
+   `.claude/CLAUDE.md` for the issue tracker or the executor lanes.
+3. **Cross-references.** Grep for anything renamed, moved, deleted or re-timed —
+   mise task names, `kb_setup` modules, doc paths, superseded issue numbers:
 
    ```bash
    git grep -nE "<old-filename>|<old-task>|<renamed-symbol>" -- ':!.agent*' ':!*.lock'
    ```
 
-   Common sources: mise task names, `kb_setup` module names, doc paths, issue
-   numbers that got superseded.
 4. **`docs/` specs and `sources/REGISTRY.md`.** Update status banners; keep
    point-in-time analysis legible by marking the old state as baseline rather
    than rewriting the reasoning. Any repo an agent read this session goes in a
@@ -422,7 +420,8 @@ keeps the repo checks; on a fresh clone it falls back to the newest tracked
 
 **Then ASK the user to `/clear` — via `AskUserQuestion`, never in prose, and
 never by clearing yourself.** This is the "asks the user" half of the banner,
-and it is the last act of the skill whether a human typed `/clear-prep` or an
+and it is the last thing this skill ASKS (the archive below still follows it on a
+*"/clear now"*) whether a human typed `/clear-prep` or an
 agent invoked it on its own at ~20% context: one question, options *"/clear now
 (then `/session-resume`)"* and *"not yet — keep going in this session"*, with the
 handoff path and the resume line in the question text so the answer is one
@@ -437,16 +436,20 @@ is the point: re-asking next turn is the nagging this skill must not become, but
 deferral that never expires leaves a session writing its handoff at the end of the
 window instead of the start.
 
-**On *"/clear now"* — and only then — ARCHIVE any active plan**, so it stops
-injecting into every later session and contradicting `next-ticket`:
-`mv .planning/<id> .planning/.archive/<id> && rm -f .planning/.active_plan`.
-The leading dot is load-bearing: `resolve-plan-dir.sh` falls back to the newest
-`.planning/<dir>/` by mtime and **skips hidden dirs** (`.*) continue ;;`), so a
-plain `archive/` stays a candidate. Archive rather than delete (`.planning/` is
-gitignored, so none of it is corpus); expect one advisory `PLAN REGRESSED` line,
-which never blocks. After the answer, never before the ask — *"not yet"* resumes
-work and still needs the live plan. Then stop: the next thing is the user's
-`/clear`, then `/session-resume`.
+**On *"/clear now"* — and only then — ARCHIVE any active plan**, or it injects
+into every later session and contradicts `next-ticket`:
+`mkdir -p .planning/.archive && mv .planning/<id> .planning/.archive/<id>`, then
+clear `.planning/.active_plan` **only if it names `<id>`** (one global pointer; a
+parallel `PLAN_ID` session may have repointed it). Both details are load-bearing:
+nothing creates `.archive/`, so without `mkdir -p` the first archive fails and an
+`&&` chain then silently leaves the plan selected; and the leading dot matters
+because `resolve-plan-dir.sh` falls back to the newest `.planning/<dir>/` by mtime
+while **skipping hidden dirs** (`.*) continue ;;`), so a plain `archive/` stays a
+candidate. Legacy root mode keeps `task_plan.md` at the repo root — same
+treatment. Archive rather than delete (`.planning/` is gitignored, so none of it
+is corpus); expect one advisory `PLAN REGRESSED` line, which never blocks. After
+the answer, never before the ask. Then stop: next is the user's `/clear`, then
+`/session-resume`.
 
 ## Keeping this skill honest over time
 
@@ -454,14 +457,12 @@ This repo can measure its own skills, so use that rather than taste:
 
 - `mise run kb-skill-score` scores every project skill with `plugin-eval`'s
   deterministic static layer — free, no LLM, comparable run to run. Read the
-  **Δ column**, not the score: it is computed against `docs/skills/baseline.json`,
-  so the comparison is the task's job. Re-baseline with `-- --write` once a change
-  is deliberate. A score never fails a gate, but a skill name matching nothing
-  exits **2** rather than reporting an empty corpus.
-- Read the number with its condition attached. `triggering_accuracy` is a regex
-  over the description, so it rewards the literal words "proactively" and
-  "automatically" — chasing it is keyword-stuffing; fixing a genuinely vague
-  description is not. Re-baseline after any description change and read the Δ.
+  **Δ column**, not the score: it is computed against `docs/skills/baseline.json`.
+  Re-baseline with `-- --write` once a change is deliberate. A score never fails a
+  gate, but a skill name matching nothing exits **2**, not an empty corpus.
+- Read the number with its condition. `triggering_accuracy` is a regex over the
+  description, so it rewards the literal words "proactively" and "automatically" —
+  chasing it is keyword-stuffing; fixing a vague description is not.
 
 ## Checklist
 
@@ -483,18 +484,18 @@ This repo can measure its own skills, so use that rather than taste:
 
 ## See also
 
+- `.claude/skills/session-resume/SKILL.md` — the other end of this loop, and
+  where a surviving plan gets reported.
 - `.claude/skills/kb-review/SKILL.md` — the review that must precede `kb-ship`;
   its receipt is what step 2's ordering trap is about.
-- `.claude/skills/kb-curator/SKILL.md` — the ingestion loop that owns
-  `kb-remember` / `kb-reflect` in full; step 2 only covers closing them out at
-  handoff time.
-- `.claude/skills/goal-engineering/SKILL.md` — the companion for a round that
-  ran a `/goal`, and the owner of `kb-goal-outcome`.
+- `.claude/skills/kb-curator/SKILL.md` — owns `kb-remember` / `kb-reflect` in
+  full; step 2 only closes them out at handoff time.
+- `.claude/skills/goal-engineering/SKILL.md` — for a round that ran a `/goal`;
+  owns `kb-goal-outcome`.
 - `.claude/rules/clarify-before-acting.md` — why step 0 uses `AskUserQuestion`
-  for every question, including the small ones.
+  for every question, including small ones.
 - `.claude/rules/agent-report-persistence.md` — the verbatim-at-receipt contract
   step 4c audits.
-- `.claude/rules/verify-before-advancing.md` — the full gate matrix step 5
-  samples from.
-- `.claude/rules/md-size-budgets.md` — the per-class markdown budgets, and why
-  no flat character limit is quoted here.
+- `.claude/rules/verify-before-advancing.md` — the gate matrix step 5 samples.
+- `.claude/rules/md-size-budgets.md` — the per-class budgets, and why no flat
+  character limit is quoted here.

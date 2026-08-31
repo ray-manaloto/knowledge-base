@@ -108,13 +108,17 @@ so a finished round's `task_plan.md` arrives looking exactly like a live one.
 sh "${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/cache/planning-with-files/planning-with-files/3.12.0}/scripts/resolve-plan-dir.sh"
 ```
 
-Empty output means no active plan and there is nothing to report. Otherwise read
-its `task_plan.md` and `progress.md`, and report the disagreement plainly:
+Empty output means no plan in slug mode — but check the repo root too, because
+legacy mode puts `task_plan.md` there and the hook falls back to it
+(`claude-hook.sh`'s `elif [ -f task_plan.md ]`). Otherwise read its
+`task_plan.md` and `progress.md`, and report the disagreement plainly:
 
-- **its `## Next Step` versus `uv run kb-setup next-ticket`.** The generated
-  ticket wins — always. A plan is intra-round working state and is **never
-  authoritative across a round boundary**; a plan naming a different next task is
-  reporting the *previous* round's intent, not this one's.
+- **its `## Next Step` versus `uv run kb-setup next-ticket`.** The plan loses. A
+  plan is intra-round working state and is **never authoritative across a round
+  boundary**; one naming a different next task is reporting the *previous*
+  round's intent, not this one's. It loses to the generated ticket, and it loses
+  to a task the user named — `clear-prep` step 0's order is `$ARGUMENTS` first,
+  then `next-ticket`, and that order holds here too.
 - **phases still `in_progress`** against a handoff that calls the round done.
 
 **Report it; do not archive it.** This skill reads and reconciles — archiving is
