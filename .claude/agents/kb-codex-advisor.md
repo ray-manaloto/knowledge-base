@@ -46,6 +46,7 @@ EOF
 
 cat /tmp/kb-codex-advisor-prompt.md | codex exec \
   --ephemeral --sandbox read-only \
+  --model gpt-5.6-sol \
   -c model_reasoning_effort="xhigh" \
   -o /tmp/kb-codex-advisor-verdict.md -
 ```
