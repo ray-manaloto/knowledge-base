@@ -1,0 +1,110 @@
+<title>PR 639 Merge Block</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  :root {
+    --paper:  #F6F8FB;
+    --ink:    #16202E;
+    --muted:  #56677D;
+    --rule:   #D5DDE8;
+    --good:   #1B6247;
+    --bad:    #A6371F;
+  }
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 4vh 5vw;
+    display: flex;
+    justify-content: center;
+  }
+
+  main { width: 100%; max-width: 760px; }
+
+  h1 {
+    font-family: "Newsreader", Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(2rem, 6vw, 3.1rem);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0 0 6px;
+  }
+
+  .sub {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: clamp(0.8rem, 2.2vw, 0.92rem);
+    color: var(--good);
+    letter-spacing: 0.04em;
+    margin: 0 0 clamp(20px, 4vh, 38px);
+  }
+
+  dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(72px, auto) 1fr;
+    column-gap: clamp(16px, 4vw, 34px);
+    row-gap: 0;
+    border-top: 1px solid var(--rule);
+  }
+  dt, dd {
+    padding: clamp(11px, 2.2vh, 17px) 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+  }
+  dt {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: clamp(0.72rem, 1.9vw, 0.82rem);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    align-self: center;
+  }
+  dd {
+    font-size: clamp(1.02rem, 2.9vw, 1.32rem);
+    line-height: 1.35;
+    text-wrap: balance;
+  }
+  dd b { font-weight: 700; }
+  dd .why {
+    display: block;
+    font-size: clamp(0.84rem, 2.1vw, 0.95rem);
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .ask {
+    margin: clamp(22px, 4.5vh, 40px) 0 0;
+    font-size: clamp(1.05rem, 3vw, 1.35rem);
+    font-weight: 700;
+    color: var(--good);
+    text-wrap: balance;
+  }
+  .ask .n { color: var(--muted); font-weight: 400; display: block; font-size: clamp(0.84rem, 2.1vw, 0.95rem); margin-top: 5px; }
+</style>
+
+<main>
+  <h1>#639 wouldn&rsquo;t merge</h1>
+  <p class="sub">FIXED &middot; 2026-08-31 &middot; not yet landed</p>
+
+  <dl>
+    <dt>Cause</dt>
+    <dd>The same branch was used twice.
+      <span class="why">It shipped once, then work carried on in it. Git can&rsquo;t tell the two versions apart.</span></dd>
+
+    <dt>Files</dt>
+    <dd>Four clashed. <b>Three hold version numbers.</b>
+      <span class="why">The fourth decides what you work on next.</span></dd>
+
+    <dt>Fix</dt>
+    <dd>Kept our side on all four.
+      <span class="why">Checked byte for byte, not by eye. Ours was newer every time.</span></dd>
+
+    <dt>Left</dt>
+    <dd>Run the checks, get it reviewed, land it.</dd>
+  </dl>
+
+  <p class="ask">&rarr; I need nothing from you right now.
+    <span class="n">I&rsquo;ll ask before anything is deleted, and before it lands.</span></p>
+</main>
