@@ -1019,6 +1019,20 @@ def render(results: list[GateResult], *, sha: str, path: Path) -> str:
             f"  ! could not read HEAD for ({', '.join(unbound)}) — "
             f"their results are not bound to any commit"
         )
+
+    # A gate can exit 0 while its OWN verdict says it did not actually check
+    # anything — `kb-manifest-audit`'s SKIP is the worked case. Without this,
+    # `outcome` reaches nowhere a human reads (`summarise`/`all_passed` stay
+    # rc-only on purpose — this is about visibility, not a new failure mode),
+    # and the exact collapse the sidecar channel exists to prevent — a SKIP
+    # rendering as an ordinary PASS — happens right here, in the printed report.
+    noted = [(r.task, r.outcome) for r in results if r.outcome and r.outcome != "OK"]
+    if noted:
+        lines.append(
+            "  ! a gate's own verdict differs from a clean PASS — a green rc "
+            f"here did not necessarily mean OK ({', '.join(f'{t}={o}' for t, o in noted)})"
+        )
+
     lines.append(f"recorded: {path}")
     return "\n".join(lines)
 
