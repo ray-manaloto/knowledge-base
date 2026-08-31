@@ -1,0 +1,115 @@
+<title>One Thing Left to Test</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Karla:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --ground:#fbf9f4; --card:#fff; --ink:#22201c; --soft:#6f6a61;
+    --line:#e2ddd2; --ok:#2f7a55; --ok-bg:#e9f4ee;
+    --ask:#b06a12; --ask-bg:#fdf2e0;
+    --bad:#a33a2c;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);margin:0;
+    font-family:Karla,system-ui,sans-serif;font-size:18px;line-height:1.55;
+    padding:clamp(26px,5vw,64px) clamp(18px,5vw,36px)}
+  .wrap{max-width:62ch;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:clamp(34px,6vw,52px);
+     line-height:1.05;margin:0 0 14px;letter-spacing:-.02em;text-wrap:balance}
+  h2{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:25px;margin:0 0 12px}
+  .big{font-size:21px;line-height:1.5;margin:0}
+  p{margin:0 0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:24px 26px}
+  .row{display:flex;gap:16px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none;padding-bottom:0}
+  .mark{flex:none;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;
+        justify-content:center;font-size:21px;font-weight:700}
+  .yes{background:var(--ok-bg);color:var(--ok)}
+  .no{background:var(--ask-bg);color:var(--ask)}
+  .rowtitle{font-weight:700;font-size:18.5px;margin:0 0 3px}
+  .rowsub{color:var(--soft);font-size:16px;margin:0}
+  .ask{background:var(--ask-bg);border:2px solid #edc98d;border-radius:10px;padding:24px 26px}
+  figure{margin:0}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{font-size:15px;color:var(--soft);margin-top:12px}
+  .q{font-family:Fraunces,Georgia,serif;font-size:27px;font-weight:600;margin:0 0 14px}
+  .opt{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px 18px;margin-bottom:10px}
+  .opt b{font-size:18px}
+  .opt span{color:var(--soft);font-size:16px;display:block;margin-top:2px}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>One thing left to test</h1>
+  <p class="big">We built a smoke detector for the build. It works. There's one situation
+  we haven't tried it in — and if I got that one wrong, <strong>nobody can ship
+  anything.</strong></p>
+</header>
+
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="Three situations for a smoke detector. With smoke, it should alarm, and we tested that it does. Smoke cleared, it should go quiet, and we tested that it does. In an empty house with nothing installed yet, it should also stay quiet, and this is the case we have not tested.">
+  <rect x="8" y="20" width="232" height="196" rx="12" fill="#e9f4ee" stroke="#2f7a55" stroke-width="2"/>
+  <text x="124" y="62" text-anchor="middle" font-size="40">🔥</text>
+  <text x="124" y="102" text-anchor="middle" font-family="Karla, sans-serif" font-size="17" font-weight="700" fill="#22201c">There's a fire</text>
+  <text x="124" y="130" text-anchor="middle" font-family="Karla, sans-serif" font-size="15.5" fill="#4a463f">It should scream</text>
+  <text x="124" y="176" text-anchor="middle" font-size="28">✅</text>
+  <text x="124" y="202" text-anchor="middle" font-family="Karla, sans-serif" font-size="15" font-weight="700" fill="#2f7a55">Tested. It screams.</text>
+
+  <rect x="264" y="20" width="232" height="196" rx="12" fill="#e9f4ee" stroke="#2f7a55" stroke-width="2"/>
+  <text x="380" y="62" text-anchor="middle" font-size="40">🏠</text>
+  <text x="380" y="102" text-anchor="middle" font-family="Karla, sans-serif" font-size="17" font-weight="700" fill="#22201c">Fire's out</text>
+  <text x="380" y="130" text-anchor="middle" font-family="Karla, sans-serif" font-size="15.5" fill="#4a463f">It should go quiet</text>
+  <text x="380" y="176" text-anchor="middle" font-size="28">✅</text>
+  <text x="380" y="202" text-anchor="middle" font-family="Karla, sans-serif" font-size="15" font-weight="700" fill="#2f7a55">Tested. It's quiet.</text>
+
+  <rect x="520" y="20" width="232" height="196" rx="12" fill="#fdf2e0" stroke="#b06a12" stroke-width="2.5" stroke-dasharray="8 5"/>
+  <text x="636" y="62" text-anchor="middle" font-size="40">📦</text>
+  <text x="636" y="102" text-anchor="middle" font-family="Karla, sans-serif" font-size="17" font-weight="700" fill="#22201c">Empty house</text>
+  <text x="636" y="130" text-anchor="middle" font-family="Karla, sans-serif" font-size="15.5" fill="#4a463f">It should also stay quiet</text>
+  <text x="636" y="176" text-anchor="middle" font-size="28">❓</text>
+  <text x="636" y="202" text-anchor="middle" font-family="Karla, sans-serif" font-size="15" font-weight="700" fill="#b06a12">Never tried it.</text>
+</svg>
+<figcaption>The first two are done. The third is the whole question.</figcaption>
+</figure>
+
+<div class="card">
+  <h2>What the "empty house" is</h2>
+  <p style="margin-bottom:0">When someone downloads this project fresh, the big source
+  folders aren't there yet — they get fetched later. So the checker has nothing to look at.
+  <strong>It's supposed to shrug and say "can't tell, that's fine."</strong> I wrote it to do
+  that. I just haven't proved it.</p>
+</div>
+
+<div class="card">
+  <h2>Why it matters</h2>
+  <div class="row">
+    <div class="mark yes">✓</div>
+    <div><p class="rowtitle">If I got it right</p>
+    <p class="rowsub">Nothing happens. Fresh copies work normally.</p></div>
+  </div>
+  <div class="row">
+    <div class="mark no">✕</div>
+    <div><p class="rowtitle">If I got it wrong</p>
+    <p class="rowsub">The checker screams on every fresh copy, and
+    <b style="color:#a33a2c">every attempt to ship is blocked</b> — by the very thing we
+    added to make shipping safer.</p></div>
+  </div>
+</div>
+
+<div class="ask">
+  <p class="q">So: should I test it?</p>
+  <div class="opt"><b>Yes — test it</b>
+  <span>About half an hour. Then the last step is a code review, and this can ship.</span></div>
+  <div class="opt"><b>No — skip it, go straight to the review</b>
+  <span>Faster now. We find out the hard way if I got it wrong.</span></div>
+  <p style="margin:14px 0 0;font-size:16.5px"><b>I'd test it.</b> It's cheap, and the failure
+  it prevents is the kind you discover at the worst moment.</p>
+</div>
+
+<div class="card">
+  <h2>Where everything else stands</h2>
+  <p>The broken build is fixed and understood. The checker is written, working, and already
+  caught a real problem nobody knew about. All of it is saved safely.</p>
+  <p style="margin-bottom:0">After this test, <strong>one step remains</strong> before any of
+  it can be merged: a code review. That was always going to be needed and hasn't happened
+  yet.</p>
+</div>
+</div>
