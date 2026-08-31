@@ -252,7 +252,17 @@ _RUFF_MANIFEST_PATHS = (
 )
 
 _UV_MANIFEST_PATHS = (
-    ("Cargo.toml", "deb1b5b79721a1c62f107d0d956fad87031355e11b721e393c68ea4bdaa82b58"),
+    # Re-hashed 2026-08-31 against the content AT THE PINNED COMMIT
+    # (`sources/uv.manifest`'s `commit = 61291a8ca5477a9ca653f14d2ac5665587c263fa`,
+    # fetched via raw.githubusercontent.com since no local clone was checked out
+    # there). The prior value (`deb1b5b7…`) was verified — via a second, local
+    # route — to be the hash of the file at the OLD pin (0.12.5,
+    # `210d1f6785e95a8c8c0d53e284408c9be1134700`): commit `b2d51b53` bumped
+    # `sources/uv.manifest` to 0.12.7 without touching this registration, so the
+    # workspace `Cargo.toml`'s content moved and this hash did not. Re-confirmed
+    # the file is STILL a bare `[workspace]` root with no `[package]`/`name` —
+    # the registration's premise still holds, only the pinned bytes changed.
+    ("Cargo.toml", "8b10951d2e6cd44e5aa3b499e4425509a89f281b0fe1f8c3a541e889e7d3a364"),
     (
         "test/workspaces/albatross-groups-only/pyproject.toml",
         "70ae71d05636b4496820087106ae2c8e8673e5ef4c4ea0c5fc709c9e493c0b34",

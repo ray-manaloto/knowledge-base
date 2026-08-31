@@ -4,3 +4,16 @@ url = https://github.com/ast-grep/ast-grep
 ref = main
 commit = 40dab3c0de635a7450ddbb88f255b099533afbd4
 kind = code
+# EXTRACTION DEFERRED, not skipped: this is a cost/budget decision, not a
+# stated defect (`manifest.py`'s `build`/`defer_reason` split, Ray 2026-08-24).
+# Never evaluated as anything but a survey candidate (REGISTRY.md row 114+) —
+# named only as the maintained tree-sitter-based tool if that layer is ever
+# wanted, never assessed as a diagram generator itself — so the extraction
+# cost has not been justified yet. The `Cargo.toml`-zero-node shape (#1666)
+# that a bare workspace root produces is NOT a blocker here: `_UV_MANIFEST_PATHS`
+# / `_RUFF_MANIFEST_PATHS` in `graph.py` already register that exact shape via
+# `EXPECTED_PACKAGE_MANIFEST_NO_NAME`, so that path is available for this
+# source's `Cargo.toml` too, whenever someone decides the source is worth
+# including. Clears on that decision, not on any code change.
+build = defer
+defer_reason = never evaluated as anything but a survey candidate (REGISTRY.md row 114+; named only as the maintained tree-sitter-based tool if that layer is ever wanted, never assessed as a diagram generator), so the extraction cost is not yet justified. This is a priority call, not a defect: the bare workspace Cargo.toml's zero-node shape (#1666) already has a working approval path (EXPECTED_PACKAGE_MANIFEST_NO_NAME, as used for uv/ruff's own Cargo.toml). Clears when someone decides this source is worth including and registers its Cargo.toml the same way.
