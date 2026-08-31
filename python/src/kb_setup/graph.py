@@ -388,6 +388,28 @@ _EXPECTED_METADATA_ONLY = (
         pinned_commit="10b22eb42d652db541b22d563a6fe6e0eeb05736",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
+    # A bare `[workspace]` root (resolver + members + default-members), no
+    # `[package]`/`name` — same U0 shape as uv's and logbook's Cargo.toml below.
+    graphify_health.ExpectedMetadataOnly(
+        source_name="biome",
+        relative_path="Cargo.toml",
+        content_sha256="4447101af02598ae78268af3c8226655a7b50ffef155191c87a4e125274a9055",
+        pinned_commit="4d9c1d53ff57c44247e7a32718e1c69a0c1735af",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
+    # A 3-line `pyproject.toml` holding only `[tool.uv]` config (`no-build =
+    # false`) for the integration-test crate — no `[project]`/name, the same
+    # U0 shape as `_UV_MANIFEST_PATHS` above. Kept as its own entry rather than
+    # folded into that tuple because it is a distinct file discovered later
+    # (#1666 follow-up) and this repo's registry entries stay individually
+    # reviewable rather than silently merged into an existing group.
+    graphify_health.ExpectedMetadataOnly(
+        source_name="uv",
+        relative_path="crates/uv/pyproject.toml",
+        content_sha256="32b3705d5b32ffaf3da1f3ccb279bafdb572a6f8a156f1929eaef62f780eac85",
+        pinned_commit="61291a8ca5477a9ca653f14d2ac5665587c263fa",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
 )
 
 # `website/src/pages/index.astro`, the ONE reviewed partial extraction (#328).
