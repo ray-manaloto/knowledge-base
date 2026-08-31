@@ -239,3 +239,6 @@ brain/graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 /.self-graph/
 # lychee's result cache (lychee.toml: cache = true) — per-machine, 1-day TTL
 .lycheecache
+
+# planning-with-files live plan state (working state; the durable record is the handoff + docs/artifacts + kb-remember)
+.planning/
