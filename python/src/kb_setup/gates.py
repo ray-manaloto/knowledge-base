@@ -148,6 +148,28 @@ SHA_ABBREV = 12
 #: `graph-size`'s — it stays OUT of `CONCURRENT_SAFE` and runs exclusive. It
 #: costs a handful of git subprocess calls, not a `stat`, so "correct and slow"
 #: costs nothing worth trading away here either.
+#: `kb-manifest-audit` joined 2026-08-31 (`kb_setup.manifest_audit`). Built
+#: after a third red `kb-build`, once per build, always the same mechanism: a
+#: package manifest extracting to zero nodes needs a reviewed registration in
+#: one of `graph.py`'s four `_EXPECTED_*` tuples or the build fails closed, and
+#: each build costs ~55 minutes to reveal ONE name. Its tier 1 (registry <->
+#: manifest `commit` agreement) is always answerable offline and always blocks
+#: on a mismatch — it alone catches the class that motivated it: `b2d51b53`
+#: bumped six `sources/*.manifest` files and touched `graph.py` zero times,
+#: silently leaving a registered hash describing the OLD pin. Its tier 2
+#: (content hash + an unregistered-zero-node-package-manifest coverage scan)
+#: needs the source clones and SKIPS per source when they are absent — a SKIP
+#: never blocks, only a DRIFT does. This is also the FIRST gate whose row
+#: carries `outcome` as data (via the sidecar `sidecar_path`/
+#: `read_sidecar_outcome`/`write_sidecar_outcome`), because rc alone cannot
+#: distinguish a tier-2 SKIP from an OK — the collapse
+#: `verify-before-advancing.md` forbids. It reads clone directories and hashes
+#: files but writes nothing under the repo tree besides its own sidecar under
+#: `.agent/kb/gates/` (the same directory the runner itself writes into), so
+#: question 1 of `CONCURRENT_SAFE` is answered; question 2 — whether hashing
+#: potentially-large clone trees contends with `test`'s xdist workers for IO —
+#: has not been characterised, so it stays OUT of `CONCURRENT_SAFE`, the same
+#: fail-closed default as `funnel` and `hk-test`.
 GATE_TASKS = (
     "lint",
     "test",
@@ -156,6 +178,7 @@ GATE_TASKS = (
     "graph-size",
     "hk-test",
     "funnel",
+    "kb-manifest-audit",
 )
 #: `kb-corpus-integrity` WAS here, gating the semantic-corpus layer's staged
 #: evidence tree. It left with that layer's removal (2026-08-24) — see
@@ -244,6 +267,15 @@ class GateResult:
     sha: str | None
     finished_at: str | None
     dirty: bool | None = None
+    #: A gate's own richer-than-rc verdict — e.g. `kb-manifest-audit`'s
+    #: OK/DRIFT/SKIP — read back from the SIDECAR file it wrote (see
+    #: :func:`sidecar_path`), never from stdout. `None` when the gate wrote no
+    #: sidecar; a two-state gate has nothing to add here, and that is fine — the
+    #: `rc` alone is the whole story for those. This field exists because `rc`
+    #: cannot carry a THIRD state without colliding with `_RC_TIMEOUT`/
+    #: `_RC_COULD_NOT_RUN` or collapsing SKIP into OK (`verify-before-advancing.md`
+    #: — "could not check" must never render as green).
+    outcome: str | None = None
 
     @property
     def ran(self) -> bool:
@@ -275,6 +307,58 @@ class GateResult:
         the one thing worth saying out loud. (Cold lane round 2.)
         """
         return not self.ran or bool(self.sha)
+
+
+def sidecar_path(repo_root: Path, task: str, sha: str) -> Path:
+    """Where a gate may write a richer-than-rc outcome for one (task, sha) run.
+
+    THE CHANNEL C3 ASKED FOR. :func:`_invoke` runs a gate with stdio inherited,
+    never captured (`pr._stream`'s invocation, kept byte-identical on purpose —
+    see this module's docstring), so nothing the gate PRINTS can reach its row.
+    A gate that needs to say more than pass/fail writes
+    ``{"outcome": "OK" | "DRIFT" | "SKIP" | ...}`` to this exact path BEFORE it
+    exits; :func:`_run_one` reads it back after `_invoke` returns and folds it
+    into :attr:`GateResult.outcome`. Absence is not an error — most gates never
+    write one, and `outcome` is `None` for those.
+
+    Keyed by ``sha`` because :func:`_run_one` reads HEAD *before* invoking the
+    gate, and a gate run against one commit must never be read back against a
+    stale sidecar left by a run at a different commit — a leftover file from an
+    earlier commit would otherwise silently outlive the run that wrote it.
+    """
+    return repo_root / GATES_DIR / f"outcome-{task}-{review.safe_sha(sha)}.json"
+
+
+def read_sidecar_outcome(repo_root: Path, task: str, sha: str) -> str | None:
+    """The outcome a gate recorded for (``task``, ``sha``), or None if absent/unreadable.
+
+    Unreadable (not JSON, wrong shape, non-string ``outcome``) is folded into
+    "absent" rather than raised: a malformed sidecar must not crash the gate
+    runner over a channel most gates never use.
+    """
+    path = sidecar_path(repo_root, task, sha)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, UnicodeDecodeError, json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    outcome = data.get("outcome")
+    return outcome if isinstance(outcome, str) and outcome else None
+
+
+def write_sidecar_outcome(repo_root: Path, task: str, sha: str, outcome: str) -> Path:
+    """Write ``outcome`` for (``task``, ``sha``) to the sidecar :func:`_run_one` reads.
+
+    Called by a GATE ITSELF (e.g. `kb_setup.manifest_audit.main`), before it
+    exits — never by the runner. Atomic (temp-then-rename), matching
+    :func:`record` next door, for the same reason: this file is read back by a
+    process that did not write it.
+    """
+    path = sidecar_path(repo_root, task, sha)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    atomic.write_text(path, json.dumps({"outcome": outcome}) + "\n")
+    return path
 
 
 def head_sha(repo_root: Path) -> str:
@@ -402,7 +486,13 @@ def _run_one(repo_root: Path, task: str, *, prefix_output: bool) -> GateResult:
     rc = _invoke(repo_root, task, prefix_output=prefix_output)
     finished_at = datetime.now(UTC).isoformat()
     print(f"{'PASS' if rc == 0 else 'FAIL'}  gate {task} rc={rc}\n", end="", flush=True)
-    return GateResult(task, rc, sha, finished_at, dirty)
+    # `sha` here is HEAD as read BEFORE `_invoke` — the same commit the gate
+    # itself would have read had it asked at its own start, barring an amend
+    # landing mid-gate (the pre-existing HEAD-moved caveat `render` already
+    # flags). `None` sha means git could not be read at all, in which case there
+    # is no key to look a sidecar up by.
+    outcome = read_sidecar_outcome(repo_root, task, sha) if sha else None
+    return GateResult(task, rc, sha, finished_at, dirty, outcome)
 
 
 def _batches(tasks: tuple[str, ...]) -> Iterator[tuple[str, ...]]:
@@ -670,6 +760,7 @@ def record(repo_root: Path, results: list[GateResult], *, sha: str) -> Path:
                 "sha": r.sha,
                 "finished_at": r.finished_at,
                 "dirty": r.dirty,
+                "outcome": r.outcome,
             }
             for r in results
         ],
@@ -711,6 +802,7 @@ class RecordedGate:
     rc: int | None
     sha: str | None
     dirty: bool | None
+    outcome: str | None = None
 
 
 @dataclass(frozen=True)
@@ -803,13 +895,22 @@ def _read_row(row: object) -> RecordedGate | None:
     if sha is not None and not isinstance(sha, str):
         return None
     dirty = row.get("dirty")
-    if dirty is not None and not isinstance(dirty, bool):
+    # A row written before `outcome` existed simply lacks the key — that is
+    # ABSENT, not present-but-wrong-type, and reads as `None` like any other
+    # gate that wrote no sidecar. Only a non-string, non-empty-string value here
+    # means the bytes are not a gate record. Combined with the `dirty` check
+    # into one guard (rather than two more `return None`s) to keep this
+    # function's return count within `PLR0911`'s bound.
+    outcome = row.get("outcome")
+    if (dirty is not None and not isinstance(dirty, bool)) or (
+        outcome is not None and not isinstance(outcome, str)
+    ):
         return None
     # `sha or None`: an empty string is FALSY, so the drift check skipped it, and
     # it is not None, so the unbound check skipped it too — a row bound to no
     # commit passed both directions. `iter_run` normalises the same way at write
     # time; this is the read side agreeing with it.
-    return RecordedGate(task=task, rc=rc, sha=sha or None, dirty=dirty)
+    return RecordedGate(task=task, rc=rc, sha=sha or None, dirty=dirty, outcome=outcome or None)
 
 
 def _parse(path: Path) -> Record | None:
@@ -918,6 +1019,20 @@ def render(results: list[GateResult], *, sha: str, path: Path) -> str:
             f"  ! could not read HEAD for ({', '.join(unbound)}) — "
             f"their results are not bound to any commit"
         )
+
+    # A gate can exit 0 while its OWN verdict says it did not actually check
+    # anything — `kb-manifest-audit`'s SKIP is the worked case. Without this,
+    # `outcome` reaches nowhere a human reads (`summarise`/`all_passed` stay
+    # rc-only on purpose — this is about visibility, not a new failure mode),
+    # and the exact collapse the sidecar channel exists to prevent — a SKIP
+    # rendering as an ordinary PASS — happens right here, in the printed report.
+    noted = [(r.task, r.outcome) for r in results if r.outcome and r.outcome != "OK"]
+    if noted:
+        lines.append(
+            "  ! a gate's own verdict differs from a clean PASS — a green rc "
+            f"here did not necessarily mean OK ({', '.join(f'{t}={o}' for t, o in noted)})"
+        )
+
     lines.append(f"recorded: {path}")
     return "\n".join(lines)
 

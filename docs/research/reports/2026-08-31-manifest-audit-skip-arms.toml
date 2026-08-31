@@ -1,0 +1,113 @@
+# Mutation arms proving `kb-manifest-audit` tier 2's SKIP behaviour (Ray's
+# request, 2026-08-31): a fresh checkout has no `sources/<name>/` clones at all
+# (gitignored, fetched by `kb-build`), so tier 2 must report SKIP — and SKIP must
+# never block a ship. That was written into `manifest_audit.py` at three separate
+# translation points (`AuditReport.blocks`, `AuditReport.sidecar_outcome`, and
+# `main`'s exit code) but had never been proven. If any one of the three is
+# wrong, every fresh clone is blocked from shipping by the very gate that exists
+# to make shipping safer.
+#
+# SCOPE, stated so a clean sweep is not over-read. What is NOT armed here:
+#   - tier 1 (registry <-> manifest pin agreement) — already proven by hand
+#     (mutating a `pinned_commit` to zeros: rc=1; restored: rc=0), and it is not
+#     the SKIP question this file exists to answer. One arm (T1) is included
+#     anyway per the dispatch's request for completeness, using the same
+#     realistic mutation already hand-verified.
+#   - whether the FOUR expectation registries in `graph.py` are themselves
+#     correct — this gate checks registry<->manifest AGREEMENT, never registry
+#     TRUTH (stated in `manifest_audit.py`'s own module docstring, "EXPLICITLY
+#     OUT OF SCOPE" #1).
+#   - `kb-build`'s own behaviour. This gate is an offline/plus-clone proxy for
+#     it, never a replacement (same docstring, "NOT the objective").
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: that tier 2's SKIP classification is
+# semantically the RIGHT thing to skip — only that the three places translating
+# SKIP into a ship decision cannot be broken by the realistic single-line edits
+# below without a named test catching it.
+
+suites = ["tests/test_manifest_audit.py"]
+
+# ── the control ─────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/manifest_audit.py"
+old = '''TASK_NAME = "kb-manifest-audit"'''
+new = '''TASK_NAME = "kb-manifest-audit"  # control'''
+
+# ── T1: tier 1's fail direction (already hand-verified; recorded as an arm) ──
+[[arm]]
+id = "T1"
+test = "test_tier1_drift_when_pinned_commit_is_stale"
+file = "python/src/kb_setup/manifest_audit.py"
+old = '''            if entry.pinned_commit != manifest.commit:'''
+new = '''            if entry.pinned_commit == manifest.commit:'''
+
+# ── S1: the clone-presence check itself must fire ───────────────────────────
+# Realistic break: someone "simplifies" the guard and it stops discriminating.
+# Without it, an absent clone_dir is treated as present, `_entry_is_fresh` hits
+# an OSError reading a file that isn't there, and the run reports DRIFT
+# ("unreadable") instead of SKIP for a case that was never a defect — the
+# opposite of the asymmetry this gate is supposed to hold.
+[[arm]]
+id = "S1"
+test = "test_tier2_skip_when_no_clone_present"
+file = "python/src/kb_setup/manifest_audit.py"
+old = '''        if not clone_dir.is_dir():'''
+new = '''        if False:'''
+
+# ── S2: the MIXED shape — one clone present, one absent — must stay OK ──────
+# Realistic break: swapping which branch is checked first. `elif verified_sources`
+# is the correct precedence (a real, fully-verified source makes the run OK even
+# when a DIFFERENT source's clone is missing); checking `elif skipped_sources`
+# first makes any partial skip collapse the whole run to SKIP, silently hiding
+# that a source WAS checked and passed.
+[[arm]]
+id = "S2"
+test = "test_tier2_ok_when_some_clones_present_and_some_absent"
+file = "python/src/kb_setup/manifest_audit.py"
+old = '''    elif verified_sources:
+        outcome = Outcome.OK
+    else:
+        outcome = Outcome.SKIP'''
+new = '''    elif skipped_sources:
+        outcome = Outcome.SKIP
+    else:
+        outcome = Outcome.OK'''
+
+# ── S3: `AuditReport.blocks` must not treat SKIP as blocking ────────────────
+# Realistic break: writing the union as "anything not OK blocks" instead of
+# "DRIFT blocks" — the natural first draft of this property, and precisely the
+# asymmetry the module's docstring calls out as deliberate.
+[[arm]]
+id = "S3"
+test = "test_tier2_skip_when_no_clone_present"
+file = "python/src/kb_setup/manifest_audit.py"
+old = '''        return Outcome.DRIFT in (self.tier1.outcome, self.tier2.outcome)'''
+new = '''        return self.tier1.outcome != Outcome.OK or self.tier2.outcome != Outcome.OK'''
+
+# ── S4: `sidecar_outcome` must still surface SKIP, not launder it to OK ─────
+# Realistic break: the SKIP branch quietly dropped in a later edit (e.g. while
+# adding a new outcome case) and the sidecar collapses SKIP into OK — exactly
+# the "could not check rendered as green" failure `probes-need-a-control-arm.md`
+# warns about.
+[[arm]]
+id = "S4"
+test = "test_tier2_skip_when_no_clone_present"
+file = "python/src/kb_setup/manifest_audit.py"
+old = '''        if self.tier2.outcome == Outcome.SKIP:
+            return Outcome.SKIP'''
+new = '''        if False:
+            return Outcome.SKIP'''
+
+# ── S5: the arm that measures the REAL claim — `main` must not block on SKIP ─
+# This is the ship-blocking decision itself. If `main` ignored `report.blocks`
+# and always returned FINDINGS, every one of tier1/tier2's careful three-state
+# plumbing would be for nothing: a fresh checkout with no clones would fail
+# `kb-manifest-audit` and block `kb-ship`/`kb-land` regardless.
+[[arm]]
+id = "S5"
+test = "test_main_returns_ok_and_writes_skip_sidecar_on_a_missing_clone"
+file = "python/src/kb_setup/manifest_audit.py"
+old = '''    return int(Rc.FINDINGS) if report.blocks else int(Rc.OK)'''
+new = '''    return int(Rc.FINDINGS) if True else int(Rc.OK)'''

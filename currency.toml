@@ -663,7 +663,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.14"
+expected = "2026.8.15"
 # ADDED 2026-08-08 (#242). The same SKIP-whose-reason-stopped-being-true hole
 # `[tool.hk]` records below, one tool over: `sources/mise.manifest` existed and
 # this table never named it, so `sync.py` reported a clean SKIP while the
@@ -731,7 +731,36 @@ INERT here, control-armed (a `graphify` grep of `mise.toml` returns 84, so the
 probes discriminate): `conf.d` fragment filenames — this repo has NO `conf.d`
 directory at all; `vlang` version strings — not pinned; legacy `RTX_*` variables
 — 0 uses across `mise.toml`, `hk.pkl` and `python/src/`, and they are a
-plugin-author surface this repo does not write to."""
+plugin-author surface this repo does not write to.
+
+MOVED 2026-08-30, 2026.8.14 -> 2026.8.15. Another SELF-UPDATE, the same shape as
+the 2026.8.8 -> 2026.8.9 one that produced the ruling above; `hard` moved with
+the rest, per that ruling, and the "self-update is not deliberate adoption"
+objection was raised at spec time and REFUTED by this note's own record.
+All four sites moved in ONE change: `expected` here, both `min_version` keys, and
+`sources/mise.manifest` (ref + commit + its `pinned here:` header line).
+
+The commit was resolved with `gh api repos/jdx/mise/commits/v2026.8.15 --jq .sha`
+-> `06c9ad7a39b162b7952c6c75beb879088f6c29b2`. CONTROL ARM, because this is the
+#395 trap and it reproduces live: `git ls-remote --tags <url> v2026.8.15` returns
+`b4f948d8349cab8ec155f2cd6a9ab4f2fd75565a`, the TAG OBJECT. mise ships annotated
+tags and `git checkout` peels them, so the wrong value would have been silent.
+
+The v2026.8.15 notes were read for this bump. Nothing breaking; three items are
+live interest here rather than inert:
+  - `mise config set` gains `--append`/`--remove` and `--global`/`--system`, and
+    claims to preserve TOML comments and formatting (#12603). This repo has a
+    RECORDED hazard that `mise config set` eats the comment above an existing key
+    — RE-PROBE it against .15 before trusting either the hazard or the fix.
+  - `mise outdated --json` now emits `release_url` (#12494). That is a new field
+    for the dependency-upgrade protocol's stage 1, which reads
+    `mise outdated -b --local -J`.
+  - `mise upgrade` no longer deletes the replaced install immediately
+    (`upgrade.auto_prune`, default 24h grace, #12593) — bears on `kb-reclaim` and
+    on the recorded "stale install dirs shadow the mise shims" hazard.
+Two lockfile fixes (#12583, #12605) and a platform-awareness fix to
+`mise install --dry-run` (#12568) touch the `mise.lock` platform-matrix work but
+were not probed here."""
 
 [[tool.mise.watch]]
 kind = "local"

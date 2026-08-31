@@ -645,6 +645,74 @@ def test_render_names_unrun_gates_in_the_summary():
     assert "1 passed, 1 failed" in summary
 
 
+def test_render_flags_a_pass_whose_outcome_is_skip():
+    """`kb-manifest-audit`'s SKIP is the worked case: rc=0, outcome != OK.
+
+    Without the visibility fix this reads as an ordinary PASS with nothing to
+    tell a reader the gate did not actually check anything — the exact collapse
+    the sidecar channel (`outcome`) exists to prevent, alive in the printed
+    report rather than only in the JSON.
+    """
+    results = [gates.GateResult("alpha", 0, _SHA, "t", outcome="SKIP")]
+    out = gates.render(results, sha=_SHA, path=Path("x.json"))
+    assert "PASS" in out  # rc-based state is unchanged — this is additive
+    assert "alpha=SKIP" in out
+
+
+def test_render_does_not_flag_an_ok_outcome():
+    """CONTROL ARM — a gate that recorded OK must not be singled out.
+
+    Same shape as the SKIP case (rc=0, `outcome` set), so this proves the check
+    reads the VALUE, not merely "is `outcome` set at all".
+    """
+    results = [gates.GateResult("alpha", 0, _SHA, "t", outcome="OK")]
+    out = gates.render(results, sha=_SHA, path=Path("x.json"))
+    # Positive assertion FIRST: two bare `not in` checks are also satisfied by a
+    # `render` that returns "", so without this the arm could not fail for the
+    # right reason. Caught by a cold Gemini lane, 2026-08-31.
+    assert "PASS" in out
+    assert "differs from a clean pass" not in out.lower()
+    assert "alpha=OK" not in out
+
+
+def test_render_is_silent_when_no_gate_wrote_an_outcome():
+    """CONTROL ARM — the overwhelmingly common case: no sidecar at all."""
+    results = [gates.GateResult("alpha", 0, _SHA, "t")]
+    out = gates.render(results, sha=_SHA, path=Path("x.json"))
+    assert "differs from a clean pass" not in out.lower()
+
+
+def test_a_recorded_skip_reaches_the_printed_report_through_the_real_sidecar(monkeypatch, tmp_path):
+    """The end-to-end path.
+
+    A gate WRITES a sidecar, `_run_one` reads it back via :func:`read_sidecar_outcome`,
+    and `render` must then flag it.
+
+    This is the assertion the writer-side tests at `tests/test_manifest_audit.py`
+    cannot make — those call `read_sidecar_outcome` directly and would pass even
+    if `_run_one` never called it. Here the sidecar is written by the STUBBED
+    gate itself (mirroring what `kb_setup.manifest_audit.main` does before it
+    exits), and nothing in this test touches `read_sidecar_outcome` — so a dead
+    wire at `_run_one`'s `outcome = read_sidecar_outcome(...)` call shows up as a
+    silently-vanished `SKIP`, exactly as it would for a real ship run.
+    """
+    root = _repo(tmp_path, ("alpha",))
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] == "mise" and cmd[-1] == "alpha":
+            gates.write_sidecar_outcome(root, "alpha", _SHA, "SKIP")
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    _pin_sha(monkeypatch)
+
+    gate_run, _ = gates.run_and_record(root, ("alpha",), stop_on_failure=False)
+
+    assert gate_run is not None
+    out = gates.render(gate_run.results, sha=gate_run.sha, path=gate_run.path)
+    assert "alpha=SKIP" in out
+
+
 # --------------------------------------------------------------------------
 # the ship path delegates to the same two functions (criterion 4)
 # --------------------------------------------------------------------------

@@ -161,6 +161,14 @@ ignore = [
 # job is headroom. `test_the_gate_reads_graphifys_own_cap` fails loudly if the
 # name moves, which is what makes depending on it recoverable rather than silent.
 "python/src/kb_setup/graph_size.py" = ["SLF001"]
+# `kb-manifest-audit` reads `graph.py`'s four `_EXPECTED_*` registries directly
+# (the alternative — a public re-export just for this one reader — would be a
+# second name for the same tuples) and reuses `graphify_sdk`'s own private
+# zero-node review predicates (`_package_manifest_item_is_reviewed`,
+# `_json_metadata_item_is_reviewed`, `_sha256_file`) rather than restating their
+# three-way error/nodes/edges condition, which is exactly the duplication
+# `use-tool-builtins.md` and spec REVISION 2 §C2 warn against.
+"python/src/kb_setup/manifest_audit.py" = ["SLF001"]
 # Same fail-safe rationale, opposite direction: the eval runner catches whatever a
 # repo-supplied probe or control arm raises and RECORDS it as that case's failure.
 # Narrowing this would let one bad case abort the whole run, which is the failure

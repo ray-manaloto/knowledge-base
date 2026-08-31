@@ -1,0 +1,231 @@
+<title>The Prerequisite the Plan Skips</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#f6f7f9; --surface:#ffffff; --ink:#16191f; --muted:#586074;
+    --rule:#d7dbe3; --rule-soft:#e8ebf0;
+    --chain:#2f3f8f;     /* the tracked chain */
+    --plan:#5c5348;      /* the plan file */
+    --gap:#a2620a;       /* the step nobody encoded */
+    --ok:#2c6146;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    font-size:16px; line-height:1.65; margin:0;
+    padding:clamp(24px,5vw,64px) clamp(18px,5vw,40px);
+  }
+  .wrap{max-width:74ch;margin:0 auto;display:flex;flex-direction:column;gap:30px}
+  .figwrap{max-width:1040px;margin:0 auto}
+  h1{
+    font-family:Fraunces,Georgia,serif; font-weight:700;
+    font-size:clamp(30px,5vw,44px); line-height:1.12; margin:0 0 10px;
+    text-wrap:balance; letter-spacing:-.015em;
+  }
+  h2{
+    font-family:Fraunces,Georgia,serif; font-weight:600;
+    font-size:22px; line-height:1.25; margin:0 0 10px; text-wrap:balance;
+  }
+  .eyebrow{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11.5px;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:0 0 14px;
+  }
+  .lede{font-size:18.5px; color:#2b3140; margin:0}
+  p{margin:0 0 12px}
+  section{
+    background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+    padding:22px 24px;
+  }
+  section > :last-child{margin-bottom:0}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.88em}
+  code{background:#eef0f4; padding:1px 5px; border-radius:3px}
+  blockquote{
+    margin:14px 0; padding:10px 0 10px 18px; border-left:3px solid var(--chain);
+    color:#2b3140; font-size:15.5px;
+  }
+  blockquote.gapq{border-left-color:var(--gap)}
+  figure{margin:0}
+  figure svg{display:block;width:100%;height:auto}
+  .scroll{overflow-x:auto}
+  figcaption{
+    font-size:13.5px; color:var(--muted); margin-top:12px;
+    padding-top:10px; border-top:1px solid var(--rule-soft);
+  }
+  table{border-collapse:collapse;width:100%;font-size:14.5px;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+  th{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  .tag{
+    display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;
+    letter-spacing:.06em;padding:2px 7px;border-radius:3px;border:1px solid;
+  }
+  .t-done{color:var(--ok);border-color:#a9cdb9;background:#eef6f1}
+  .t-gap{color:var(--gap);border-color:#e0c08a;background:#fbf4e6}
+  .wrong{
+    background:#fbf4e6;border:1px solid #e0c08a;border-left:4px solid var(--gap);
+    border-radius:4px;padding:20px 22px;
+  }
+  .wrong h2{color:#7d4c07}
+  footer{font-size:13px;color:var(--muted);border-top:1px solid var(--rule);padding-top:14px}
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Session kb-20260830.004 · reconciliation correction</p>
+    <h1>The Prerequisite the Plan Skips</h1>
+    <p class="lede">The tracked chain and <code>task_plan.md</code> are not competing for
+    “what’s next.” They are the same road, and the plan starts one step down it.</p>
+  </header>
+</div>
+
+<div class="figwrap scroll">
+<figure>
+<svg viewBox="0 0 1000 330" role="img" aria-label="A five-step sequence. Step one, the codex-lane review of issue 638, is done. Step two, the re-grill round, has not run and is the step the plan never encodes. Steps three to five are the plan's phases 2, 3 and 4. The plan's Next Step pointer starts at step three, skipping step two.">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#16191f"/>
+    </marker>
+    <marker id="arg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#a2620a"/>
+    </marker>
+  </defs>
+
+  <!-- lane label -->
+  <text x="8" y="26" font-family="IBM Plex Mono, monospace" font-size="11" fill="#586074" letter-spacing="1.4">THE ONE ORDER BOTH FILES DESCRIBE</text>
+
+  <!-- box 1 : done -->
+  <rect x="8" y="52" width="176" height="70" rx="3" fill="#eef1fa" stroke="#2f3f8f" stroke-width="1.4"/>
+  <text x="22" y="76" font-family="IBM Plex Sans, sans-serif" font-size="13.5" font-weight="600" fill="#16191f">#638 §10 review</text>
+  <text x="22" y="94" font-family="IBM Plex Mono, monospace" font-size="11" fill="#2f3f8f">codex lane</text>
+  <text x="22" y="112" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2c6146">✓ DONE — comment 5472992777</text>
+
+  <!-- box 2 : the gap -->
+  <rect x="212" y="52" width="176" height="70" rx="3" fill="#fbf4e6" stroke="#a2620a" stroke-width="1.8" stroke-dasharray="6 4"/>
+  <text x="226" y="76" font-family="IBM Plex Sans, sans-serif" font-size="13.5" font-weight="600" fill="#16191f">re-grill round</text>
+  <text x="226" y="94" font-family="IBM Plex Mono, monospace" font-size="11" fill="#a2620a">/grilling</text>
+  <text x="226" y="112" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#a2620a">✗ NOT RUN</text>
+
+  <!-- box 3 -->
+  <rect x="416" y="52" width="176" height="70" rx="3" fill="#f4f3f1" stroke="#5c5348" stroke-width="1.4"/>
+  <text x="430" y="76" font-family="IBM Plex Sans, sans-serif" font-size="13.5" font-weight="600" fill="#16191f">Phase 2</text>
+  <text x="430" y="94" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#3b4150">answer the 5 questions</text>
+  <text x="430" y="112" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#5c5348">in_progress · 0 of 7</text>
+
+  <!-- box 4 -->
+  <rect x="620" y="52" width="176" height="70" rx="3" fill="#f4f3f1" stroke="#5c5348" stroke-width="1.4"/>
+  <text x="634" y="76" font-family="IBM Plex Sans, sans-serif" font-size="13.5" font-weight="600" fill="#16191f">Phase 3</text>
+  <text x="634" y="94" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#3b4150">write the spec</text>
+  <text x="634" y="112" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#5c5348">= /to-spec</text>
+
+  <!-- box 5 -->
+  <rect x="824" y="52" width="168" height="70" rx="3" fill="#f4f3f1" stroke="#5c5348" stroke-width="1.4"/>
+  <text x="838" y="76" font-family="IBM Plex Sans, sans-serif" font-size="13.5" font-weight="600" fill="#16191f">Phase 4</text>
+  <text x="838" y="94" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#3b4150">review → tickets</text>
+  <text x="838" y="112" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#5c5348">= /to-tickets</text>
+
+  <!-- arrows -->
+  <line x1="186" y1="87" x2="208" y2="87" stroke="#16191f" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="390" y1="87" x2="412" y2="87" stroke="#a2620a" stroke-width="1.8" marker-end="url(#arg)"/>
+  <line x1="594" y1="87" x2="616" y2="87" stroke="#16191f" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="798" y1="87" x2="820" y2="87" stroke="#16191f" stroke-width="1.4" marker-end="url(#ar)"/>
+
+  <text x="192" y="44" font-family="IBM Plex Mono, monospace" font-size="10" fill="#586074">findings</text>
+  <text x="372" y="44" font-family="IBM Plex Mono, monospace" font-size="10" fill="#a2620a">facts you can trust</text>
+
+  <!-- ownership brackets -->
+  <path d="M8,146 L8,156 L388,156 L388,146" fill="none" stroke="#2f3f8f" stroke-width="1.3"/>
+  <text x="8" y="176" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#2f3f8f">aggregated-research-chain.toml — the head, #638</text>
+  <text x="8" y="193" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#586074">“…probably triggers another /grilling round before /to-spec”</text>
+
+  <path d="M416,146 L416,156 L992,156 L992,146" fill="none" stroke="#5c5348" stroke-width="1.3"/>
+  <text x="416" y="176" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#5c5348">task_plan.md — Phases 2 → 4</text>
+  <text x="416" y="193" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#586074">the road from questions to tickets</text>
+
+  <!-- the seam -->
+  <line x1="402" y1="34" x2="402" y2="262" stroke="#a2620a" stroke-width="1.5" stroke-dasharray="4 5"/>
+  <rect x="300" y="272" width="392" height="46" rx="3" fill="#fbf4e6" stroke="#a2620a" stroke-width="1.3"/>
+  <text x="316" y="291" font-family="IBM Plex Sans, sans-serif" font-size="12.5" font-weight="600" fill="#7d4c07">The plan’s “## Next Step” points HERE →</text>
+  <text x="316" y="308" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#7d4c07">so it opens at Phase 2 and never names the re-grill.</text>
+  <line x1="402" y1="262" x2="418" y2="272" stroke="#a2620a" stroke-width="1.3"/>
+</svg>
+<figcaption>The two files describe one sequence, not two priorities. Every box left of
+the dashed seam is owned by the tracked chain; every box right of it is owned by the plan.
+The plan’s pointer starts at Phase 2 — one box past the step the chain calls a prerequisite.
+Box states measured this session: <span class="mono">gh issue view 638</span> → OPEN;
+<span class="mono">task_plan.md</span> → Phase 2 <span class="mono">in_progress</span>, 0 of 7 boxes ticked.</figcaption>
+</figure>
+</div>
+
+<div class="wrap">
+
+<section>
+  <p class="eyebrow">Why it looked like a conflict</p>
+  <h2>Two files, two scopes, one road</h2>
+  <p>The chain file is a <strong>tracker backlog</strong> — 11 <code>[[ticket]]</code> entries
+  ordered by blockers, and <code>#638</code> is the head. <code>task_plan.md</code> is
+  <strong>intra-round working state</strong> for one specific job: turning five design
+  artifacts into a spec.</p>
+  <p>They name different next steps because they are pointing at <em>different points on the
+  same line</em>. Nothing is competing. The chain file says so in its own comment, above the
+  <code>#638</code> entry:</p>
+  <blockquote>“It sits ahead of #581 because the whole upgrade-protocol design rests on that
+  session’s facts, several of which were <strong>CORRECTED mid-session</strong> — so the review
+  is <strong>a prerequisite for trusting any of them</strong>, not a parallel nicety.”</blockquote>
+  <p>And <code>#638</code> §10 line 137 states the outcome it expects:</p>
+  <blockquote class="gapq">“a findings list that probably triggers <strong>another
+  <code>/grilling</code> round</strong> before <code>/to-spec</code>.”</blockquote>
+  <p>Plan Phase 3 <em>is</em> <code>/to-spec</code>. So the re-grill belongs before Phase 2,
+  because the re-grill is what decides whether the five questions are even asking the right
+  things.</p>
+</section>
+
+<section>
+  <p class="eyebrow">What each source actually knows</p>
+  <h2>Neither one is wrong; one is incomplete</h2>
+  <table>
+    <tr><th>Source</th><th>Says next</th><th>Blind to</th></tr>
+    <tr>
+      <td><span class="mono">kb-setup next-ticket</span><br><span class="tag t-done">authoritative</span></td>
+      <td>#638 — codex review, <em>then re-grill</em></td>
+      <td>Phase 2–4 are not tracker tickets, so it cannot see them at all.</td>
+    </tr>
+    <tr>
+      <td><span class="mono">task_plan.md</span> <span class="mono">## Next Step</span><br><span class="tag t-gap">incomplete</span></td>
+      <td>Phase 2, Q1 — does status survive a clone</td>
+      <td>The re-grill. It was never written into any phase, so no checkbox can go unticked for it.</td>
+    </tr>
+  </table>
+</section>
+
+<div class="wrong">
+  <p class="eyebrow">Correction to what I told you</p>
+  <h2>I asked you to pick. That was the wrong question.</h2>
+  <p>My resume report ended <em>“Want me to start on the #638 re-grill, or on plan Phase 2’s
+  five questions?”</em> — an either/or. It is neither: it is <strong>re-grill, then Phase 2</strong>,
+  and the plan’s pointer is what made them look like alternatives.</p>
+  <p>The <code>session-resume</code> skill’s rule (“a plan is intra-round working state; the plan
+  loses”) landed on the right ordering here by luck, not by reasoning — it framed a
+  <em>dependency</em> as an <em>authority contest</em>. The rule is built for a plan left over from a
+  finished round. This plan was <strong>deliberately kept live</strong> across the boundary
+  (ledger tick 20: <span class="mono">“plan stays LIVE (1/5 phases) so it is deliberately not
+  archived”</span>), which is the case the rule does not cover.</p>
+</div>
+
+<section>
+  <p class="eyebrow">The fix</p>
+  <h2>One line in the plan, not a re-plan</h2>
+  <p>Phase 2 is missing its first checkbox. The repair is to insert the re-grill ahead of Q1 and
+  move <code>## Next Step</code> onto it — after which the chain and the plan read the same
+  sentence, and this page stops being needed.</p>
+</section>
+
+<footer>
+  Measured in session <span class="mono">kb-20260830.004</span>, 2026-08-30. Sources read this
+  session: <span class="mono">docs/roadmap/aggregated-research-chain.toml</span> (11 tickets, #638
+  first), <span class="mono">gh issue view 638</span> (OPEN, §10 lines 128–137),
+  <span class="mono">.planning/2026-08-30-upgrade-protocol-spec/task_plan.md</span>,
+  <span class="mono">ledger-main.jsonl</span> tick 20.
+</footer>
+
+</div>

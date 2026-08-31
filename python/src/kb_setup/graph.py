@@ -140,12 +140,14 @@ _EXPECTED_UNCLASSIFIED = (
         source_name="Attacca",
         relative_path=".claudeignore",
         content_sha256="ea4bc0ca648a2339096adda7b96bc619eae53d96c7ccd4a1fe7d3f6dcf86319a",
+        pinned_commit="34a52ce09db146035ca56db160388034de629693",
         classification="reviewed-root-ignore-metadata",
     ),
     graphify_health.ExpectedUnclassifiedFile(
         source_name="Attacca",
         relative_path=".github/BOILERPLATE_VERSION",
         content_sha256="2819592ffada78626fb51ebec43f23a97c1447270ec7f96b0567f830f530c462",
+        pinned_commit="34a52ce09db146035ca56db160388034de629693",
         # Operational input read by scripts/validate-plugins.mjs at this immutable pin.
         classification="reviewed-version-marker",
     ),
@@ -252,7 +254,17 @@ _RUFF_MANIFEST_PATHS = (
 )
 
 _UV_MANIFEST_PATHS = (
-    ("Cargo.toml", "deb1b5b79721a1c62f107d0d956fad87031355e11b721e393c68ea4bdaa82b58"),
+    # Re-hashed 2026-08-31 against the content AT THE PINNED COMMIT
+    # (`sources/uv.manifest`'s `commit = 61291a8ca5477a9ca653f14d2ac5665587c263fa`,
+    # fetched via raw.githubusercontent.com since no local clone was checked out
+    # there). The prior value (`deb1b5b7…`) was verified — via a second, local
+    # route — to be the hash of the file at the OLD pin (0.12.5,
+    # `210d1f6785e95a8c8c0d53e284408c9be1134700`): commit `b2d51b53` bumped
+    # `sources/uv.manifest` to 0.12.7 without touching this registration, so the
+    # workspace `Cargo.toml`'s content moved and this hash did not. Re-confirmed
+    # the file is STILL a bare `[workspace]` root with no `[package]`/`name` —
+    # the registration's premise still holds, only the pinned bytes changed.
+    ("Cargo.toml", "8b10951d2e6cd44e5aa3b499e4425509a89f281b0fe1f8c3a541e889e7d3a364"),
     (
         "test/workspaces/albatross-groups-only/pyproject.toml",
         "70ae71d05636b4496820087106ae2c8e8673e5ef4c4ea0c5fc709c9e493c0b34",
@@ -268,24 +280,28 @@ _EXPECTED_METADATA_ONLY = (
         source_name="10x-Team",
         relative_path=".claude-plugin/marketplace.json",
         content_sha256="c90e241178951c4457dc98de02e33abf86de04ec3a98b012cacff8334c83ca70",
+        pinned_commit="ea01f8262495e99a66ca292739b0517314e6914e",
         skipped_disposition="data json (not a config/manifest)",
     ),
     graphify_health.ExpectedMetadataOnly(
         source_name="10x-Team",
         relative_path=".claude-plugin/plugin.json",
         content_sha256="033d0f42d41ae76ffb008b559feaf5f4038f85a1c034f4c60432edcafa6d5d11",
+        pinned_commit="ea01f8262495e99a66ca292739b0517314e6914e",
         skipped_disposition="data json (not a config/manifest)",
     ),
     graphify_health.ExpectedMetadataOnly(
         source_name="10x-Team",
         relative_path=".cursor-plugin/plugin.json",
         content_sha256="f06e9e3dbf4d14fa987823811363b1a03f155e94c7df9877c498e26fad159813",
+        pinned_commit="ea01f8262495e99a66ca292739b0517314e6914e",
         skipped_disposition="data json (not a config/manifest)",
     ),
     graphify_health.ExpectedMetadataOnly(
         source_name="10x-Team",
         relative_path="gemini-extension.json",
         content_sha256="a2dff2cfbac3d49bbe87501ccb93460b8f3e8a4c0d39787fd4d933cea2318608",
+        pinned_commit="ea01f8262495e99a66ca292739b0517314e6914e",
         skipped_disposition="data json (not a config/manifest)",
     ),
     # All eight are object-rooted JSON that `json_config._is_config_json` declines,
@@ -296,6 +312,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="Attacca",
             relative_path=relative_path,
             content_sha256=content_sha256,
+            pinned_commit="34a52ce09db146035ca56db160388034de629693",
             skipped_disposition="data json (not a config/manifest)",
         )
         for relative_path, content_sha256 in _ATTACCA_METADATA_ONLY_PATHS
@@ -311,6 +328,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="datamodel-code-generator",
             relative_path=relative_path,
             content_sha256=content_sha256,
+            pinned_commit="d8151e11fb8679bda624ab9e6a4f9b7c5ab98208",
             skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         )
         for relative_path, content_sha256 in _DATAMODEL_CODE_GENERATOR_MANIFEST_PATHS
@@ -320,6 +338,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="ruff",
             relative_path=relative_path,
             content_sha256=content_sha256,
+            pinned_commit="11c76bf48fdac06b2f240cba502eda96da4dce77",
             skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         )
         for relative_path, content_sha256 in _RUFF_MANIFEST_PATHS
@@ -329,6 +348,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="uv",
             relative_path=relative_path,
             content_sha256=content_sha256,
+            pinned_commit="61291a8ca5477a9ca653f14d2ac5665587c263fa",
             skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         )
         for relative_path, content_sha256 in _UV_MANIFEST_PATHS
@@ -337,30 +357,57 @@ _EXPECTED_METADATA_ONLY = (
         source_name="picologging",
         relative_path="pyproject.toml",
         content_sha256="2ad0ed12418773f0f98bd2b4f9ceca5d2a82db2ba93f5a77e88bf44ebb326c5c",
+        pinned_commit="deaee6e435d58d0bc1b9dc5635fe29062a44cb1e",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
     graphify_health.ExpectedMetadataOnly(
         source_name="logbook",
         relative_path="Cargo.toml",
         content_sha256="35e0e98ef730ec11aa7917ac076784d38de19f96938f5977ff03b484c5256b3b",
+        pinned_commit="d3d6972c64fc555e3428a60f18ffb19cdb9395c1",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
     graphify_health.ExpectedMetadataOnly(
         source_name="taplo",
         relative_path="Cargo.toml",
         content_sha256="948071c255f61f3f514db829faa5929f82f5c3a942bf6916c8988dad1c0b7165",
+        pinned_commit="20a9145169437bb1a5629577094f20c01e83369b",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
     graphify_health.ExpectedMetadataOnly(
         source_name="typos",
         relative_path="Cargo.toml",
         content_sha256="35ec168d87130bfaed7231ab6c65eb0f00f55ecfd801c2ef72adcf8069c037a6",
+        pinned_commit="bee27e3a4fd1ea2111cf90ab89cd076c870fce14",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
     graphify_health.ExpectedMetadataOnly(
         source_name="pensyve",
         relative_path="Cargo.toml",
         content_sha256="ac98f98e7bc6843a3c04a80ac106df2dd85377660cd729bd3b1cf431e1f3c883",
+        pinned_commit="10b22eb42d652db541b22d563a6fe6e0eeb05736",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
+    # A bare `[workspace]` root (resolver + members + default-members), no
+    # `[package]`/`name` — same U0 shape as uv's and logbook's Cargo.toml below.
+    graphify_health.ExpectedMetadataOnly(
+        source_name="biome",
+        relative_path="Cargo.toml",
+        content_sha256="4447101af02598ae78268af3c8226655a7b50ffef155191c87a4e125274a9055",
+        pinned_commit="4d9c1d53ff57c44247e7a32718e1c69a0c1735af",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
+    # A 3-line `pyproject.toml` holding only `[tool.uv]` config (`no-build =
+    # false`) for the integration-test crate — no `[project]`/name, the same
+    # U0 shape as `_UV_MANIFEST_PATHS` above. Kept as its own entry rather than
+    # folded into that tuple because it is a distinct file discovered later
+    # (#1666 follow-up) and this repo's registry entries stay individually
+    # reviewable rather than silently merged into an existing group.
+    graphify_health.ExpectedMetadataOnly(
+        source_name="uv",
+        relative_path="crates/uv/pyproject.toml",
+        content_sha256="32b3705d5b32ffaf3da1f3ccb279bafdb572a6f8a156f1929eaef62f780eac85",
+        pinned_commit="61291a8ca5477a9ca653f14d2ac5665587c263fa",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
 )
@@ -400,6 +447,7 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         source_name="OpenSymphony",
         relative_path="crates/opensymphony-code-intel/fixtures/python/malformed.py",
         content_sha256="5812469eaff4436903f09258c1dc76da0ff4a8057c3a3fa083dc29bb3d158e6f",
+        pinned_commit="0cc21ddda5d1853a8fbd11add578b43b6ebd6fcb",
         first_error_line=2,
         extracted_nodes=2,
         lost_symbols=0,
@@ -423,6 +471,7 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         source_name="cclint",
         relative_path="tests/unit/infrastructure/security/PathValidator.test.ts",
         content_sha256="8bacc406e7f3b40412570618c0ad219820ec2838d8a7f2d9d7c4f719cabb2c44",
+        pinned_commit="da801da4e75bb73f5e1a69c6ea0c666a49a14939",
         first_error_line=28,
         extracted_nodes=1,
         lost_symbols=21,
@@ -450,6 +499,7 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         source_name="code-review-graph",
         relative_path="tests/fixtures/sample.luau",
         content_sha256="6618eb68fe06399b930d70c71773ec9872bb9d91db64b61439de7e6df02a919c",
+        pinned_commit="c3f3a6681791f6c6d870e8e437ecfe4e8500e377",
         first_error_line=10,
         extracted_nodes=10,
         lost_symbols=2,
@@ -488,6 +538,7 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         source_name="graphify",
         relative_path="tests/fixtures/sample.luau",
         content_sha256="c1aa998580d46b917014567ad39fe125c2a63ac540c3840fd27813d2004d2bd5",
+        pinned_commit="0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956",
         first_error_line=8,
         extracted_nodes=5,
         lost_symbols=0,
@@ -501,6 +552,7 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         source_name="Attacca",
         relative_path="website/src/pages/index.astro",
         content_sha256="355b3510c6b9b7ecba2e23a70eeebbc73edf8c372a91cba74d497479540aa942",
+        pinned_commit="34a52ce09db146035ca56db160388034de629693",
         first_error_line=1,
         extracted_nodes=1,
         lost_symbols=25,
@@ -541,6 +593,7 @@ _EXPECTED_UNSUPPORTED_LANGUAGE = (
         source_name="code-review-graph",
         relative_path="tests/fixtures/sample.R",
         content_sha256="3e3d48a842d2fcf26d288fda088a1fe0f218165b8f1a01b1b899fbf401e7613b",
+        pinned_commit="c3f3a6681791f6c6d870e8e437ecfe4e8500e377",
         language=".r",
         lost_symbols=6,
         reason=(
@@ -553,6 +606,7 @@ _EXPECTED_UNSUPPORTED_LANGUAGE = (
         source_name="code-review-graph",
         relative_path="tests/fixtures/test_sample.R",
         content_sha256="2c643bf1eb0749fe0af797b46c119325f62169bb06763f42054b81f1fa0fb702",
+        pinned_commit="c3f3a6681791f6c6d870e8e437ecfe4e8500e377",
         language=".r",
         lost_symbols=1,
         reason=(

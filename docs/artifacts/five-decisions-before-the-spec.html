@@ -1,0 +1,271 @@
+<title>Five Decisions Before the Spec</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#f9f8f6; --surface:#fff; --ink:#1a1714; --muted:#6b635c;
+    --rule:#ddd8d1; --soft:#ecE8e2;
+    --accent:#1f5f52; --accent-wash:#e8f1ee;
+    --warn:#8c3a1e; --warn-wash:#faefe9;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink); margin:0;
+    font-family:"Source Sans 3",system-ui,sans-serif; font-size:16.5px; line-height:1.62;
+    padding:clamp(24px,5vw,60px) clamp(16px,5vw,36px);
+  }
+  .wrap{max-width:76ch;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-family:Bitter,Georgia,serif;font-weight:700;font-size:clamp(29px,5vw,42px);
+     line-height:1.1;margin:0 0 10px;letter-spacing:-.02em;text-wrap:balance}
+  h2{font-family:Bitter,Georgia,serif;font-weight:600;font-size:20px;line-height:1.28;margin:0;text-wrap:balance}
+  .eyebrow{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.15em;
+     text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+  .lede{font-size:18px;color:#3a342e;margin:0}
+  p{margin:0 0 10px}
+  code{font-family:"JetBrains Mono",monospace;font-size:.85em;background:var(--soft);padding:1px 5px;border-radius:3px}
+  .mono{font-family:"JetBrains Mono",monospace;font-size:.85em}
+  .card{background:var(--surface);border:1px solid var(--rule);border-radius:5px;
+     padding:20px 22px;display:flex;flex-direction:column;gap:12px}
+  .card > :last-child{margin-bottom:0}
+  .cardhead{display:flex;gap:14px;align-items:baseline}
+  .rank{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:500;color:var(--surface);
+     background:var(--accent);border-radius:3px;padding:3px 8px;flex:none}
+  .rank.hot{background:var(--warn)}
+  .lbl{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.12em;
+     text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px}
+  ol.opts{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:5px;font-size:15.5px}
+  .rec{background:var(--accent-wash);border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 3px 3px 0;font-size:15.5px}
+  .rec b{color:var(--accent)}
+  .ans{background:#1a1714;color:#f4f1ec;border-left:3px solid var(--accent);padding:12px 15px;
+     border-radius:0 3px 3px 0;font-size:15.5px}
+  .ans b{color:#7fd4bf}
+  .ans code,.ans .mono{background:#302a25;color:#f4f1ec}
+  .flag{background:var(--warn-wash);border-left:3px solid var(--warn);padding:10px 14px;border-radius:0 3px 3px 0;font-size:15.5px}
+  .flag b{color:var(--warn)}
+  figure{margin:0;background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:20px 22px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{font-size:13.5px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--soft)}
+  .prov{background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:18px 22px;font-size:14.5px}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--soft);vertical-align:top}
+  th{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  footer{font-size:13px;color:var(--muted);border-top:1px solid var(--rule);padding-top:14px}
+</style>
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">Q0 · the re-grill · session kb-20260830.004</p>
+  <h1>Five Decisions Before the Spec</h1>
+  <p class="lede">A cold lane read four prior reports and the design page, settled
+  <strong>11</strong> questions it could answer from the repo, and left <strong>five</strong> that
+  need you. Ranked by what a wrong answer costs.</p>
+  <p class="flag" style="margin-top:14px"><b>Updated after publication — four of five now answered.</b>
+  <strong>1</strong> — enrollment first. <strong>4</strong> — the spec waits.
+  <strong>3</strong> — dissolved by measurement, not decided: the “red gates” it worried about are green
+  (2026-08-31). <strong>5</strong> — Ray’s call: “full” means <em>every pin site</em>, 35, not the 18
+  mapped. Only <strong>2</strong> is still open. Decision 2 also carries a finding that removes an
+  option somebody proposed. Nothing below has been silently rewritten; every superseded claim is still
+  visible beside its correction.</p>
+</header>
+
+<div class="card">
+  <div class="cardhead"><span class="rank">1</span><h2>Does dependency population read <code>mise.toml</code> directly, or inherit the curated list?</h2></div>
+  <p><span class="lbl">Stakes</span>If population still goes through a curated allowlist, the same
+  seven tools that motivated the whole redesign stay invisible after the rewrite — <strong>a new
+  engine built around the exact gap it was meant to close.</strong></p>
+  <div><span class="lbl">Options</span>
+  <ol class="opts">
+    <li>Auto-discover every dependency from <code>mise.toml [tools]</code>, bypassing the curated list.</li>
+    <li>Keep the allowlist; ship with the 7 gaps as tracked follow-up issues.</li>
+    <li>Block slice 1 until every entry has an explicit row (delays MVP for mechanical enrollment).</li>
+  </ol></div>
+  <div class="rec"><b>Recommended: 1.</b> All seven are already in <code>mise.toml</code> — I verified
+  each one this session — so reading that table closes the gap at zero extra cost. One risk: some
+  entries aren't things you want version-tracked. Mitigate with an <strong>exclude</strong>-list, so
+  new tools are covered by default instead of invisible by default.</div>
+</div>
+
+<figure>
+<svg viewBox="0 0 900 250" role="img" aria-label="Two population strategies. An include-list reads a curated list in currency.toml and covers twenty tools, leaving seven mise tools invisible. An exclude-list reads mise.toml's tools table directly, covering all tools by default with only deliberate exclusions removed.">
+  <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#4a423b"/></marker></defs>
+
+  <text x="6" y="18" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#6b635c" letter-spacing="1.3">TODAY — INCLUDE-LIST</text>
+  <rect x="6" y="30" width="150" height="52" rx="3" fill="#f2efe9" stroke="#8c3a1e" stroke-width="1.4"/>
+  <text x="18" y="52" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#1a1714">currency.toml</text>
+  <text x="18" y="70" font-family="Source Sans 3, sans-serif" font-size="12" fill="#8c3a1e">curated list</text>
+  <line x1="158" y1="56" x2="196" y2="56" stroke="#4a423b" stroke-width="1.4" marker-end="url(#a2)"/>
+  <text x="163" y="48" font-family="JetBrains Mono, monospace" font-size="9.5" fill="#6b635c">names</text>
+  <rect x="200" y="30" width="132" height="52" rx="3" fill="#fff" stroke="#8c8378" stroke-width="1.3"/>
+  <text x="212" y="52" font-family="Source Sans 3, sans-serif" font-size="13" font-weight="600" fill="#1a1714">covered</text>
+  <text x="212" y="70" font-family="Source Sans 3, sans-serif" font-size="12" fill="#4a423b">the listed tools</text>
+  <rect x="348" y="30" width="240" height="52" rx="3" fill="#faefe9" stroke="#8c3a1e" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <text x="360" y="52" font-family="Source Sans 3, sans-serif" font-size="13" font-weight="600" fill="#8c3a1e">7 tools INVISIBLE</text>
+  <text x="360" y="70" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#8c3a1e">python pkl typos taplo biome gitleaks gh</text>
+  <text x="600" y="52" font-family="Source Sans 3, sans-serif" font-size="12" fill="#6b635c">not on the list,</text>
+  <text x="600" y="68" font-family="Source Sans 3, sans-serif" font-size="12" fill="#6b635c">so never asked about</text>
+
+  <line x1="6" y1="112" x2="894" y2="112" stroke="#ddd8d1" stroke-width="1"/>
+
+  <text x="6" y="142" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#6b635c" letter-spacing="1.3">PROPOSED — EXCLUDE-LIST</text>
+  <rect x="6" y="154" width="150" height="52" rx="3" fill="#e8f1ee" stroke="#1f5f52" stroke-width="1.4"/>
+  <text x="18" y="176" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#1a1714">mise.toml</text>
+  <text x="18" y="194" font-family="Source Sans 3, sans-serif" font-size="12" fill="#1f5f52">[tools] — the source</text>
+  <line x1="158" y1="180" x2="196" y2="180" stroke="#4a423b" stroke-width="1.4" marker-end="url(#a2)"/>
+  <text x="161" y="172" font-family="JetBrains Mono, monospace" font-size="9.5" fill="#6b635c">all rows</text>
+  <rect x="200" y="154" width="132" height="52" rx="3" fill="#fff" stroke="#1f5f52" stroke-width="1.3"/>
+  <text x="212" y="176" font-family="Source Sans 3, sans-serif" font-size="13" font-weight="600" fill="#1a1714">covered</text>
+  <text x="212" y="194" font-family="Source Sans 3, sans-serif" font-size="12" fill="#1f5f52">every tool, by default</text>
+  <line x1="334" y1="180" x2="372" y2="180" stroke="#4a423b" stroke-width="1.4" marker-end="url(#a2)"/>
+  <rect x="376" y="154" width="212" height="52" rx="3" fill="#fff" stroke="#8c8378" stroke-width="1.3"/>
+  <text x="388" y="176" font-family="Source Sans 3, sans-serif" font-size="13" font-weight="600" fill="#1a1714">explicit excludes only</text>
+  <text x="388" y="194" font-family="Source Sans 3, sans-serif" font-size="12" fill="#4a423b">a removal is a decision you wrote</text>
+  <text x="600" y="176" font-family="Source Sans 3, sans-serif" font-size="12" fill="#1f5f52">nothing can be missed</text>
+  <text x="600" y="192" font-family="Source Sans 3, sans-serif" font-size="12" fill="#1f5f52">by omission</text>
+</svg>
+<figcaption>The difference is which direction the default runs. An include-list makes silence mean
+“not covered”; an exclude-list makes silence mean “covered”. Measured this session: all seven named
+tools appear in <span class="mono">mise.toml</span>’s <span class="mono">[tools]</span> table, so
+option 1 needs no new data source. The “15 of 33 unmapped” figure behind this was
+<strong>inherited</strong> when this figure was drawn and has since been <strong>re-derived and
+confirmed</strong> (2026-08-31): denominator = 20 mise <span class="mono">[tools]</span> + 13 distinct
+pyproject packages. The re-derivation added one thing the figure cannot show —
+<span class="mono">[tool.mise]</span> and <span class="mono">[tool.claude-code]</span> are tracked but
+match nothing in either pin file, so they sit outside the 33 altogether.</figcaption>
+</figure>
+
+<div class="card">
+  <div class="cardhead"><span class="rank hot">2</span><h2>Where does new tracked state live — given the repo already breaks its own rule?</h2></div>
+  <div class="flag"><b>Confirmed live violation.</b> <code>do-not.md:70</code> says
+  <em>“Do NOT commit <code>graphify-out/</code> beyond <code>memory/</code>”</em> and
+  <code>:79</code> says <em>“The rule is back to one exception.”</em> I ran
+  <span class="mono">git ls-files graphify-out/</span> this session: it returns <strong>two</strong>
+  directories — <code>memory/</code> and an undocumented
+  <code>graphify-semantic-slice/</code> holding <strong>5 tracked files</strong>. Two independent
+  cold reports found it separately.</div>
+  <p><span class="lbl">Stakes</span>Any new tracked artifact either extends a broken invariant,
+  creates a <strong>third</strong> ungoverned subtree, or papers over a defect a future audit
+  rediscovers.</p>
+  <div><span class="lbl">Options</span>
+  <ol class="opts">
+    <li>Remove the subtree, restore one exception, then place new state elsewhere.</li>
+    <li>Document it as a sanctioned second exception, then add the new state as a third.</li>
+    <li>Put new tracked state outside <code>graphify-out/</code> entirely and settle the subtree separately.</li>
+  </ol></div>
+  <div class="flag"><b>Corrected twice after publication. Read this, not my first answer.</b>
+  I first said “graphify documents no such structure”, from our <strong>fork’s</strong> README,
+  pinned 2026-08-25. Checked against live upstream (<code>v8</code> HEAD <code>33362d96</code>,
+  2026-08-30, <strong>0.9.53</strong> vs our 0.9.50), that was wrong in the way that matters:
+  <strong>upstream has a clear opinion, and it is the opposite of ours.</strong> Its README, verbatim:
+  <em>“<code>graphify-out/</code> is meant to be committed to git so everyone on the team starts with
+  a map.”</em> The only recommended exclusions are <code>cost.json</code> (“local only”) and
+  optionally <code>cache/</code>. Upstream has no derived-vs-retained distinction <strong>because it
+  assumes you commit the whole tree</strong>. Control arm: the same grep returns 11 hits for a term
+  known present, so the reads discriminate.</div>
+  <p><span class="lbl">Why that flips the finding</span>By upstream’s convention, a tracked
+  purpose-named subdirectory under <code>graphify-out/</code> is <strong>exactly the right shape</strong>
+  — <code>graphify-semantic-slice/</code> is not misplaced. This repo inverts upstream’s default for
+  one reason only: our graph is 737 MB, far past what git will carry. So the defect is not
+  <em>where</em> the directory sits. <strong>It is that <code>do-not.md</code> still says “one
+  exception” while the repo has two.</strong> The directory is undeclared, not misfiled.</p>
+  <div class="flag"><b>And the multi-source concept is not a directory at all.</b> What upstream
+  ships is <code>graphify global add/list/path</code>, writing one flat
+  <code>~/.graphify/global-graph.json</code> outside every project — which <code>do-not.md</code>
+  rule 2 <em>already bans here</em> as shared mutable machine state. The workspace/repository
+  vocabulary is a <strong>hosted-server</strong> surface, not a local layout; control-armed against 19
+  upstream issues titled “workspace”, all of which mean monorepo workspaces and none a directory
+  concept. No precedent to extend from either direction.</div>
+  <p><span class="lbl">And the directory is messier than the question assumed</span>
+  <code>graphify-out/</code> holds <strong>13 entries</strong>, of which only <strong>2</strong> are
+  tracked: <code>memory/</code> (332 files) and <code>graphify-semantic-slice/</code> (5). The other
+  eleven are untracked leftovers — including <code>graphify-semantic-corpus/</code> and
+  <strong>two</strong> <code>.superseded-*</code> copies of it, from the layer this repo’s rules say
+  was removed on 2026-08-24. All measured this session.</p>
+  <div class="rec"><b>Recommendation, now revised by the evidence.</b> The choice is no longer
+  “where does it go” but <strong>which of two coherent stories this repo tells</strong>:
+  <br><br><b>(a) Declare it.</b> Amend <code>do-not.md</code> to name
+  <code>graphify-semantic-slice/</code> as a second sanctioned exception. This follows upstream’s
+  shape — a purpose-named tracked subdirectory — and is the smaller diff. Cost: every exception makes
+  the next one easier, and this rule has already gone stale once for a day.
+  <br><br><b>(b) Move it to <code>sources/extractions/</code>.</b> This repo already treats that as
+  the tracked home for non-regenerable extraction output, and it restores a clean invariant:
+  <em>everything under <code>graphify-out/</code> is derived and gitignored except <code>memory/</code></em>.
+  Cost: it departs from upstream’s shape, and it is a move rather than a one-line rule edit.
+  <br><br><b>I lean (b)</b> — the confusion here has now happened twice, and both times the cause was
+  tracked evidence living in a tree everyone reads as derived. But this is a judgment call about which
+  story you want to maintain, not a fact the evidence settles.</div>
+</div>
+
+<div class="card">
+  <div class="cardhead"><span class="rank">3</span><h2>Are the currently-RED gates a landing blocker for slice 1?</h2></div>
+  <p><span class="lbl">Stakes</span>The design treats “gates pass” as the signal a bump is safe. If
+  the baseline is already red for unrelated reasons, the protocol’s first real run fails on
+  pre-existing defects — <strong>and reads as a failure of the new design.</strong></p>
+  <div class="flag" style="opacity:.62"><b>Was: inherited, not re-measured.</b> The
+  <span class="mono">hk-test</span> 40-passed / 6-failed figure and the absent currency stamp came
+  from a prior report. Nobody had re-run them. <b>Superseded 2026-08-31 — kept for the record.</b></div>
+  <div class="ans"><b>ANSWERED — by measurement, not judgement.</b>
+  <span class="mono">mise run kb-gates</span> at <span class="mono">d08baaa7</span>:
+  <b>all 7 rc=0, every row <span class="mono">dirty:false</span></b> — and the specific number was
+  <span class="mono">hk-test: 46 passed, 0 failed (floor 40)</span>. Note 40 + 6 = 46: the prior report
+  saw the right test count and misattributed six of them as failures.
+  <b>There is no red baseline, so it blocks nothing.</b>
+  <p style="margin:8px 0 0">The residual — <span class="mono">kb-build</span> IS red, but it is not one
+  of the seven gates. <b>Ray, 2026-08-31: it stays out</b> (≈55 min, network, re-clones every pinned
+  source; a transient DNS failure would become a blocked ship). A new seconds-long
+  <b>manifest-audit gate</b> catches the same class before a build ever runs.</p></div>
+</div>
+
+<div class="card">
+  <div class="cardhead"><span class="rank">4</span><h2>Does the spec wait for decision 1, or proceed on a stated assumption?</h2></div>
+  <p><span class="lbl">Stakes</span>The design page’s “spec the full protocol now” call was made
+  <strong>without ever reading the report that produces decision 1</strong>. Specifying first
+  freezes the population contract — by the artifact’s own words, <em>“the schema is the expensive
+  thing to get wrong”</em> — against whichever assumption the author happens to hold.</p>
+  <div class="rec"><b>Recommended: wait.</b> Decision 1 is one answer away and it is the cheapest
+  possible moment to change it.</div>
+</div>
+
+<div class="card">
+  <div class="cardhead"><span class="rank">5</span><h2>Should “full protocol” be redefined as “every <em>mapped</em> dependency”?</h2></div>
+  <p><span class="lbl">Stakes</span>A prior report refuted literal completeness as achievable, so
+  the MVP’s success criterion <strong>cannot be met as written on day one regardless of how
+  decision 1 goes</strong> — some legitimate gap always exists. Whoever writes acceptance criteria
+  needs a definition of “full” a gate can actually check.</p>
+  <div class="ans"><b>ANSWERED — Ray, 2026-08-31: every pin site. 35, not 18.</b>
+  “Full” means literally full. The denominator was re-derived this session and is
+  <span class="mono">20 mise [tools] + 13 distinct pyproject packages = 33</span>, of which
+  <b>18 are covered</b> by a reachable <span class="mono">currency.toml [tool.X]</span> table.
+  Plus <span class="mono">[tool.mise]</span> and <span class="mono">[tool.claude-code]</span>, which
+  have neither a <span class="mono">mise_key</span> nor a <span class="mono">python_package</span> and
+  so sit <em>outside</em> the 33 while being real tracked tools — hence <b>35</b>.
+  <p style="margin:8px 0 0"><b>The cost, accepted knowingly:</b> the criterion reads <b>18/35 on day
+  one</b> and stays red until the 15 are mapped. That is a roadmap, not a defect — the alternative
+  definitions all pass immediately by declaring the gap out of scope.</p>
+  <p style="margin:8px 0 0"><b>The uncovered 15, by name.</b> mise (7):
+  <span class="mono">biome, gh, gitleaks, pkl, python, taplo, typos</span>. pyproject (8):
+  <span class="mono">anthropic, httpx2, mcp2cli, msgspec, pytest, pytest-xdist, structlog,
+  trafilatura</span>. <b><span class="mono">biome</span> is on this list and is also the manifest
+  currently breaking <span class="mono">kb-build</span></b> — the same gap seen from two sides.</p></div>
+</div>
+
+<div class="prov">
+  <p class="eyebrow">Provenance — what I checked, and what I did not</p>
+  <table>
+    <tr><th>Claim</th><th>Grade</th></tr>
+    <tr><td>All 7 tools present in <code>mise.toml [tools]</code></td><td><b style="color:var(--accent)">CONFIRMED</b> — ran it this session</td></tr>
+    <tr><td>Second tracked subtree under <code>graphify-out/</code>, 5 files</td><td><b style="color:var(--accent)">CONFIRMED</b> — <span class="mono">git ls-files</span>, this session</td></tr>
+    <tr><td><code>do-not.md</code> permits exactly one exception</td><td><b style="color:var(--accent)">CONFIRMED</b> — read at <code>:70</code>, <code>:79</code></td></tr>
+    <tr><td>15 of 33 dependencies unmapped</td><td><b style="color:var(--accent)">RE-DERIVED 2026-08-31 — HOLDS</b>. Reproduced exactly: denominator = 20 mise <code>[tools]</code> + 13 distinct pyproject packages; covered = has a reachable <code>currency.toml [tool.X]</code> table. The suspicion that it conflated corpus sources with dependencies is <b>REFUTED</b> — the 97 tracked manifests play no part in reaching 33. One thing it hides: <code>[tool.mise]</code> and <code>[tool.claude-code]</code> sit outside the 33 entirely, so 33 is not the full population.</td></tr>
+    <tr><td><span class="mono">hk-test</span> 40 pass / 6 fail</td><td><b style="color:var(--warn)">REFUTED 2026-08-31</b> — re-run: <code>hk-test: 46 passed, 0 failed (floor 40)</code>, and all 7 gates rc=0 at <code>d08baaa7</code> with every row <code>dirty:false</code>. 40 + 6 = 46, so the prior report saw the right test count and misattributed six as failures. <b>This is why decision 3 dissolved rather than being decided.</b></td></tr>
+    <tr><td>A public comment cites the wrong upstream PR number</td><td><b style="color:var(--warn)">REFUTED</b> — settled after publication. The comment is <strong>correct</strong>: it names <code>#441 “SQLite Support”</code> (merged 2025-08-27, confirmed) as the answer and cites <code>#680</code> only as the wrong number it is refuting. The lane read a refutation as an endorsement. Nothing needs fixing.</td></tr>
+  </table>
+</div>
+
+<footer>
+  Source: <span class="mono">.agent/kb/reports/agents/q0-regrill-questions.md</span> (333 lines,
+  5 questions, 11 candidates settled rather than asked). Built from four prior cold reports plus
+  <span class="mono">clear-to-spec.html</span> — which was itself written from only one of those
+  four, which is why these five exist at all.
+  <br><br>Decisions <b>3</b> and <b>5</b> answered in session <span class="mono">kb-20260830.005</span>, 2026-08-31. Decision 3 by running <span class="mono">mise run kb-gates</span> at <span class="mono">d08baaa7</span> (7/7 rc=0, all <span class="mono">dirty:false</span>); decision 5 by Ray, with the denominator re-derived from <span class="mono">mise.toml</span>, <span class="mono">pyproject.toml</span> and <span class="mono">currency.toml</span> via <span class="mono">tomllib</span> rather than grep — report at <span class="mono">.agent/kb/reports/agents/dep-inventory.md</span>.
+</footer>
+</div>

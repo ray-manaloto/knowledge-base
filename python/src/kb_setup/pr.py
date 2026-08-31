@@ -19,8 +19,9 @@ What it does keep is the part that carries the safety:
   matching one, is recorded once at `handoff.check_for_branch` with the
   measurement behind it; this module owns only the ship-time policy;
 * ``ship`` then runs every gate in :data:`gates.GATE_TASKS` (``lint``, ``test``,
-  ``brain-audit``, ``eval``, ``graph-size``, ``hk-test``, ``funnel``) BEFORE the
-  branch is pushed, so a red branch never becomes a PR — and RECORDS each result
+  ``brain-audit``, ``eval``, ``graph-size``, ``hk-test``, ``funnel``,
+  ``kb-manifest-audit``) BEFORE the branch is pushed, so a red branch never
+  becomes a PR — and RECORDS each result
   under `.agent/kb/gates/`, because the
   numbers it prints used to survive only as long as the terminal did (#146). The
   list, the runner and the record all live in `kb_setup.gates`; this module keeps

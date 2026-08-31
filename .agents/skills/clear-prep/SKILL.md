@@ -45,16 +45,13 @@ in this skill that cannot be reordered without losing work.
 > flag").** Until then `disable-model-invocation: true` hid it from the listing so only a
 > human could fire it; the 2026-08-21 session review measured why that failed — 20% of
 > context was crossed 15 minutes in and the ask came at ~75%. The trigger is still a
-> question, never a silent run: an agent that invokes this skill does so to PREPARE the
-> handoff and then asks the user to `/clear` (AskUserQuestion), and the intended
-> mechanical trigger is a DENY-style guard on context usage (session-review R1, #431/#433
-> neighbours) — not built yet, so until it lands the trigger is the description above
-> plus the agent's own context reading. The description is what model invocation
-> matches on, so it now names the triggers (context past ~20%, a round ending, the user
-> asking for a handoff); the `triggering_accuracy` dimension in `mise run
-> kb-skill-score` therefore measures a real trigger for this skill from 2026-08-21 on —
-> re-baseline it (`-- --write`) rather than reading the old "inert" note. Step 7 is
-> where the "asks the user" half is made concrete.
+> question, never a silent run: an agent invokes this skill to PREPARE the handoff and
+> then asks the user to `/clear` (AskUserQuestion). The intended mechanical trigger is a
+> DENY-style guard on context usage (session-review R1, #431/#433) — not built yet, so
+> until it lands the trigger is the description plus the agent's own context reading.
+> The description is what model invocation matches on, so it now names the triggers
+> (context past ~20%, a round ending, the user asking for a handoff). Step 7 is where
+> the "asks the user" half is made concrete.
 
 ## 0. Resolve next-task ambiguity FIRST (Ray, 2026-07-08)
 
@@ -138,6 +135,15 @@ still running, and any scheduled wakeups or crons created this session. Stop
 what should not outlive the session and note anything deliberately left running.
 A stale wakeup firing after the handoff re-triggers work that is already done.
 
+**If a `planning-with-files` plan is active, its files are gather inputs** — all
+of them, from the dir `resolve-plan-dir.sh` prints. `progress.md` is the round's
+narration, `task_plan.md`'s decisions journal the reasoning behind what shipped,
+and **`findings.md` is where the round's research actually accumulated** (it is
+the plugin's untrusted-content sink, so it holds what `task_plan.md` may not).
+`ledger-*.jsonl` is the per-action record. All feed the handoff; none replaces it
+— the plan dies with the clone and carries no gate evidence, receipt, or
+generated next task.
+
 **Do not block `/clear` on anything that runs without this session.** GitHub
 Actions runs and bots like Renovate execute on GitHub's schedule whether you
 clear or not — they are not this session's background tasks. Inventory them in
@@ -161,9 +167,12 @@ commit *is* an ancestor. Run `kb-remember` after the land and there is no
 receipt that covers it, so the artifacts either never land or force a whole new
 review round for a memory file.
 
-So close the loop while the branch is still unmerged:
+So close the loop while the branch is still unmerged. **Write the answer and
+lesson files first** — `kb-remember` refuses a path that does not exist, and
+`.agent/` is gitignored so it may not be there at all:
 
 ```bash
+mkdir -p .agent/plans && : > .agent/round-answer.md   # + round-lesson.md if correcting
 mise run kb-remember -- --question "<what this round asked>" \
                        --answer-file .agent/round-answer.md --outcome useful
 # A round that OVERTURNED a belief is `corrected`, and then the lesson is
@@ -188,31 +197,21 @@ Also write anything durable into **auto-memory** (step 4a) — the two layers
 answer different questions. `graphify-out/memory/` teaches the *corpus*;
 auto-memory teaches the *next session*.
 
-**`kb-distill` is the third thing a round can leave behind, and the one nobody
-was capturing** (#219). It reads this project's transcripts for throwaway
-scripts — a `python3` heredoc, a scratchpad `.py` — and proposes a
-`skill -> mise task -> kb_setup module` for any shape written more than once.
-It lives here rather than in its own skill precisely because a task does not
-need one: `md-size-budgets.md`'s listing budget is a real cost, and the trigger
-for this one is "a round just ended", which is what this skill already is.
+**`kb-distill` is the third thing a round can leave behind** (#219). It reads
+this project's transcripts for throwaway scripts — a `python3` heredoc, a
+scratchpad `.py` — and proposes a `skill -> mise task -> kb_setup module` for any
+shape written more than once. Read its output as **leads**: it always exits 0 and
+gates nothing, and **nothing to propose is the common, correct result** — which
+is what makes a non-empty report worth reading.
 
-Read its output as **leads**. It always exits 0 and gates nothing; an
-undistilled probe is a statement about future cost, not a failure. **Nothing to
-propose is the common, correct result** — a session of one-off work should
-produce an empty report, and that is what makes a non-empty one worth reading.
-**`kb-session-reflect` is the fourth, and it asks what distill cannot.** distill
-is a FREQUENCY miner — it groups scripts across sessions by import signature, so
-it answers *was a program written twice?* A step done by hand ONCE, in one
-session, has no frequency to mine and is invisible to it: a directive violated
-at a rate, a probe that answered without asking, a run of adjacent tasks wanting
-one wrapper. Its largest group is the hand-written mutation harness, rebuilt as
-a fresh scratchpad every round while `kb-arms` has existed to replace it since issue
-160 — re-derive that count from a live run rather than repeating one here.
-
-Both read the same transcripts through one reader (`distill.tool_uses`), and
-both are advisory. Read `.claude/skills/kb-session-reflect/SKILL.md` when a
-finding looks worth turning into a `skill -> task -> module` triple; it carries
-the rule for which of those three layers a lead actually earns.
+**`kb-session-reflect` is the fourth, and asks what distill cannot.** distill is
+a FREQUENCY miner, grouping scripts by import signature: *was a program written
+twice?* A step done by hand ONCE has no frequency to mine and is invisible to it
+— a directive violated at a rate, a probe that answered without asking, adjacent
+tasks wanting one wrapper. Both read the same transcripts through one reader
+(`distill.tool_uses`) and both are advisory. Read
+`.claude/skills/kb-session-reflect/SKILL.md` when a lead looks worth a
+`skill -> task -> module` triple; it carries the rule for which layer it earns.
 
 ## 3. Documentation sync — make the docs match what happened
 
@@ -224,16 +223,14 @@ reflected in docs):
    addition needs an offsetting trim; prefer collapsing duplication into a
    pointer over deleting a load-bearing fact.
 2. **`.claude/rules/*.md`** when a lesson generalises past this round.
-   `.claude/CLAUDE.md` for anything about the issue tracker or the executor
-   lanes.
-3. **Cross-references.** Grep for anything renamed, moved, deleted or re-timed:
+   `.claude/CLAUDE.md` for the issue tracker or the executor lanes.
+3. **Cross-references.** Grep for anything renamed, moved, deleted or re-timed —
+   mise task names, `kb_setup` modules, doc paths, superseded issue numbers:
 
    ```bash
    git grep -nE "<old-filename>|<old-task>|<renamed-symbol>" -- ':!.agent*' ':!*.lock'
    ```
 
-   Common sources: mise task names, `kb_setup` module names, doc paths, issue
-   numbers that got superseded.
 4. **`docs/` specs and `sources/REGISTRY.md`.** Update status banners; keep
    point-in-time analysis legible by marking the old state as baseline rather
    than rewriting the reasoning. Any repo an agent read this session goes in a
@@ -279,7 +276,9 @@ it is auto-loaded and believed.
 
 ### b. The handoff — survives `/clear`, dies with the clone
 
-Write `.agent/plans/session-<YYYY-MM-DD>[-letter].md`. Append a letter suffix
+Write `.agent/plans/session-<YYYY-MM-DD>[-letter].md` — after `mkdir -p
+.agent/plans`, since `.gitignore` ignores `.agent/` and a fresh clone has none,
+so the write fails before the round's recovery artifact exists. Append a letter suffix
 rather than overwriting an existing handoff for the same day.
 
 It must be **self-sufficient**: step 7's resume prompt only points here, so
@@ -302,20 +301,18 @@ handoff. Anything missing gets written now, verbatim from context, before
 coverage for you** (#148). Abbreviating the sha is fine and is what these
 documents already do — `review-8a46d08…-cold.md` is checked as a pattern, so a
 lane named for a commit nothing was ever written for now fails rather than
-passing silently. Two things it cannot see, both stated so the silence is not
-read as a pass: a name written in PROSE rather than as a filename (measured at
-1-in-42 precision over 37 handoffs, so it is deliberately not extracted), and an
-agent that ran and was never mentioned at all — out of reach for anything in
-python, and out of scope per the ticket. Cite a report you know is missing as
-`` `name` (absent) ``; the marker is checked both ways, so it cannot hide a real
-one.
+passing silently. Two things it cannot see, stated so the silence is not read as
+a pass: a name written in PROSE rather than as a filename (1-in-42 precision over
+37 handoffs, so deliberately not extracted), and an agent that ran and was never
+mentioned at all. Cite a report you know is missing as `` `name` (absent) ``; the
+marker is checked both ways, so it cannot hide a real one.
 
-If a report is now load-bearing — something tracked cites it —
-**promote a copy to `docs/research/reports/`**. `.agent/` is gitignored and dies
-to any `git clean -xdf`, and a citation only one machine can open is not a
-citation. `kb-review` lane reports are the exception with a stricter rule: they
-live at `.agent/kb/review/reports/review-<sha>-<lane>.md` with any `:variant`
-stripped from the lane, because `kb_setup.review` *reads* those filenames.
+If a report is now load-bearing — something tracked cites it — **promote a copy
+to `docs/research/reports/`**. `.agent/` is gitignored and dies to any
+`git clean -xdf`, and a citation only one machine can open is not a citation.
+`kb-review` lane reports are the exception, with a stricter rule: they live at
+`.agent/kb/review/reports/review-<sha>-<lane>.md` with any `:variant` stripped
+from the lane, because `kb_setup.review` *reads* those filenames.
 
 ## 5. Validate, then commit
 
@@ -391,78 +388,80 @@ with a backticked `- **branch**:` bullet, so pasting it satisfies this.
 
 ## 7. Emit the resume prompt — one line
 
-All the context is in auto-memory (loaded automatically) and the handoff. The
-prompt is therefore a pointer and nothing more. Inlining the task plan, issue
-summaries or gate commands is the duplication this skill exists to prevent —
-and a prompt that disagrees with the handoff sends the next session to the
-wrong one.
+All the context is in auto-memory (loaded automatically) and the handoff, so the
+prompt is a pointer and nothing more. Inlining the task plan, issue summaries or
+gate commands is the duplication this skill exists to prevent, and a prompt that
+disagrees with the handoff sends the next session to the wrong one.
 
-**The pointer is now a skill, so there is nothing to paste:**
+**The pointer is a skill, so there is nothing to paste:**
 
 ```text
 /session-resume
 ```
 
-`session-resume` finds the newest handoff itself, reads the newest directive with it,
-and — the part a pasted path cannot do — CHECKS both against the repo, reporting
-any place they disagree. Ray, 2026-08-19: *"we need to automate this better so
-that i can just run a slash command and/or skill on the next session that just
-knows how to jump to handoff so there is less copy/paste needed."*
+It finds the newest handoff itself, reads the newest directive with it, and — the
+part a pasted path cannot do — CHECKS both against the repo, reporting where they
+disagree. Ray, 2026-08-19: *"we need to automate this better so that i can just
+run a slash command and/or skill on the next session that just knows how to jump
+to handoff so there is less copy/paste needed."* `/session-resume <path>` reads a
+SPECIFIC handoff instead; that skill documents the fresh-clone fallback.
 
 **Print this line even when the round ended untidily.** It was skipped on
-2026-08-19 and the next session had no idea where to start. A handoff nobody is
-told to read is a handoff nobody reads.
-
-The older form still works when the next session should read a SPECIFIC handoff
-rather than the newest:
-
-```text
-Read and follow .agent/plans/session-<date>.md
-```
-
-(`/session-resume <path>` does the same and keeps the repo checks.) On a fresh clone
-`.agent/` is gitignored and there is no handoff to point at; `/session-resume` falls
-back to the newest tracked `docs/direction/*.md` plus `git log`, so it stays the
-right prompt to print either way.
+2026-08-19 and the next session had no idea where to start.
 
 **Then ASK the user to `/clear` — via `AskUserQuestion`, never in prose, and
 never by clearing yourself.** This is the "asks the user" half of the banner,
-and it is the last act of the skill whether a human typed `/clear-prep` or an
-agent invoked it on its own at ~20% context: one question, options *"/clear now
-(then `/session-resume`)"* and *"not yet — keep going in this session"*, with the
-handoff path and the resume line in the question text so the answer is one
-click. Only the user runs `/clear`; an agent that invoked this skill has
-prepared for it. On *"not yet"*, resume the work you were doing — the handoff
-stays valid until something changes — and do not ask again until the NEXT
-qualifying trigger: a further PR opened or landed, a new directive, the user
-raising it, **or roughly another 25 percentage points of context consumed since
-the deferral** (so a *"not yet"* at ~20% asks again near ~45%, and again near
-~70% — bounded, and never *never*). Both banner triggers therefore survive a
-deferral, which is the point: re-asking on the very next turn is the nagging
-this skill must not become, but a deferral that never expires is the other
-failure, and it is the one that leaves a session writing its handoff at the end
-of the window instead of the start. On *"/clear now"*, stop: the next thing that
-happens is the user's `/clear` and then `/session-resume`.
+and it is the last thing this skill ASKS (the archive below still follows it on a
+*"/clear now"*) whether a human typed `/clear-prep` or an agent invoked it at
+~20% context: one question, options *"/clear now (then `/session-resume`)"* and
+*"not yet — keep going"*, with the handoff path and the resume line in the
+question text so answering is one click. Only the user runs `/clear`. On *"not
+yet"*, resume the work — the handoff stays valid until something changes — and do
+not ask again until the NEXT qualifying trigger: a further PR opened or landed, a
+new directive, the user raising it, **or roughly another 25 percentage points of
+context consumed** (so a *"not yet"* at ~20% asks again near ~45%, then ~70% —
+bounded, never *never*). Re-asking next turn is the nagging this skill must not
+become; a deferral that never expires is the worse failure, leaving a session
+writing its handoff at the end of the window instead of the start.
+
+**On *"/clear now"* — and only then — ARCHIVE the plan, but only if it is DONE:**
+
+```bash
+PWF="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/cache/planning-with-files/planning-with-files/3.12.0}"
+sh "$PWF/scripts/check-complete.sh"   # phases still in_progress? then DO NOT archive
+mkdir -p .planning/.archive && mv .planning/<id> .planning/.archive/<id>
+grep -qx '<id>' .planning/.active_plan 2>/dev/null && rm .planning/.active_plan
+```
+
+**Archiving an UNFINISHED plan destroys the thing the plugin exists for** — its
+`SessionStart` hook (matcher `startup|resume|clear|compact`) restores a live plan
+after exactly the `/clear` you are preparing, and in gated mode the Stop hook is
+still counting its phases. So check first — an incomplete plan is normal and stays.
+The `.active_plan` guard matters: one global pointer a parallel `PLAN_ID` may hold.
+
+Two details are load-bearing. Nothing creates `.archive/`, so without `mkdir -p`
+the first archive fails and an `&&` chain silently leaves the plan selected. And
+the leading dot matters because `resolve-plan-dir.sh` falls back to the newest
+`.planning/<dir>/` by mtime while **skipping hidden dirs** (`.*) continue ;;`).
+
+**Find the plan before you move it** — `resolve-plan-dir.sh` honours `PLAN_ID`
+and `PWF_PLAN_ROOT`, and legacy mode keeps `task_plan.md` at the repo ROOT with
+no `.planning/` at all. Archive rather than delete; `.planning/` is gitignored,
+so none of it is corpus. After the answer, never before the ask. Then stop: next
+is the user's `/clear`, then `/session-resume`.
 
 ## Keeping this skill honest over time
 
 This repo can measure its own skills, so use that rather than taste:
 
 - `mise run kb-skill-score` scores every project skill with `plugin-eval`'s
-  deterministic static layer — free, no LLM, and comparable run to run. Read the
-  **Δ column**, not the score: it is computed against the committed baseline in
-  `docs/skills/baseline.json`, so the comparison is the task's job and not
-  yours. Re-baseline with `-- --write` once a change is deliberate. A score
-  never fails a gate (there is no validated floor), but a skill name matching
-  nothing exits **2** rather than reporting an empty corpus.
-- Read the number with its condition attached. `triggering_accuracy` is a regex
-  over the description, so it rewards the literal words "proactively" and
-  "automatically". Chasing it is keyword-stuffing; fixing a genuinely vague
-  description is not. For this skill the dimension was inert while it was
-  human-only; since 2026-08-21 it measures a real trigger (see the banner), so
-  re-baseline after the description change and read the Δ.
-- The durable record of how a round went is `mise run kb-remember` (step 2), not
-  a comment in this file.
+  deterministic static layer — free, no LLM, comparable run to run. Read the
+  **Δ column**, not the score: it is computed against `docs/skills/baseline.json`.
+  Re-baseline with `-- --write` once a change is deliberate. A score never fails a
+  gate, but a skill name matching nothing exits **2**, not an empty corpus.
+- Read the number with its condition. `triggering_accuracy` is a regex over the
+  description, so it rewards the literal words "proactively" and "automatically" —
+  chasing it is keyword-stuffing; fixing a vague description is not.
 
 ## Checklist
 
@@ -479,22 +478,23 @@ This repo can measure its own skills, so use that rather than taste:
 - [ ] Handoff written and self-verified (paths, `file:line`, task names, gate rcs, inherited numbers labelled).
 - [ ] Branch is not `main`; commit made if appropriate — then the handoff's HEAD re-pinned to it (step 5).
 - [ ] Resume prompt printed — `/session-resume` (skipped on 2026-08-19; the next session had no idea where to start).
-- [ ] Step 7's `AskUserQuestion` was PUT to the user and the answer recorded — `/clear now` **or** `not yet`; both are valid outcomes, and only the user ever clears.
+- [ ] Step 7's `AskUserQuestion` was PUT to the user and the answer recorded — `/clear now` **or** `not yet`; both valid, and only the user ever clears.
+- [ ] On `/clear now` **only**, and only if `check-complete.sh` says every phase is done: plan archived to `.planning/.archive/`, and `.active_plan` cleared **only if it named that plan**.
 
 ## See also
 
+- `.claude/skills/session-resume/SKILL.md` — the other end of this loop, and
+  where a surviving plan gets reported.
 - `.claude/skills/kb-review/SKILL.md` — the review that must precede `kb-ship`;
   its receipt is what step 2's ordering trap is about.
-- `.claude/skills/kb-curator/SKILL.md` — the ingestion loop that owns
-  `kb-remember` / `kb-reflect` in full; step 2 only covers closing them out at
-  handoff time.
-- `.claude/skills/goal-engineering/SKILL.md` — the companion for a round that
-  ran a `/goal`, and the owner of `kb-goal-outcome`.
+- `.claude/skills/kb-curator/SKILL.md` — owns `kb-remember` / `kb-reflect` in
+  full; step 2 only closes them out at handoff time.
+- `.claude/skills/goal-engineering/SKILL.md` — for a round that ran a `/goal`;
+  owns `kb-goal-outcome`.
 - `.claude/rules/clarify-before-acting.md` — why step 0 uses `AskUserQuestion`
-  for every question, including the small ones.
+  for every question, including small ones.
 - `.claude/rules/agent-report-persistence.md` — the verbatim-at-receipt contract
   step 4c audits.
-- `.claude/rules/verify-before-advancing.md` — the full gate matrix step 5
-  samples from.
-- `.claude/rules/md-size-budgets.md` — the per-class markdown budgets, and why
-  no flat character limit is quoted here.
+- `.claude/rules/verify-before-advancing.md` — the gate matrix step 5 samples.
+- `.claude/rules/md-size-budgets.md` — the per-class budgets, and why no flat
+  character limit is quoted here.

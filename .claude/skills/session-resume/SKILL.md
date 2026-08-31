@@ -37,9 +37,13 @@ Apply `$ARGUMENTS` first, before selecting anything:
 - **Empty**: the normal case, everything below as written.
 
 ```bash
-ls -t .agent/plans/session-*.md | head -3
+set -o pipefail
+ls -t .agent/plans/session-*.md 2>/dev/null | head -3   # rc 1 = none; other rc = a real error
 ls -t docs/direction/*.md | head -2
 ```
+
+Without `pipefail` the pipe returns `head`'s 0 and "no handoff" is
+indistinguishable from a failure to look.
 
 Read the **newest** of each (or the handoff `$ARGUMENTS` named), in full. Not a
 skim: the owed section and the gotchas are the parts that cost a session when
@@ -57,6 +61,9 @@ live agenda. Read to the bottom.
 ```bash
 mise run kb-session-state
 ```
+
+If the `planning-with-files` plugin is active, its plan files are part of "the
+real state" too — step 3 says what to do with them.
 
 One task, already handoff-shaped: branch, tree, recent commits, open PRs. A
 failed `gh` lookup prints `COULD NOT ASK` rather than `none`, which is the
@@ -86,10 +93,51 @@ of the handoff — the user can read that. It is:
 - **anything the handoff asserts that the repo contradicts** — a merged PR it
   calls open, a gate it calls green with no artifact at that SHA, a commit that
   is not an ancestor of `main`;
+- **a SURVIVING plan from a finished round** — see below;
 - **the next task**, quoted from the handoff or the directive rather than
   paraphrased;
 - **the standing traps**, because those are what re-cost time;
 - **what is owed**, with issue numbers where the handoff gives them.
+
+#### A surviving `planning-with-files` plan is a disagreement
+
+`/clear-prep` archives the round's plan when it closes. If one is still live,
+either that did not happen or the round is genuinely unfinished — and the
+difference matters, because the plugin **may already be injecting that plan into
+this session**. Its `SessionStart` matcher includes `clear`, and when nothing pins
+the active plan its resolver falls back to the *newest `.planning/<dir>/` by
+mtime*, so a finished round's `task_plan.md` arrives looking like a live one.
+
+```bash
+PWF="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/cache/planning-with-files/planning-with-files/3.12.0}"
+sh "$PWF/scripts/resolve-plan-dir.sh"        # honours PLAN_ID / PWF_PLAN_ROOT / .active_plan
+sh "$PWF/scripts/plan-doctor.sh"             # says what is ACTUALLY injecting, and why
+```
+
+**"May" is doing real work in that sentence — use `plan-doctor`, not inference.**
+In autonomous or gated mode `inject-plan.sh` REFUSES to inject an unattested or
+tampered plan, printing `v3 mode requires attested plan` or `[PLAN TAMPERED —
+injection blocked]` instead of the body. So a resolvable plan is not proof the
+model received one, and reporting a disagreement against a plan nothing injected
+is a false alarm. `plan-doctor` reports resolution AND injection; prefer it.
+
+Empty output is not "no plan" either: legacy mode keeps `task_plan.md` at the
+repo ROOT (`claude-hook.sh`'s `elif [ -f task_plan.md ]`), and `PWF_PLAN_ROOT`
+can point the whole tree elsewhere. Check both before concluding none exists.
+Then read its `task_plan.md`, `findings.md` and `progress.md` — `findings.md` is
+where a round's research actually accumulates — and report plainly:
+
+- **its `## Next Step` versus `uv run kb-setup next-ticket`.** The plan loses. A
+  plan is intra-round working state and is **never authoritative across a round
+  boundary**; one naming a different next task is reporting the *previous*
+  round's intent, not this one's. It loses to the generated ticket, and it loses
+  to a task the user named — `clear-prep` step 0's order is `$ARGUMENTS` first,
+  then `next-ticket`, and that order holds here too.
+- **phases still `in_progress`** against a handoff that calls the round done.
+
+**Report it; do not archive it.** This skill reads and reconciles — archiving is
+`/clear-prep`'s act, and a plan the user still wants is one `/clear-prep` away
+from being closed properly rather than silently swept.
 
 If everything agrees, say so in one line and move on. A clean reconciliation is
 a short report.

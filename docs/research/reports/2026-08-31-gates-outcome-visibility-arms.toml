@@ -1,0 +1,86 @@
+# Mutation arms for the `GateResult.outcome` visibility fix in `gates.render()`.
+#
+# WHY THIS EXISTS. A cold review found the sidecar `outcome` channel
+# (`kb-manifest-audit`'s OK/DRIFT/SKIP) was write-only: `_run_one` reads it back
+# from disk into `GateResult.outcome`, but nothing downstream ever prints it —
+# `render()` computed its per-gate state from `rc` alone. So a `kb-manifest-audit`
+# SKIP (checked nothing) rendered in the human-facing gate report as an ordinary
+# PASS — the exact collapse the sidecar exists to prevent, live in the one place
+# a person actually reads. The fix adds a warning-shaped line to `render()`,
+# alongside its existing `dirty`/`unbound`/`unrun` notices, when any gate's
+# `outcome` is set and is not `"OK"`.
+#
+# THE TRAP THIS SPEC IS BUILT TO CATCH. The two existing tests at
+# `tests/test_manifest_audit.py:283` and `:306` assert
+# `read_sidecar_outcome(...) == "SKIP"` directly against the WRITER primitive —
+# they pass whether or not `_run_one` ever calls it, so they are not evidence the
+# wire from disk to the printed report actually holds. The arm below breaks that
+# exact wire (the `_run_one` call site, not the writer and not `render`'s own
+# check), and the named test must die on the downstream assertion — the
+# `render()` output — not on some other accidental failure.
+
+suites = ["tests/test_gates.py"]
+
+# The revert: `_run_one` stops reading the sidecar back at all, so every gate's
+# `outcome` is `None` regardless of what it wrote to disk — the state before the
+# sidecar channel had any consumer. `test_a_recorded_skip_reaches_the_printed_report_through_the_real_sidecar`
+# is the one arm here that exercises the REAL path end-to-end (a stubbed gate
+# writes the sidecar via `write_sidecar_outcome`, `run_and_record` drives
+# `_run_one` for real, and only then is `render()` asked to show it) — so it is
+# the only arm that can actually confirm the wire, as opposed to `render()`'s own
+# unit tests, which construct `GateResult(outcome=...)` directly and would stay
+# green even if `_run_one` never called `read_sidecar_outcome` at all.
+[[arm]]
+id = "run_one-stops-reading-the-sidecar-back"
+test = "test_a_recorded_skip_reaches_the_printed_report_through_the_real_sidecar"
+file = "python/src/kb_setup/gates.py"
+old = "    outcome = read_sidecar_outcome(repo_root, task, sha) if sha else None"
+new = "    outcome = None"
+
+# The control: an inert comment on the exact line the arm above mutates, proving
+# the harness (bytecode purge, suite selection, the named test) is not itself
+# broken. Must SURVIVE — `load_spec` refuses a spec with no `control = true` row.
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/gates.py"
+old = "    outcome = read_sidecar_outcome(repo_root, task, sha) if sha else None"
+new = "    outcome = read_sidecar_outcome(repo_root, task, sha) if sha else None  # inert control edit"
+
+# The revert of the VISIBILITY fix itself, in `render()`: delete the new
+# warning-shaped block wholesale, restoring the pre-fix state where `outcome` is
+# read but never printed. This is the arm that directly targets what this change
+# adds — the two `render()`-only tests below die on it; the end-to-end test above
+# also dies on it (same output-shape assertion), so it is not repeated as its own
+# id here.
+[[arm]]
+id = "render-drops-the-outcome-notice-block"
+test = "test_render_flags_a_pass_whose_outcome_is_skip"
+file = "python/src/kb_setup/gates.py"
+old = """
+    # A gate can exit 0 while its OWN verdict says it did not actually check
+    # anything — `kb-manifest-audit`'s SKIP is the worked case. Without this,
+    # `outcome` reaches nowhere a human reads (`summarise`/`all_passed` stay
+    # rc-only on purpose — this is about visibility, not a new failure mode),
+    # and the exact collapse the sidecar channel exists to prevent — a SKIP
+    # rendering as an ordinary PASS — happens right here, in the printed report.
+    noted = [(r.task, r.outcome) for r in results if r.outcome and r.outcome != "OK"]
+    if noted:
+        lines.append(
+            "  ! a gate's own verdict differs from a clean PASS — a green rc "
+            f"here did not necessarily mean OK ({', '.join(f'{t}={o}' for t, o in noted)})"
+        )
+"""
+new = "\n"
+
+# The OVER-CORRECTION direction: flagging every gate that wrote a sidecar at
+# all, rather than only the ones whose outcome disagrees with a clean pass. This
+# is what `test_render_does_not_flag_an_ok_outcome` (the control-shaped test
+# alongside the SKIP one) exists to catch — proving the check reads the VALUE,
+# not merely "did this gate write a sidecar".
+[[arm]]
+id = "render-flags-every-outcome-including-ok"
+test = "test_render_does_not_flag_an_ok_outcome"
+file = "python/src/kb_setup/gates.py"
+old = '    noted = [(r.task, r.outcome) for r in results if r.outcome and r.outcome != "OK"]'
+new = "    noted = [(r.task, r.outcome) for r in results if r.outcome]"

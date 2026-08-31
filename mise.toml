@@ -37,7 +37,7 @@
 # `currency.toml`'s `expected` and `sources/mise.manifest`. All three now name
 # one version, so any disagreement between them is drift by definition. (They
 # drifted once under the old two-tier rule and the cold lane caught it.)
-min_version = { hard = "2026.8.14", soft = "2026.8.14" }
+min_version = { hard = "2026.8.15", soft = "2026.8.15" }
 
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
@@ -984,6 +984,28 @@ run = "uv run kb-setup funnel"
 # Well under the outer 1800s `gates._GATE_TIMEOUT` — this is a handful of `git`
 # subprocess calls against one branch's delta, not a build.
 timeout = "60s"
+
+[tasks.kb-manifest-audit]
+description = "Gate: registry entries still agree with sources/*.manifest (offline tier 1) + clone freshness/coverage (tier 2)"
+# Built because `kb-build` failed three times, once per build, always the same
+# mechanism: a package manifest that extracts to zero nodes needs a reviewed
+# registration in one of `graph.py`'s four `_EXPECTED_*` tuples or the build
+# fails closed, and each build costs ~55 minutes to reveal ONE name. Tier 1
+# (always runs, offline: every entry's `pinned_commit` against its manifest's
+# CURRENT `commit`) catches the class that motivated this gate outright —
+# `b2d51b53` bumped six `sources/*.manifest` files and touched `graph.py` zero
+# times, so a registered hash silently kept describing the OLD pin. Tier 2
+# (requires the source clones: content hash + an unregistered-zero-node-
+# package-manifest scan) SKIPS per source with no clone present — SKIP never
+# blocks, only a DRIFT does (`kb_setup.manifest_audit`'s module docstring).
+#
+# Named `kb-manifest-audit`, not `manifest-audit`: unlike `funnel`, this one
+# is namespaced with every other `kb-*` mise task in this file; `gates.
+# GATE_TASKS` names it by this exact declared string either way.
+run = "uv run kb-setup manifest-audit"
+# Offline tier 1 is milliseconds; tier 2 hashes and scans whatever clones
+# happen to be present. Nowhere near the outer 1800s `gates._GATE_TIMEOUT`.
+timeout = "120s"
 
 [tasks.kb-serve]
 description = "Start the read-only MCP server pinned to THIS graph (stdio)"
