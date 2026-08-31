@@ -241,4 +241,7 @@ brain/graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 .lycheecache
 
 # planning-with-files live plan state (working state; the durable record is the handoff + docs/artifacts + kb-remember)
-.planning/
+# ANCHORED with a leading slash on purpose: the plugin only ever resolves a plan root
+# at the repo root (resolve-plan-dir.sh:18), so an unanchored `.planning/` would also
+# silently hide any nested one a future source or vendored tree happened to carry.
+/.planning/

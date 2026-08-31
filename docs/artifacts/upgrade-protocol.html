@@ -112,9 +112,16 @@ is the evidence this table rests on &mdash; not a design sketch.</p>
   </tbody>
 </table>
 
-<p><strong>Eleven of thirteen are already machine work.</strong> The gap is not capability &mdash;
-every command exists. The gap is that nothing <em>sequences</em> them, so an agent is the
-sequencer, and an agent forgets stage 3.</p>
+<p><strong>Ten of thirteen are already machine work</strong> &mdash; two are unclear, one is
+the agent fan-out. The gap is <em>mostly</em> sequencing: nothing chains the stages, so an
+agent is the sequencer, and an agent forgets stage 3. <strong>But it is not only
+sequencing.</strong> Two stages have no command to sequence: stage 5 is hand-edited today,
+and stage 13's per-tool validation does not exist. Those must be built, not merely ordered.</p>
+<p style="font-size:14px;opacity:.8"><strong>Corrected 2026-08-30.</strong> This paragraph
+read <em>"Eleven of thirteen … every command exists."</em> Both halves were wrong against
+this page's own table, four rows above: the tally is <strong>10 machine / 2 unclear /
+1 agent</strong>, and rows 5 and 13 state in their own cells that their commands do not
+exist. A cold review caught the second error; re-deriving the count found the first.</p>
 
 <h2>The shape you asked for</h2>
 <p class="sub">Three layers, each a thin seam over the one below. The flags are the only place
@@ -213,10 +220,19 @@ verdict, or it upgrades blindly and the gates catch it after the fact.</p>
 back, and whether a 30-dependency sweep produces one PR or thirty.</p>
 
 <h3>4 · What the code generator can actually own</h3>
-<p>You want generation over hand-writing. <code>mise</code> and <code>uv</code> emit JSON but
-publish no schema &mdash; <code>uv</code>'s own output declares <code>{"version": "preview"}</code>
-and contains zero <code>latest</code> fields. So the schemas would have to be authored here
-before anything could be generated from them.</p>
+<p>You want generation over hand-writing. <code>mise</code> and <code>uv</code> <strong>do publish
+JSON Schemas</strong> &mdash; but they describe <strong>config, not command output</strong>
+(<code>outdated</code> appears zero times in each). So the vendor schemas are usable as
+<em>validators</em> for <code>mise.toml</code> / <code>pyproject.toml</code>, while the structs for
+<em>command output</em> have no published schema and would have to be authored here.
+<code>uv</code>'s own <code>outdated</code> output declares <code>{"version": "preview"}</code> and contains
+zero <code>latest</code> fields.</p>
+<p style="font-size:14px;opacity:.8"><strong>Corrected 2026-08-30.</strong> This paragraph
+previously read <em>"publish no schema"</em> flat. That is the exact claim Ray corrected
+during session <code>kb-20260830.001</code> &mdash; it had been asserted from plausibility
+rather than probed. A cold review found the uncorrected wording still standing here while
+<code>clear-to-spec.html</code> carried the corrected version, so the two pages contradicted
+each other in the same commit.</p>
 
 <footer>
   <p>Source: <code>docs/artifacts/upgrade-protocol.html</code>, tracked. Every stage in the

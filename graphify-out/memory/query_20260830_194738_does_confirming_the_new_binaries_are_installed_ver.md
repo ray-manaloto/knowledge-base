@@ -79,6 +79,15 @@ The correct verification is a probe that asks the lockfile directly —
 `mise lock --dry-run --json`, which returned all five bumped tools while
 `hk`/`gh`/`python` returned `[]`.
 
+> **SCOPED 2026-08-30 (cold review).** "The correct verification" is too strong as
+> written. What this probe demonstrably catches is **version-level** drift. Whether
+> it also reports a checksum- or url-only refresh for a tool whose version has NOT
+> moved is **UNVERIFIED** — not tested here, and not refuted either. The suspicion
+> is grounded rather than idle: the repo's own `kb_setup.tool_sync._lock_converged`
+> (`tool_sync.py:287`) parses `mise.lock` and compares **version strings only**, so
+> at least one checker in this chain is blind to sub-version drift. Read this
+> paragraph as "a better probe, bounded to versions", not "the complete one".
+
 The generalisable lesson is narrower and sharper than "run more checks": **a
 verification can be true, well-chosen for the failure it was chosen against, and
 still orthogonal to the defect.** "The binaries are installed" correctly rules

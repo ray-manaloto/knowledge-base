@@ -129,6 +129,17 @@ th:first-child,td:first-child{width:1%;white-space:nowrap;font-weight:500}
   background:var(--stop-wash);border:1px solid #EBCDCE;border-radius:4px;
   padding:18px 20px;margin:24px 0;
 }
+.correction{
+  background:var(--cost-wash);border:1px solid #E6D2B4;
+  border-left:4px solid var(--cost);border-radius:4px;
+  padding:20px 22px;margin:32px 0 0;
+}
+.correction .lab{
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--cost);font-weight:500;margin:0 0 10px;
+}
+.correction p{margin:0;font-size:15px;max-width:68ch}
+.correction p + p{margin-top:12px}
 .warn .lab{
   font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.12em;
   text-transform:uppercase;color:var(--stop);font-weight:500;margin:0 0 8px;
@@ -149,8 +160,14 @@ a{color:var(--go)}
 <header>
   <p class="eyebrow">planning-with-files 3.12.0 · knowledge-base · 2026-08-30</p>
   <h1>Three Switches Before the Plan</h1>
-  <p class="standfirst">The plugin is installed and live. But its <strong>default</strong> setting does the one thing you installed it to prevent — it re-injects the plan into context on <em>every single tool call</em>. Three switches decide whether it saves context or spends it. Here is what each one actually changes.</p>
+  <p class="standfirst">The plugin is installed and live. But its <strong>default</strong> setting does the one thing you installed it to prevent — it re-injects the plan into context on <em>every matched tool call</em> — every <code>Write</code>, <code>Edit</code>, <code>Bash</code>, <code>Read</code>, <code>Glob</code> and <code>Grep</code>. Three switches decide whether it saves context or spends it. Here is what each one actually changes.</p>
 </header>
+
+<div class="correction">
+  <p class="lab">Corrected after publication — 2026-08-30, later the same day</p>
+  <p><strong>The per-call cost is about 5&times; what this page originally said.</strong> The first version quoted the plugin's own <code>~90 tokens per matched tool call</code>. That figure is measured against the plugin's short starter template. Measured against <em>our actual plan</em>: <code>head -30 task_plan.md</code> is <strong>1,748 bytes ≈ 440 tokens</strong>. At 500 tool calls that is roughly <strong>220,000 tokens</strong> — about 22% of a 1M window, paid on every turn.</p>
+  <p><strong>And the framing was wrong in a way that matters more than the number.</strong> The original page argued autonomous mode on token cost alone. The sharper argument is below, in <em>What the injection mode does and does not fix</em>: the problem this plugin was installed to solve is <em>cross-session</em> loss, and the injection mode has nothing to do with that. The recommendation is unchanged; the reason for it is better.</p>
+</div>
 
 <section>
   <h2>The mechanism: two taps into your context</h2>
@@ -165,7 +182,7 @@ flowchart TB
   U -->|"pours plan head in<br/>ONCE per turn"| C["Model context"]
   C --> T["Tool call<br/>Write · Edit · Bash · Read · Glob · Grep"]
   T --> PT{{"PreToolUse hook"}}
-  PT -->|"TAP 2 — LEGACY ONLY:<br/>pours plan head in AGAIN<br/>~90 tokens, EVERY call"| C
+  PT -->|"TAP 2 — LEGACY ONLY:<br/>pours plan head in AGAIN<br/>1,748 B = 440 tok, every matched call"| C
   PT -.->|"AUTONOMOUS or GATED:<br/>tap is closed"| N["nothing injected"]
   C --> S{{"Stop hook"}}
   S -->|"LEGACY + AUTONOMOUS:<br/>advisory only"| E["Turn ends"]
@@ -177,8 +194,38 @@ flowchart TB
 
   <div class="warn">
     <p class="lab">The irony of the default</p>
-    <p>You installed this because <em>"we are losing too much information."</em> Legacy mode's fix for that is to repeat the plan into context on every file read — which spends context to save context. On a heavy session that is a net loss.</p>
+    <p>You installed this because <em>"we are losing too much information."</em> Legacy mode's fix for that is to repeat the plan into context on every matched file operation — which spends context to save context. On a heavy session that is a net loss. <strong>Measured on this session: 55 matched calls in the first hour.</strong></p>
   </div>
+
+  <h3>What the injection mode does and does not fix</h3>
+  <p>This is the distinction the first version of this page missed, and it settles the choice more cleanly than any token count.</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Failure</th><th>What actually rescues you</th><th>Does the mode matter?</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Losing state across a <code>/clear</code></strong> — the stated reason for installing this</td>
+        <td>The <em>files existing on disk</em>. The <code>SessionStart</code> hook fires on <code>clear</code> and the skill's first instruction is to read all three files.</td>
+        <td><span class="chip go">No</span> — identical in every mode</td>
+      </tr>
+      <tr>
+        <td><strong>Losing state to compaction</strong></td>
+        <td>Same files. <code>PreCompact</code> fires in every mode and reminds the agent to flush first.</td>
+        <td><span class="chip go">No</span> — identical in every mode</td>
+      </tr>
+      <tr>
+        <td><strong>Drifting off-plan mid-turn</strong>, 200 tool calls deep</td>
+        <td>Re-injection — the plan staying in the attention window.</td>
+        <td><span class="chip cost">Yes</span> — this is the only thing the mode changes</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>So the mode is a bet about <em>intra-session drift on a strong model</em>, priced at ~440 tokens per matched tool call. It is not the mechanism that protects you across a <code>/clear</code> — the files are, and they are there either way.</p>
+
+  <p><strong>One honest cost of autonomous mode, stated because the first version of this page did not.</strong> Legacy injects the raw tail of <code>progress.md</code> — actual sentences. Autonomous replaces that with a synthesized ledger block that reports <em>counts and the last event type</em>, not text. So in autonomous mode nothing from <code>progress.md</code> reaches context on its own; it has to be read deliberately. That is a real narrowing, and it is the one place the default is genuinely richer.</p>
 </section>
 
 <section>
@@ -198,7 +245,7 @@ flowchart TB
       </tr>
       <tr>
         <td>Tap 2 — per tool call</td>
-        <td><span class="chip cost">every call</span></td>
+        <td><span class="chip cost">every call</span><br><span class="num" style="font-size:13px;color:var(--cost)">1,748 B ≈ 440 tok</span></td>
         <td><span class="chip go">closed</span></td>
         <td><span class="chip go">closed</span></td>
       </tr>
@@ -304,7 +351,9 @@ flowchart TB
   <h3 style="margin-top:0">Where every claim here came from</h3>
   <ul class="sources">
     <li><strong>Measured this session.</strong> The <code>PreToolUse</code> matcher <code>Write|Edit|Bash|Read|Glob|Grep</code> — read directly from <code>hooks/hooks.json</code> in the installed plugin cache, not carried over from a prior report.</li>
-    <li><strong>Read this session</strong> from the installed <code>skills/planning-with-files/SKILL.md</code> (v3.12.0): the mode comparison table, the <code>~90 tokens per matched tool call</code> figure, the gate decision table, <code>inject-smart</code>, and the file layouts.</li>
+    <li><strong>Read this session</strong> from the installed <code>skills/planning-with-files/SKILL.md</code> (v3.12.0): the mode comparison table, the gate decision table, <code>inject-smart</code>, and the file layouts.</li>
+    <li><strong>Measured this session, replacing an inherited number.</strong> <code>head -30 task_plan.md | wc -c</code> → <strong>1,748 bytes</strong>; <code>head -50</code> → 2,793; the raw progress tail → 1,166. The plugin's own <code>~90 tokens</code> claim is its starter template, not this plan. The first version of this page quoted the plugin's figure without measuring, which is the exact failure this repo's rules call an inherited number.</li>
+    <li><strong>Verified this session.</strong> The install is the full plugin route: 13 commands, all 6 lifecycle hooks (<code>SessionStart</code>, <code>UserPromptSubmit</code>, <code>PreToolUse</code>, <code>PostToolUse</code>, <code>PreCompact</code>, <code>Stop</code>), marketplace + <code>enabledPlugins</code> entries present, and NOT overridden in <code>settings.local.json</code>. Slug mode is the plugin's own documented recommendation for attested and parallel workflows (its v2.41.0 changelog).</li>
     <li><strong>Measured this session.</strong> <code>uv run kb-setup next-ticket</code> → <code>READY — #638</code>. <code>mise run kb-currency-check</code> → <code>kb-build</code> FAILED at <code>2026-08-29T21:33:55Z</code>, graphify #1666.</li>
     <li><strong>Inherited, and labelled as such.</strong> The claim that 5 of #638's 7 measured claims are refuted comes from last session's three codex lanes. I have not re-verified it here.</li>
   </ul>

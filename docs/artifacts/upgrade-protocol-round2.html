@@ -223,7 +223,7 @@ function wire(mode){
   const saveBtn = document.getElementById('save');
   if (!saveBtn) return;
   saveBtn.addEventListener('click', async () => {
-    const ns = await claude.use('artifact');
+    const ns = await artifactNs();
     if (!ns) { status.className='status err'; status.textContent='Saving is unavailable in this view — use Copy answers instead.'; return; }
     const st2 = collect();
     st2.saved = new Date().toISOString().replace('T',' ').slice(0,16) + ' UTC';
@@ -242,8 +242,20 @@ function wire(mode){
   });
 }
 
+// Resolve the artifact namespace, or null. Guarded because `claude` is simply
+// ABSENT outside the Claude artifact runtime (opening this file directly, any
+// other host): a bare `claude.use(...)` throws SYNCHRONOUSLY, before any .catch()
+// is attached, so the read-only fallback below would never run and the page would
+// silently lose its Copy-answers path. Found by cold review 2026-08-30.
+async function artifactNs(){
+  try {
+    if (typeof claude === 'undefined' || !claude || typeof claude.use !== 'function') return null;
+    return await claude.use('artifact');
+  } catch (e) { return null; }
+}
+
 (function(){
   wire('write');
-  claude.use('artifact').then(ns => { if (!ns) wire('readonly'); }).catch(()=>wire('readonly'));
+  artifactNs().then(ns => { if (!ns) wire('readonly'); }).catch(()=>wire('readonly'));
 })();
 </script>

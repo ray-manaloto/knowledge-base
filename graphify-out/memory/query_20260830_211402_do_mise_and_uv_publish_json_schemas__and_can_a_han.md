@@ -24,7 +24,11 @@ stage. Today's proof: a bump moved the pin, the manifests and the installed
 binary, and went 7/7 green over a `mise.lock` still holding old checksums.
 
 The deeper diagnosis: **each stage has a checker, and each checker reads a
-different file.** Nothing reads `mise.lock` at all. What is missing is not
+different file.** ~~Nothing reads `mise.lock` at all.~~ **CORRECTED 2026-08-30
+(cold review, re-derived): FALSE — `kb_setup.tool_sync._lock_converged` reads and
+parses `mise.lock` at `tool_sync.py:287`, wired via `mise.toml:1157-1159`. What is
+true is narrower: it compares VERSION STRINGS only, not checksums or per-platform
+urls, so lock drift below the version level is still unchecked.** What is missing is not
 another checker but ONE OBJECT that knows a dependency has a set of artifacts
 which must all agree. Every previous fix added a checker to the pile.
 
@@ -48,8 +52,9 @@ which must all agree. Every previous fix added a checker to the pile.
 
 ## The token answer, which is the constraint that dominates
 
-Exactly **one of 75 mise tasks names an LLM backend**, and it is not in this
-pipeline. Clone, AST extraction, cluster, label, derived views and
+Exactly **one of ~~75~~ 85 mise tasks names an LLM backend**, and it is not in this
+pipeline. (**Count corrected 2026-08-30**: `grep -c '^\[tasks\.' mise.toml` → **85**.
+The ratio claim is unaffected; only the denominator was stale.) Clone, AST extraction, cluster, label, derived views and
 `graphify reflect` are all deterministic. **So a full zero-token upgrade of
 every dependency is achievable today** — skip semantic extraction and record
 `skipped_tokens` rather than blocking. Zero-token is the DEFAULT PATH, not a
@@ -66,6 +71,15 @@ every step is a plain function DBOS merely decorates.
 And: do NOT codegen models from the published 170KB/137KB vendor schemas —
 hundreds of types to read `[tools]`. Use them for VALIDATION; author two small
 structs for the command outputs, which have no published schema.
+
+> **FLAGGED 2026-08-30 (cold review), unresolved and deliberately left so.** This
+> paragraph sits against the directive quoted above it — *"Generate, never
+> hand-write"*, and Ray's standing call that **the code generator owns every model
+> type**. The two are reconcilable only if "generate" is read as scoped to types
+> that HAVE a source schema, which is a reading nobody has confirmed. It is a real
+> open question for the spec, not an editing slip, so it is annotated rather than
+> silently rewritten in either direction. **Resolve it before any implementer lane
+> is handed a spec that hand-authors a struct.**
 
 
 ## Outcome

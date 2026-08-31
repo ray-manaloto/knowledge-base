@@ -165,7 +165,8 @@
 <header class="mast">
   <p class="kicker">knowledge-base · dependency-upgrade protocol · 30 August 2026</p>
   <h1>The Upgrade Schema</h1>
-  <p class="standfirst">Eight tables. Two hold truth read out of files, three hold judgment rescued from a file being deleted, three hold what happened during a run. Every column here exists because something in the repo would otherwise lose information.</p>
+  <p class="standfirst">Nine tables. Two hold truth read out of files, four hold judgment rescued from a file being deleted, three hold what happened during a run. Every column here exists because something in the repo would otherwise lose information.</p>
+  <p class="standfirst" style="font-size:14px;opacity:.75;margin-top:10px"><strong>Corrected 2026-08-30:</strong> this line read <em>"Eight tables … two, three, three"</em> until a cold review counted the page's own cards. The real set is nine — <code>manifest</code>, <code>dep</code> · <code>probe</code>, <code>watch</code>, <code>watch_review</code>, <code>fork</code> · <code>upgrade_run</code>, <code>stage_event</code>, <code>gate_result</code>. Group 2 always had four.</p>
 </header>
 
 <section class="col">
@@ -185,7 +186,7 @@
   <figure>
     <pre class="mermaid">%%{init: {'theme':'base','themeVariables':{'darkMode':false,'background':'#FFFFFF','primaryColor':'#f2f2f4','primaryTextColor':'#1b1b1b','primaryBorderColor':'#8d8d94','lineColor':'#4a4a4a','fontFamily':'IBM Plex Sans Condensed, sans-serif','fontSize':'14px','clusterBkg':'#fafafa','clusterBorder':'#b8b8be'}}}%%
 erDiagram
-  dep ||--o{ manifest : "owner_dep"
+  dep |o--o{ manifest : "owner_dep — NULLABLE"
   dep ||--o{ probe : "declared checks"
   dep ||--o{ watch : "tracked issues"
   dep ||--o| fork : "optional, all-or-nothing"
@@ -193,7 +194,7 @@ erDiagram
   dep ||--o{ upgrade_run : "one per attempt"
   upgrade_run ||--o{ stage_event : "append-only"
   upgrade_run ||--o{ gate_result : "six per run"
-  manifest ||--o{ stage_event : "scopes source stages"</pre>
+  manifest |o--o{ stage_event : "scopes source stages — NULLABLE"</pre>
     <figcaption><strong>Read the crow&rsquo;s feet as the argument.</strong> Every one-to-many here is a relation that a column on <code>dep</code> could not hold — which is precisely why the table exists. The two dotted-optional edges (<code>fork</code>, and <code>manifest</code> on <code>stage_event</code>) are where the schema admits that not every dependency has one.</figcaption>
   </figure>
 </section>
@@ -255,7 +256,7 @@ erDiagram
   <div class="col">
     <p class="eyebrow">Group 2 · judgment, rescued from the file being deleted</p>
     <h2>What <code>currency.toml</code> was actually holding</h2>
-    <p>The file has 22 readers and is roughly 85% prose judgment. Deleting it without these three tables would drop behaviour, not just configuration.</p>
+    <p>The file has 22 readers and is roughly 85% prose judgment. Deleting it without these four tables would drop behaviour, not just configuration.</p>
   </div>
 
   <div class="tcard absorb">
