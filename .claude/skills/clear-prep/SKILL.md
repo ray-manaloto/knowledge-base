@@ -442,14 +442,13 @@ into every later session and contradicts `next-ticket`:
 clear `.planning/.active_plan` **only if it names `<id>`** (one global pointer; a
 parallel `PLAN_ID` session may have repointed it). Both details are load-bearing:
 nothing creates `.archive/`, so without `mkdir -p` the first archive fails and an
-`&&` chain then silently leaves the plan selected; and the leading dot matters
-because `resolve-plan-dir.sh` falls back to the newest `.planning/<dir>/` by mtime
-while **skipping hidden dirs** (`.*) continue ;;`), so a plain `archive/` stays a
+`&&` chain then silently leaves the plan selected; and the dot matters because
+`resolve-plan-dir.sh` falls back to the newest `.planning/<dir>/` by mtime while
+**skipping hidden dirs** (`.*) continue ;;`), so a plain `archive/` stays a
 candidate. Legacy root mode keeps `task_plan.md` at the repo root — same
-treatment. Archive rather than delete (`.planning/` is gitignored, so none of it
-is corpus); expect one advisory `PLAN REGRESSED` line, which never blocks. After
-the answer, never before the ask. Then stop: next is the user's `/clear`, then
-`/session-resume`.
+treatment. Archive rather than delete (`.planning/` is gitignored); expect one
+advisory `PLAN REGRESSED` line, which never blocks. After the answer, never
+before the ask. Then stop: next is the user's `/clear`, then `/session-resume`.
 
 ## Keeping this skill honest over time
 
