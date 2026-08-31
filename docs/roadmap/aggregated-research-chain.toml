@@ -24,21 +24,15 @@
 # that it is instructed to have codex lanes run after /clear-prep and /clear on
 # the next session to review the session for anything missed/incorrect/vague".
 #
-# #638 is not a build ticket — it is the session record for `kb-20260830.001`,
-# and its §10 assigns the work: run CODEX LANES over it and re-verify every
-# "measured this session" claim, the two inferred answers Ray never explicitly
-# confirmed, and anything vague enough to be implemented two ways. Ray expects
-# the findings to trigger another /grilling round BEFORE /to-spec.
+# #638 CLOSED 2026-08-31 (session kb-20260830.005). Its §10 assignment is done:
+# the codex-lane review ran (comment 5472992777) and the re-grill ran
+# (comment 5478091373). It was then held open only because decisions 3 and 5 of
+# `docs/artifacts/five-decisions-before-the-spec.html` were unanswered — decision 3
+# has since DISSOLVED under measurement (the inherited "hk-test 40/6" was really
+# 46 passed / 0 failed, so there was never a red baseline) and decision 5 was
+# answered by Ray ("full" = every pin site, 35). Its two STILL-OWED bumps were
+# carved out to #641 rather than closed with it. #581 is therefore now the head.
 #
-# It sits ahead of #581 because the whole upgrade-protocol design rests on that
-# session's facts, several of which were CORRECTED mid-session — so the review is
-# a prerequisite for trusting any of them, not a parallel nicety. #581 is
-# unblocked and stays next in line after it.
-[[ticket]]
-issue = 638
-title = "session kb-20260830.001 record — codex-lane review for missed/incorrect/vague, then re-grill"
-blockers = []
-
 [[ticket]]
 issue = 581
 title = "breadth verb — first source"
