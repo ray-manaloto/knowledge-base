@@ -19,7 +19,8 @@
 # reporting it READY or BLOCKED, so a forgotten removal is caught on the next
 # run instead of silently skipped past.
 
-# PLACED FIRST DELIBERATELY (Ray, 2026-08-30, verbatim): "update
+# HISTORICAL NOTE — this header describes an entry that NO LONGER SITS BELOW IT.
+# #638 was placed first deliberately (Ray, 2026-08-30, verbatim): "update
 # docs/roadmap/aggregated-research-chain.toml to point to the new github issue so
 # that it is instructed to have codex lanes run after /clear-prep and /clear on
 # the next session to review the session for anything missed/incorrect/vague".
