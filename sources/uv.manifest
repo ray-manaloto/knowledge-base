@@ -5,10 +5,13 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] uv`
-#   pinned here:    0.12.5
+#   pinned here:    0.12.7
 # Cross-checkable without trusting this file: `uv --version` prints the tag's own
-# short commit (`210d1f678`), so binary and pin verify against each other — the
-# same property ty has and ruff does not.
+# short commit, so binary and pin verify against each other — the same property
+# ty has and ruff does not. Re-run at the 0.12.5 -> 0.12.7 bump, 2026-08-30:
+# `mise exec -- uv --version` prints `uv 0.12.7 (61291a8ca ...)`, and `61291a8ca`
+# is the head of the `commit` below — so this file's SHA is verified by the
+# binary rather than only by the tag lookup that wrote it.
 #
 # ⚠️ ASK `mise exec -- uv`, NOT bare `uv`. Measured 2026-08-19 right here: bare
 # `uv --version` reported 0.12.3 (507230998) while `mise exec -- uv --version`
@@ -30,7 +33,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/astral-sh/uv
-ref = 0.12.5
-commit = 210d1f6785e95a8c8c0d53e284408c9be1134700
+ref = 0.12.7
+commit = 61291a8ca5477a9ca653f14d2ac5665587c263fa
 kind = code
 added = 2026-08-02

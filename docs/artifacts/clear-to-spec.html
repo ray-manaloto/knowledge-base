@@ -1,0 +1,269 @@
+<title>Clear To Spec</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap">
+<style>
+  :root {
+    --paper:    #FBFAF8;
+    --card:     #FFFFFF;
+    --rule:     #E4E1DA;
+    --ink:      #17181C;
+    --ink-soft: #5B626D;
+    --done:     #1B5E4A;
+    --mine:     #2B4E77;
+    --yours:    #96431C;
+    --done-wash:  #E7F1EC;
+    --mine-wash:  #EAF0F7;
+    --yours-wash: #FAEDE6;
+
+    --display: "Inter Tight", "Helvetica Neue", Arial, sans-serif;
+    --body:    "Newsreader", Georgia, serif;
+    --mono:    "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: var(--body); font-size: 17.5px; line-height: 1.6;
+    margin: 0; padding: 0 20px 96px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+  .col  { max-width: 68ch; }
+
+  header.mast { padding: 54px 0 22px; margin-bottom: 34px; border-bottom: 3px solid var(--ink); }
+  .kicker {
+    font-family: var(--display); font-size: 12px; font-weight: 600;
+    letter-spacing: .15em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 12px;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 800;
+    font-size: clamp(38px, 6vw, 62px); line-height: 1.0;
+    letter-spacing: -.03em; margin: 0 0 16px; text-wrap: balance;
+  }
+  .standfirst { font-size: 20px; line-height: 1.46; color: var(--ink-soft); max-width: 60ch; margin: 0; }
+
+  /* the scoreboard */
+  .score { display: grid; gap: 14px; margin: 0 0 44px; }
+  @media (min-width: 760px) { .score { grid-template-columns: repeat(3, 1fr); } }
+  .score > div {
+    background: var(--card); border: 1px solid var(--rule);
+    border-radius: 5px; padding: 20px 22px;
+  }
+  .score .n {
+    font-family: var(--display); font-weight: 800; font-size: 46px;
+    line-height: 1; letter-spacing: -.03em; display: block; margin-bottom: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .score .t {
+    font-family: var(--display); font-size: 12.5px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 9px;
+  }
+  .score .d { font-size: 15px; line-height: 1.45; color: var(--ink-soft); margin: 0; }
+  .score .s-done  { border-top: 5px solid var(--done); }
+  .score .s-done  .n, .score .s-done  .t { color: var(--done); }
+  .score .s-mine  { border-top: 5px solid var(--mine); }
+  .score .s-mine  .n, .score .s-mine  .t { color: var(--mine); }
+  .score .s-yours { border-top: 5px solid var(--yours); }
+  .score .s-yours .n, .score .s-yours .t { color: var(--yours); }
+
+  section { margin: 0 0 58px; }
+  h2 {
+    font-family: var(--display); font-weight: 700; font-size: 27px;
+    letter-spacing: -.018em; margin: 0 0 8px; text-wrap: balance;
+  }
+  .eyebrow {
+    font-family: var(--display); font-size: 11px; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft);
+    margin: 0 0 8px; display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+  p { margin: 0 0 15px; }
+  strong { font-weight: 600; }
+  code, .m {
+    font-family: var(--mono); font-size: .85em; background: #F2F1EC;
+    border: 1px solid var(--rule); border-radius: 3px; padding: 1px 5px;
+  }
+
+  .scroll { overflow-x: auto; margin: 22px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; background: var(--card); }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft);
+    border-bottom: 2px solid var(--ink); white-space: nowrap;
+  }
+  td.q { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .pill {
+    font-family: var(--display); font-size: 10.5px; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap; display: inline-block;
+  }
+  .p-done  { background: var(--done-wash);  color: var(--done);  border: 1px solid #B8D6C9; }
+  .p-mine  { background: var(--mine-wash);  color: var(--mine);  border: 1px solid #BDD0E4; }
+  .p-yours { background: var(--yours-wash); color: var(--yours); border: 1px solid #E6C3B0; }
+
+  .ask {
+    background: var(--card); border: 1px solid var(--rule);
+    border-left: 5px solid var(--yours); border-radius: 0 5px 5px 0;
+    padding: 20px 22px; margin: 0 0 16px;
+  }
+  .ask h3 {
+    font-family: var(--display); font-weight: 700; font-size: 19px;
+    margin: 0 0 4px; letter-spacing: -.01em;
+  }
+  .ask .from {
+    font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft); margin: 0 0 12px;
+  }
+  .ask p { font-size: 16px; margin-bottom: 12px; }
+  .ask .rec {
+    background: var(--yours-wash); border-radius: 4px; padding: 12px 14px;
+    font-size: 15.5px; line-height: 1.5; margin: 0;
+  }
+  .ask .rec b {
+    font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--yours);
+    display: block; margin-bottom: 5px;
+  }
+
+  .note {
+    border-left: 4px solid var(--mine); background: var(--mine-wash);
+    padding: 18px 20px; border-radius: 0 4px 4px 0; margin: 22px 0;
+  }
+  .note .lab {
+    font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--mine);
+    display: block; margin-bottom: 7px;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note.go { border-left-color: var(--done); background: var(--done-wash); }
+  .note.go .lab { color: var(--done); }
+
+  .prov {
+    border-top: 2px solid var(--ink); margin-top: 66px; padding-top: 18px;
+    font-size: 14px; color: var(--ink-soft);
+  }
+  .prov h2 { font-size: 18px; margin-bottom: 11px; color: var(--ink); }
+  .prov ul { margin: 0; padding-left: 20px; }
+  .prov li { margin-bottom: 7px; }
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="kicker">knowledge-base · issue #638 · 30 August 2026</p>
+  <h1>Clear To Spec</h1>
+  <p class="standfirst">Fifteen questions came out of the cold read. Three are already answered, seven are mine to decide and I have decided them, and five need you. Here is every one, with its disposition.</p>
+</header>
+
+<div class="score">
+  <div class="s-done">
+    <span class="n">3</span>
+    <span class="t">Already answered</span>
+    <p class="d">Settled by your comments or by a lane&rsquo;s measurement. Nothing owed.</p>
+  </div>
+  <div class="s-mine">
+    <span class="n">7</span>
+    <span class="t">Mine — decided</span>
+    <p class="d">Architecture calls. Asking you would have been offloading. Each decision is stated below; correct any you disagree with.</p>
+  </div>
+  <div class="s-yours">
+    <span class="n">5</span>
+    <span class="t">Genuinely yours</span>
+    <p class="d">No probe settles these. Each has my recommendation attached, so none is a blank page.</p>
+  </div>
+</div>
+
+<section class="col">
+  <div class="note go">
+    <span class="lab">The short answer to &ldquo;can we move to /to-spec&rdquo;</span>
+    <p><strong>Yes — for the slice.</strong> Everything needed to specify <em>slice 1</em> is settled or decidable: the schema, the two pins, the state machine, the generated-docs treatment split.</p>
+    <p><strong>Not yet for the full protocol.</strong> Two of the five below — the state model and the manifest scope — would be baked into the spec as guesses, and both are expensive to unwind after tickets exist. They are worth ten minutes now.</p>
+    <p>My recommendation: <strong>answer the five, then <code>/to-spec</code> the full protocol</strong> with slice 1 first in the ticket chain. If you would rather move now, say so and I will spec slice 1 alone under stated assumptions and we settle the rest before slice 2.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">The full disposition</p>
+    <h2>All fifteen</h2>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Question</th><th>Status</th><th>Answer, or who owns it</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="q">3</td><td><code>currency.toml</code> outcome</td><td><span class="pill p-done">Answered</span></td><td>You: <em>&ldquo;then add the necessary tables to support what would be lost&rdquo;</em> — delete it, build the tables.</td></tr>
+        <tr><td class="q">12</td><td>Which stages are skipped in zero-token mode</td><td><span class="pill p-done">Answered</span></td><td>You: <em>&ldquo;we want to provide the option to skip if token budget is tight&rdquo;</em> — an option, not a default. Caller-selected.</td></tr>
+        <tr><td class="q">14</td><td>What <code>mise-json</code> / <code>uv-json</code> meant in the codegen answer</td><td><span class="pill p-done">Answered</span></td><td>Settled by measurement: both vendor schemas describe <strong>config, not command output</strong> (<code>outdated</code> appears 0 times in each). So they are validators; the command-output structs are ours.</td></tr>
+
+        <tr><td class="q">6</td><td>What <code>pyproject-direct</code> includes</td><td><span class="pill p-mine">Decided</span></td><td><strong>Every explicitly declared requirement</strong> — project, optional and dependency-groups. None is transitive. Version comes from <code>uv.lock</code>, not the requirement text, which also fixes the floor problem.</td></tr>
+        <tr><td class="q">7</td><td>Which gates run per dependency</td><td><span class="pill p-mine">Decided</span></td><td><strong>All three layers.</strong> The six authorization gates, then per-dep probes, then the seven ship gates. Dropping the first six would remove the safety bar invisibly — <code>gate_result</code> exists to hold them.</td></tr>
+        <tr><td class="q">9</td><td>Git history for a red dependency</td><td><span class="pill p-mine">Decided</span></td><td><strong>No commit for a failure.</strong> Keep the candidate uncommitted until gates pass; commit successes only; failures live in <code>stage_event</code> evidence. Matches the existing snapshot/restore primitive.</td></tr>
+        <tr><td class="q">10</td><td>What <code>source_synced</code> must prove</td><td><span class="pill p-mine">Decided</span></td><td><strong>Per-manifest, not per-dependency.</strong> One sub-run per owned manifest, scoped by <code>stage_event.manifest</code>. Codex&rsquo;s code and docs clocks become two event streams.</td></tr>
+        <tr><td class="q">11</td><td>Missing manifests and the 12 absent docs mirrors</td><td><span class="pill p-mine">Decided</span></td><td><strong>Valid nullable mappings.</strong> A dependency may own zero sources. The absent mirrors stay a reported defect, not a blocker on every upgrade.</td></tr>
+        <tr><td class="q">15</td><td>Does <code>kb-upgrade</code> call <code>kb-ship</code> itself</td><td><span class="pill p-mine">Decided</span></td><td><strong>No.</strong> It stops at local commits plus evidence. Opening a PR is outward-facing and stays a separately authorised step.</td></tr>
+        <tr><td class="q">—</td><td>Which state machine library</td><td><span class="pill p-mine">Decided</span></td><td><code>python-statemachine&gt;=3.2.1</code> — the only candidate that takes an enum it did not define <em>and</em> claims Python 3.14 <em>and</em> is natively async.</td></tr>
+
+        <tr><td class="q">1</td><td>The authoritative and durable state model</td><td><span class="pill p-yours">Yours</span></td><td>Narrowed, not settled — see below.</td></tr>
+        <tr><td class="q">2</td><td>The 23 tracked JSON state files</td><td><span class="pill p-yours">Yours</span></td><td>Its premise was refuted — see below.</td></tr>
+        <tr><td class="q">4 + 5</td><td>What <code>all-generated</code> meant, and which manifest buckets are targets</td><td><span class="pill p-yours">Yours</span></td><td>Two readings of your own answer — see below.</td></tr>
+        <tr><td class="q">8</td><td><code>revert-continue</code> versus <code>zero-skip-policy</code></td><td><span class="pill p-yours">Yours</span></td><td>Your instruction contradicts your standing rule — see below.</td></tr>
+        <tr><td class="q">13</td><td>Is <code>/to-spec</code> the full protocol or slice 1</td><td><span class="pill p-yours">Yours</span></td><td>Literally the question you just asked — see below.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">The five</p>
+    <h2>Each with a recommendation, so none is a blank page</h2>
+  </div>
+
+  <div class="ask">
+    <h3>1 · Does upgrade status survive a clone?</h3>
+    <p class="from">Q9 from round 3, never answered</p>
+    <p>Your state-machine comment settled the <em>shape</em> — generated enum, a library owning transitions. What is still open is where the SQLite file lives: gitignored and rebuilt from tracked text, or tracked and travelling in the PR.</p>
+    <p class="rec"><b>My recommendation</b> Gitignored, rebuilt from <code>mise.toml</code> / <code>pyproject.toml</code> / the manifests — <em>but</em> each batch writes a small tracked status record. That keeps a binary out of git and avoids merge conflicts on concurrent runs, while the evidence a reviewer needs still survives. The generated-docs slice is already building exactly that renderer, so it costs nothing extra.</p>
+  </div>
+
+  <div class="ask">
+    <h3>2 · The 23 tracked JSON state files</h3>
+    <p class="from">Q10 from round 3, never answered — and the plan&rsquo;s premise was wrong</p>
+    <p>The design said &ldquo;delete the 23 dead JSON files&rdquo;. <strong>They are not dead.</strong> A cold lane read them: they hold reviewed findings, timestamped upstream baselines and docs fingerprints, and none maps to the proposed stage enum. Deleting them erases human review acknowledgements.</p>
+    <p class="rec"><b>My recommendation</b> Migrate, do not delete. The review acknowledgements become <code>watch_review</code> rows — which is what makes &ldquo;cleared against WHICH release&rdquo; answerable at all. Baselines and fingerprints become <code>probe</code> rows. Delete the files only after a migration proves every value has a home, in a later commit than the one that adds the tables.</p>
+  </div>
+
+  <div class="ask">
+    <h3>3 · What <code>all-generated</code> meant, and the 12</h3>
+    <p class="from">Q12 from round 3 — your answer admits two readings, and collides with a measurement</p>
+    <p>Two questions in one answer. <strong>Scope:</strong> does &ldquo;generated&rdquo; mean every byte of a manifest, or only the pin fields? <code>sources/graphify.manifest</code> is ~90 lines of authored judgment. <strong>The 12:</strong> you ruled all 97 come under the protocol, but 12 of them are not dependencies and have nothing to generate from.</p>
+    <p class="rec"><b>My recommendation</b> Generate <strong>pin fields only</strong>, preserving authored prose — this is what the existing updater already does, so it is also the smallest change. And <strong>keep the 12 as stub rows</strong> rather than deleting them: they are knowledge sources someone ingested deliberately, and a documented exception is cheaper than losing them.</p>
+  </div>
+
+  <div class="ask">
+    <h3>4 · A red gate — your answer versus your rule</h3>
+    <p class="from">Q6 from round 2, against two eager standing rules</p>
+    <p>You answered <code>revert-continue</code>: revert that dependency, keep the batch going. <code>zero-skip-policy</code> and <code>verify-before-advancing</code> both say a red check <em>is</em> the current task and nothing advances past it. An implementer cannot be left to pick which of your instructions wins.</p>
+    <p class="rec"><b>My recommendation</b> Scope the rules explicitly: write into <code>zero-skip-policy.md</code> that a <em>rejected upgrade candidate</em> is not a project failure — restore it, record the rejection with evidence, continue. The rules keep full force over the repo&rsquo;s own code. The point is that the exception gets <strong>written down</strong>; an unwritten one gets re-litigated by every future session.</p>
+  </div>
+
+  <div class="ask">
+    <h3>5 · Full protocol, or slice 1?</h3>
+    <p class="from">Q13 — and the question you just asked me</p>
+    <p>You called the MVP <em>&ldquo;the full upgrade automation with the ability to skip agent tokens&rdquo;</em>. The advisor&rsquo;s slice 1 is narrower: two tables, populate, <code>kb-upgrade</code>, every token stage recorded skipped, plus a gate that reads whether <code>mise.lock</code> advanced.</p>
+    <p class="rec"><b>My recommendation</b> <code>/to-spec</code> the <strong>full protocol</strong>, then let <code>/to-tickets</code> cut it into slices with slice 1 first. Speccing only slice 1 risks freezing a schema the later stages cannot use — and the schema is the expensive thing to get wrong. The spec is cheap; the rework is not.</p>
+  </div>
+</section>
+
+<div class="prov col">
+  <h2>Provenance</h2>
+  <ul>
+    <li><strong>The fifteen questions</strong> are a codex lane&rsquo;s, verbatim from its cold read of #638. The three-way disposition, every &ldquo;decided&rdquo; answer, and every recommendation are mine.</li>
+    <li><strong>Settled by measurement, not opinion</strong>: the vendor schemas describe config not command output (<code>outdated</code> → 0 occurrences in each, with a discriminating control); the 23 JSON files hold live values; the floor-versus-<code>==</code> currency gap (floors return empty, exact and VCS pins return values).</li>
+    <li><strong>Settled by you</strong>, quoted from artifact comments this session: the <code>currency.toml</code> ruling, the skip-is-an-option correction, and the state-machine requirement.</li>
+    <li><strong>Not settled by anyone, and not pretended otherwise</strong>: an end-to-end install of the two proposed pins on Python 3.14, and any DBOS↔state-machine integration. Both belong in the adopting ticket as its first task.</li>
+    <li><strong>Nothing here has been applied.</strong> No spec has been written and no file changed.</li>
+  </ul>
+</div>
+
+</div>

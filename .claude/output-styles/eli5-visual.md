@@ -99,17 +99,52 @@ Artifacts render **mermaid natively** — `<pre class="mermaid">` in HTML. Use i
 for flowcharts, dependency graphs, sequence and state diagrams; it is the right
 tool and is far less error-prone than hand-authored SVG for those shapes.
 
-Two mechanics that are easy to get wrong:
+### `themeVariables` alone DOES NOT WORK — this shipped broken twice
 
-- **Pin a light plate under every mermaid block.** Mermaid draws with its own
-  palette and will render dark-on-dark for a viewer in dark mode. Give
-  `.mermaid` an explicit light background, or theme it via
-  `%%{init: {'theme':'base','themeVariables':{…}}}%%`. Under the light-only rule
-  above this is no longer about the viewer's theme — mermaid can still pick its
-  own dark palette on a light page, so the plate is still required.
-- Hand-author inline SVG only where the shape is a genuine comparison figure
-  mermaid cannot express. Then `artifact-diagramming`'s rules apply in full:
-  `viewBox`, `currentColor`, `<figure>` + `<figcaption>`, `role="img"`.
+Ray, 2026-08-30, on a page whose mermaid block rendered unreadably: *"hard to
+read — update /eli5-visual to not have black background w black text for
+entities"*.
+
+That page **already had** `%%{init: {'theme':'base','themeVariables':{...}}}%%`
+with a light `background`, `primaryColor` and `primaryTextColor`, and `.mermaid`
+already had an explicit light CSS background. It still rendered dark entity boxes
+with dark text. So the previous version of this section — "give `.mermaid` a
+background, or theme it via `themeVariables`" — is **refuted by observation**, and
+following it is how the page broke.
+
+Two reasons it fails. `themeVariables` does not reach every element mermaid
+draws; and with `htmlLabels` on (the default) node text is a `<span
+class="nodeLabel">` styled by mermaid's injected stylesheet, which a `fill:` never
+touches and which loads *after* your `<style>`.
+
+**The fix already exists and is NOT repeated here.** `.claude/skills/eli5-visual/SKILL.md`
+§2 carries the verbatim CSS block, measured against the real renderer, and §2a/§2b
+carry the evidence for every selector in it. **Ship that block verbatim; do not
+write your own from memory** — this section previously tried to summarise it and
+produced selectors scoped under `.mermaid`, which is the one thing §2 proves
+cannot work.
+
+The load-bearing fact from §2, because it is what makes a summary dangerous: the
+renderer **replaces your block with an SVG it names itself** — `#claude-mermaid-0`,
+`#claude-mermaid-1`, … — so every rule scoped under `.mermaid` misses, and a
+container-level `background` never reaches the drawing. The block is scoped
+`svg[id^="claude-mermaid"]` for exactly that reason, and it must also name
+`foreignObject div/span/p`, because flowchart labels are HTML inside the SVG where
+`fill` does nothing and only `color` applies.
+
+Keep the `%%{init:...}%%` header too — §2 says it still sets node fills — but it is
+the belt, never the braces.
+
+**And prefer inline SVG for any diagram whose boxes are named entities.** Mermaid
+earns its place on sequence and state diagrams, where the layout is the hard part.
+For a handful of labelled boxes and arrows, hand-authored SVG is fewer lines than
+the override above, has no injected stylesheet to fight, and cannot regress —
+`artifact-diagramming`'s rules then apply in full: `viewBox`, `<figure>` +
+`<figcaption>`, `role="img"`, an `aria-label` carrying the claim.
+
+**Check the render, do not assume it.** A page whose diagram is unreadable is a
+failed explanation no matter how correct the content is, and this has now failed
+twice on the same mechanism.
 
 ## Persistence — the part that is usually skipped
 

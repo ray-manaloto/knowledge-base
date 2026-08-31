@@ -1,0 +1,890 @@
+<title>Three Questions Before the Spec</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root {
+    --paper:      #FBFAF7;
+    --card:       #FFFFFF;
+    --rule:       #E3DFD5;
+    --ink:        #1A1F2B;
+    --ink-soft:   #5C6577;
+    --settled:    #1D4E6F;
+    --corrected:  #A0451F;
+    --open:       #7C6212;
+    --settled-wash:  #EAF1F5;
+    --corrected-wash:#F8EDE7;
+    --open-wash:     #F7F2DE;
+
+    --display: "IBM Plex Sans Condensed", "Helvetica Neue", Arial, sans-serif;
+    --body:    "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono:    "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+  }
+
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  .col  { max-width: 68ch; }
+
+  /* ---------- masthead ---------- */
+  header.mast {
+    border-bottom: 3px solid var(--ink);
+    padding: 56px 0 22px;
+    margin-bottom: 40px;
+  }
+  .kicker {
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(38px, 6vw, 62px);
+    line-height: 1.02;
+    letter-spacing: -.015em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  /* ---------- sections ---------- */
+  section { margin: 0 0 64px; }
+  h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 27px;
+    letter-spacing: -.008em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 19px;
+    margin: 30px 0 6px;
+  }
+  .eyebrow {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .17em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+  p { margin: 0 0 16px; }
+  strong { font-weight: 600; }
+  code, .m {
+    font-family: var(--mono);
+    font-size: .87em;
+    background: #F2F0EA;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--ink);
+  }
+
+  /* ---------- question cards ---------- */
+  .qgrid { display: grid; gap: 18px; margin: 26px 0 0; }
+  @media (min-width: 900px) { .qgrid { grid-template-columns: repeat(3, 1fr); } }
+
+  .q {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-top: 4px solid var(--open);
+    border-radius: 4px;
+    padding: 20px 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .q .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .06em;
+    color: var(--open);
+    background: var(--open-wash);
+    border: 1px solid #E6DCB4;
+    border-radius: 999px;
+    padding: 2px 9px;
+    align-self: flex-start;
+  }
+  .q h4 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 18px;
+    margin: 2px 0 0;
+    line-height: 1.25;
+  }
+  .q p { font-size: 15.5px; line-height: 1.55; margin: 0; color: var(--ink-soft); }
+  .q .who {
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--corrected);
+    margin-top: auto;
+    padding-top: 10px;
+    border-top: 1px dotted var(--rule);
+  }
+
+  /* ---------- figures ---------- */
+  figure {
+    margin: 30px 0;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 22px 20px 16px;
+  }
+  figure > svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    margin-top: 16px;
+    padding-top: 13px;
+    border-top: 1px solid var(--rule);
+  }
+  .mermaid {
+    background: var(--card);
+    color: var(--ink);
+    overflow-x: auto;
+    text-align: center;
+  }
+
+  /* The renderer replaces .mermaid with an SVG it names itself (#claude-mermaid-N),
+     so every rule scoped under .mermaid misses. Verbatim from
+     .claude/skills/eli5-visual/SKILL.md §2 — do not rewrite from memory. */
+  svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+  svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+  svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+  svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+  svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+  svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+  svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+  svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+  svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+  svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+  svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+  svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+  svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+  svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+  svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+  svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
+
+  /* ---------- verdict block ---------- */
+  .verdict {
+    border-left: 4px solid var(--corrected);
+    background: var(--corrected-wash);
+    padding: 18px 20px;
+    border-radius: 0 4px 4px 0;
+    margin: 24px 0;
+  }
+  .verdict .lab {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--corrected);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .verdict p:last-child { margin-bottom: 0; }
+
+  .settled {
+    border-left: 4px solid var(--settled);
+    background: var(--settled-wash);
+    padding: 18px 20px;
+    border-radius: 0 4px 4px 0;
+    margin: 24px 0;
+  }
+  .settled .lab {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--settled);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .settled p:last-child { margin-bottom: 0; }
+
+  /* ---------- table ---------- */
+  .scroll { overflow-x: auto; margin: 22px 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 15px;
+    background: var(--card);
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 13px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    border-bottom: 2px solid var(--ink);
+    white-space: nowrap;
+  }
+  td.num { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 13.5px; }
+  tr:last-child td { border-bottom: none; }
+
+  /* ---------- provenance ---------- */
+  .prov {
+    border-top: 2px solid var(--ink);
+    margin-top: 72px;
+    padding-top: 20px;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .prov h2 { font-size: 18px; margin-bottom: 12px; color: var(--ink); }
+  .prov ul { margin: 0; padding-left: 20px; }
+  .prov li { margin-bottom: 7px; }
+  .prov .m { font-size: 12.5px; }
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="kicker">knowledge-base · issue #638 · 30 August 2026</p>
+  <h1>Three Questions Before the Spec</h1>
+  <p class="standfirst">A dependency-upgrade protocol is one step from being specced. Two answers were never given, one pair of answers contradicts itself, and the advisor just refuted a piece of its own schema. Here is what each one costs if guessed.</p>
+</header>
+
+<div class="col" style="margin-bottom:52px">
+  <div class="verdict">
+    <span class="lab">Updated after publication · two reader comments</span>
+    <p><strong>&ldquo;Where do we store the status of the dependency?&rdquo;</strong> &mdash; the first version of this page never showed that. A section answering it has been added below the architecture figure; nothing already on the page was wrong, it was incomplete.</p>
+    <p><strong>A requirement was added:</strong> the documentation itself should be generated from the database rather than hand-written. That is now its own section and a third running lane.</p>
+    <p><strong>And Question A was corrected.</strong> The first version framed the schema break as a future risk. A cold reader found it is live today, and re-reading the two files confirmed it. The figure now shows the real pair. The correction is marked in place.</p>
+    <p><strong>Three more reader comments are answered below:</strong> where DBOS sits (it is the boundary around <code>kb-upgrade</code>, now drawn), a dropped requirement about state machines, and a 138&nbsp;MB extraction this repo has lost track of. The mermaid figure also rendered dark-on-dark; that is fixed, and the fix is now pinned in the output style so it cannot recur.</p>
+  </div>
+</div>
+
+<section class="col">
+  <p class="eyebrow">The shape of the thing</p>
+  <h2>What is being built</h2>
+  <p>One command upgrades every dependency in the repo. For each one it bumps the pin, runs the gates, and — if the gates go red — reverts that dependency and keeps going, reporting what it dropped. One commit per dependency, one pull request per batch.</p>
+  <p>The pin itself is never moved into a database. <code>mise.toml</code> and <code>pyproject.toml</code> stay the version truth. The database owns two things the files cannot express: <strong>which sources a dependency has to keep in sync</strong>, and <strong>how far along each dependency is</strong>.</p>
+  <p>The stage that costs subscription tokens — semantic extraction — is recorded as deliberately skipped, so a full upgrade can run at zero token cost when the budget is tight.</p>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Architecture</p>
+    <h2>Three components, and the one arrow that matters</h2>
+  </div>
+  <figure>
+    <pre class="mermaid">%%{init: {'theme':'base','themeVariables':{'darkMode':false,'background':'#FFFFFF','primaryColor':'#f2f2f4','primaryTextColor':'#1b1b1b','primaryBorderColor':'#8d8d94','lineColor':'#4a4a4a','fontFamily':'IBM Plex Sans Condensed, sans-serif','fontSize':'14px','clusterBkg':'#fafafa','clusterBorder':'#b8b8be'}}}%%
+flowchart LR
+  subgraph TRUTH["version truth — hand-edited files"]
+    MISE["mise.toml"]
+    PYP["pyproject.toml"]
+  end
+  subgraph SRC["97 source manifests"]
+    MAN["sources/*.manifest"]
+  end
+  DB[("kb_setup.deps<br/>one SQLite file")]
+  subgraph ENGINE["DBOS — decorates each step, owns resume"]
+    UP["kb-upgrade<br/>mise task"]
+  end
+  GATES["7 gates<br/>lint · test · brain-audit<br/>eval · graph-size · hk-test · funnel"]
+  PR["one PR<br/>via kb-ship"]
+
+  MISE -- "populates pin" --> DB
+  PYP  -- "populates pin" --> DB
+  MAN  -- "populates mapping" --> DB
+  DB   -- "reads work list" --> UP
+  UP   -- "writes new pin" --> MISE
+  UP   -- "writes new pin" --> PYP
+  UP   -- "runs per dep" --> GATES
+  GATES -- "red → revert that dep" --> UP
+  UP   -- "writes stage + evidence" --> DB
+  UP   -- "batch done" --> PR</pre>
+    <figcaption><strong>The database never writes a version.</strong> It is populated <em>from</em> the two config files and the manifests, and the upgrade task writes pins back into those same files. Deleting the database loses status, never truth. <strong>DBOS is the box around <code>kb-upgrade</code>, not a component beside it</strong> — the advisor&rsquo;s ruling was that every step stays a plain function DBOS merely decorates, so removing it later is deleting decorators rather than a rewrite. It is drawn as a boundary for that reason.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Answering a reader question</p>
+    <h2>Where the status actually lives</h2>
+    <p>Not in a column on the dependency. Status is a <strong>second table with one row per dependency per stage</strong> — which is the only shape that lets &ldquo;the gates passed&rdquo; and &ldquo;the expensive stage was skipped for budget&rdquo; be true about the same dependency at the same time.</p>
+    <p><strong>Correction:</strong> an earlier version of this section called those stages &ldquo;deliberately skipped&rdquo;, as though skipping were the design&rsquo;s default. It is not. <code>skipped_tokens</code> is an <em>option you exercise when the token budget is tight</em> — the stages run normally otherwise.</p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 880 330" role="img" aria-label="The dep_stage table holds one row per dependency per stage. For the dependency rumdl, the stages outdated, bumped and gated are ok, source_synced is running, and deep_extraction, reflection and artifacts are recorded as skipped_tokens. A single status column could hold only one of these seven values.">
+      <defs>
+        <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5C6577"/>
+        </marker>
+      </defs>
+
+      <text x="20" y="22" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="500" fill="#1D4E6F">dep</text>
+      <rect x="20" y="34" width="176" height="54" rx="4" fill="#EAF1F5" stroke="#1D4E6F" stroke-width="1.5"/>
+      <text x="34" y="55" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#1A1F2B">name = rumdl</text>
+      <text x="34" y="74" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#1A1F2B">pin  = 0.2.62</text>
+
+      <line x1="196" y1="61" x2="256" y2="61" stroke="#5C6577" stroke-width="1.4" marker-end="url(#ar3)"/>
+      <text x="200" y="53" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#5C6577">1 : 7</text>
+
+      <text x="262" y="22" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="500" fill="#1D4E6F">dep_stage</text>
+
+      <!-- header row -->
+      <text x="272" y="46" font-family="IBM Plex Sans Condensed, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2" fill="#5C6577">STAGE</text>
+      <text x="470" y="46" font-family="IBM Plex Sans Condensed, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2" fill="#5C6577">STATE</text>
+      <text x="672" y="46" font-family="IBM Plex Sans Condensed, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2" fill="#5C6577">EVIDENCE</text>
+      <line x1="262" y1="53" x2="860" y2="53" stroke="#1A1F2B" stroke-width="1.6"/>
+
+      <!-- rows -->
+      <text x="272" y="76" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#1A1F2B">outdated</text>
+      <rect x="466" y="64" width="52" height="18" rx="9" fill="#EAF1F5" stroke="#1D4E6F"/>
+      <text x="475" y="77" font-family="IBM Plex Mono, monospace" font-size="11" fill="#1D4E6F">ok</text>
+      <text x="672" y="76" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#5C6577">0.2.60 → 0.2.62</text>
+      <line x1="262" y1="86" x2="860" y2="86" stroke="#E3DFD5"/>
+
+      <text x="272" y="107" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#1A1F2B">bumped</text>
+      <rect x="466" y="95" width="52" height="18" rx="9" fill="#EAF1F5" stroke="#1D4E6F"/>
+      <text x="475" y="108" font-family="IBM Plex Mono, monospace" font-size="11" fill="#1D4E6F">ok</text>
+      <text x="672" y="107" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#5C6577">mise.toml, 1 commit</text>
+      <line x1="262" y1="117" x2="860" y2="117" stroke="#E3DFD5"/>
+
+      <text x="272" y="138" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#1A1F2B">gated</text>
+      <rect x="466" y="126" width="52" height="18" rx="9" fill="#EAF1F5" stroke="#1D4E6F"/>
+      <text x="475" y="139" font-family="IBM Plex Mono, monospace" font-size="11" fill="#1D4E6F">ok</text>
+      <text x="672" y="138" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#5C6577">gates-&lt;sha&gt;.json, 7/7</text>
+      <line x1="262" y1="148" x2="860" y2="148" stroke="#E3DFD5"/>
+
+      <text x="272" y="169" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#1A1F2B">source_synced</text>
+      <rect x="466" y="157" width="70" height="18" rx="9" fill="#F5F3EC" stroke="#5C6577"/>
+      <text x="475" y="170" font-family="IBM Plex Mono, monospace" font-size="11" fill="#5C6577">running</text>
+      <text x="672" y="169" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#5C6577">rumdl.manifest</text>
+      <line x1="262" y1="179" x2="860" y2="179" stroke="#E3DFD5"/>
+
+      <text x="272" y="200" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#1A1F2B">deep_extraction</text>
+      <rect x="466" y="188" width="112" height="18" rx="9" fill="#F7F2DE" stroke="#7C6212"/>
+      <text x="475" y="201" font-family="IBM Plex Mono, monospace" font-size="11" fill="#7C6212">skipped_tokens</text>
+      <text x="672" y="200" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#5C6577">budget option, not a default</text>
+      <line x1="262" y1="210" x2="860" y2="210" stroke="#E3DFD5"/>
+
+      <text x="272" y="231" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#1A1F2B">reflection</text>
+      <rect x="466" y="219" width="112" height="18" rx="9" fill="#F7F2DE" stroke="#7C6212"/>
+      <text x="475" y="232" font-family="IBM Plex Mono, monospace" font-size="11" fill="#7C6212">skipped_tokens</text>
+      <line x1="262" y1="241" x2="860" y2="241" stroke="#E3DFD5"/>
+
+      <text x="272" y="262" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#1A1F2B">artifacts</text>
+      <rect x="466" y="250" width="112" height="18" rx="9" fill="#F7F2DE" stroke="#7C6212"/>
+      <text x="475" y="263" font-family="IBM Plex Mono, monospace" font-size="11" fill="#7C6212">skipped_tokens</text>
+      <line x1="262" y1="272" x2="860" y2="272" stroke="#1A1F2B" stroke-width="1.6"/>
+
+      <text x="262" y="298" font-family="Source Serif 4, serif" font-size="13.5" font-weight="600" fill="#1A1F2B">A single &ldquo;status&rdquo; column could hold exactly one of these seven rows.</text>
+      <text x="262" y="317" font-family="Source Serif 4, serif" font-size="13.5" fill="#5C6577">The zero-token run is the case that proves it: three stages green, three deliberately skipped, at once.</text>
+    </svg>
+    <figcaption><strong>Status is a row, not a field.</strong> <code>evidence</code> is the column that keeps a claim checkable — it points at the artifact that settled the stage, so &ldquo;gates passed&rdquo; can be re-read rather than re-asserted. Values shown are the schema&rsquo;s enumerations from issue #638 §7; the <code>rumdl</code> pins are this branch&rsquo;s real bump, the rest is an illustrative row set.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Question A · already answered, this session</p>
+    <h2>The schema had its arrow pointing the wrong way</h2>
+    <p>The original two-table design put a <code>syncs_manifest</code> column on the <strong>dependency</strong> row, justified by a measurement: only 2 dependencies today own more than one manifest. The advisor was asked to re-check that, and refuted it — then a cold reader refuted the refutation, harder.</p>
+  </div>
+
+  <div class="col">
+    <div class="verdict">
+      <span class="lab">Correction · this section was wrong when first published</span>
+      <p>The first version of this page said a second manifest per dependency was a <em>future</em> problem — &ldquo;the moment a second is built, this breaks.&rdquo; That was wrong. <strong>It is already built.</strong> <code>codex</code> owns two manifests today, and the figure below now shows the real pair instead of a hypothetical one. Both were read directly, not taken from a report.</p>
+    </div>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 880 320" role="img" aria-label="Two schema layouts compared. A syncs_manifest column on the dependency row can hold only one manifest, but the dependency codex already owns two: a code manifest pinned to release tag rust-v0.151.0 on openai slash codex, and a docs manifest tracking the main branch of a different repository. An owner_dep column on the manifest row holds any number for free.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5C6577"/>
+        </marker>
+        <marker id="arBad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#A0451F"/>
+        </marker>
+        <marker id="arOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1D4E6F"/>
+        </marker>
+      </defs>
+
+      <!-- LEFT: rejected -->
+      <text x="20" y="24" font-family="IBM Plex Sans Condensed, sans-serif" font-size="12" font-weight="700" letter-spacing="1.6" fill="#A0451F">REJECTED — FK ON THE DEP ROW</text>
+
+      <rect x="20" y="42" width="180" height="62" rx="4" fill="#F8EDE7" stroke="#A0451F" stroke-width="1.5"/>
+      <text x="34" y="64" font-family="IBM Plex Mono, monospace" font-size="13" fill="#1A1F2B">dep: codex</text>
+      <text x="34" y="84" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#A0451F">syncs_manifest = ?</text>
+
+      <line x1="200" y1="62" x2="278" y2="62" stroke="#5C6577" stroke-width="1.4" marker-end="url(#ar)"/>
+      <text x="206" y="54" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#5C6577">holds one</text>
+
+      <rect x="282" y="40" width="184" height="46" rx="4" fill="#FFFFFF" stroke="#5C6577"/>
+      <text x="294" y="59" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#1A1F2B">codex.manifest</text>
+      <text x="294" y="77" font-family="IBM Plex Mono, monospace" font-size="10" fill="#5C6577">kind=code · rust-v0.151.0</text>
+
+      <line x1="200" y1="88" x2="278" y2="116" stroke="#A0451F" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arBad)"/>
+      <text x="150" y="150" font-family="IBM Plex Sans Condensed, sans-serif" font-size="12" font-weight="700" fill="#A0451F">no second slot</text>
+
+      <rect x="282" y="96" width="184" height="46" rx="4" fill="#F8EDE7" stroke="#A0451F" stroke-width="1.5"/>
+      <text x="294" y="115" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#1A1F2B">codex-docs.manifest</text>
+      <text x="294" y="133" font-family="IBM Plex Mono, monospace" font-size="10" fill="#A0451F">kind=docs · ref=main</text>
+
+      <text x="20" y="184" font-family="Source Serif 4, serif" font-size="13.5" font-weight="600" fill="#A0451F">Both exist right now.</text>
+      <text x="20" y="205" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">And they are not the same repository:</text>
+      <text x="20" y="224" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">the code follows a release tag, the docs</text>
+      <text x="20" y="243" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">follow another project&rsquo;s <tspan font-family="IBM Plex Mono, monospace" font-size="12">main</tspan>.</text>
+      <text x="20" y="270" font-family="Source Serif 4, serif" font-size="13.5" font-weight="600" fill="#A0451F">So one bump cannot advance both.</text>
+
+      <!-- divider -->
+      <line x1="480" y1="14" x2="480" y2="306" stroke="#E3DFD5" stroke-width="1.5"/>
+
+      <!-- RIGHT: adopted -->
+      <text x="510" y="24" font-family="IBM Plex Sans Condensed, sans-serif" font-size="12" font-weight="700" letter-spacing="1.6" fill="#1D4E6F">ADOPTED — FK ON THE MANIFEST ROW</text>
+
+      <rect x="510" y="42" width="180" height="62" rx="4" fill="#EAF1F5" stroke="#1D4E6F" stroke-width="1.5"/>
+      <text x="524" y="64" font-family="IBM Plex Mono, monospace" font-size="13" fill="#1A1F2B">dep: codex</text>
+      <text x="524" y="84" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#1D4E6F">no manifest column</text>
+
+      <rect x="700" y="34" width="160" height="38" rx="4" fill="#FFFFFF" stroke="#1D4E6F"/>
+      <text x="712" y="58" font-family="IBM Plex Mono, monospace" font-size="11" fill="#1A1F2B">codex.manifest</text>
+      <rect x="700" y="82" width="160" height="38" rx="4" fill="#FFFFFF" stroke="#1D4E6F"/>
+      <text x="712" y="106" font-family="IBM Plex Mono, monospace" font-size="11" fill="#1A1F2B">codex-docs.manifest</text>
+      <rect x="700" y="130" width="160" height="38" rx="4" fill="#FFFFFF" stroke="#1D4E6F" stroke-dasharray="4 3"/>
+      <text x="712" y="154" font-family="IBM Plex Mono, monospace" font-size="11" fill="#5C6577">…any number</text>
+
+      <line x1="698" y1="53" x2="694" y2="66" stroke="#1D4E6F" stroke-width="1.4" marker-start="url(#arOk)"/>
+      <line x1="698" y1="101" x2="694" y2="76" stroke="#1D4E6F" stroke-width="1.4" marker-start="url(#arOk)"/>
+      <line x1="698" y1="149" x2="694" y2="86" stroke="#1D4E6F" stroke-width="1.4" marker-start="url(#arOk)"/>
+      <text x="556" y="200" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#1D4E6F">owner_dep →</text>
+
+      <text x="510" y="232" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">One-to-many for free. No join table.</text>
+      <text x="510" y="251" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">Promoting the 50 unpinned manifests is</text>
+      <text x="510" y="270" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">then harmless — each becomes its own dep.</text>
+    </svg>
+    <figcaption><strong>The measurement was true and the conclusion was wrong — twice over.</strong> &ldquo;Pairings = 2&rdquo; counted the <em>dependencies</em> that own more than one manifest, not the manifests, so it never described the cardinality the column had to hold. Read fresh this session: <code>sources/codex.manifest:33</code> is <code>ref = rust-v0.151.0</code> on <code>openai/codex</code>, <code>sources/codex-docs.manifest:4</code> is <code>ref = main</code> on <code>chenrui333/codex-docs</code>. Control arm: <code>sources/rumdl.manifest</code>, one manifest, a version tag — so the probe distinguishes the two shapes.</figcaption>
+  </figure>
+
+  <div class="verdict col">
+    <span class="lab">The second finding, which is bigger than the schema</span>
+    <p>The two manifests advance on <strong>different clocks</strong>. Bumping <code>codex</code> from one release tag to the next says nothing about whether the docs mirror moved, because the docs mirror does not follow releases at all — it follows another project&rsquo;s branch head.</p>
+    <p>So <code>source_synced</code> is not one stage. It either means &ldquo;the code manifest matches the pin&rdquo; or &ldquo;every mapped source advanced to its own upstream&rdquo;, and those are different builds. That question is now on the list below.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Question B · needs Ray</p>
+    <h2>Two settled answers that cannot both hold</h2>
+    <p>Round 3 of the design grilling settled that <strong>all 97 manifests</strong> come under the protocol and are generated from a dependency. A separate inventory, run the same session, found that <strong>12 of those 97 are not a dependency at all</strong>.</p>
+    <p>A manifest is generated <em>from</em> a dependency. Those 12 have nothing to be generated from.</p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 880 260" role="img" aria-label="97 source manifests split into three buckets: 35 map to a pinned dependency, 50 are dependency-shaped but unpinned, and 12 are not a dependency at all. The 12 have two possible fates: stub dependency rows, or deletion.">
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5C6577"/>
+        </marker>
+      </defs>
+
+      <text x="20" y="22" font-family="IBM Plex Sans Condensed, sans-serif" font-size="12" font-weight="700" letter-spacing="1.6" fill="#5C6577">97 SOURCE MANIFESTS, PARTITIONED</text>
+
+      <!-- proportional bar: 35 / 50 / 12 of 97 across 640px -->
+      <rect x="20" y="38" width="231" height="44" fill="#EAF1F5" stroke="#1D4E6F" stroke-width="1.5"/>
+      <text x="34" y="60" font-family="IBM Plex Mono, monospace" font-size="15" fill="#1A1F2B">A · 35</text>
+      <text x="34" y="76" font-family="Source Serif 4, serif" font-size="12" fill="#5C6577">maps to a pinned dep</text>
+
+      <rect x="251" y="38" width="330" height="44" fill="#F5F3EC" stroke="#5C6577" stroke-width="1.5"/>
+      <text x="265" y="60" font-family="IBM Plex Mono, monospace" font-size="15" fill="#1A1F2B">B · 50</text>
+      <text x="265" y="76" font-family="Source Serif 4, serif" font-size="12" fill="#5C6577">dependency-shaped, not pinned</text>
+
+      <rect x="581" y="38" width="79" height="44" fill="#F7F2DE" stroke="#7C6212" stroke-width="1.8"/>
+      <text x="594" y="60" font-family="IBM Plex Mono, monospace" font-size="15" fill="#1A1F2B">C · 12</text>
+      <text x="594" y="76" font-family="Source Serif 4, serif" font-size="12" fill="#7C6212">not a dep</text>
+
+      <!-- the fork -->
+      <line x1="620" y1="82" x2="620" y2="112" stroke="#7C6212" stroke-width="1.6"/>
+      <line x1="470" y1="112" x2="770" y2="112" stroke="#7C6212" stroke-width="1.6"/>
+      <line x1="470" y1="112" x2="470" y2="140" stroke="#7C6212" stroke-width="1.6" marker-end="url(#ar2)"/>
+      <line x1="770" y1="112" x2="770" y2="140" stroke="#7C6212" stroke-width="1.6" marker-end="url(#ar2)"/>
+
+      <rect x="330" y="146" width="280" height="72" rx="4" fill="#FFFFFF" stroke="#7C6212"/>
+      <text x="344" y="169" font-family="IBM Plex Sans Condensed, sans-serif" font-size="14" font-weight="600" fill="#1A1F2B">Reading A — keep them</text>
+      <text x="344" y="190" font-family="Source Serif 4, serif" font-size="13" fill="#5C6577">12 stub dep rows with no pin,</text>
+      <text x="344" y="208" font-family="Source Serif 4, serif" font-size="13" fill="#5C6577">carried as a permanent exception.</text>
+
+      <rect x="630" y="146" width="230" height="72" rx="4" fill="#FFFFFF" stroke="#7C6212"/>
+      <text x="644" y="169" font-family="IBM Plex Sans Condensed, sans-serif" font-size="14" font-weight="600" fill="#1A1F2B">Reading B — cut them</text>
+      <text x="644" y="190" font-family="Source Serif 4, serif" font-size="13" fill="#5C6577">delete the 12; every manifest</text>
+      <text x="644" y="208" font-family="Source Serif 4, serif" font-size="13" fill="#5C6577">then has an owner by construction.</text>
+
+      <text x="20" y="169" font-family="Source Serif 4, serif" font-size="13.5" font-weight="600" fill="#1A1F2B">Only 12% fail the test —</text>
+      <text x="20" y="188" font-family="Source Serif 4, serif" font-size="13.5" fill="#5C6577">not the 81 an earlier estimate</text>
+      <text x="20" y="206" font-family="Source Serif 4, serif" font-size="13.5" fill="#5C6577">implied. The scale of the</text>
+      <text x="20" y="224" font-family="Source Serif 4, serif" font-size="13.5" fill="#5C6577">decision is small; its shape isn&rsquo;t.</text>
+    </svg>
+    <figcaption><strong>The bar is drawn to scale.</strong> The fork under bucket C is the whole question: two implementers reading &ldquo;all 97 come under the protocol&rdquo; will build different things, and both will believe they followed the instruction.</figcaption>
+  </figure>
+</section>
+
+<section class="col">
+  <p class="eyebrow">Question C · needs Ray</p>
+  <h2>The two blanks that were never filled</h2>
+  <p>Round 3 asked two questions that went unanswered. An inference was stated back and not contradicted — which is not the same as confirmed, and the issue itself says so.</p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Question</th><th>The inference, unconfirmed</th><th>What breaks if it is wrong</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Q9</strong> — where is the single source of truth?</td>
+          <td>A version is typed only in <code>mise.toml</code> / <code>pyproject.toml</code>. The database owns mapping and status, never the pin.</td>
+          <td>If the database is meant to own the pin, the whole populate direction reverses and every diagram above is backwards.</td>
+        </tr>
+        <tr>
+          <td><strong>Q10</strong> — what happens to the 23 tracked state files?</td>
+          <td>They move into the database and the files are deleted.</td>
+          <td>If they stay, the design adds a fourth copy of the same facts instead of removing three.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="settled">
+    <span class="lab">Why these are asked and not assumed</span>
+    <p>The repo&rsquo;s own rule: a premise a spec rests on is verified before the spec rests on it. Both of these are load-bearing for the populate direction, and neither has ever been stated by the person who decides.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Added requirement</p>
+    <h2>The documentation should be generated too</h2>
+    <p>The same disease that the upgrade protocol fixes in pins is already loose in the prose. <code>CLAUDE.md</code> says <code>graphifyy[all]==0.9.48</code>. <code>pyproject.toml</code> says <code>0.9.50</code>. Both were read today. Nothing generated would drift like that.</p>
+    <p>So: any document that <strong>restates a fact whose authoritative copy is machine-readable</strong> — a version, a count, a status, a dependency list — stops being hand-maintained. Judgment stays hand-written; restatement does not.</p>
+    <p>That test has a sharp edge, and the advisor put the edge in a place worth drawing.</p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 880 300" role="img" aria-label="Two treatments compared. Where the database owns every fact in a file, the file is generated whole from the database. Where prose owns the sentence and a version sits inside it, the file is left alone and a drift gate compares the registered pattern against the database, failing when they disagree.">
+      <defs>
+        <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1D4E6F"/>
+        </marker>
+        <marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#7C6212"/>
+        </marker>
+      </defs>
+
+      <!-- LEFT -->
+      <text x="20" y="22" font-family="IBM Plex Sans Condensed, sans-serif" font-size="12" font-weight="700" letter-spacing="1.6" fill="#1D4E6F">DB OWNS EVERY FACT → GENERATE THE WHOLE FILE</text>
+
+      <rect x="20" y="40" width="120" height="46" rx="4" fill="#EAF1F5" stroke="#1D4E6F" stroke-width="1.5"/>
+      <text x="34" y="61" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1F2B">dep</text>
+      <text x="34" y="78" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1F2B">dep_stage</text>
+
+      <line x1="140" y1="63" x2="196" y2="63" stroke="#1D4E6F" stroke-width="1.5" marker-end="url(#ar4)"/>
+      <rect x="200" y="42" width="104" height="42" rx="4" fill="#FFFFFF" stroke="#1D4E6F"/>
+      <text x="212" y="60" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#1A1F2B">template</text>
+      <text x="212" y="76" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#5C6577">+ kb_setup</text>
+
+      <line x1="304" y1="63" x2="356" y2="63" stroke="#1D4E6F" stroke-width="1.5" marker-end="url(#ar4)"/>
+      <rect x="360" y="34" width="94" height="58" rx="4" fill="#EAF1F5" stroke="#1D4E6F" stroke-width="1.5"/>
+      <text x="372" y="58" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#1A1F2B">status.md</text>
+      <text x="372" y="76" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#1D4E6F">all bytes</text>
+
+      <text x="20" y="126" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">The 23 tracked JSON state files and a</text>
+      <text x="20" y="145" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">read-only currency view: zero prose,</text>
+      <text x="20" y="164" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">so nothing is lost by overwriting them.</text>
+      <text x="20" y="192" font-family="Source Serif 4, serif" font-size="13.5" font-weight="600" fill="#1D4E6F">Gate on idempotence: generate twice,</text>
+      <text x="20" y="211" font-family="Source Serif 4, serif" font-size="13.5" font-weight="600" fill="#1D4E6F">diff must be empty.</text>
+
+      <line x1="480" y1="14" x2="480" y2="286" stroke="#E3DFD5" stroke-width="1.5"/>
+
+      <!-- RIGHT -->
+      <text x="510" y="22" font-family="IBM Plex Sans Condensed, sans-serif" font-size="12" font-weight="700" letter-spacing="1.6" fill="#7C6212">PROSE OWNS THE SENTENCE → GATE, DO NOT GENERATE</text>
+
+      <rect x="510" y="40" width="270" height="70" rx="4" fill="#FFFFFF" stroke="#5C6577"/>
+      <text x="522" y="62" font-family="IBM Plex Mono, monospace" font-size="11" fill="#5C6577">CLAUDE.md:177</text>
+      <text x="522" y="82" font-family="Source Serif 4, serif" font-size="12.5" fill="#1A1F2B">&ldquo;The ONE Python config and Graphify</text>
+      <text x="522" y="99" font-family="Source Serif 4, serif" font-size="12.5" fill="#1A1F2B">owner: exact <tspan font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#A0451F">graphifyy[all]==0.9.48</tspan>&rdquo;</text>
+
+      <line x1="645" y1="110" x2="645" y2="146" stroke="#7C6212" stroke-width="1.6" marker-end="url(#ar5)"/>
+      <text x="654" y="132" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#7C6212">registered pattern</text>
+
+      <rect x="540" y="150" width="210" height="40" rx="4" fill="#F7F2DE" stroke="#7C6212" stroke-width="1.5"/>
+      <text x="552" y="175" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1F2B">drift gate — compare to DB</text>
+
+      <line x1="645" y1="190" x2="645" y2="216" stroke="#7C6212" stroke-width="1.6" marker-end="url(#ar5)"/>
+      <rect x="556" y="220" width="178" height="34" rx="4" fill="#F8EDE7" stroke="#A0451F" stroke-width="1.5"/>
+      <text x="568" y="242" font-family="IBM Plex Mono, monospace" font-size="12" fill="#A0451F">FAIL — pin says 0.9.50</text>
+
+      <text x="510" y="282" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">The sentence stays a human&rsquo;s. Only the number is held to account.</text>
+    </svg>
+    <figcaption><strong>The difference is who owns the bytes.</strong> Generating into a prose file would mean a markdown linter and a generator rewriting each other forever, in a file that already sits at a size budget — so the fact gets a gate instead of a template. <code>CLAUDE.md:177</code> and <code>pyproject.toml:32</code> were both read today; the disagreement drawn here is live right now.</figcaption>
+  </figure>
+
+  <div class="col">
+    <div class="verdict">
+      <span class="lab">Two exclusions that make this safe</span>
+      <p><code>sources/**</code> and <code>docs/direction/**</code> are never regenerated. A source manifest records what a source said <em>at ingestion time</em>, and the direction files are your words verbatim — a generator that &ldquo;fixed&rdquo; either would destroy the provenance they exist to hold. The scrape lane carries that exclusion list explicitly.</p>
+      <p>And a number written <em>with</em> its condition — &ldquo;772 MB, measured 2026-08-23, this figure goes stale&rdquo; — is reported separately rather than regenerated. Refreshing the number and dropping the caveat makes the doc worse.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">All three lanes landed</p>
+    <h2>What the cold read found</h2>
+    <p>Three codex lanes ran against the issue and the repo. Between them: <strong>5 claims refuted, 3 unverifiable, 24 ambiguities, 5 contradictions</strong>, and one inventory of every document that restates a machine-readable fact.</p>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>#638 said</th><th>Actually</th><th>Settled by</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>A full zero-token upgrade of <strong>every</strong> dependency is achievable today</td>
+          <td><strong>False, but not for the stated reason.</strong> The token axis holds — <code>kb-label</code>&rsquo;s default is deterministic and its <code>--claude-cli</code> flag is opt-in and marked broken. It fails on <em>coverage</em>: 15 of 33 direct dependencies have no currency mapping at all.</td>
+          <td>lane 1, re-checked here</td>
+        </tr>
+        <tr>
+          <td>75 mise tasks</td>
+          <td><strong>85.</strong> Re-derived here: <code>mise tasks --json</code> filtered to this <code>mise.toml</code>. Control: <code>kb-build</code> present, bogus absent.</td>
+          <td>lane 1, re-checked here</td>
+        </tr>
+        <tr>
+          <td>DBOS&rsquo;s <code>sqlite/tursodb</code> PR is merged</td>
+          <td><strong>That PR does not exist.</strong> Issue #101 is closed with &ldquo;No branches or pull requests.&rdquo; SQLite support is real; the merged PR is #680. The citation was invented.</td>
+          <td>lane 1</td>
+        </tr>
+        <tr>
+          <td>agentsview tool-call storage is <strong>UNVERIFIED and load-bearing</strong>; a prototype must run first</td>
+          <td><strong>Resolved, positively.</strong> Official docs: structured tool input/output, full Bash command text including heredocs, and an <code>agentsview session tool-calls</code> command. No prototype needed. Stars 5,477, not 5,644.</td>
+          <td>lane 1</td>
+        </tr>
+        <tr>
+          <td>The baseline is behind on 5 tools</td>
+          <td><strong>8.</strong> Control arm: 4 pairs equal, so the comparison distinguishes.</td>
+          <td>lane 1</td>
+        </tr>
+        <tr>
+          <td>Piped a gate into <code>tail</code> 4 times</td>
+          <td><strong>6.</strong> The 4 was a reflector snapshot taken 85 minutes before the issue was written and published as a session total.</td>
+          <td>lane 1</td>
+        </tr>
+        <tr>
+          <td>Delete &ldquo;the 23 dead JSON files&rdquo;</td>
+          <td><strong>They are not dead.</strong> They hold reviewed findings, timestamped upstream baselines and docs fingerprints. None maps to the proposed stage enum, so deleting them erases human review acknowledgements.</td>
+          <td>lane 2</td>
+        </tr>
+        <tr>
+          <td><code>graphify-out/memory/</code> is the only committed subdirectory — asserted by three active documents</td>
+          <td><strong>Two are committed.</strong> <code>graphify-out/graphify-semantic-slice/</code> holds 5 tracked files. Re-derived here: <code>git ls-files</code>, control-armed against <code>graph.json</code> (0 tracked).</td>
+          <td>lane 3, re-checked here</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <div class="settled">
+      <span class="lab">And one disagreement resolved in the repo&rsquo;s favour</span>
+      <p>Lane 3 reported the <code>hk-test</code> ship gate failing — 6 Taplo cases, exit 101. Re-run here: <strong>46 passed, 0 failed.</strong> The failures were the lane&rsquo;s sandbox, not the repo. The lane said so itself rather than claiming a defect, which is why this cost one command instead of an afternoon.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">The generated-docs answer</p>
+    <h2>The scope is smaller than it sounds</h2>
+    <p>Of <strong>936 tracked markdown documents</strong>, <strong>33 restate a machine-readable fact</strong>. Thirteen of those are <em>already</em> generated — almost all the graphify skill tree, which the repo regenerates on every version bump. That leaves <strong>19 hand-written and 1 mixed</strong>, and only <strong>8 are drifted right now</strong>.</p>
+    <p>And the advisor&rsquo;s treatment split held under contact: <strong>16 of the 20 want a drift gate, not a generator.</strong> Only 4 want a generated region. Nothing wants whole-file generation, because every candidate carries prose.</p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 880 210" role="img" aria-label="Of 936 tracked markdown documents, 903 are excluded, 13 are already generated, 1 is mixed and 19 are hand-written. Of the 20 needing treatment, 16 want a drift gate and 4 want a generated region.">
+      <text x="20" y="22" font-family="IBM Plex Sans Condensed, sans-serif" font-size="12" font-weight="700" letter-spacing="1.6" fill="#5C6577">936 TRACKED MARKDOWN DOCUMENTS</text>
+
+      <rect x="20" y="36" width="756" height="34" fill="#F5F3EC" stroke="#5C6577"/>
+      <text x="34" y="58" font-family="IBM Plex Mono, monospace" font-size="13" fill="#5C6577">903 excluded — provenance, dated research, judgment, navigation</text>
+      <rect x="776" y="36" width="84" height="34" fill="#EAF1F5" stroke="#1D4E6F" stroke-width="1.8"/>
+      <text x="790" y="58" font-family="IBM Plex Mono, monospace" font-size="13" fill="#1A1F2B">33</text>
+
+      <line x1="818" y1="70" x2="818" y2="92" stroke="#1D4E6F" stroke-width="1.5"/>
+      <line x1="300" y1="92" x2="818" y2="92" stroke="#1D4E6F" stroke-width="1.5"/>
+      <line x1="300" y1="92" x2="300" y2="108" stroke="#1D4E6F" stroke-width="1.5"/>
+
+      <rect x="300" y="112" width="180" height="38" rx="4" fill="#EAF1F5" stroke="#1D4E6F"/>
+      <text x="314" y="129" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1F2B">13 already generated</text>
+      <text x="314" y="145" font-family="Source Serif 4, serif" font-size="11.5" fill="#5C6577">leave alone</text>
+
+      <rect x="492" y="112" width="150" height="38" rx="4" fill="#F7F2DE" stroke="#7C6212" stroke-width="1.6"/>
+      <text x="506" y="129" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1F2B">16 drift-gate</text>
+      <text x="506" y="145" font-family="Source Serif 4, serif" font-size="11.5" fill="#7C6212">prose keeps its bytes</text>
+
+      <rect x="654" y="112" width="150" height="38" rx="4" fill="#F8EDE7" stroke="#A0451F" stroke-width="1.6"/>
+      <text x="668" y="129" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1F2B">4 marked region</text>
+      <text x="668" y="145" font-family="Source Serif 4, serif" font-size="11.5" fill="#A0451F">generator owns a block</text>
+
+      <text x="20" y="130" font-family="Source Serif 4, serif" font-size="13.5" font-weight="600" fill="#1A1F2B">8 of the 20 are</text>
+      <text x="20" y="149" font-family="Source Serif 4, serif" font-size="13.5" font-weight="600" fill="#A0451F">drifted right now.</text>
+
+      <text x="300" y="182" font-family="Source Serif 4, serif" font-size="13.5" fill="#1A1F2B">Nothing qualifies for whole-file generation — every candidate carries prose worth keeping.</text>
+    </svg>
+    <figcaption><strong>Counts are lane 3&rsquo;s, re-derived from the tracked tree rather than estimated.</strong> The eight drifted today: <code>CLAUDE.md</code>, <code>.claude/CLAUDE.md</code>, <code>docs/graphify-reference.md</code>, <code>docs/secrets.md</code>, and the rules <code>md-size-budgets</code>, <code>tool-currency-and-native-first</code>, <code>do-not</code>, <code>agent-artifact-conventions</code>.</figcaption>
+  </figure>
+
+  <div class="col">
+    <div class="verdict">
+      <span class="lab">The tooling answer, and it corrects the advisor</span>
+      <p>The advisor guessed Jinja2 was already in the dependency closure. It is <strong>importable but ambient</strong> — <code>uv tree --invert --package jinja2</code> resolves 166 packages and prints no Jinja2 node. Control arm: <code>msgspec</code> resolves and is declared; a bogus module is <code>MODULE_NOT_FOUND</code>. So adopting it <em>adds a declared dependency</em>.</p>
+      <p>It would at least consolidate rather than duplicate: <code>currency/report.py</code> already hand-builds markdown in four places (<code>:41-51</code>, <code>:139-145</code>, <code>:357-413</code>, <code>:422-438</code>).</p>
+    </div>
+  </div>
+</section>
+
+<section class="col">
+  <p class="eyebrow">A requirement I dropped</p>
+  <h2>The states are a state machine, and they are generated</h2>
+  <p>Your comment, verbatim: <em>&ldquo;i had required to use a modern state machine library w enum states that are code generated&rdquo;.</em> That is not in #638 anywhere, and it is not in anything I wrote today. It changes the second table from a design choice into a constrained one.</p>
+  <p>It also reconnects to an answer already on the record. Round 1&rsquo;s Q4 said codegen covers <strong>all five</strong>, and one of the five was the <em>status record</em>. So <code>dep_stage.state</code> was never meant to be a hand-typed string column — the enum is generated, and a library owns which transitions are legal.</p>
+
+  <div class="settled">
+    <span class="lab">What this rules out, immediately</span>
+    <p>A hand-written <code>CHECK (state IN (...))</code> constraint, a Python <code>StrEnum</code> typed by hand, and any &ldquo;the code just writes the right string&rdquo; approach. It also means an illegal transition — <code>reverted</code> straight to <code>ok</code>, say — becomes a <em>library</em> error rather than a bug nobody notices, which is the whole reason to want one.</p>
+    <p>And the generator already exists here: <code>datamodel-code-generator</code> is pinned in its own isolated group and <code>mise run kb-codegen</code> drives it. This is the tool that would have caught the two hand-written parsers that returned false answers.</p>
+  </div>
+
+  <p>What is <em>not</em> settled by your comment is <strong>which library</strong>, and that is an architect call rather than a question for you — unless you already have one in mind, in which case say so and it is settled. The shortlist is small and the trade is about whether transitions are declared in Python or in a schema the generator reads.</p>
+</section>
+
+<section class="col">
+  <p class="eyebrow">The out-of-sync finding</p>
+  <h2>A 138 MB extraction the repo has lost track of</h2>
+  <p>Your comment named it: <code>.agent/kb/native-extract/graphify-out</code>. Measured this session — it is real, it is large, and it is <strong>gitignored</strong>.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Fact</th><th>Value</th><th>How</th></tr></thead>
+      <tbody>
+        <tr><td>Size</td><td class="num">138 MB</td><td><code>du -sh</code></td></tr>
+        <tr><td>Built</td><td class="num">2026-08-23 19:22</td><td>directory mtimes</td></tr>
+        <tr><td>What it extracted</td><td><code>sources/graphify</code></td><td><code>.graphify_root</code></td></tr>
+        <tr><td><strong>What it cost</strong></td><td class="num">205,654 output tokens</td><td><code>.graphify_semantic_marker</code></td></tr>
+        <tr><td>Tracked?</td><td><strong>No</strong> — <code>.gitignore:177</code> matches <code>.agent/</code></td><td><code>git check-ignore -v</code>; control: <code>graphify-out/memory/</code> returns rc 1</td></tr>
+        <tr><td>Contains</td><td>16 MB <code>graph.json</code>, <code>GRAPH_REPORT.md</code>, <code>graph.graphml</code>, a <code>wiki/</code>, a 14,125-file <code>obsidian/</code></td><td><code>ls</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="verdict">
+    <span class="lab">Why this is the sharpest example on the page</span>
+    <p>That marker file records <strong>real money already spent</strong> — a semantic extraction is the one stage in this whole design that costs subscription tokens, and this is 205,654 output tokens of it sitting in a directory <code>git clean -xdf</code> deletes without asking. It does not exist on any other machine and it does not survive a fresh clone.</p>
+    <p>It is also the second tracking defect found today. The first: three active documents assert <code>graphify-out/memory/</code> is the only committed subdirectory, while <code>graphify-out/graphify-semantic-slice/</code> holds 5 tracked files. Both are the same disease as the drifted version strings — a claim about state that nothing checks.</p>
+  </div>
+</section>
+
+<section class="col">
+  <p class="eyebrow">The round</p>
+  <h2>Four questions, and why these four</h2>
+  <p>The lanes produced <strong>15</strong> questions for you. Firing all fifteen would be the same failure as the issue itself: volume standing in for judgment. These four are the ones where <em>no probe can help</em> and <em>every downstream ticket changes</em>. The other eleven are architect calls or fall out of these.</p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Q</th><th>The conflict</th><th>Cost of guessing</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>1</strong><br>Does status survive a clone</td>
+          <td>Narrowed by your state-machine comment. The <em>shape</em> is settled — generated enum, a library owning transitions. What is not settled is where the database file lives: gitignored and rebuilt, or tracked and travelling in the PR. The 138 MB orphan above is what the gitignored answer looks like when it goes wrong.</td>
+          <td>Decides whether a batch&rsquo;s status is repository evidence or one machine&rsquo;s local state — and whether <code>git clean</code> can destroy it.</td>
+        </tr>
+        <tr>
+          <td><strong>2</strong><br><s><code>currency.toml</code></s><br><strong>ANSWERED</strong></td>
+          <td>You settled it: <em>&ldquo;then add the necessary tables to support what would be lost&rdquo;.</em> Delete the file; build the tables that hold what it held. No longer a question.</td>
+          <td>Now a design task, not a decision. The schema it forced is the subject of its own page.</td>
+        </tr>
+        <tr>
+          <td><strong>3</strong><br><code>all-generated</code></td>
+          <td>Two problems in one answer. The 12 non-dependency manifests have nothing to generate <em>from</em> — and &ldquo;all-generated&rdquo; never said whether it means every byte or only the pin fields. A manifest holds authored judgment: <code>sources/graphify.manifest</code> is ~90 lines of it.</td>
+          <td>Whole-byte generation needs a lossless prose migration. Field-only generation is not what &ldquo;all&rdquo; ordinarily means.</td>
+        </tr>
+        <tr>
+          <td><strong>4</strong><br><code>revert-continue</code></td>
+          <td>Your answer says a red gate reverts that dependency and the batch continues. <code>zero-skip-policy</code> and <code>verify-before-advancing</code> say a red check <em>is</em> the current task and nothing advances past it. Both are standing instructions here.</td>
+          <td>Unattended batching is the whole point of the feature; the rules are eager and load-bearing. One has to be explicitly scoped, by you, not chosen by an implementer.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="settled">
+    <span class="lab">Not asking you about these — they are mine to settle</span>
+    <p>Schema cardinality (answered above), <code>dep_stage</code> as current-state versus event log, <code>probes_json</code>&rsquo;s contract, and how <code>latest</code> is discovered for unmapped dependencies. Those are architecture, and handing them to you would be offloading the job.</p>
+  </div>
+</section>
+
+<div class="prov col">
+  <h2>Provenance</h2>
+  <ul>
+    <li><strong>Measured this session</strong>, in this repo at <span class="m">56b98d8af809</span>: <span class="m">ls sources/*.manifest | wc -l</span> → 97 · <span class="m">graphify-out/.currency-stamp.json</span> absent while <span class="m">graph.json</span> exists · <span class="m">CLAUDE.md:177</span> says <span class="m">graphifyy[all]==0.9.48</span> while <span class="m">pyproject.toml:32</span> says <span class="m">0.9.50</span> · <span class="m">_python_project_pin</span> at <span class="m">python/src/kb_setup/currency/sync.py:168</span> · <span class="m">_lock_converged</span> at <span class="m">python/src/kb_setup/tool_sync.py:277</span>.</li>
+    <li><strong>Re-derived in this session, by me, after a lane claimed it</strong>: 85 mise tasks (<code>mise tasks --json</code> filtered to this <code>mise.toml</code>; control <code>kb-build</code> present, bogus absent) · <code>kb-label</code>&rsquo;s deterministic default at <code>mise.toml:1052-1055</code> · <code>codex.manifest:33</code> and <code>codex-docs.manifest:4</code> · two tracked subdirectories under <code>graphify-out/</code> (<code>git ls-files</code> → 331 in <code>memory/</code>, 5 in <code>graphify-semantic-slice/</code>, 0 for <code>graph.json</code>) · <code>hk-test</code> 46 passed 0 failed.</li>
+    <li><strong>Lane-reported and NOT independently re-checked here</strong>: the DBOS PR-versus-issue state, agentsview&rsquo;s documented tool-call storage and star count, the 8-tool baseline lag, the 6 piped-gate calls, the A/B/C partition, the 936/33/19/13 document counts, and the Jinja2 resolution probe. Each carries a control arm in its own report; none has a second route yet. Treat them as strong leads, not as settled the way the row above is.</li>
+    <li><strong>The Question A verdict</strong> is <span class="m">fable-advisor</span>&rsquo;s, returned this session, and it refutes a design the same advisor gave in the previous session.</li>
+    <li><strong>Ray&rsquo;s answers</strong> quoted in Question B are recorded verbatim in issue #638 §4, round 3, Q12.</li>
+    <li><strong>The <code>dep_stage</code> figure</strong> shows the schema&rsquo;s enumerated values as issue #638 §7 defines them. The <code>rumdl 0.2.60 → 0.2.62</code> bump is real and is in PR #637; the seven row STATES are an illustration of the zero-token case, not a recorded run.</li>
+    <li><strong>The generated-docs treatment split</strong> (whole-file where the database owns every fact, drift-gate where prose owns the sentence) is <span class="m">fable-advisor</span>&rsquo;s verdict this session, not yet tested against the repo. Whether a template engine is already available here is one of the things lane 3 is probing rather than assuming.</li>
+  </ul>
+</div>
+
+</div>

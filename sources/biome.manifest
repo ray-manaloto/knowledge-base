@@ -1,5 +1,5 @@
 # Source manifest — reproducible-by-reference (Invariant 3).
 url = https://github.com/biomejs/biome
-ref = @biomejs/biome@2.5.10
-commit = 05797b196eb4412bb373d0825c44b0dd856f4134
+ref = @biomejs/biome@2.5.11
+commit = 4d9c1d53ff57c44247e7a32718e1c69a0c1735af
 kind = code

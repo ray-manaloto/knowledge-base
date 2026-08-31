@@ -663,7 +663,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.10"
+expected = "2026.8.14"
 # ADDED 2026-08-08 (#242). The same SKIP-whose-reason-stopped-being-true hole
 # `[tool.hk]` records below, one tool over: `sources/mise.manifest` existed and
 # this table never named it, so `sync.py` reported a clean SKIP while the
@@ -1969,8 +1969,11 @@ retires (1), and nothing retires (2) short of a version-sorted listing."""
 mise_key = "rumdl"
 binary = "rumdl"
 github = "rvben/rumdl"
-# `mise exec -- rumdl --version` prints `rumdl 0.2.60` — the house form, name
-# anchored, as at `[tool.agnix]` / `[tool.ruff]` / `[tool.ty]`.
+# `mise exec -- rumdl --version` prints `rumdl 0.2.62` — the house form, name
+# anchored, as at `[tool.agnix]` / `[tool.ruff]` / `[tool.ty]`. Re-probed at the
+# 0.2.60 -> 0.2.62 bump, 2026-08-30: the SHAPE is what `version_pattern` matches
+# and it is unchanged, so this quote tracks the current version rather than
+# recording a measurement of that version's behaviour.
 version_pattern = '^rumdl (\d+\.\d+\.\d+)'
 manifest = "sources/rumdl.manifest"
 
@@ -2116,15 +2119,22 @@ version_pattern = '^(\d+\.\d+\.\d+)$'
 # names ctx7 as the doc fetcher, and the first-party `context7-cli` skill in
 # upstash/context7 drives this exact binary.
 #
-# DELIBERATELY NO `github` KEY, and that is the whole point of this comment.
-# `upstash/context7` is one repo publishing TWO differently-versioned things:
-# the Claude plugin / MCP server (tags `v1.0.30`) and this CLI (npm `0.5.8`).
-# Pointing an upstream check at those tags would compare 0.5.8 against 1.0.30 —
-# the exact non-comparable-pin failure `[tool.skillopt]` already reports as
-# UNKNOWN. The engine has no `npm` source field (`config.py:176-295` offers
-# `pypi` and `github` only), so there is no honest upstream check available for
-# an npm-only tool. Step 1 still verifies installed-vs-pinned, which is the part
-# that can be checked truthfully; upstream stays unchecked rather than wrong.
+# DELIBERATELY NO `github` KEY. Historical evidence: when this was written,
+# `upstash/context7`'s `v1.0.x` plugin / MCP server tags were not comparable with
+# the CLI's npm `0.5.8` version. Re-measured 2026-08-30 after the npm pin moved
+# to `0.5.9`: upstream now also publishes CLI releases tagged
+# `ctx7@<version>`. Without a prefix, however, a GitHub upstream check still
+# resolves to the plugin's `v1.0.30`, not the CLI's `0.5.9`; the version-
+# comparability problem remains real unless a `tag_prefix` is declared.
+#
+# The engine's GitHub route filters and strips a declared prefix, so
+# `github = "upstash/context7"` plus `tag_prefix = "ctx7@"` appears feasible;
+# `ctx7@0.5.9` is a published GitHub Release, not merely a raw git tag. It is
+# deliberately not wired here: enabling an upstream check is a behavior change
+# that needs its own end-to-end verification round rather than riding along on
+# a version-pin bump. The engine's lack of an `npm` source is therefore no
+# longer the operative reason for omitting the check, because the `github`
+# route exists.
 mise_key = "npm:ctx7"
 binary = "ctx7"
 version_pattern = '^(\d+\.\d+\.\d+)$'

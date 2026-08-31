@@ -1,0 +1,363 @@
+<title>Three Switches Before the Plan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#F5F7F9;
+  --surface:#FFFFFF;
+  --ink:#16202B;
+  --ink-mid:#4C5A67;
+  --ink-soft:#77848F;
+  --rule:#D7DEE5;
+  --rule-soft:#E8EDF1;
+  --go:#0F6E62;
+  --go-wash:#E4F1EE;
+  --cost:#9A5B12;
+  --cost-wash:#F8EEE0;
+  --stop:#9E2B30;
+  --stop-wash:#F9E7E7;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:16px;
+  line-height:1.62;
+  margin:0;
+  padding:0 20px 96px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:820px;margin:0 auto}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:.88em}
+code{background:var(--rule-soft);padding:.1em .34em;border-radius:3px;color:var(--ink)}
+
+/* ---- masthead ---- */
+header{padding:64px 0 40px;border-bottom:2px solid var(--ink)}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-soft);margin:0 0 18px;
+}
+h1{
+  font-family:"Fraunces",Georgia,serif;
+  font-optical-sizing:auto;
+  font-weight:600;font-size:clamp(38px,6.4vw,60px);line-height:1.02;
+  letter-spacing:-.022em;margin:0 0 20px;text-wrap:balance;
+}
+.standfirst{font-size:19px;line-height:1.55;color:var(--ink-mid);margin:0;max-width:62ch}
+.standfirst strong{color:var(--ink);font-weight:600}
+
+/* ---- sections ---- */
+section{padding:44px 0;border-bottom:1px solid var(--rule)}
+section:last-of-type{border-bottom:none}
+h2{
+  font-family:"Fraunces",Georgia,serif;font-weight:600;
+  font-size:27px;line-height:1.2;letter-spacing:-.012em;margin:0 0 6px;text-wrap:balance;
+}
+h3{font-size:15px;font-weight:600;letter-spacing:.01em;margin:30px 0 8px}
+.dek{color:var(--ink-soft);font-size:15px;margin:0 0 26px;max-width:64ch}
+p{margin:0 0 15px;max-width:68ch}
+.switch-no{
+  font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.12em;
+  color:var(--go);text-transform:uppercase;display:block;margin-bottom:10px;font-weight:500;
+}
+
+/* ---- figure / mermaid ---- */
+figure{margin:30px 0 8px;padding:0}
+figcaption{
+  font-size:13.5px;color:var(--ink-soft);margin-top:12px;line-height:1.5;
+  border-left:2px solid var(--rule);padding-left:12px;max-width:66ch;
+}
+.plate{
+  background:#fff;border:1px solid var(--rule);border-radius:4px;
+  padding:22px 16px;overflow-x:auto;
+}
+svg[id^="claude-mermaid"] { background:#fff !important; max-width:100%; height:auto; border-radius:3px; }
+svg[id^="claude-mermaid"] text, svg[id^="claude-mermaid"] tspan,
+svg[id^="claude-mermaid"] .nodeLabel, svg[id^="claude-mermaid"] .edgeLabel,
+svg[id^="claude-mermaid"] .cluster-label, svg[id^="claude-mermaid"] .messageText,
+svg[id^="claude-mermaid"] .labelText, svg[id^="claude-mermaid"] .loopText,
+svg[id^="claude-mermaid"] .noteText, svg[id^="claude-mermaid"] .sequenceNumber,
+svg[id^="claude-mermaid"] foreignObject div, svg[id^="claude-mermaid"] foreignObject span,
+svg[id^="claude-mermaid"] foreignObject p { fill:#1b1b1b !important; color:#1b1b1b !important; background:transparent !important; }
+svg[id^="claude-mermaid"] .edgeLabel rect, svg[id^="claude-mermaid"] .label-container,
+svg[id^="claude-mermaid"] rect.actor, svg[id^="claude-mermaid"] .actor { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+svg[id^="claude-mermaid"] .node :is(rect, path, polygon, circle, ellipse):not([style*="fill"]) { fill:#f2f2f4 !important; stroke:#8d8d94 !important; }
+svg[id^="claude-mermaid"] .cluster rect { fill:#fafafa !important; stroke:#b8b8be !important; }
+svg[id^="claude-mermaid"] .edgePath path, svg[id^="claude-mermaid"] line,
+svg[id^="claude-mermaid"] .messageLine0, svg[id^="claude-mermaid"] .messageLine1,
+svg[id^="claude-mermaid"] .actor-line { stroke:#4a4a4a !important; }
+svg[id^="claude-mermaid"] marker path, svg[id^="claude-mermaid"] .arrowheadPath,
+svg[id^="claude-mermaid"] .arrowMarkerPath { fill:#4a4a4a !important; stroke:#4a4a4a !important; }
+
+/* ---- tables ---- */
+.tablewrap{overflow-x:auto;margin:24px 0 6px;border:1px solid var(--rule);border-radius:4px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:520px}
+th{
+  text-align:left;font-weight:600;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-soft);padding:12px 16px;border-bottom:1px solid var(--rule);
+  font-family:"IBM Plex Mono",monospace;vertical-align:bottom;
+}
+td{padding:13px 16px;border-bottom:1px solid var(--rule-soft);vertical-align:top;line-height:1.5}
+tbody tr:last-child td{border-bottom:none}
+th:first-child,td:first-child{width:1%;white-space:nowrap;font-weight:500}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---- verdict chips ---- */
+.chip{
+  display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;
+  letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:3px;
+  font-weight:500;white-space:nowrap;
+}
+.chip.go{background:var(--go-wash);color:var(--go)}
+.chip.cost{background:var(--cost-wash);color:var(--cost)}
+.chip.stop{background:var(--stop-wash);color:var(--stop)}
+
+/* ---- recommendation panel ---- */
+.rec{
+  background:var(--surface);border:1px solid var(--rule);
+  border-left:4px solid var(--go);border-radius:4px;
+  padding:20px 22px;margin:26px 0 0;
+}
+.rec .lab{
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--go);font-weight:500;margin:0 0 8px;
+}
+.rec p{margin:0;font-size:15px}
+.rec p + p{margin-top:10px}
+
+.warn{
+  background:var(--stop-wash);border:1px solid #EBCDCE;border-radius:4px;
+  padding:18px 20px;margin:24px 0;
+}
+.correction{
+  background:var(--cost-wash);border:1px solid #E6D2B4;
+  border-left:4px solid var(--cost);border-radius:4px;
+  padding:20px 22px;margin:32px 0 0;
+}
+.correction .lab{
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--cost);font-weight:500;margin:0 0 10px;
+}
+.correction p{margin:0;font-size:15px;max-width:68ch}
+.correction p + p{margin-top:12px}
+.warn .lab{
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--stop);font-weight:500;margin:0 0 8px;
+}
+.warn p{margin:0;font-size:15px}
+
+/* ---- source list ---- */
+.sources{font-size:13.5px;color:var(--ink-soft)}
+.sources li{margin-bottom:7px}
+.sources code{background:transparent;padding:0;color:var(--ink-mid)}
+footer{padding-top:36px;border-top:2px solid var(--ink);margin-top:8px;font-size:13.5px;color:var(--ink-soft)}
+a{color:var(--go)}
+@media (max-width:560px){ body{padding:0 16px 72px} header{padding:44px 0 30px} }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">planning-with-files 3.12.0 · knowledge-base · 2026-08-30</p>
+  <h1>Three Switches Before the Plan</h1>
+  <p class="standfirst">The plugin is installed and live. But its <strong>default</strong> setting does the one thing you installed it to prevent — it re-injects the plan into context on <em>every matched tool call</em> — every <code>Write</code>, <code>Edit</code>, <code>Bash</code>, <code>Read</code>, <code>Glob</code> and <code>Grep</code>. Three switches decide whether it saves context or spends it. Here is what each one actually changes.</p>
+</header>
+
+<div class="correction">
+  <p class="lab">Corrected after publication — 2026-08-30, later the same day</p>
+  <p><strong>The per-call cost is about 5&times; what this page originally said.</strong> The first version quoted the plugin's own <code>~90 tokens per matched tool call</code>. That figure is measured against the plugin's short starter template. Measured against <em>our actual plan</em>: <code>head -30 task_plan.md</code> is <strong>1,748 bytes ≈ 440 tokens</strong>. At 500 tool calls that is roughly <strong>220,000 tokens</strong> — about 22% of a 1M window, paid on every turn.</p>
+  <p><strong>And the framing was wrong in a way that matters more than the number.</strong> The original page argued autonomous mode on token cost alone. The sharper argument is below, in <em>What the injection mode does and does not fix</em>: the problem this plugin was installed to solve is <em>cross-session</em> loss, and the injection mode has nothing to do with that. The recommendation is unchanged; the reason for it is better.</p>
+</div>
+
+<section>
+  <h2>The mechanism: two taps into your context</h2>
+  <p class="dek">The plugin reads your plan file and pours it into the model's context through hooks. There are two places it pours, and one place it can refuse to let a turn end.</p>
+
+  <figure>
+    <div class="plate">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#f2f2f4','primaryTextColor':'#1b1b1b','primaryBorderColor':'#8d8d94','lineColor':'#4a4a4a','secondaryColor':'#e4f1ee','tertiaryColor':'#fafafa','fontSize':'14px'}}}%%
+flowchart TB
+  P["Your prompt"] --> U{{"UserPromptSubmit hook"}}
+  U -->|"pours plan head in<br/>ONCE per turn"| C["Model context"]
+  C --> T["Tool call<br/>Write · Edit · Bash · Read · Glob · Grep"]
+  T --> PT{{"PreToolUse hook"}}
+  PT -->|"TAP 2 — LEGACY ONLY:<br/>pours plan head in AGAIN<br/>1,748 B = 440 tok, every matched call"| C
+  PT -.->|"AUTONOMOUS or GATED:<br/>tap is closed"| N["nothing injected"]
+  C --> S{{"Stop hook"}}
+  S -->|"LEGACY + AUTONOMOUS:<br/>advisory only"| E["Turn ends"]
+  S -.->|"GATED ONLY:<br/>decision: block<br/>forces another turn"| C
+</pre>
+    </div>
+    <figcaption><strong>Tap 2 is the whole problem.</strong> A session like the last one makes hundreds of tool calls; in legacy mode each one re-pours the plan. Autonomous mode closes tap 2 and keeps tap 1 — the plugin's own reasoning is that strong models drift less between tool calls, but still need the plan once per turn. Gated mode adds the dashed loop-back at the bottom, which is a hook that can refuse to let your turn end.</figcaption>
+  </figure>
+
+  <div class="warn">
+    <p class="lab">The irony of the default</p>
+    <p>You installed this because <em>"we are losing too much information."</em> Legacy mode's fix for that is to repeat the plan into context on every matched file operation — which spends context to save context. On a heavy session that is a net loss. <strong>Measured on this session: 55 matched calls in the first hour.</strong></p>
+  </div>
+
+  <h3>What the injection mode does and does not fix</h3>
+  <p>This is the distinction the first version of this page missed, and it settles the choice more cleanly than any token count.</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Failure</th><th>What actually rescues you</th><th>Does the mode matter?</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Losing state across a <code>/clear</code></strong> — the stated reason for installing this</td>
+        <td>The <em>files existing on disk</em>. The <code>SessionStart</code> hook fires on <code>clear</code> and the skill's first instruction is to read all three files.</td>
+        <td><span class="chip go">No</span> — identical in every mode</td>
+      </tr>
+      <tr>
+        <td><strong>Losing state to compaction</strong></td>
+        <td>Same files. <code>PreCompact</code> fires in every mode and reminds the agent to flush first.</td>
+        <td><span class="chip go">No</span> — identical in every mode</td>
+      </tr>
+      <tr>
+        <td><strong>Drifting off-plan mid-turn</strong>, 200 tool calls deep</td>
+        <td>Re-injection — the plan staying in the attention window.</td>
+        <td><span class="chip cost">Yes</span> — this is the only thing the mode changes</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>So the mode is a bet about <em>intra-session drift on a strong model</em>, priced at ~440 tokens per matched tool call. It is not the mechanism that protects you across a <code>/clear</code> — the files are, and they are there either way.</p>
+
+  <p><strong>One honest cost of autonomous mode, stated because the first version of this page did not.</strong> Legacy injects the raw tail of <code>progress.md</code> — actual sentences. Autonomous replaces that with a synthesized ledger block that reports <em>counts and the last event type</em>, not text. So in autonomous mode nothing from <code>progress.md</code> reaches context on its own; it has to be read deliberately. That is a real narrowing, and it is the one place the default is genuinely richer.</p>
+</section>
+
+<section>
+  <span class="switch-no">Switch 1 of 3</span>
+  <h2>Which mode?</h2>
+  <p class="dek">Set by writing a <code>.mode</code> file next to the plan. <code>init-session.sh</code> writes it for you with <code>--autonomous</code> or <code>--gated</code>.</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th></th><th>Legacy (default)</th><th>Autonomous</th><th>Gated</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Tap 1 — per turn</td>
+        <td>full plan head</td>
+        <td>plan head + ledger</td>
+        <td>plan head + ledger</td>
+      </tr>
+      <tr>
+        <td>Tap 2 — per tool call</td>
+        <td><span class="chip cost">every call</span><br><span class="num" style="font-size:13px;color:var(--cost)">1,748 B ≈ 440 tok</span></td>
+        <td><span class="chip go">closed</span></td>
+        <td><span class="chip go">closed</span></td>
+      </tr>
+      <tr>
+        <td>Stop hook</td>
+        <td><span class="chip go">advisory</span></td>
+        <td><span class="chip go">advisory</span></td>
+        <td><span class="chip stop">can block</span></td>
+      </tr>
+      <tr>
+        <td>Attestation</td>
+        <td>opt-in</td>
+        <td><span class="chip go">on at init</span></td>
+        <td><span class="chip go">on at init</span></td>
+      </tr>
+      <tr>
+        <td>What reaches context<br>from <code>progress.md</code></td>
+        <td>raw <code>tail -20</code></td>
+        <td>synthesized counts only</td>
+        <td>synthesized counts only</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>The add-on worth taking with it: <code>inject-smart</code></h3>
+  <p>The default injection is <code>head -50</code> — position-blind. Late in a long plan, the <em>in-progress phase</em>, the decisions journal and the error table all sit past line 50, so you pay the tokens for a window that no longer contains the active work. The <code>inject-smart</code> token in <code>.mode</code> swaps that for goal, next step, current phase, the full in-progress phase, and the last three decisions. It composes with any mode.</p>
+
+  <div class="rec">
+    <p class="lab">Recommendation — autonomous, plus inject-smart</p>
+    <p>Autonomous closes the expensive tap and turns attestation on, and its Stop hook stays advisory — so nothing can refuse to end your turn. Gated buys one thing on top: a hook that forces continuation until the plan reports complete. That is valuable for an unattended overnight run and is a liability in an interactive session where you want to stop and steer.</p>
+    <p><strong>Gated is the switch to flip later</strong>, on a specific long run, not the one to start with.</p>
+  </div>
+</section>
+
+<section>
+  <span class="switch-no">Switch 2 of 3</span>
+  <h2>Where do the files land?</h2>
+  <p class="dek">Two layouts. This matters here because the repo has a hook that denies <code>git add -A</code>, and a rule about what is tracked versus scratch.</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th></th><th>Legacy — repo root</th><th>Slug mode</th></tr></thead>
+    <tbody>
+      <tr><td>Path</td><td><code>./task_plan.md</code><br><code>./findings.md</code><br><code>./progress.md</code></td><td><code>.planning/2026-08-30-&lt;slug&gt;/</code><br>all three, plus <code>.mode</code>, <code>.nonce</code>, <code>.attestation</code></td></tr>
+      <tr><td>New untracked entries<br>in <code>git status</code></td><td class="num">3 files at repo root</td><td class="num">1 directory</td></tr>
+      <tr><td>Parallel plans</td><td><span class="chip stop">one only</span></td><td><span class="chip go">many, switchable</span></td></tr>
+      <tr><td>Archiving a finished round</td><td>move or delete 3 root files</td><td>move one directory</td></tr>
+      <tr><td>Marker files</td><td>dotfiles at repo root</td><td>inside the plan directory</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="rec">
+    <p class="lab">Recommendation — slug mode</p>
+    <p>One ignorable directory instead of three loose files in a repo root that is already carefully curated. It also makes the archive step — the thing that stops a finished plan from haunting the next session — a single directory move.</p>
+    <p><strong>The <code>.gitignore</code> call I will make unless you say otherwise:</strong> add <code>.planning/</code> to <code>.gitignore</code>. This repo's convention is that live working state is gitignored and durable records are tracked; the durable record of a round is already the handoff, the artifacts and <code>kb-remember</code>. A live plan is working state.</p>
+  </div>
+</section>
+
+<section>
+  <span class="switch-no">Switch 3 of 3</span>
+  <h2>What is the plan actually <em>for</em>?</h2>
+  <p class="dek">This is the one I cannot derive. The tracked chain says the next ticket is #638 — but last session's review refuted most of #638, so what the plan covers is a live choice.</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Scope</th><th>What the phases would be</th><th>Cost</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>A. The design round</strong></td>
+        <td>Answer the 5 open questions → write the spec → post #638's corrections → break into tickets</td>
+        <td>the round you were mid-way through; picks up exactly where the artifacts stop</td>
+      </tr>
+      <tr>
+        <td><strong>B. Clear the decks</strong></td>
+        <td>Land #637 → install agentsview → the <code>typos</code>/<code>agnix</code>/<code>mise</code> bumps → then design</td>
+        <td>unblocks agentsview, which #637 is holding; defers the design again</td>
+      </tr>
+      <tr>
+        <td><strong>C. Fix the red</strong></td>
+        <td><code>kb-build</code> has been failing since 2026-08-29 (graphify #1666)</td>
+        <td>it cost three codex lanes their graph access last round; everything else is built on a graph that will not rebuild</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="rec">
+    <p class="lab">Recommendation — A, with B's blockers as its first phase</p>
+    <p>The five artifacts from last session are a design that stops one step short of a spec, and that is the most perishable thing in the repo right now — it lives in your head and in five HTML pages. Phase 1 lands #637 and posts the #638 corrections, because both are cheap and both unblock other people's reading of the state. Phases 2 onward are the five questions and the spec.</p>
+    <p><strong>C is real and I am not dismissing it</strong> — but it is a graphify upstream defect, not a design decision, and it belongs in its own plan.</p>
+  </div>
+</section>
+
+<section>
+  <h2>The trap that fires either way</h2>
+  <p>Whatever you pick: <strong>a finished plan re-injects itself into the next session, forever.</strong> The moment this plan exists, every new session's <code>UserPromptSubmit</code> pours it back in — including after this round is over, when it will contradict whatever <code>next-ticket</code> generates.</p>
+  <p>The fix is one step at the end of the round, and it is now owed: <strong>archive the plan directory when the round closes.</strong> That step belongs in <code>clear-prep</code>, not in anyone's memory.</p>
+</section>
+
+<footer>
+  <h3 style="margin-top:0">Where every claim here came from</h3>
+  <ul class="sources">
+    <li><strong>Measured this session.</strong> The <code>PreToolUse</code> matcher <code>Write|Edit|Bash|Read|Glob|Grep</code> — read directly from <code>hooks/hooks.json</code> in the installed plugin cache, not carried over from a prior report.</li>
+    <li><strong>Read this session</strong> from the installed <code>skills/planning-with-files/SKILL.md</code> (v3.12.0): the mode comparison table, the gate decision table, <code>inject-smart</code>, and the file layouts.</li>
+    <li><strong>Measured this session, replacing an inherited number.</strong> <code>head -30 task_plan.md | wc -c</code> → <strong>1,748 bytes</strong>; <code>head -50</code> → 2,793; the raw progress tail → 1,166. The plugin's own <code>~90 tokens</code> claim is its starter template, not this plan. The first version of this page quoted the plugin's figure without measuring, which is the exact failure this repo's rules call an inherited number.</li>
+    <li><strong>Verified this session.</strong> The install is the full plugin route: 13 commands, all 6 lifecycle hooks (<code>SessionStart</code>, <code>UserPromptSubmit</code>, <code>PreToolUse</code>, <code>PostToolUse</code>, <code>PreCompact</code>, <code>Stop</code>), marketplace + <code>enabledPlugins</code> entries present, and NOT overridden in <code>settings.local.json</code>. Slug mode is the plugin's own documented recommendation for attested and parallel workflows (its v2.41.0 changelog).</li>
+    <li><strong>Measured this session.</strong> <code>uv run kb-setup next-ticket</code> → <code>READY — #638</code>. <code>mise run kb-currency-check</code> → <code>kb-build</code> FAILED at <code>2026-08-29T21:33:55Z</code>, graphify #1666.</li>
+    <li><strong>Inherited, and labelled as such.</strong> The claim that 5 of #638's 7 measured claims are refuted comes from last session's three codex lanes. I have not re-verified it here.</li>
+  </ul>
+  <p style="margin-top:22px">Source: <code>docs/artifacts/three-switches-before-the-plan.html</code> — tracked, republished to this same URL when it changes.</p>
+</footer>
+
+</div>
