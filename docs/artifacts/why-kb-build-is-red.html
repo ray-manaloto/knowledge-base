@@ -64,7 +64,7 @@
 
 <div class="wide scroll">
 <figure>
-<svg viewBox="0 0 1000 320" role="img" aria-label="A triage of the 475 Cargo.toml files under sources. 464 contain a package section and extract to real nodes. The remaining 11 are bare workspace roots that extract to zero nodes and emit a warning. Of those 11, four are excluded by a build key set to defer or skip, six are registered in graph.py, and exactly one — biome — is neither, so its warning is unapproved and the build fails closed.">
+<svg viewBox="0 0 1000 320" role="img" aria-label="A triage of the 475 Cargo.toml files under sources. 462 parse and contain a package section, extracting to real nodes; 2 more raise a TOML decode error and are a separate class. The remaining 11 are bare workspace roots that extract to zero nodes and emit a warning. Of those 11, four are excluded by a build key set to defer or skip, six are registered in graph.py, and exactly one — biome — is neither, so its warning is unapproved and the build fails closed.">
   <defs><marker id="t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#3d4854"/></marker>
   <marker id="tr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#a32d1e"/></marker></defs>
 
@@ -77,8 +77,8 @@
   <line x1="167" y1="172" x2="223" y2="228" stroke="#8d99a6" stroke-width="1.3" marker-end="url(#t)"/>
 
   <rect x="225" y="40" width="195" height="56" rx="3" fill="#fff" stroke="#1d6b4f" stroke-width="1.4"/>
-  <text x="238" y="63" font-family="Roboto Mono, monospace" font-size="14" font-weight="500" fill="#1d6b4f">464</text>
-  <text x="272" y="63" font-family="Work Sans, sans-serif" font-size="12" fill="#12161c">with [package]</text>
+  <text x="238" y="63" font-family="Roboto Mono, monospace" font-size="14" font-weight="500" fill="#1d6b4f">462</text>
+  <text x="272" y="63" font-family="Work Sans, sans-serif" font-size="12" fill="#12161c">parse + [package]</text>
   <text x="238" y="82" font-family="Work Sans, sans-serif" font-size="11.5" fill="#3d4854">extract → real nodes, silent</text>
 
   <rect x="225" y="205" width="195" height="56" rx="3" fill="#fbecea" stroke="#a32d1e" stroke-width="1.5"/>
@@ -120,8 +120,14 @@
   <text x="791" y="286" font-family="Work Sans, sans-serif" font-size="12.5" font-weight="600" fill="#a32d1e">fail closed → RED</text>
   <text x="791" y="302" font-family="Work Sans, sans-serif" font-size="11" fill="#a32d1e">one unapproved warning is enough</text>
 </svg>
-<figcaption>Every one of the 475 was classified this session, unbounded — no <code>head</code>, no
-<code>-maxdepth</code>. The discriminator is <b>not the file's shape</b>: <code>uv</code>'s
+<figcaption><b>Corrected 2026-08-31 (fourth):</b> the 462/11 split here was first published as
+<b>464/11</b>, measured with <code>grep -c '[package]'</code> — on a page whose own argument is to use
+the real predicate. Parsing all 475 with <code>tomllib</code> gives <b>three</b> classes: 462 parse and
+have <code>[package]</code>, <b>11 parse and do not</b>, and <b>2 raise <code>TOMLDecodeError</code></b>
+(<code>biome/crates/biome_cli</code>, <code>biome/crates/biome_ruledoc_utils</code>) — both of which
+contain the literal string <code>[package]</code>, which is why the grep miscounted them. <b>The 11 and
+the single unguarded source are unchanged.</b> Every one of the 475 was classified unbounded — no
+<code>head</code>, no <code>-maxdepth</code>. The discriminator is <b>not the file's shape</b>: <code>uv</code>'s
 <code>Cargo.toml</code> is just as bare as <code>biome</code>'s. What separates green from red is
 whether the source is <b>excluded by a build key or registered by hash</b>. Ten of the eleven are;
 one is not.</figcaption>
@@ -310,8 +316,8 @@ The control arm is the blue box — the mechanism is not broken, it simply was n
   the explicit advice was <b>do not fix <code>biome</code> and re-run</b>, because each build buys only
   one more name. Every number in that sentence was real. The conclusion drawn from them was not, because
   nobody ran the audit it was recommending.</p>
-  <p>Running it costs about thirty seconds and closes the set: 475 files, 464 with a
-  <code>[package]</code>, <b>11 bare</b>, and 10 of those 11 already excluded or registered. The queue
+  <p>Running it costs about thirty seconds and closes the set: 475 files, 462 with a
+  <code>[package]</code>, <b>11 bare</b>, 2 unparsable, and 10 of those 11 already excluded or registered. The queue
   was never open-ended. The advice inverted as a result — fixing <code>biome</code> is now the cheap
   path to a green build, not a wasted 55 minutes.</p>
   <p style="margin-bottom:0">This is the same failure the section above already records twice, at a
