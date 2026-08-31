@@ -169,6 +169,39 @@ def test_tier2_ok_control_arm_when_hash_matches(tmp_path: Path, monkeypatch) -> 
     assert report.sidecar_outcome == Outcome.OK
 
 
+def test_tier2_ok_when_some_clones_present_and_some_absent(tmp_path: Path, monkeypatch) -> None:
+    """The MIXED shape a fresh checkout is actually in, not the all-absent one.
+
+    `demo` is present and clean; `ghost` has no clone at all. `_tier2`'s outcome
+    branch checks `elif verified_sources` before `else: SKIP` — this is the test
+    that would catch a swap to `elif skipped_sources` (checking the WRONG
+    condition first), which would report SKIP even though a real source was
+    fully verified.
+    """
+    content = "[workspace]\nmembers = []\n"
+    sources_dir = tmp_path / "sources"
+    _write_manifest(sources_dir, "demo", _COMMIT_A)
+    _write_manifest(sources_dir, "ghost", _COMMIT_A)  # never cloned
+    clone = sources_dir / "demo"
+    clone.mkdir()
+    (clone / "Cargo.toml").write_text(content, encoding="utf-8")
+    entry = _metadata_entry(
+        source_name="demo",
+        relative_path="Cargo.toml",
+        sha256=_sha256(content),
+        commit=_COMMIT_A,
+    )
+    monkeypatch.setattr(manifest_audit, "_registries", lambda: _one_registry(entry))
+
+    report = manifest_audit.audit(tmp_path)
+
+    assert report.tier2.outcome == Outcome.OK
+    assert "demo" in report.tier2.verified_sources
+    assert "ghost" in report.tier2.skipped_sources
+    assert not report.blocks
+    assert report.sidecar_outcome == Outcome.OK
+
+
 def test_tier2_coverage_flags_an_unregistered_zero_node_manifest(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -268,3 +301,33 @@ def test_main_writes_the_sidecar_gates_reads_back(tmp_path: Path, monkeypatch) -
     assert rc == int(Rc.FINDINGS)
     sha = gates.head_sha(tmp_path)
     assert gates.read_sidecar_outcome(tmp_path, manifest_audit.TASK_NAME, sha) == "DRIFT"
+
+
+def test_main_returns_ok_and_writes_skip_sidecar_on_a_missing_clone(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The claim this whole gate exists to prove: SKIP must never block `main`.
+
+    Same shape as `test_main_writes_the_sidecar_gates_reads_back`, but with no
+    clone present at all — a fresh checkout. `main` must exit `Rc.OK` (never
+    `Rc.FINDINGS`) and the sidecar must read `SKIP`, never laundered to `OK`.
+    """
+    import subprocess
+
+    from kb_setup.result import Rc
+
+    monkeypatch.chdir(tmp_path)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "--allow-empty", "-q", "-m", "root"], cwd=tmp_path, check=True)
+
+    _write_manifest(tmp_path / "sources", "demo", _COMMIT_A)  # no clone ever made
+    entry = _metadata_entry(
+        source_name="demo", relative_path="Cargo.toml", sha256="x" * 64, commit=_COMMIT_A
+    )
+    monkeypatch.setattr(manifest_audit, "_registries", lambda: _one_registry(entry))
+
+    rc = manifest_audit.main(tmp_path, [])
+
+    assert rc == int(Rc.OK)
+    sha = gates.head_sha(tmp_path)
+    assert gates.read_sidecar_outcome(tmp_path, manifest_audit.TASK_NAME, sha) == "SKIP"
