@@ -45,16 +45,13 @@ in this skill that cannot be reordered without losing work.
 > flag").** Until then `disable-model-invocation: true` hid it from the listing so only a
 > human could fire it; the 2026-08-21 session review measured why that failed — 20% of
 > context was crossed 15 minutes in and the ask came at ~75%. The trigger is still a
-> question, never a silent run: an agent that invokes this skill does so to PREPARE the
-> handoff and then asks the user to `/clear` (AskUserQuestion), and the intended
-> mechanical trigger is a DENY-style guard on context usage (session-review R1, #431/#433
-> neighbours) — not built yet, so until it lands the trigger is the description above
-> plus the agent's own context reading. The description is what model invocation
-> matches on, so it now names the triggers (context past ~20%, a round ending, the user
-> asking for a handoff); the `triggering_accuracy` dimension in `mise run
-> kb-skill-score` therefore measures a real trigger for this skill from 2026-08-21 on —
-> re-baseline it (`-- --write`) rather than reading the old "inert" note. Step 7 is
-> where the "asks the user" half is made concrete.
+> question, never a silent run: an agent invokes this skill to PREPARE the handoff and
+> then asks the user to `/clear` (AskUserQuestion). The intended mechanical trigger is a
+> DENY-style guard on context usage (session-review R1, #431/#433) — not built yet, so
+> until it lands the trigger is the description plus the agent's own context reading.
+> The description is what model invocation matches on, so it now names the triggers
+> (context past ~20%, a round ending, the user asking for a handoff). Step 7 is where
+> the "asks the user" half is made concrete.
 
 ## 0. Resolve next-task ambiguity FIRST (Ray, 2026-07-08)
 
@@ -137,6 +134,12 @@ Also inventory **session-local runtime state**: background tasks and agents
 still running, and any scheduled wakeups or crons created this session. Stop
 what should not outlive the session and note anything deliberately left running.
 A stale wakeup firing after the handoff re-triggers work that is already done.
+
+**If a `planning-with-files` plan is active, its files are gather inputs.** From
+the dir `resolve-plan-dir.sh` prints: `progress.md` is the round's narration, and
+`task_plan.md`'s decisions journal is the reasoning behind what shipped. Both feed
+the handoff; neither replaces it — the plan dies with the clone (`.planning/` is
+gitignored) and carries no gate evidence, receipt, or generated next task.
 
 **Do not block `/clear` on anything that runs without this session.** GitHub
 Actions runs and bots like Renovate execute on GitHub's schedule whether you
@@ -413,17 +416,9 @@ knows how to jump to handoff so there is less copy/paste needed."*
 2026-08-19 and the next session had no idea where to start. A handoff nobody is
 told to read is a handoff nobody reads.
 
-The older form still works when the next session should read a SPECIFIC handoff
-rather than the newest:
-
-```text
-Read and follow .agent/plans/session-<date>.md
-```
-
-(`/session-resume <path>` does the same and keeps the repo checks.) On a fresh clone
-`.agent/` is gitignored and there is no handoff to point at; `/session-resume` falls
-back to the newest tracked `docs/direction/*.md` plus `git log`, so it stays the
-right prompt to print either way.
+(`/session-resume <path>` reads a SPECIFIC handoff rather than the newest, and
+keeps the repo checks; on a fresh clone it falls back to the newest tracked
+`docs/direction/*.md` plus `git log`. That skill documents both.)
 
 **Then ASK the user to `/clear` — via `AskUserQuestion`, never in prose, and
 never by clearing yourself.** This is the "asks the user" half of the banner,
@@ -437,32 +432,36 @@ stays valid until something changes — and do not ask again until the NEXT
 qualifying trigger: a further PR opened or landed, a new directive, the user
 raising it, **or roughly another 25 percentage points of context consumed since
 the deferral** (so a *"not yet"* at ~20% asks again near ~45%, and again near
-~70% — bounded, and never *never*). Both banner triggers therefore survive a
-deferral, which is the point: re-asking on the very next turn is the nagging
-this skill must not become, but a deferral that never expires is the other
-failure, and it is the one that leaves a session writing its handoff at the end
-of the window instead of the start. On *"/clear now"*, stop: the next thing that
-happens is the user's `/clear` and then `/session-resume`.
+~70% — bounded, and never *never*). Both banner triggers survive a deferral, which
+is the point: re-asking next turn is the nagging this skill must not become, but a
+deferral that never expires leaves a session writing its handoff at the end of the
+window instead of the start.
+
+**On *"/clear now"* — and only then — ARCHIVE any active plan**, so it stops
+injecting into every later session and contradicting `next-ticket`:
+`mv .planning/<id> .planning/.archive/<id> && rm -f .planning/.active_plan`.
+The leading dot is load-bearing: `resolve-plan-dir.sh` falls back to the newest
+`.planning/<dir>/` by mtime and **skips hidden dirs** (`.*) continue ;;`), so a
+plain `archive/` stays a candidate. Archive rather than delete (`.planning/` is
+gitignored, so none of it is corpus); expect one advisory `PLAN REGRESSED` line,
+which never blocks. After the answer, never before the ask — *"not yet"* resumes
+work and still needs the live plan. Then stop: the next thing is the user's
+`/clear`, then `/session-resume`.
 
 ## Keeping this skill honest over time
 
 This repo can measure its own skills, so use that rather than taste:
 
 - `mise run kb-skill-score` scores every project skill with `plugin-eval`'s
-  deterministic static layer — free, no LLM, and comparable run to run. Read the
-  **Δ column**, not the score: it is computed against the committed baseline in
-  `docs/skills/baseline.json`, so the comparison is the task's job and not
-  yours. Re-baseline with `-- --write` once a change is deliberate. A score
-  never fails a gate (there is no validated floor), but a skill name matching
-  nothing exits **2** rather than reporting an empty corpus.
+  deterministic static layer — free, no LLM, comparable run to run. Read the
+  **Δ column**, not the score: it is computed against `docs/skills/baseline.json`,
+  so the comparison is the task's job. Re-baseline with `-- --write` once a change
+  is deliberate. A score never fails a gate, but a skill name matching nothing
+  exits **2** rather than reporting an empty corpus.
 - Read the number with its condition attached. `triggering_accuracy` is a regex
   over the description, so it rewards the literal words "proactively" and
-  "automatically". Chasing it is keyword-stuffing; fixing a genuinely vague
-  description is not. For this skill the dimension was inert while it was
-  human-only; since 2026-08-21 it measures a real trigger (see the banner), so
-  re-baseline after the description change and read the Δ.
-- The durable record of how a round went is `mise run kb-remember` (step 2), not
-  a comment in this file.
+  "automatically" — chasing it is keyword-stuffing; fixing a genuinely vague
+  description is not. Re-baseline after any description change and read the Δ.
 
 ## Checklist
 
@@ -479,7 +478,8 @@ This repo can measure its own skills, so use that rather than taste:
 - [ ] Handoff written and self-verified (paths, `file:line`, task names, gate rcs, inherited numbers labelled).
 - [ ] Branch is not `main`; commit made if appropriate — then the handoff's HEAD re-pinned to it (step 5).
 - [ ] Resume prompt printed — `/session-resume` (skipped on 2026-08-19; the next session had no idea where to start).
-- [ ] Step 7's `AskUserQuestion` was PUT to the user and the answer recorded — `/clear now` **or** `not yet`; both are valid outcomes, and only the user ever clears.
+- [ ] Step 7's `AskUserQuestion` was PUT to the user and the answer recorded — `/clear now` **or** `not yet`; both valid, and only the user ever clears.
+- [ ] On `/clear now` **only**: any active plan archived to `.planning/.archive/` and `.active_plan` removed — otherwise it re-injects forever.
 
 ## See also
 

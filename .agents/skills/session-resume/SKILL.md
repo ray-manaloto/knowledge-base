@@ -58,6 +58,9 @@ live agenda. Read to the bottom.
 mise run kb-session-state
 ```
 
+If the `planning-with-files` plugin is active, its plan files are part of "the
+real state" too — step 3 says what to do with them.
+
 One task, already handoff-shaped: branch, tree, recent commits, open PRs. A
 failed `gh` lookup prints `COULD NOT ASK` rather than `none`, which is the
 distinction that matters when deciding whether a PR is waiting.
@@ -86,10 +89,37 @@ of the handoff — the user can read that. It is:
 - **anything the handoff asserts that the repo contradicts** — a merged PR it
   calls open, a gate it calls green with no artifact at that SHA, a commit that
   is not an ancestor of `main`;
+- **a SURVIVING plan from a finished round** — see below;
 - **the next task**, quoted from the handoff or the directive rather than
   paraphrased;
 - **the standing traps**, because those are what re-cost time;
 - **what is owed**, with issue numbers where the handoff gives them.
+
+#### A surviving `planning-with-files` plan is a disagreement
+
+`/clear-prep` archives the round's plan as its last act. If one is still live,
+either that did not happen or the round is genuinely unfinished — and the
+difference matters, because the plugin is **already injecting that plan into this
+session**. Its `SessionStart` matcher includes `clear`, and when nothing pins the
+active plan its resolver falls back to the *newest `.planning/<dir>/` by mtime*,
+so a finished round's `task_plan.md` arrives looking exactly like a live one.
+
+```bash
+sh "${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/cache/planning-with-files/planning-with-files/3.12.0}/scripts/resolve-plan-dir.sh"
+```
+
+Empty output means no active plan and there is nothing to report. Otherwise read
+its `task_plan.md` and `progress.md`, and report the disagreement plainly:
+
+- **its `## Next Step` versus `uv run kb-setup next-ticket`.** The generated
+  ticket wins — always. A plan is intra-round working state and is **never
+  authoritative across a round boundary**; a plan naming a different next task is
+  reporting the *previous* round's intent, not this one's.
+- **phases still `in_progress`** against a handoff that calls the round done.
+
+**Report it; do not archive it.** This skill reads and reconciles — archiving is
+`/clear-prep`'s act, and a plan the user still wants is one `/clear-prep` away
+from being closed properly rather than silently swept.
 
 If everything agrees, say so in one line and move on. A clean reconciliation is
 a short report.
