@@ -48,3 +48,19 @@ default_subagent_reasoning_effort = "high"
 [mcp_servers.graphify]
 url = "https://api.graphify.com/mcp"
 auth = "oauth"
+
+# `update_plan` became OPT-IN in codex 0.152.0 (PR #41744, "Make the update_plan
+# tool opt-in", merged 2026-08-31T00:55:03Z — verified via `gh api`, before the
+# rust-v0.152.0 release at 2026-09-01T01:58:32Z).
+#
+# Without this block the bump SILENTLY removes the planning tool from every lane
+# here, and `without_update_plan_instructions()` also strips its instructions
+# from the system prompt — so a lane would neither have the tool nor be told it
+# once had one. Neither this file nor `~/.codex/config.toml` set it before the
+# bump (control arm: the same grep matches `default_subagent_model` at line 22).
+#
+# This lands in the SAME change as the pin, because a version bump that quietly
+# removes a capability is the shape `tool-currency-and-native-first.md` exists
+# to catch.
+[tools.update_plan]
+enabled = true

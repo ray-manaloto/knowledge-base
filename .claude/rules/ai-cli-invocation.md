@@ -33,17 +33,33 @@ auto-selects either. `agy` is not a backend. Key-detected backends stay stripped
 
 ```bash
 # Research/debate (no tool execution, fast):
-echo "prompt" | codex exec --ephemeral --sandbox read-only -
+echo "prompt" | codex exec --sandbox read-only -
 
 # Implementation (with tool execution):
 echo "prompt" | codex exec --full-auto --sandbox workspace-write -
 
 # With reasoning effort override:
-echo "prompt" | codex exec --ephemeral -c model_reasoning_effort="high" -
+echo "prompt" | codex exec -c model_reasoning_effort="high" -
 
 # Capture to file (for background use):
-cat prompt.md | codex exec --ephemeral -o /tmp/result.md -
+cat prompt.md | codex exec -o /tmp/result.md -
 ```
+
+**`--ephemeral` IS NO LONGER IN THESE PATTERNS** (2026-09-01, Ray). It means
+"run without persisting session files to disk", and a lane that persists nothing
+cannot be reviewed afterwards — `mise run kb-session-search` (agentsview) reads
+`~/.codex/sessions/`, so an ephemeral lane is invisible to it by construction.
+Control-armed: with the flag, 0 new session files; without it, +1 at ~104 KB.
+
+Two things this does NOT change, both read from `codex exec --help`: `--ephemeral`
+governs persistence ONLY — sandbox, auth and ARG_MAX are separate mechanisms — so
+dropping it weakens no isolation. And `resume --last` picks "the most recent
+RECORDED session", so ephemeral lanes were never resumable; this adds that.
+
+The cost it DOES carry: lane runs now compete for `resume --last`. Use
+`codex exec resume <session-id>`. `--thread-source` is not the mitigation — on
+0.151.0 it accepts an invalid value without error, labels the file, and still
+leaves the run newest for `--last`.
 
 **WRONG patterns (will silently fail or hang):**
 
