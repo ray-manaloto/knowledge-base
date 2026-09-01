@@ -1414,12 +1414,21 @@ description = "Search Claude AND Codex session transcripts: mise run kb-session-
 # The UI stays a plain `agentsview serve`, documented in sources/REGISTRY.md.
 #
 # IT MAY AUTOSTART A LOCAL DAEMON, and that is deliberate. Measured 2026-09-01
-# against the installed 0.41.1 with each command's own argv: ONLY `usage daily`
-# reads SQLite directly; `session search`, `session list`, `stats`, `projects`
-# and `health` all exit 1 with "daemon autostart is disabled" under
-# AGENTSVIEW_NO_DAEMON=1. The project's README says `session list` falls back to
-# SQLite -- the binary disagrees, so the README is wrong. End it with
-# `agentsview daemon stop`.
+# against the installed 0.41.1: only `usage daily` runs with no daemon at all;
+# `session search`, `session list`, `stats`, `projects` and `health` exit 1 with
+# "daemon autostart is disabled" under AGENTSVIEW_NO_DAEMON=1 WHEN NO DAEMON IS
+# RUNNING. That condition was missing here for one commit: the variable disables
+# AUTOSTART, not use -- with a daemon already up, the same command under the same
+# variable returns rc=0. The README's "read from the daemon if warm, otherwise
+# SQLite" is still wrong for `session list`; there is no otherwise. End the
+# daemon with `agentsview daemon stop`.
+#
+# IT ASKS FOR THE SESSIONS agentsview HIDES BY DEFAULT. The tool excludes
+# one-shot and automated sessions unless told otherwise, and says so only on
+# stderr -- 2,846 excluded on this machine, 2,669 one-shot and 177 automated.
+# Every `codex exec` lane is a one-shot automated session, so the default hides
+# exactly what this task is for: 11 sessions vs 31 on one measured query, 65%
+# hidden. `--only-interactive` restores the tool's own narrower view.
 #
 # IT REFUSES RATHER THAN ANSWERING FROM A STALE INDEX. agentsview reads a
 # derived SQLite index, so "0 results" has two causes that look identical: the

@@ -77,3 +77,27 @@ test = "test_an_unquoted_multi_word_pattern_says_to_quote_it"
 file = "python/src/kb_setup/agentsview.py"
 old = '''    if not any(token.startswith("-") for token in extra):'''
 new = '''    if False:'''
+
+# ── F5: the ADVISOR's finding — lane sessions hidden by the tool's own default
+# agentsview excludes one-shot and automated sessions unless asked, which is
+# exactly what every `codex exec` lane is. Measured: 11 sessions by default vs
+# 31 with the flags on one query. The mutation drops the inversion, restoring
+# the tool's default and hiding the lanes again.
+[[arm]]
+id = "F5"
+test = "test_lane_sessions_are_included_by_default"
+file = "python/src/kb_setup/agentsview.py"
+old = '''    if not args.only_interactive:'''
+new = '''    if False:'''
+
+# ── F6: the OVER-CORRECTION — inverting a default must stay an opt-OUT ──────
+# First mutation here was PROBE BROKEN and kb-arms said so: de-indenting the
+# append left the `if` with an empty body, so the suite went red on an
+# IndentationError rather than on this test. `if True:` makes the append
+# unconditional — the actual over-correction — without breaking the parse.
+[[arm]]
+id = "F6"
+test = "test_only_interactive_restores_the_tools_own_default"
+file = "python/src/kb_setup/agentsview.py"
+old = '''    if not args.only_interactive:'''
+new = '''    if True:'''
