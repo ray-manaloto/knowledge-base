@@ -131,11 +131,17 @@ def test_repository_rejects_skillopt_in_dependency_group(
     repo = _contract_repo(tmp_path)
     _fake_clean_clone(monkeypatch)
     pyproject = repo / "pyproject.toml"
+    # Anchored on the GROUP NAME, not on a version. The literal form here read
+    # `datamodel-code-generator[protobuf]==0.75.1`, so the 2026-09-01 bump to
+    # 0.76.0 turned this `.replace()` into a silent no-op: nothing injected
+    # `skillopt`, and the assertion then failed against a fixture that had never
+    # been mutated. A setup step that can quietly not happen is a broken probe —
+    # it failed loudly here only by luck of which way the assertion pointed.
+    text = pyproject.read_text(encoding="utf-8")
+    before, sep, after = text.partition("codegen = [")
+    assert sep, "fixture has no `codegen = [` group to mutate"
     pyproject.write_text(
-        pyproject.read_text(encoding="utf-8").replace(
-            'codegen = ["datamodel-code-generator[protobuf]==0.75.1"]',
-            'codegen = ["datamodel-code-generator[protobuf]==0.75.1", "skillopt==0.2.0"]',
-        ),
+        before + sep + '"skillopt==0.2.0", ' + after,
         encoding="utf-8",
     )
     errors = skillopt_contract.repository_contract_errors(repo)

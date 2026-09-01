@@ -13,7 +13,7 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "1.0.0"
+version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -24,9 +24,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/25/aa/4978e58035bd6c638c7b483450a68b7ef2d732ab78885e27bb9db0cff1a2/anthropic-1.0.0.tar.gz", hash = "sha256:42be3c97604af7252c5898413aee076ace6c46e9bca0d0d90ceb77c7d3719027", size = 1077769, upload-time = "2026-08-20T19:59:00.565Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/50/463166f02179ab279edb61de1589a6f69cb3838d6a2fb6f2c92a3f8042f1/anthropic-1.3.0.tar.gz", hash = "sha256:6873492a77ede8849a161ab1bc78bc9a1e492a006d0b5bb4c57ac77845df838a", size = 1148177, upload-time = "2026-09-01T17:37:10.392Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ad/5b/db4a854aebf5d33a5ab714c46af6eb85ee44f390ed29b7b325c00b9f11ed/anthropic-1.0.0-py3-none-any.whl", hash = "sha256:32dd52e9e1d774393b27182f451398ba4262287a4d0eab30887f89f1481b3ae4", size = 1171725, upload-time = "2026-08-20T19:58:58.725Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/5d/7863a9961d320c23787c7b594956afe4e878f9c0ae2376b11a20e416791d/anthropic-1.3.0-py3-none-any.whl", hash = "sha256:e7e7dbebf9f3c84a23954ab989378af6ae10a4d1804c81e9fea4b5ced695ce75", size = 1296959, upload-time = "2026-09-01T17:37:08.525Z" },
 ]
 
 [[package]]
@@ -499,7 +499,7 @@ wheels = [
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.75.1"
+version = "0.76.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argcomplete" },
@@ -511,9 +511,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/59/d2/187e101ed143f5280079a57c7c7e3d702609826aadd85c095fd5a8267af9/datamodel_code_generator-0.75.1.tar.gz", hash = "sha256:d2053a889161af7e495a3eedb92b68c81848e6ea7988d467c602e5b2da30f018", size = 2116531, upload-time = "2026-08-24T19:16:37.119Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5c/65/27983214b172cf5463209ef55b68f7bb180eaeb114fbca477f709e2ca721/datamodel_code_generator-0.76.0.tar.gz", hash = "sha256:782ad3d17ea53f3a2300347d4058e281ba749ff57821712464f88c1ce75876c8", size = 2184419, upload-time = "2026-08-29T02:04:09.432Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/be/a8d2b7450762a4ebb7b81a8e7b1756af725b3f3c14f3f76599d42493c602/datamodel_code_generator-0.75.1-py3-none-any.whl", hash = "sha256:58cb9330cdf0a356aee8547c0cce52d8fd2daa5253c7a6b8e245e9d3117c999e", size = 609533, upload-time = "2026-08-24T19:16:35.482Z" },
+    { url = "https://files.pythonhosted.org/packages/57/72/801a441c9d3717c9fab3399a382ed2d146cc79df12b8ea45427ce26d55a3/datamodel_code_generator-0.76.0-py3-none-any.whl", hash = "sha256:cff9d19faa9072cfc19a04d11ac5e30d0e1a846bd1f843f05f37841941fe3e62", size = 643099, upload-time = "2026-08-29T02:04:07.519Z" },
 ]
 
 [package.optional-dependencies]
@@ -1081,9 +1081,9 @@ requires-dist = [
 provides-extras = ["fetch"]
 
 [package.metadata.requires-dev]
-codegen = [{ name = "datamodel-code-generator", extras = ["protobuf"], specifier = "==0.75.1" }]
+codegen = [{ name = "datamodel-code-generator", extras = ["protobuf"], specifier = "==0.76.0" }]
 dev = [
-    { name = "mcp2cli", specifier = "==3.6.0" },
+    { name = "mcp2cli", specifier = "==3.7.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-xdist", specifier = "==3.8.0" },
     { name = "ruff", specifier = "==0.16.5" },
@@ -1336,16 +1336,16 @@ wheels = [
 
 [[package]]
 name = "mcp2cli"
-version = "3.6.0"
+version = "3.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "mcp" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6c/d2/5878e65afe78efe1ffbec117fb4729dd0e29ddcb7217d9724f93b64f4487/mcp2cli-3.6.0.tar.gz", hash = "sha256:c62cee41beeb82d0ea4a85559bced431f13624434de8b7e6a9277dcbddc4f206", size = 45708, upload-time = "2026-08-19T07:42:42.131Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ac/2e/4b568f917779dff1ee95798b8d47377b0b9e5640ffcf6ba076f037921d16/mcp2cli-3.7.0.tar.gz", hash = "sha256:5f5fcc9794d47dbfa0ca1a30140e314801937b83fe59e9b991be338420def721", size = 47611, upload-time = "2026-08-29T23:36:27.445Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/31/129d0629b7cb4e9deaf932576adbcbaaaaf847b6a9ad66183b30f209f0ad/mcp2cli-3.6.0-py3-none-any.whl", hash = "sha256:ee232ea402c5b424d810dda9d5a6dc6ce3d3396930a5044136f66fa5fc4755ef", size = 46612, upload-time = "2026-08-19T07:42:41.129Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/9e/d95684becd68361f380946705290c4757a9b1f2c596d31dc7d021d5c5714/mcp2cli-3.7.0-py3-none-any.whl", hash = "sha256:6e8442f0291072aad5848d44dfd7bde32baa65676b8596108d2ff63589d22fd0", size = 48473, upload-time = "2026-08-29T23:36:26.514Z" },
 ]
 
 [[package]]

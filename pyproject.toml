@@ -84,10 +84,10 @@ dev = [
   "pytest==9.1.1",
   "pytest-xdist==3.8.0",
   "trafilatura==2.2.0",
-  "mcp2cli==3.6.0",
+  "mcp2cli==3.7.0",
 ]
 
-codegen = ["datamodel-code-generator[protobuf]==0.75.1"]
+codegen = ["datamodel-code-generator[protobuf]==0.76.0"]
 
 [build-system]
 requires = ["hatchling"]
