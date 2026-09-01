@@ -39,6 +39,15 @@ review:
 
     git diff <FIXED>...HEAD -- . ':(exclude)docs/research/**'
 
+METHOD — include this whenever the diff contains a check, a gate or a guard:
+
+Do NOT review only by reading. Wherever the diff asserts a FACT about this
+repository — a count, a path, a command's behaviour, a claim that two files
+agree — RUN the check that would refute it and report the exit code you saw.
+A claim you did not execute is `unverified`. Construct the input that SHOULD
+trip each check and run it, plus one that should pass, and report both.
+Mutate a scratch COPY, never the tracked tree.
+
 Return a findings list: severity, a one-line claim, and file:line for each.
 Cite every claim or label it unverified. Report NO FINDINGS explicitly if you
 find nothing, rather than inventing something.
@@ -60,6 +69,14 @@ skill and missing from this prompt, so following this file verbatim reintroduced
 the 56%-prose context cost the exclusion exists to remove — the same
 skill-corrected/reference-not-corrected split as the `codex-reviewer` paragraph
 directly above. Found by the cold lane, on the change that added the exclusion.
+
+**The METHOD paragraph above is the THIRD instance of that same split**, found
+the same way — by the cold lane, on the change that added the lesson. SKILL.md
+was amended to say *"put the method paragraph in the dispatch prompt"* while
+this file, which holds the prompt anyone actually copies, was not. A reader
+following the template verbatim would have got the reading-only pass the lesson
+exists to prevent. Three for three: when SKILL.md gains a line about what to
+hand a lane, the line belongs HERE, in the block between the backticks.
 
 Do **not** tell it what the change was for. That is the point of the lane — a
 reviewer given the design intent confirms the happy path, which is the failure

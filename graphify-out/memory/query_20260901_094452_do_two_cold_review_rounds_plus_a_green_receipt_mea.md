@@ -16,7 +16,7 @@ correction: "The belief: two cold review rounds plus a green receipt means a dif
 ## What the round did
 
 PR #645 (`fix/agentsview-lane-visibility`) had diverged: local HEAD and the
-remote head were siblings, each holding one commit the other lacked, because a
+remote head were siblings holding commits the other lacked, because a
 second author (`sortakool`, co-authored by the Codesmith bot) pushed
 `0184d2cc` while the local session held two unpushed commits.
 

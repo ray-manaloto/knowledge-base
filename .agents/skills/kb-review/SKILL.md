@@ -411,9 +411,11 @@ gate or a guard, put the method paragraph in the dispatch prompt — it costs on
 paragraph and it is what separates a lane that could only agree from one that
 could disagree. Two cautions, both real: a read-only lane must mutate a COPY or
 say it could not, and a lane that mutates the working tree must restore it —
-**verify the tree yourself afterwards** (`a-review-lane-mutated-a-tracked-file`,
-
-# 399), rather than trusting the report's word that it did
+**verify the tree yourself afterwards** (issue 399, and the auto-memory note
+`a-review-lane-mutated-a-tracked-file`) rather than trusting the report's word
+that it did. The issue number is spelled out rather than hashed because a
+formatter wrapped the `#399` form to line-start here, where `#` is an H1 — the
+citation became a heading and the sentence lost its ending.
 
 ## References
 
