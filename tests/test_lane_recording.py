@@ -103,6 +103,56 @@ def test_a_pipeline_hides_nothing(tmp_path: Path) -> None:
     assert lr.check(tmp_path, globs=_GLOBS).rc is Rc.FINDINGS
 
 
+_BS = chr(92)
+"""A literal backslash, named because writing it inline is how the first probe
+of the continuation defect lied: `"\\\\"` in a Python literal is an ESCAPED
+backslash, not a line continuation, so the synthetic case reported clean while
+the real file caught correctly. The two disagreed, and the probe was wrong."""
+
+
+def test_a_continued_line_is_one_command(tmp_path: Path) -> None:
+    """THE DEFECT THAT MADE THE FIRST VERSION DECORATION.
+
+    `.claude/agents/kb-codex-advisor.md` — the primary file this gate protects —
+    writes its invocation across five backslash-continued lines. A per-line walk sees
+    the flag on a line with no command word, and the segment holding `codex`
+    never holds the flag. Re-adding `--ephemeral` exactly where it used to live
+    was measured NOT CAUGHT (rc 0) by the shipped version.
+
+    The three arms that "proved" that version all mutated the SINGLE-LINE
+    patterns in `ai-cli-invocation.md` — a convenient break, not a realistic
+    one.
+    """
+    _write(
+        tmp_path,
+        "a.md",
+        f"```bash\ncat p.md | codex exec {_BS}\n  --ephemeral --sandbox read-only {_BS}\n"
+        "  -o /tmp/v.md -\n```\n",
+    )
+    assert lr.check(tmp_path, globs=_GLOBS).rc is Rc.FINDINGS
+
+
+def test_a_clean_continued_command_stays_clean(tmp_path: Path) -> None:
+    """The over-correction arm: joining lines must not make every multi-line run a hit."""
+    _write(
+        tmp_path,
+        "a.md",
+        f"```bash\ncat p.md | codex exec {_BS}\n  --sandbox read-only {_BS}\n"
+        "  -o /tmp/v.md -\n```\n",
+    )
+    assert lr.check(tmp_path, globs=_GLOBS).rc is Rc.OK
+
+
+def test_a_wrapper_does_not_hide_the_lane(tmp_path: Path) -> None:
+    """`mise exec --` is how you reach a pinned binary past a stale PATH here.
+
+    Matching on the COMMAND WORD alone saw `mise` and stopped, so this evaded
+    the shipped version. `env`, `time`, `nohup` and `sudo` are the same shape.
+    """
+    _write(tmp_path, "a.md", "```bash\nmise exec -- codex exec --ephemeral -\n```\n")
+    assert lr.check(tmp_path, globs=_GLOBS).rc is Rc.FINDINGS
+
+
 def test_zero_files_is_not_run_rather_than_a_pass(tmp_path: Path) -> None:
     """The trap this repo just measured elsewhere, refused here.
 

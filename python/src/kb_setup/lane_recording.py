@@ -91,12 +91,66 @@ class Report:
         return Rc.FINDINGS if self.findings else Rc.OK
 
 
+def join_continuations(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    r"""Fold backslash-continued shell lines into one logical command.
+
+    THIS IS THE DEFECT THAT MADE THE FIRST VERSION DECORATION, so it is a
+    named function rather than three lines inline. The real invocation in
+    `.claude/agents/kb-codex-advisor.md` — the primary file this gate exists to
+    protect — is written across five continued lines:
+
+        cat prompt.md | codex exec \
+          --sandbox read-only \
+          --model gpt-5.6-sol \
+          ...
+
+    A per-line walk sees `--ephemeral` on a line whose command word is nothing,
+    and the segment containing `codex` never contains the flag. Re-adding the
+    flag exactly where it used to live was measured NOT CAUGHT (rc 0).
+
+    The three arms that "proved" the gate all mutated the SINGLE-LINE patterns
+    in `ai-cli-invocation.md` — a convenient break rather than the realistic
+    one. `probes-need-a-control-arm.md` rule 2 is explicit that a mutation must
+    be one that could really happen; this is what that costs when ignored.
+
+    The reported line number is the line the command STARTS on, which is where
+    a reader should look.
+    """
+    joined: list[tuple[int, str]] = []
+    start: int | None = None
+    buffer: list[str] = []
+    for line_no, text in lines:
+        if start is None:
+            start = line_no
+        stripped = text.rstrip()
+        if stripped.endswith("\\"):
+            buffer.append(stripped[:-1].rstrip())
+            continue
+        buffer.append(stripped)
+        joined.append((start, " ".join(buffer)))
+        start, buffer = None, []
+    if start is not None and buffer:
+        # A fence that ended mid-continuation. Keep it rather than dropping it:
+        # an unterminated continuation is exactly where something could hide.
+        joined.append((start, " ".join(buffer)))
+    return joined
+
+
 def _is_ephemeral_codex(command: str) -> bool:
     """True when `command` instructs a codex run that persists nothing.
 
     Judged per SEGMENT, so a pipeline's other commands cannot excuse the codex
     call beside them, and so `echo … | codex exec --ephemeral -` is read as the
     codex invocation it is rather than as an `echo`.
+
+    WITHIN a segment the test is "does a `codex` token appear anywhere", not
+    "is `codex` the command word". A command word alone missed
+    `mise exec -- codex exec --ephemeral` — a wrapper form this repo uses
+    routinely, since `mise exec --` is how you reach a pinned binary past a
+    stale PATH. `env`, `time`, `nohup` and `sudo` are the same shape. Widening
+    to any token costs little here because the fence walk has already excluded
+    prose, and `shlex` has already collapsed any quoted mention into a single
+    token that cannot equal `codex`.
     """
     parsed = check_first.segments(command)
     if parsed is None:
@@ -105,8 +159,7 @@ def _is_ephemeral_codex(command: str) -> bool:
         # tokenise is exactly where a real one could hide.
         return _CODEX in command and _FLAG in command
     for tokens in parsed:
-        words = check_first.command_word(tokens)
-        if not words or Path(words[0]).name != _CODEX:
+        if not any(Path(tok).name == _CODEX for tok in tokens):
             continue
         # Match the flag NAME, split at `=`. `--ephemeral=true` is the same
         # flag; matching the raw token missed that on a sibling guard this week.
@@ -123,7 +176,8 @@ def check(root: Path, *, globs: tuple[str, ...] = DEFAULT_GLOBS) -> Report:
             continue
         rel = path.relative_to(root).as_posix()
         report.scanned.append(rel)
-        for line_no, command in skill_lint.command_lines(path.read_text(encoding="utf-8")):
+        lines = list(skill_lint.command_lines(path.read_text(encoding="utf-8")))
+        for line_no, command in join_continuations(lines):
             if _is_ephemeral_codex(command):
                 report.findings.append(Finding(path=rel, line=line_no, command=command))
     return report
