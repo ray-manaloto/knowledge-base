@@ -116,5 +116,17 @@ disagree.
 
 The corollary, which is the expensive half: the same is true of MY own reading.
 I read the `0184d2cc` hunk myself and reasoned correctly about the shell's
-backslash-newline semantics, and I did not notice the comment eight lines above
-the code I was reading — because I was reading, not running.
+backslash-newline semantics, and still did not catch the false count — because I
+was reading, not running.
+
+CORRECTED 2026-09-01 by a round-2 cold lane, and the correction matters more than
+the anecdote. This paragraph originally said the comment was "eight lines above
+the code I was reading". That was false two ways, and both are checkable in one
+command each. `git show --name-only --format= 0184d2cc` returns FOUR files and
+`hk.pkl` is not among them — so nothing I read in that commit was adjacent to
+that comment at all. And the real distance, `git show 0184d2cc:hk.pkl | nl -ba`,
+is comment at 522 to step at 525: THREE lines, not eight.
+
+A vivid specific ("eight lines above") is exactly the shape that survives review
+unchallenged, because it reads as recalled measurement. It was neither recalled
+nor measured. The lesson stands; the number was invented to dramatise it.

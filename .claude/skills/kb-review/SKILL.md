@@ -388,9 +388,12 @@ blocker was **method** (a lane that mutated code to test its claim) rather than
 lane identity, which is the thread to pull if this bound ever needs revisiting:
 give the one lane a mutating instruction before adding a second lane back.
 
-**That thread was pulled on 2026-09-01, and it holds — so ADD THE INSTRUCTION,
-it is no longer a hypothesis.** PR #645 already carried two cold rounds and a
-receipt at `3f1ce491`. A third pass, identical in lane and scope but told *do not
+**That thread was pulled on 2026-09-01 and the result is ENCOURAGING BUT
+CONFOUNDED — add the instruction, and keep calling it a hypothesis.** An earlier
+version of this paragraph said it "holds" and was "no longer a hypothesis"; a
+round-2 cold lane refuted that the next day, and the refutation is the more
+useful lesson. PR #645 already carried two cold rounds and a receipt at
+`3f1ce491`. A third pass, identical in lane and scope but told *do not
 review by reading — construct the input that should trip each check and RUN it,
 plus one that should pass, and report the exit codes*, came back with nine arms
 against the gate under review (the realistic regression, the clean form, the
@@ -405,6 +408,22 @@ It found what both reading passes had walked over: a comment claiming the gate
 scanned "8 files" when running it prints **15**. Wrong on arrival, not stale.
 **Running the gate prints the count; reading the gate does not**, and a reviewer
 with no reason to doubt a comment has no reason to run it.
+
+**THE CONFOUND, which the first version of this paragraph did not state.**
+"Identical in lane and scope" was true; *identical in the code under review* was
+not. `git diff --name-only b1264c6025b0..6fefe4dad894` lists **8 files across 4
+commits, among them `python/src/kb_setup/lane_recording.py` and
+`tests/test_lane_recording.py` — the gate itself and its own tests.** The third
+pass therefore read different bytes than the two before it, so METHOD is not
+isolated from a code change and this is not a controlled comparison. It is one
+n=1 observation with a plausible mechanism, which is worth acting on and is not
+worth calling settled.
+
+Recorded because of how it was caught: this paragraph asserted a causal finding
+in the measured voice, was shipped, was quoted onward as established within a day
+— and was then refuted by the very next cold round, reading the same range. An
+inherited number is not a measurement (`probes-need-a-control-arm.md` rule 6);
+neither is a comparison whose other variable moved.
 
 So a round count is not a verification depth. When the diff contains a check, a
 gate or a guard, put the method paragraph in the dispatch prompt — it costs one
