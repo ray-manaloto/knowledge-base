@@ -22,6 +22,8 @@
        display:grid;grid-template-columns:104px 1fr;gap:15px;align-items:baseline;
        border-left:4px solid var(--muted)}
   .row.ok{border-left-color:var(--ok)}
+  .row.bad{border-left-color:#B02E26}
+  .row.bad .tag{color:#B02E26}
   .tag{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.09em;
        text-transform:uppercase;color:var(--muted);font-weight:500}
   .row.ok .tag{color:var(--ok)}
@@ -86,10 +88,21 @@
     <div class="row ok">
       <span class="tag">Verdict</span>
       <div>
-        <p>What we have is correct. Nothing is missing.</p>
+        <p>The <em>installed pieces</em> are right. That is a narrower claim than the one
+        this row used to make.</p>
         <p>I nearly told you the opposite — that <code>protobuf</code> looked unused, since
         four of the five jobs are plain schema. Checking found a fifth job that really does
         read a protobuf file. The extra is earning its place.</p>
+      </div>
+    </div>
+    <div class="row bad">
+      <span class="tag">Correction</span>
+      <div>
+        <p>This row previously said “Nothing is missing.” That went further than I checked.</p>
+        <p>I tested which <em>optional pieces to install</em>. I did not test the tool’s
+        <em>settings</em> — a far bigger surface, and a different question. Ray pushed back,
+        correctly. Two reviews are running through every setting against what we actually
+        generate; this page gets the answer when they land.</p>
       </div>
     </div>
     <div class="row">
@@ -111,6 +124,6 @@
     </div>
   </div>
 
-  <p class="ask"><b>I need nothing from you here</b> — unless you want the extra packages
-  pulled in anyway, in which case say so and I will.</p>
+  <p class="ask"><b>What I need from you:</b> nothing yet — the two feature reviews are
+  running. I will bring you what they find.</p>
 </div>

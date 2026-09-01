@@ -1,9 +1,9 @@
-amends "package://github.com/jdx/hk/releases/download/v1.56.1/hk@1.56.1#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v1.57.0/hk@1.57.0#/Config.pkl"
 
 // Builtin linters MUST be assigned from Builtins (`= Builtins.name`), never a
 // bare `["name"] {}` block — a bare block is a fresh empty Step that hk silently
 // skips. See ray-manaloto/dotfiles feedback_hk_builtins_need_assignment.
-import "package://github.com/jdx/hk/releases/download/v1.56.1/hk@1.56.1#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.57.0/hk@1.57.0#/Builtins.pkl"
 
 // Refuse this config on an older hk binary rather than silently misreading it.
 min_hk_version = "1.49.0"
@@ -305,39 +305,45 @@ local proseExclude = baseExclude
 // command there would be a gate that can only pass — the exact failure
 // `probes-need-a-control-arm.md` rule 2 exists to prevent. `check`/`fix` keep the
 // builtin until the whole-tree profile is scoped properly (its own ticket).
-// NOT `(Builtins.gitleaks) { … }`, and the reason is a gate that could only pass.
-// Amending the builtin inherits its `tests` block, whose bad-file case WRITES a
-// leaky file to disk and expects a failure. `--staged` reads the git index, not
-// the disk, and hk's harness never stages anything — so that case came back
-// `code=0` and `mise run hk-test` went 47 passed / 1 failed on exactly the
-// shape `probes-need-a-control-arm.md` rule 2 exists to forbid. A fresh Step
-// inherits no tests, so nothing here claims a FAIL direction it cannot exhibit.
+// UPSTREAM NOW SHIPS THIS. `Builtins.gitleaks_staged` landed in hk v1.57.0 via
+// jdx/hk#1248, which closes OUR discussion jdx/hk#1246 — filed from this repo
+// (`sortakool` = Raymond Manaloto) reporting that `gitleaks dir` takes exactly
+// one path, so `{{files}}` with 2+ files silently scanned the whole tree. jdx
+// reproduced it and took BOTH options we offered: `Builtins.gitleaks` now
+// hardcodes `.`, and this builtin is the staged-scope one. The argv is
+// byte-identical to the local Step this replaces.
 //
-// The honest consequence, stated rather than discovered: this step has NO
-// step-defined test, because hk's file-based harness structurally cannot write
-// one for a staged-scope command. Its FAIL direction was armed by hand instead
-// (isolated repo, planted key staged -> rc 1; cleaned -> rc 0; same key in a
-// gitignored file -> rc 0 where the old shape gave rc 1), and the builtin still
-// covers `check`/`fix`, so the 46 remaining step tests are unchanged. (46, not
-// 47: the pre-fix run was 47 passed / 1 failed = 48 declared, and removing the
-// inherited PAIR leaves 46. A cold lane caught the off-by-one here while the
-// commit body had it right — the in-tree comment is the copy a reader lands on.)
+// TWO CORRECTIONS TO WHAT THIS COMMENT USED TO SAY, both refuted by reading the
+// pinned source rather than by a new release:
 //
-// `--pre-commit` AND `--staged` are both passed, and that is deliberate upstream
-// parity: gitleaks' own `.pre-commit-hooks.yaml` passes both. `--staged` wins —
-// armed: secret on disk but unstaged -> rc 0; staged clean while the disk holds
-// it -> rc 0; staged WITH it, disk then cleaned -> rc 1. That last case is one
-// the old disk-scanning shape MISSED, so this gate is strictly stronger there.
-// Do not "tidy" either flag away; they are copied from upstream on purpose.
-local gitleaksStaged: Step = new Step {
-  types = List("text")
-  check = new CommandSpec {
-    command = new Command {
-      argv = List("gitleaks", "git", "--pre-commit", "--redact", "--staged", "--verbose", "--no-banner")
-    }
-    effect = "read"
-  }
-}
+//  1. It claimed hk's harness "structurally cannot write" a staged-scope test.
+//     FALSE, and false when written: `StepTest.before` exists at Config.pkl:971
+//     in the v1.56.1 we were already pinned to, and upstream's four tests use
+//     exactly it (`before = "git init --quiet && git add foo.txt"`), including
+//     one that stages a secret, cleans the worktree, and still expects rc 1. We
+//     could have written these all along. The narrower original diagnosis was
+//     right — amending `Builtins.gitleaks` inherits a disk-writing test that a
+//     `--staged` command cannot satisfy — but the generalisation was not.
+//  2. `types = List("text")` is DROPPED, matching upstream. It read as a
+//     harmless filter and was a hole: the command ignores the file list and
+//     reads the index, so the filter could only suppress the STEP — a commit
+//     staging just a `.png` or `.zip` never ran the secret gate at all.
+//
+// Adopting the builtin gains its tests rather than inheriting a broken one:
+// `hk test` goes 46 -> **51**, MEASURED here, not predicted. The research lane
+// that scoped this bump said 50; it was one out, which is why this line records
+// the run and not the forecast. Any comment in this file quoting 46 is stale.
+//
+// FOURTH VERSION TOKEN, found the hard way: bumping the `amends` URI alone gives
+// `Module version conflict: Expected ... hk@1.57.0 ... but got ... hk@1.56.1`,
+// because line 6 imports `Builtins.pkl` at its own pinned version. This file
+// carries TWO version tokens on line 1 and TWO more on line 6. Move all four.
+//
+// `--pre-commit` AND `--staged` are both passed, upstream parity with gitleaks'
+// own `.pre-commit-hooks.yaml`. `--staged` wins — armed here: secret on disk but
+// unstaged -> rc 0; staged clean while the disk holds it -> rc 0; staged WITH it,
+// disk then cleaned -> rc 1. That last case the old disk-scanning shape MISSED.
+local gitleaksStaged: Step = Builtins.gitleaks_staged
 
 local pyGlob = List("python/src/**/*.py", "tests/**/*.py")
 

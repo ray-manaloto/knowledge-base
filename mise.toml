@@ -43,7 +43,7 @@ min_version = { hard = "2026.8.15", soft = "2026.8.15" }
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.7"
 uv = "0.12.8"
-hk = "1.56.1"
+hk = "1.57.0"
 pkl = "0.32.1"
 typos = "1.50.0"
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
