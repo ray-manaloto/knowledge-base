@@ -12,7 +12,7 @@
 #                   pyproject's own comment calls that floor the worst of the group,
 #                   since a pre-1.0 tool admitted every breaking release by
 #                   construction. The floor is gone — do not go looking for it.
-#   pinned here:    0.0.74
+#   pinned here:    0.0.77
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -27,7 +27,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/astral-sh/ty
-ref = 0.0.74
-commit = 00199f0aaa6a8cd264fea08eae4f3c3fe4451c17
+ref = 0.0.77
+commit = 371111b450de94d229a33541cb9648c0df9624ec
 kind = code
 added = 2026-08-02

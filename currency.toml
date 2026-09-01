@@ -1791,7 +1791,7 @@ manifest = "sources/uv.manifest"
 # takes `expected` (the version we have REVIEWED) rather than pretending mise
 # owns it. Bump `expected` and the pyproject pin in the same change, or this row
 # asserts a review that did not happen.
-expected = "0.16.4"
+expected = "0.16.5"
 binary = "ruff"
 github = "astral-sh/ruff"
 pypi = "ruff"
@@ -1803,7 +1803,7 @@ manifest = "sources/ruff.manifest"
 # `expected` for the same reason. Pre-1.0 and moving fast, which is exactly why
 # it needs a row rather than trust — a 0.0.x bump can carry a breaking change
 # with no marker to trip gate 3.
-expected = "0.0.74"
+expected = "0.0.77"
 binary = "ty"
 github = "astral-sh/ty"
 pypi = "ty"
@@ -2081,7 +2081,7 @@ note = """rumdl publishes ANNOTATED tags, so `git ls-remote --tags --refs` retur
 # `[tool.ruff]` / `[tool.ty]`, so it takes `expected` rather than pretending
 # mise owns it. Bump `expected` and the pyproject pin in the same change, or
 # this row asserts a review that did not happen.
-expected = "0.75.1"
+expected = "0.76.0"
 binary = "datamodel-codegen"
 github = "koxudaxi/datamodel-code-generator"
 pypi = "datamodel-code-generator"

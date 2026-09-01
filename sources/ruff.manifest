@@ -9,7 +9,7 @@
 #                   (`ruff>=0.11`) when this manifest was written; the group moved to
 #                   exact pins, so the old wording named a constraint that no longer
 #                   exists and would send the next bumper to the wrong line.
-#   pinned here:    0.16.4
+#   pinned here:    0.16.5
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -24,7 +24,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/astral-sh/ruff
-ref = 0.16.4
-commit = 11c76bf48fdac06b2f240cba502eda96da4dce77
+ref = 0.16.5
+commit = 9e4938c4a60bed3e87a11ee1e1db1bd23f4d964a
 kind = code
 added = 2026-08-02

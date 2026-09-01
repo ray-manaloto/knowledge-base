@@ -221,7 +221,7 @@ _DATAMODEL_CODE_GENERATOR_MANIFEST_PATHS = (
 )
 
 _RUFF_MANIFEST_PATHS = (
-    ("Cargo.toml", "663c169e08caaab92de7b8f74a0466e3ac03a98c6adcade6b369078a52871b0f"),
+    ("Cargo.toml", "2c8a5ce1b3c570bbd7e1a4b0c987e75ce5ae1924390d108c53191fcbc03251e2"),
     (
         "crates/ruff/resources/test/fixtures/include-test/nested-project/pyproject.toml",
         "d5573471176b520beaa0a57b853d6d6fa3f2d127e633f5196a85a58becffd52e",
@@ -328,7 +328,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="datamodel-code-generator",
             relative_path=relative_path,
             content_sha256=content_sha256,
-            pinned_commit="d8151e11fb8679bda624ab9e6a4f9b7c5ab98208",
+            pinned_commit="1e422243c189636b11b776f29a5b42972b0cad0e",
             skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         )
         for relative_path, content_sha256 in _DATAMODEL_CODE_GENERATOR_MANIFEST_PATHS
@@ -338,7 +338,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="ruff",
             relative_path=relative_path,
             content_sha256=content_sha256,
-            pinned_commit="11c76bf48fdac06b2f240cba502eda96da4dce77",
+            pinned_commit="9e4938c4a60bed3e87a11ee1e1db1bd23f4d964a",
             skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         )
         for relative_path, content_sha256 in _RUFF_MANIFEST_PATHS
