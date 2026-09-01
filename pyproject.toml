@@ -241,6 +241,17 @@ addopts = "-q"
 # Approved by Ray, 2026-08-16.
 [tool.typos.default.extend-words]
 cpy = "cpy"
+# `nativ` is the NAME of a pinned source, not a misspelling of "native":
+# github.com/Blaizzy/nativ, tracked at `sources/nativ.manifest` and described in
+# `sources/REGISTRY.md`. Approved by Ray 2026-09-01 under `zero-skip-policy.md`
+# rule 1, which requires explicit sign-off for any suppression.
+#
+# It flags on line 217's bare token and NOT on line 212's `[Blaizzy/nativ]`,
+# because typos skips the word inside a link path — which is why the repo could
+# carry it from 2026-08-08 (#237) without anyone noticing that `mise run lint`
+# had gone red. Renaming the prose to "native" was the alternative and is the
+# WRONG fix: it would falsify a pinned source's identity to satisfy a linter.
+nativ = "nativ"
 
 [tool.uv.sources]
 graphifyy = { git = "https://github.com/ray-manaloto/graphify", rev = "0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956" }

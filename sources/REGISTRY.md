@@ -339,6 +339,46 @@ Raw fetches live in gitignored `sources/raw/`. Refetch + re-extract when a
 doc-sourced node is **> 1 month** past its `captured_at`. Going forward, query the
 graphify KB (which we control), not external mirrors.
 
+## Backlog added 2026-09-01 — agentsview, the Codex half of session review
+
+| # | Source | Kind | Tier | Status | Why it's here |
+|---|---|---|---|---|---|
+| 84 | [kenn-io/agentsview](https://github.com/kenn-io/agentsview) | repo | T2 | tool | Local session viewer that reads Claude Code AND Codex transcripts. **Installed and wired**, not ingested — see below. |
+
+**Adopted 2026-09-01 (Ray).** Pinned in `mise.toml` as
+`"github:kenn-io/agentsview" = "0.41.1"`; wrapped by `mise run kb-session-search`
+(`kb_setup.agentsview`). It closes a measured gap: every existing session task
+here reads `~/.claude/projects/` only, while this machine also holds **2,658**
+files under `~/.codex/sessions/` and **978** archived — and since 2026-08-31
+every lane in this repo runs on codex.
+
+**Status is `tool`, NOT `manifest`, and that is a deliberate deferral.** A
+`sources/agentsview.manifest` would make an already-failing `kb-build`
+(`IncompleteGraphifyOperationError`, 2026-08-31T12:15Z) responsible for an
+unmeasured new source, against a `graph-size` already at 736 MiB of 1,024.
+`build = skip` was considered and REJECTED — #417 measured that exact shape
+producing a stale clone that three readers then cited from the wrong version.
+**Promote this row to `manifest` once `kb-build` is green**; the pin to use is
+tag `v0.41.1` → commit `a902515a2f8256ffb95716a2ca860c1887d35da5`.
+
+**The UI is deliberately un-wrapped.** `agentsview serve` starts a local web
+browser UI; run it by hand. It is not a mise task because a server gives an
+agent no bounded output and `long-running-command-hangs.md` rule 2 forbids
+`&`-detaching a local `mise run`. `agentsview daemon stop` ends the background
+daemon the search path autostarts.
+
+**Two facts measured here that its own docs get wrong**, worth carrying because
+the next reader will hit them:
+
+1. **Only `usage daily` reads SQLite directly.** `session search`, `session
+   list`, `stats`, `projects` and `health` all exit 1 with *"daemon autostart is
+   disabled"* under `AGENTSVIEW_NO_DAEMON=1` — including `session list`, which
+   the README annotates as *"read from the daemon if warm, otherwise SQLite"*.
+2. **`open_issues_count` is not the issue count.** The REST field read **94** on
+   2026-09-01; the issues-only search reads **71**, and there are **23** open
+   PRs. Both numbers are right; only one of them is issues. Do not let either be
+   "corrected" to the other without naming the field.
+
 ## Program notes
 
 - **graphify-first**: ingest+extract into this KB **before** web search — graphify
