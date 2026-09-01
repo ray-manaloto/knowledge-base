@@ -158,6 +158,18 @@ def _unknown_flag_message(extra: list[str]) -> str:
             f"refusing {' '.join(sorted(names & _REFUSED_FLAGS))}: it unredacts detected "
             "secrets, which `secret_guard` (#441) exists to keep out of a transcript"
         )
+    if not any(token.startswith("-") for token in extra):
+        # A BARE word, not a flag: almost always an unquoted multi-word pattern.
+        # `session search` takes ONE pattern, so `-- foo bar` used to search for
+        # "foo" and drop "bar" silently. Refusing is right, but the generic
+        # message below would send the reader to edit this module over a missing
+        # pair of quotes. (Cold round 2 of `c3c13e2de6d9`, P3.)
+        joined = " ".join(extra)
+        return (
+            f"extra word(s): {joined}. `session search` takes ONE pattern, so this would "
+            "have searched only the first and dropped the rest. Quote the whole phrase "
+            "instead, e.g. kb-session-search -- 'your exact phrase'."
+        )
     return (
         f"unrecognised argument(s): {' '.join(extra)}. This task forwards a fixed set of "
         "flags; anything else would be silently ignored and the results would still look "

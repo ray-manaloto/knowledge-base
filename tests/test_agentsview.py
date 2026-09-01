@@ -179,6 +179,27 @@ def test_a_pattern_that_looks_like_a_flag_still_works(
     assert "--flag-like-pattern" in seen[-1]
 
 
+@pytest.mark.usefixtures("_binary")
+def test_an_unquoted_multi_word_pattern_says_to_quote_it(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Refusing is right; sending the reader to edit this module is not.
+
+    `session search` takes ONE pattern, so `-- foo bar` previously searched for
+    "foo" and dropped "bar" silently. The refusal that closed that would have
+    answered with "add the flag to kb_setup/agentsview.py" — over a missing
+    pair of quotes. Cold round 2 of `c3c13e2de6d9` rated the unexplained
+    behaviour change P3; this is the explanation, in the place the user meets it.
+    """
+    monkeypatch.setattr(agentsview, "_run", lambda *_a, **_k: _proc(0, out="{}"))
+    with pytest.raises(SystemExit) as exc:
+        agentsview.main(["foo", "bar"], Path())
+    assert exc.value.code == Rc.BAD_REQUEST
+    err = capsys.readouterr().err
+    assert "Quote the whole phrase" in err
+    assert "kb_setup/agentsview.py" not in err, "the flag advice is wrong for a bare word"
+
+
 def test_forced_env_pins_telemetry_and_update_check(monkeypatch: pytest.MonkeyPatch) -> None:
     """Telemetry off and update-check off must survive into the child process.
 
