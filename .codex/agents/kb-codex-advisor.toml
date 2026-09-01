@@ -42,11 +42,19 @@ and any file:line evidence you gathered from the graph or Read/Grep>
 EOF
 
 cat /tmp/kb-codex-advisor-prompt.md | codex exec \
-  --ephemeral --sandbox read-only \
+  --sandbox read-only \
   --model gpt-5.6-sol \
   -c model_reasoning_effort="xhigh" \
   -o /tmp/kb-codex-advisor-verdict.md -
 ```
+
+**No `--ephemeral`.** It means "run without persisting session files to disk",
+and a lane that persists nothing cannot be reviewed afterwards —
+`mise run kb-session-search` reads exactly those files. This file is the mirror
+codex's own CLI reads; its `.claude/agents/kb-codex-advisor.md` twin says the
+same. Nothing generates one from the other, so BOTH are scanned by the
+`lane_recording` gate — this half was missed for one commit and the gate
+reported clean the whole time.
 
 Never `--full-auto` and never a writable sandbox — you advise, you do not
 change anything, and codex must not be given permission to.

@@ -153,6 +153,45 @@ def test_a_wrapper_does_not_hide_the_lane(tmp_path: Path) -> None:
     assert lr.check(tmp_path, globs=_GLOBS).rc is Rc.FINDINGS
 
 
+def test_a_continuation_does_not_leak_across_a_fence(tmp_path: Path) -> None:
+    """Cold round 2, P1 — and it was reproduced through the real CLI, not inferred.
+
+    `skill_lint.command_lines` yields a FLAT list with no fence markers, so a
+    fence ending on a trailing backslash merged into the NEXT fence's first
+    command. When the join landed inside a quoted string it swallowed a
+    complete `codex exec --ephemeral -"` into ONE shlex token, hiding both the
+    command and the flag: rc 0, "every instructed codex run persists a session
+    record", with a live violation in a scanned file.
+
+    Contiguity is the boundary — lines inside one fence are consecutive.
+    """
+    _write(
+        tmp_path,
+        "a.md",
+        f'```bash\necho "a multi-line prompt {_BS}\n```\n\nprose\n\n'
+        '```bash\ncodex exec --ephemeral -"\n```\n',
+    )
+    assert lr.check(tmp_path, globs=_GLOBS).rc is Rc.FINDINGS
+
+
+def test_the_codex_toml_mirror_is_scanned(tmp_path: Path) -> None:
+    """The OTHER round-2 P1: the gate watched one half of a mirrored pair.
+
+    `.codex/agents/*.toml` is what codex's own CLI reads. Scanning only
+    `.claude/**` let `.codex/agents/kb-codex-advisor.toml:45` keep instructing
+    `--ephemeral` while the gate reported every file clean — the flip had not
+    reached the lane and the guard said it had. Nothing generates one half from
+    the other, so both are scanned rather than one trusted to imply the other.
+    """
+    (tmp_path / ".codex" / "agents").mkdir(parents=True)
+    (tmp_path / ".codex" / "agents" / "a.toml").write_text(
+        "```bash\ncodex exec --ephemeral -\n```\n", encoding="utf-8"
+    )
+    report = lr.check(tmp_path)
+    assert ".codex/agents/a.toml" in report.scanned
+    assert report.rc is Rc.FINDINGS
+
+
 def test_zero_files_is_not_run_rather_than_a_pass(tmp_path: Path) -> None:
     """The trap this repo just measured elsewhere, refused here.
 

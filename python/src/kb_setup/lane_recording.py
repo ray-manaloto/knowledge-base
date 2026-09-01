@@ -44,13 +44,23 @@ from kb_setup.result import Rc
 
 DEFAULT_GLOBS: tuple[str, ...] = (
     ".claude/agents/*.md",
+    ".codex/agents/*.toml",
     ".claude/rules/ai-cli-invocation.md",
 )
 """Where a canonical codex invocation is written down.
 
 Deliberately narrow. `.claude/agents/*.md` is the standing lane roster and
 `ai-cli-invocation.md` is the rule that documents the patterns — between them
-they are where a reintroduction would actually land. A wider glob would pull in
+they are where a reintroduction would actually land.
+
+`.codex/agents/*.toml` IS THE MIRROR CODEX ITSELF READS, and leaving it out was
+a P1 in cold round 2. The first version scanned only `.claude/**`, so
+`.codex/agents/kb-codex-advisor.toml:45` kept instructing
+`--ephemeral --sandbox read-only` while the gate reported every file clean —
+the flip had not actually reached the lane, and the guard said it had. Those
+`.toml` files carry markdown-fenced commands, so the same walker applies.
+There is no generator keeping the pair in sync, which is exactly why both
+halves must be scanned rather than one trusted to imply the other. A wider glob would pull in
 handoffs and reports, which QUOTE old invocations verbatim as history and must
 not be rewritten to satisfy a gate (`agent-artifact-conventions.md`: corpus and
 report content records what was said, not what is current).
@@ -118,21 +128,40 @@ def join_continuations(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
     """
     joined: list[tuple[int, str]] = []
     start: int | None = None
+    previous: int | None = None
     buffer: list[str] = []
+
+    def flush() -> None:
+        nonlocal start, buffer
+        if start is not None and buffer:
+            joined.append((start, " ".join(buffer)))
+        start, buffer = None, []
+
     for line_no, text in lines:
+        # CONTIGUITY IS THE FENCE BOUNDARY. `command_lines` yields a FLAT list
+        # with no fence markers, so a continuation at the end of one fence would
+        # otherwise merge into the next fence's first command. Cold round 2
+        # reproduced the harm through the real CLI: a fence ending mid-quote
+        # with a trailing backslash swallowed a complete
+        # `codex exec --ephemeral -"` from a LATER fence into one quoted shlex
+        # token, hiding both `codex` and the flag — rc 0, "every instructed
+        # codex run persists a session record", with a live violation in a
+        # scanned file. Lines inside one fence are consecutive; anything else
+        # crossed prose or a boundary and must not be joined.
+        if previous is not None and line_no != previous + 1:
+            flush()
         if start is None:
             start = line_no
+        previous = line_no
         stripped = text.rstrip()
         if stripped.endswith("\\"):
             buffer.append(stripped[:-1].rstrip())
             continue
         buffer.append(stripped)
-        joined.append((start, " ".join(buffer)))
-        start, buffer = None, []
-    if start is not None and buffer:
-        # A fence that ended mid-continuation. Keep it rather than dropping it:
-        # an unterminated continuation is exactly where something could hide.
-        joined.append((start, " ".join(buffer)))
+        flush()
+    # A fence that ended mid-continuation. Keep it rather than dropping it:
+    # an unterminated continuation is exactly where something could hide.
+    flush()
     return joined
 
 
