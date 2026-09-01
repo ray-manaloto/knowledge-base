@@ -388,6 +388,54 @@ blocker was **method** (a lane that mutated code to test its claim) rather than
 lane identity, which is the thread to pull if this bound ever needs revisiting:
 give the one lane a mutating instruction before adding a second lane back.
 
+**That thread was pulled on 2026-09-01 and the result is ENCOURAGING BUT
+CONFOUNDED — add the instruction, and keep calling it a hypothesis.** An earlier
+version of this paragraph said it "holds" and was "no longer a hypothesis"; a
+round-2 cold lane refuted that the next day, and the refutation is the more
+useful lesson. PR #645 already carried two cold rounds and a receipt at
+`3f1ce491`. A third pass, identical in lane and scope but told *do not
+review by reading — construct the input that should trip each check and RUN it,
+plus one that should pass, and report the exit codes*, came back with nine arms
+against the gate under review (the realistic regression, the clean form, the
+cross-fence shape, a wrapper form, `--flag=value`, a prose-only mention that must
+NOT fire, an unparsable-quote fallback, a zero-match glob that must exit
+`NOT_RUN`, two commands in one fence) plus an end-to-end mutate-and-restore
+against the REAL tracked file the gate protects. It also left the repo to check
+two facts the diff *asserted* — a manifest SHA against the tag it claims, a TOML
+key against the upstream struct — rather than reading them.
+
+It found what both reading passes had walked over: a comment claiming the gate
+scanned "8 files" when running it prints **15**. Wrong on arrival, not stale.
+**Running the gate prints the count; reading the gate does not**, and a reviewer
+with no reason to doubt a comment has no reason to run it.
+
+**THE CONFOUND, which the first version of this paragraph did not state.**
+"Identical in lane and scope" was true; *identical in the code under review* was
+not. `git diff --name-only b1264c6025b0..6fefe4dad894` lists **8 files across 4
+commits, among them `python/src/kb_setup/lane_recording.py` and
+`tests/test_lane_recording.py` — the gate itself and its own tests.** The third
+pass therefore read different bytes than the two before it, so METHOD is not
+isolated from a code change and this is not a controlled comparison. It is one
+n=1 observation with a plausible mechanism, which is worth acting on and is not
+worth calling settled.
+
+Recorded because of how it was caught: this paragraph asserted a causal finding
+in the measured voice, was shipped, was quoted onward as established within a day
+— and was then refuted by the very next cold round, reading the same range. An
+inherited number is not a measurement (`probes-need-a-control-arm.md` rule 6);
+neither is a comparison whose other variable moved.
+
+So a round count is not a verification depth. When the diff contains a check, a
+gate or a guard, put the method paragraph in the dispatch prompt — it costs one
+paragraph and it is what separates a lane that could only agree from one that
+could disagree. Two cautions, both real: a read-only lane must mutate a COPY or
+say it could not, and a lane that mutates the working tree must restore it —
+**verify the tree yourself afterwards** (issue 399, and the auto-memory note
+`a-review-lane-mutated-a-tracked-file`) rather than trusting the report's word
+that it did. The issue number is spelled out rather than hashed because a
+formatter wrapped the `#399` form to line-start here, where `#` is an H1 — the
+citation became a heading and the sentence lost its ending.
+
 ## References
 
 - `references/repo-smells.md` — the repo-specific smells that are NOT in the

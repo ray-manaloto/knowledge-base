@@ -1,0 +1,183 @@
+<title>Where The Graphify Fork Lives</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#F7F8FA;
+    --ink:#16202B;
+    --muted:#5D6B7A;
+    --ok:#0F6B5C;
+    --warn:#A85A16;
+    --rule:#DDE3E9;
+    --card:#FFFFFF;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    line-height:1.45;
+    margin:0;
+    padding:34px 26px 30px;
+  }
+  .wrap{max-width:920px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+
+  .eyebrow{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 6px;
+  }
+  h1{
+    font-family:"Source Serif 4",Georgia,serif;
+    font-size:31px;font-weight:600;line-height:1.15;
+    margin:0 0 10px;text-wrap:balance;
+  }
+  .answer{
+    font-size:16px;color:var(--ink);margin:0;max-width:64ch;
+  }
+  .answer strong{color:var(--ok);font-weight:600}
+  code{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:.9em;background:#EDF1F4;padding:1px 5px;border-radius:3px;
+    color:var(--ink);
+  }
+
+  figure{margin:0;overflow-x:auto}
+  svg{max-width:100%;height:auto;display:block}
+  figcaption{
+    font-size:12.5px;color:var(--muted);margin-top:8px;
+  }
+
+  .rows{display:flex;flex-direction:column;gap:12px}
+  .row{
+    background:var(--card);
+    border:1px solid var(--rule);
+    border-left:4px solid var(--warn);
+    border-radius:5px;
+    padding:13px 16px;
+    display:grid;
+    grid-template-columns:112px 1fr;
+    gap:16px;
+    align-items:baseline;
+  }
+  .tag{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--warn);font-weight:500;
+  }
+  .row p{margin:0;font-size:14.5px}
+  .row p + p{margin-top:5px;color:var(--muted);font-size:13.5px}
+
+  .ask{
+    border-top:1px solid var(--rule);
+    padding-top:16px;
+    font-size:15.5px;
+  }
+  .ask b{font-weight:600}
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Answer · measured 2026-09-01</p>
+    <h1>The fork is <code>github.com/ray-manaloto/graphify</code> — and you are already running it.</h1>
+    <p class="answer">The version number in your project file is <strong>not</strong> what decides
+    where graphify comes from. One line below it points at the fork instead, and that line wins.
+    The patch you depend on is really in the copy that runs — <strong>checked, not assumed</strong>.</p>
+  </header>
+
+  <figure>
+    <svg viewBox="0 0 900 250" role="img"
+         aria-label="The project file names version 0.9.50, but a source-override line redirects it to the fork at commit 0a2eb5f, which is what gets installed and does carry the patch. A separate older copy on the machine lacks the patch but loses the path race.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,0 10,5 0,10" fill="#16202B"/>
+        </marker>
+        <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,0 10,5 0,10" fill="#A85A16"/>
+        </marker>
+      </defs>
+
+      <!-- node 1 -->
+      <rect x="4" y="26" width="192" height="72" rx="5" fill="#FFFFFF" stroke="#DDE3E9"/>
+      <text x="100" y="52" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="13" fill="#16202B">the project file</text>
+      <text x="100" y="74" text-anchor="middle" font-family="IBM Plex Mono,monospace"
+            font-size="12.5" fill="#5D6B7A">says 0.9.50</text>
+
+      <line x1="200" y1="62" x2="252" y2="62" stroke="#16202B" stroke-width="1.4" marker-end="url(#ar)"/>
+      <text x="226" y="52" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="11" fill="#5D6B7A">but</text>
+
+      <!-- node 2 -->
+      <rect x="256" y="26" width="192" height="72" rx="5" fill="#FFFFFF" stroke="#0F6B5C" stroke-width="1.6"/>
+      <text x="352" y="52" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="13" fill="#0F6B5C" font-weight="600">one line overrides it</text>
+      <text x="352" y="74" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="12" fill="#5D6B7A">“use the fork instead”</text>
+
+      <line x1="452" y1="62" x2="504" y2="62" stroke="#16202B" stroke-width="1.4" marker-end="url(#ar)"/>
+      <text x="478" y="52" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="11" fill="#5D6B7A">fetches</text>
+
+      <!-- node 3 -->
+      <rect x="508" y="26" width="192" height="72" rx="5" fill="#FFFFFF" stroke="#DDE3E9"/>
+      <text x="604" y="52" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="13" fill="#16202B">your fork</text>
+      <text x="604" y="74" text-anchor="middle" font-family="IBM Plex Mono,monospace"
+            font-size="12.5" fill="#5D6B7A">0a2eb5f</text>
+
+      <line x1="704" y1="62" x2="756" y2="62" stroke="#16202B" stroke-width="1.4" marker-end="url(#ar)"/>
+      <text x="730" y="52" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="11" fill="#5D6B7A">installs</text>
+
+      <!-- node 4 -->
+      <rect x="760" y="26" width="136" height="72" rx="5" fill="#FFFFFF" stroke="#0F6B5C" stroke-width="1.6"/>
+      <text x="828" y="52" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="13" fill="#0F6B5C" font-weight="600">what runs</text>
+      <text x="828" y="74" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="12" fill="#0F6B5C">has the patch</text>
+
+      <!-- shadow copy -->
+      <line x1="828" y1="102" x2="828" y2="158" stroke="#A85A16" stroke-width="1.4"
+            stroke-dasharray="5 4" marker-end="url(#arw)"/>
+      <text x="818" y="134" text-anchor="end" font-family="IBM Plex Sans,sans-serif"
+            font-size="11" fill="#A85A16">loses the race — for now</text>
+
+      <rect x="700" y="162" width="196" height="66" rx="5" fill="#FDF6EE"
+            stroke="#A85A16" stroke-width="1.4" stroke-dasharray="5 4"/>
+      <text x="798" y="187" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="13" fill="#A85A16" font-weight="600">a second, newer copy</text>
+      <text x="798" y="208" text-anchor="middle" font-family="IBM Plex Sans,sans-serif"
+            font-size="12" fill="#A85A16">no patch at all</text>
+    </svg>
+    <figcaption>Every step of the top row was read from a file or a command, not inferred.
+    Seven places in the repo record the same commit and none disagree.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <span class="tag">Problem 1</span>
+      <div>
+        <p>The file every session reads first tells you the wrong thing.</p>
+        <p><code>CLAUDE.md:177</code> still says <code>==0.9.48</code> from a plain package index —
+        wrong version, and no mention of the fork. It was written three days before the fork landed
+        and never updated.</p>
+      </div>
+    </div>
+    <div class="row">
+      <span class="tag">Problem 2</span>
+      <div>
+        <p>There is a second graphify on your Mac, and it is missing the patch.</p>
+        <p>A leftover <code>0.9.53</code> install — three versions <em>newer</em>, so any
+        version-comparing check reads it as better. It wins nothing today only because of
+        where it sits on your PATH.</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="ask"><b>What I need from you:</b> say the word and I fix both — one line in
+  <code>CLAUDE.md</code>, and remove the stale install. Neither is touched yet.</p>
+
+</div>
