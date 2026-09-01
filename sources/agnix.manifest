@@ -45,7 +45,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/agent-sh/agnix
-ref = v0.50.0
-commit = faaeed49b5d018aaadecc2b2d21dcf049ed817c0
+ref = v0.52.1
+commit = d18c0a88e6a61878502f105106d054bcce9789df
 kind = code
 added = 2026-08-02

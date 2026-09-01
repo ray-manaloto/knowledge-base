@@ -106,7 +106,7 @@ gitleaks = "8.30.1"
 # `mise run lint` while the pinned docs (`sub-agents.md:286`, `:303`) declare it
 # valid. Do not drop below 0.44.0 to "match dotfiles" — bump dotfiles instead.
 # 0.45.0 additionally accepts parameterized ids such as `claude-opus-5[effort=high]`.
-"github:agent-sh/agnix" = "0.50.0"
+"github:agent-sh/agnix" = "0.52.1"
 # fnox: the credential tool the shell's secrets come from (jdx/fnox, in mise's
 # registry as `github:jdx/fnox`). Pinned here rather than left to the user's
 # GLOBAL mise, which at the time installed into a directory literally named
