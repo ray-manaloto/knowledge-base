@@ -1,1 +1,14 @@
-{}
+{
+  "local:codegen-tags-carry-no-v-prefix": {
+    "comments": 0,
+    "state": "local",
+    "title": "Tags here are bare (`0.74.0`), not `v0.74.0`. A resolver that tries\nonly `v<x>` finds nothing and an apply aborts rather than mispinning \u2014 the same\nclass as `[tool.codex]`'s `rust-v<version>`, in the opposite direction. Stated\nso that abort reads as a known shape rather than a bug.",
+    "updated_at": ""
+  },
+  "local:codegen-version-literal-is-load-bearing-in-a-test": {
+    "comments": 0,
+    "state": "local",
+    "title": "`tests/test_skillopt_contract.py` copies the REAL `pyproject.toml`\ninto a tmp dir and `.replace()`s the exact string\n`codegen = [\"datamodel-code-generator==<version>\"]`. The bump to 0.74.0 made\nthat replace a silent no-op and the assertion failed \u2014 loudly, which is the\nonly good part.\n\nThe repair is more fragile than it looks, and that is the finding: the literal\nalso depends on the ARRAY BEING ON ONE LINE. `uv add --group codegen` writes\nit multi-line; `mise run fmt` (taplo) collapses it back. So the test passes\ntoday because two independent tools happen to agree on formatting, not because\nanything asserts it. A taplo config change would break it with no bump at all.\n\nThe durable fix is for that test to construct its own fixture rather than\nstring-replace a copy of a real config file \u2014 a test must own its own\nenvironment. Until then: bump the pin, update BOTH literals, and run\n`mise run fmt` before `pytest`.\n\nRe-probe on each bump by running `pytest tests/test_skillopt_contract.py`\nBEFORE assuming the pin change is complete.",
+    "updated_at": ""
+  }
+}

@@ -1,0 +1,128 @@
+<title>Four Steps, One Broken Check</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#FBFAF7;--ink:#1F1B16;--muted:#6B6357;
+    --bad:#B02E26;--ok:#2F6B3A;--rule:#E4DFD6;--card:#FFFFFF;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);
+    font-family:"Public Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+    line-height:1.45;margin:0;padding:30px 26px 26px}
+  .wrap{max-width:930px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+  .eyebrow{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;
+    letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  h1{font-family:Newsreader,Georgia,serif;font-size:29px;font-weight:600;
+     line-height:1.15;margin:0 0 9px;text-wrap:balance}
+  .lede{font-size:15.5px;margin:0;max-width:66ch}
+  .lede b{color:var(--bad)}
+  code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.87em;
+       background:#F1EEE8;padding:1px 5px;border-radius:3px}
+  figure{margin:0;overflow-x:auto}
+  svg{max-width:100%;height:auto;display:block}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:7px}
+  .rows{display:flex;flex-direction:column;gap:10px}
+  .row{background:var(--card);border:1px solid var(--rule);border-radius:5px;
+       padding:11px 15px;display:grid;grid-template-columns:112px 1fr;gap:15px;
+       align-items:baseline;border-left:4px solid var(--muted)}
+  .row.bad{border-left-color:var(--bad)}
+  .row.ok{border-left-color:var(--ok)}
+  .tag{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10.5px;
+       letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  .row.bad .tag{color:var(--bad)}
+  .row.ok .tag{color:var(--ok)}
+  .row p{margin:0;font-size:14.5px}
+  .row p+p{margin-top:4px;color:var(--muted);font-size:13.5px}
+  .ask{border-top:1px solid var(--rule);padding-top:14px;font-size:15.5px}
+  .ask b{font-weight:600}
+  .upd{font-size:12.5px;color:var(--bad);margin:0}
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Your 4-step plan · corrected 2026-09-01, round 3</p>
+    <h1>You were right. It is already handled — and my fix would have broken it.</h1>
+    <p class="lede">graphify showing as “behind” is not a false alarm to silence.
+    <b>It is the signal that tells us to do step 3.</b> Someone already decided that
+    deliberately, wrote down why, and built the checks around it.</p>
+  </header>
+
+  <figure>
+    <svg viewBox="0 0 900 178" role="img"
+         aria-label="The fork gets two separate checks. Identity is checked by exact commit rather than version number. The version comparison against upstream is deliberately kept live, because a new upstream release is the trigger to rebase. A third check confirms our patch is still present.">
+      <defs>
+        <marker id="ag2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,0 10,5 0,10" fill="#2F6B3A"/>
+        </marker>
+      </defs>
+      <rect x="4" y="56" width="176" height="66" rx="5" fill="#FFFFFF" stroke="#E4DFD6"/>
+      <text x="92" y="82" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="12.5" fill="#1F1B16" font-weight="600">our forked graphify</text>
+      <text x="92" y="102" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11.5" fill="#6B6357">three checks watch it</text>
+
+      <line x1="184" y1="76" x2="236" y2="40" stroke="#2F6B3A" stroke-width="1.4" marker-end="url(#ag2)"/>
+      <line x1="184" y1="89" x2="236" y2="89" stroke="#2F6B3A" stroke-width="1.4" marker-end="url(#ag2)"/>
+      <line x1="184" y1="102" x2="236" y2="140" stroke="#2F6B3A" stroke-width="1.4" marker-end="url(#ag2)"/>
+
+      <rect x="240" y="12" width="238" height="56" rx="5" fill="#FFFFFF" stroke="#E4DFD6"/>
+      <text x="359" y="34" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="12" fill="#1F1B16" font-weight="600">is it the right code?</text>
+      <text x="359" y="53" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11.5" fill="#6B6357">checked by exact commit, not version</text>
+
+      <rect x="240" y="63" width="238" height="52" rx="5" fill="#F2F7F3" stroke="#2F6B3A" stroke-width="1.7"/>
+      <text x="359" y="84" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="12" fill="#2F6B3A" font-weight="600">has upstream moved on?</text>
+      <text x="359" y="103" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11.5" fill="#2F6B3A">kept ON PURPOSE</text>
+
+      <rect x="240" y="120" width="238" height="52" rx="5" fill="#FFFFFF" stroke="#E4DFD6"/>
+      <text x="359" y="141" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="12" fill="#1F1B16" font-weight="600">is our patch still there?</text>
+      <text x="359" y="160" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11.5" fill="#6B6357">checked by capability, not number</text>
+
+      <line x1="482" y1="89" x2="546" y2="89" stroke="#2F6B3A" stroke-width="1.5" marker-end="url(#ag2)"/>
+      <rect x="550" y="60" width="346" height="58" rx="5" fill="#F2F7F3" stroke="#2F6B3A" stroke-width="1.7"/>
+      <text x="723" y="84" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="13" fill="#2F6B3A" font-weight="600">“behind” IS the rebase trigger</text>
+      <text x="723" y="104" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11.5" fill="#2F6B3A">silencing it would hide step 3 from us</text>
+    </svg>
+    <figcaption>Quoted from the config itself: “a new upstream release is still a finding —
+    it is the REBASE TRIGGER.”</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row ok">
+      <span class="tag">You were right</span>
+      <div>
+        <p>Nothing needs building for the fork. It is already covered, twice over.</p>
+        <p>Identity is checked by exact commit, so the version number lying about a fork
+        cannot fool it. And a separate check asks whether our patch is still physically
+        present — the actual harm, caught by capability rather than by a number.</p>
+      </div>
+    </div>
+    <div class="row bad">
+      <span class="tag">My error</span>
+      <div>
+        <p>The exclusion I proposed would have suppressed the rebase trigger.</p>
+        <p>I read “graphify shows as behind” as noise. It is the intended signal, and
+        muting it is how step 3 would quietly never happen.</p>
+      </div>
+    </div>
+    <div class="row">
+      <span class="tag">Why quiet</span>
+      <div>
+        <p>Today’s check is silent for a boring reason: a <b>7-day-old cached number</b>.</p>
+        <p>It remembers upstream at 0.9.49 and we are at 0.9.50, so we look ahead.
+        A full refresh moves it to 0.9.53 and the 3-release debt appears on its own.</p>
+      </div>
+    </div>
+    <div class="row">
+      <span class="tag">No new config</span>
+      <div>
+        <p>The DBOS plan exists, nothing is built, and it already answers “don’t build throwaway”.</p>
+        <p>Plain functions in one module, no new dependency — adopting DBOS later is
+        adding decorators. What <em>would</em> be waste is a new config file: you asked
+        to <b>reduce</b> those, and the current one is slated for deletion.</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="ask"><b>What I need from you:</b> the last three decisions, in the box below.
+  Still nothing changed.</p>
+  <p class="upd">Corrected after publishing. The previous version of this page told you the
+  opposite — that an exclusion was needed. It was wrong; this page replaces it.</p>
+</div>

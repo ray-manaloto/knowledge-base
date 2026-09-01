@@ -23,7 +23,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/crate-ci/typos
-ref = v1.48.0
-commit = bee27e3a4fd1ea2111cf90ab89cd076c870fce14
+ref = v1.50.0
+commit = 4d9c206a77c041268485162b8e2579ad7a5cb9a3
 kind = code
 added = 2026-08-02

@@ -221,7 +221,7 @@ _DATAMODEL_CODE_GENERATOR_MANIFEST_PATHS = (
 )
 
 _RUFF_MANIFEST_PATHS = (
-    ("Cargo.toml", "663c169e08caaab92de7b8f74a0466e3ac03a98c6adcade6b369078a52871b0f"),
+    ("Cargo.toml", "2c8a5ce1b3c570bbd7e1a4b0c987e75ce5ae1924390d108c53191fcbc03251e2"),
     (
         "crates/ruff/resources/test/fixtures/include-test/nested-project/pyproject.toml",
         "d5573471176b520beaa0a57b853d6d6fa3f2d127e633f5196a85a58becffd52e",
@@ -254,8 +254,8 @@ _RUFF_MANIFEST_PATHS = (
 )
 
 _UV_MANIFEST_PATHS = (
-    # Re-hashed 2026-08-31 against the content AT THE PINNED COMMIT
-    # (`sources/uv.manifest`'s `commit = 61291a8ca5477a9ca653f14d2ac5665587c263fa`,
+    # Re-hashed 2026-09-01 against the content AT THE PINNED COMMIT
+    # (`sources/uv.manifest`'s `commit = 68209e5c61ce4b76c2e685bea7913876bc929dc9`,
     # fetched via raw.githubusercontent.com since no local clone was checked out
     # there). The prior value (`deb1b5b7…`) was verified — via a second, local
     # route — to be the hash of the file at the OLD pin (0.12.5,
@@ -264,7 +264,7 @@ _UV_MANIFEST_PATHS = (
     # workspace `Cargo.toml`'s content moved and this hash did not. Re-confirmed
     # the file is STILL a bare `[workspace]` root with no `[package]`/`name` —
     # the registration's premise still holds, only the pinned bytes changed.
-    ("Cargo.toml", "8b10951d2e6cd44e5aa3b499e4425509a89f281b0fe1f8c3a541e889e7d3a364"),
+    ("Cargo.toml", "8462425d8e7f512c64662a8fccca4d821fe64251b438c4042429d7d3b05d68c2"),
     (
         "test/workspaces/albatross-groups-only/pyproject.toml",
         "70ae71d05636b4496820087106ae2c8e8673e5ef4c4ea0c5fc709c9e493c0b34",
@@ -328,7 +328,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="datamodel-code-generator",
             relative_path=relative_path,
             content_sha256=content_sha256,
-            pinned_commit="d8151e11fb8679bda624ab9e6a4f9b7c5ab98208",
+            pinned_commit="1e422243c189636b11b776f29a5b42972b0cad0e",
             skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         )
         for relative_path, content_sha256 in _DATAMODEL_CODE_GENERATOR_MANIFEST_PATHS
@@ -338,7 +338,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="ruff",
             relative_path=relative_path,
             content_sha256=content_sha256,
-            pinned_commit="11c76bf48fdac06b2f240cba502eda96da4dce77",
+            pinned_commit="9e4938c4a60bed3e87a11ee1e1db1bd23f4d964a",
             skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         )
         for relative_path, content_sha256 in _RUFF_MANIFEST_PATHS
@@ -348,7 +348,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="uv",
             relative_path=relative_path,
             content_sha256=content_sha256,
-            pinned_commit="61291a8ca5477a9ca653f14d2ac5665587c263fa",
+            pinned_commit="68209e5c61ce4b76c2e685bea7913876bc929dc9",
             skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         )
         for relative_path, content_sha256 in _UV_MANIFEST_PATHS
@@ -377,8 +377,8 @@ _EXPECTED_METADATA_ONLY = (
     graphify_health.ExpectedMetadataOnly(
         source_name="typos",
         relative_path="Cargo.toml",
-        content_sha256="35ec168d87130bfaed7231ab6c65eb0f00f55ecfd801c2ef72adcf8069c037a6",
-        pinned_commit="bee27e3a4fd1ea2111cf90ab89cd076c870fce14",
+        content_sha256="bda037d3b2d20c80b10439a87e0b5a65b028eeaa70f722704e4cc822c2d26110",
+        pinned_commit="4d9c206a77c041268485162b8e2579ad7a5cb9a3",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
     graphify_health.ExpectedMetadataOnly(
@@ -407,7 +407,7 @@ _EXPECTED_METADATA_ONLY = (
         source_name="uv",
         relative_path="crates/uv/pyproject.toml",
         content_sha256="32b3705d5b32ffaf3da1f3ccb279bafdb572a6f8a156f1929eaef62f780eac85",
-        pinned_commit="61291a8ca5477a9ca653f14d2ac5665587c263fa",
+        pinned_commit="68209e5c61ce4b76c2e685bea7913876bc929dc9",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
 )

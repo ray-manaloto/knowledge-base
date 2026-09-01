@@ -42,10 +42,10 @@ min_version = { hard = "2026.8.15", soft = "2026.8.15" }
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.7"
-uv = "0.12.7"
-hk = "1.56.1"
+uv = "0.12.8"
+hk = "1.57.0"
 pkl = "0.32.1"
-typos = "1.49.0"
+typos = "1.50.0"
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
 # extract audio before transcription — NOT a pip dep, so graphifyy[all] can't
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
@@ -106,7 +106,7 @@ gitleaks = "8.30.1"
 # `mise run lint` while the pinned docs (`sub-agents.md:286`, `:303`) declare it
 # valid. Do not drop below 0.44.0 to "match dotfiles" — bump dotfiles instead.
 # 0.45.0 additionally accepts parameterized ids such as `claude-opus-5[effort=high]`.
-"github:agent-sh/agnix" = "0.50.0"
+"github:agent-sh/agnix" = "0.52.1"
 # fnox: the credential tool the shell's secrets come from (jdx/fnox, in mise's
 # registry as `github:jdx/fnox`). Pinned here rather than left to the user's
 # GLOBAL mise, which at the time installed into a directory literally named
@@ -230,7 +230,7 @@ gh = "2.98.0"
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
 "npm:@openai/codex" = "0.152.0"
-antigravity-cli = "1.1.22"
+antigravity-cli = "1.1.23"
 "npm:ctx7" = { version = "0.5.9", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.3"
 # coreutils: macOS ships BSD userland, not GNU — this repo's own rules and

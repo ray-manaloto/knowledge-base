@@ -1,0 +1,129 @@
+<title>Why Only Protobuf</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{--paper:#FAF9F6;--ink:#1C1A17;--muted:#6A6459;--ok:#2F6B3A;--no:#8A8377;--rule:#E5E1D8;--card:#FFF}
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:"Public Sans",-apple-system,sans-serif;
+       line-height:1.45;margin:0;padding:32px 26px}
+  .wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:19px}
+  .eyebrow{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  h1{font-family:Newsreader,Georgia,serif;font-size:29px;font-weight:600;line-height:1.15;
+     margin:0 0 9px;text-wrap:balance}
+  .lede{font-size:15.5px;margin:0;max-width:64ch}
+  .lede b{color:var(--ok)}
+  code{font-family:"JetBrains Mono",monospace;font-size:.87em;background:#F0EDE6;
+       padding:1px 5px;border-radius:3px}
+  figure{margin:0;overflow-x:auto}
+  svg{max-width:100%;height:auto;display:block}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:7px}
+  .rows{display:flex;flex-direction:column;gap:10px}
+  .row{background:var(--card);border:1px solid var(--rule);border-radius:5px;padding:12px 15px;
+       display:grid;grid-template-columns:104px 1fr;gap:15px;align-items:baseline;
+       border-left:4px solid var(--muted)}
+  .row.ok{border-left-color:var(--ok)}
+  .row.bad{border-left-color:#B02E26}
+  .row.bad .tag{color:#B02E26}
+  .tag{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.09em;
+       text-transform:uppercase;color:var(--muted);font-weight:500}
+  .row.ok .tag{color:var(--ok)}
+  .row p{margin:0;font-size:14.5px}
+  .row p+p{margin-top:4px;color:var(--muted);font-size:13.5px}
+  .ask{border-top:1px solid var(--rule);padding-top:14px;font-size:15.5px}
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Answer · measured 2026-09-01</p>
+    <h1>Because we only feed it two kinds of file — and it already has both readers.</h1>
+    <p class="lede">graphify’s <code>[all]</code> buys <b>features we run</b>. This tool’s extras
+    are just <b>readers for input formats</b>. We hand it 5 files in 2 formats, so it needs
+    2 readers. <code>[all]</code> would add 6 readers for formats we never hand it.</p>
+  </header>
+
+  <figure>
+    <svg viewBox="0 0 880 196" role="img"
+         aria-label="Five schema files feed the generator. Four are JSON Schema, needing no extra. One is a protobuf file, which needs the protobuf extra. The other six extras read formats we never supply.">
+      <defs>
+        <marker id="ak" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,0 10,5 0,10" fill="#2F6B3A"/>
+        </marker>
+        <marker id="an" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,0 10,5 0,10" fill="#8A8377"/>
+        </marker>
+      </defs>
+
+      <text x="4" y="18" font-family="JetBrains Mono,monospace" font-size="11" fill="#6A6459">what we actually hand it</text>
+
+      <rect x="4" y="30" width="206" height="56" rx="5" fill="#FFF" stroke="#E5E1D8"/>
+      <text x="107" y="53" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="12.5" fill="#1C1A17" font-weight="600">4 files of one kind</text>
+      <text x="107" y="72" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11.5" fill="#6A6459">plain schema — no extra needed</text>
+
+      <rect x="4" y="96" width="206" height="56" rx="5" fill="#FFF" stroke="#2F6B3A" stroke-width="1.6"/>
+      <text x="107" y="119" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="12.5" fill="#2F6B3A" font-weight="600">1 file of another kind</text>
+      <text x="107" y="138" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11.5" fill="#2F6B3A">needs the protobuf reader</text>
+
+      <line x1="214" y1="58" x2="272" y2="80" stroke="#2F6B3A" stroke-width="1.4" marker-end="url(#ak)"/>
+      <line x1="214" y1="124" x2="272" y2="100" stroke="#2F6B3A" stroke-width="1.4" marker-end="url(#ak)"/>
+
+      <rect x="276" y="62" width="188" height="56" rx="5" fill="#F2F7F3" stroke="#2F6B3A" stroke-width="1.7"/>
+      <text x="370" y="85" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="13" fill="#2F6B3A" font-weight="600">what we have today</text>
+      <text x="370" y="104" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11.5" fill="#2F6B3A">exactly the right set</text>
+
+      <line x1="468" y1="90" x2="524" y2="90" stroke="#8A8377" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#an)"/>
+      <text x="496" y="80" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11" fill="#8A8377">“all”</text>
+
+      <rect x="528" y="52" width="348" height="76" rx="5" fill="#FFF" stroke="#8A8377" stroke-dasharray="5 4"/>
+      <text x="702" y="76" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="12.5" fill="#8A8377" font-weight="600">+6 readers for formats we never send</text>
+      <text x="702" y="96" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11.5" fill="#8A8377">graphql · web-fetch · openapi checks</text>
+      <text x="702" y="114" text-anchor="middle" font-family="Public Sans,sans-serif" font-size="11.5" fill="#8A8377">debugger · file-watcher · a 2nd formatter</text>
+
+      <text x="4" y="176" font-family="Public Sans,sans-serif" font-size="11.5" fill="#8A8377">and “all” still is not all — it leaves out two of the ten</text>
+    </svg>
+    <figcaption>Read from the generator’s own job config and its published package metadata,
+    both today.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row ok">
+      <span class="tag">Verdict</span>
+      <div>
+        <p>The <em>installed pieces</em> are right. That is a narrower claim than the one
+        this row used to make.</p>
+        <p>I nearly told you the opposite — that <code>protobuf</code> looked unused, since
+        four of the five jobs are plain schema. Checking found a fifth job that really does
+        read a protobuf file. The extra is earning its place.</p>
+      </div>
+    </div>
+    <div class="row bad">
+      <span class="tag">Correction</span>
+      <div>
+        <p>This row previously said “Nothing is missing.” That went further than I checked.</p>
+        <p>I tested which <em>optional pieces to install</em>. I did not test the tool’s
+        <em>settings</em> — a far bigger surface, and a different question. Ray pushed back,
+        correctly. Two reviews are running through every setting against what we actually
+        generate; this page gets the answer when they land.</p>
+      </div>
+    </div>
+    <div class="row">
+      <span class="tag">The difference</span>
+      <div>
+        <p>graphify is a thing we <em>run</em>; this is a thing that <em>reads our files</em>.</p>
+        <p>graphify’s extras switch on capabilities at runtime, so more is better. These
+        extras only teach it new input formats — and a reader for a format you never supply
+        does nothing but sit in the lockfile.</p>
+      </div>
+    </div>
+    <div class="row">
+      <span class="tag">Trap</span>
+      <div>
+        <p>“all” does not mean all — it omits two of the ten.</p>
+        <p>So switching to it would not even be a safe blanket choice: if we ever needed one
+        of those two, <code>[all]</code> would silently not provide it.</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="ask"><b>What I need from you:</b> nothing yet — the two feature reviews are
+  running. I will bring you what they find.</p>
+</div>

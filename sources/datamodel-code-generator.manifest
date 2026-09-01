@@ -21,7 +21,7 @@
 #   version source: pyproject.toml `[dependency-groups] codegen` EXACT pin
 #                   `datamodel-code-generator==0.75.1`, confirmed against
 #                   `datamodel-codegen --version`.
-#   pinned here:    0.75.1
+#   pinned here:    0.76.0
 #
 #   This block said 0.74.0 until 2026-08-28 while `ref` beside it already read
 #   0.75.1 — the machine-read values were correct and only the prose restating
@@ -78,6 +78,6 @@
 #
 # kind = code: AST extraction only, no LLM, no cost.
 url = https://github.com/koxudaxi/datamodel-code-generator
-ref = 0.75.1
-commit = d8151e11fb8679bda624ab9e6a4f9b7c5ab98208
+ref = 0.76.0
+commit = 1e422243c189636b11b776f29a5b42972b0cad0e
 kind = code

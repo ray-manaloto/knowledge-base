@@ -5,7 +5,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] hk`
-#   pinned here:    1.56.0
+#   pinned here:    1.57.0
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -34,7 +34,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/jdx/hk
-ref = v1.56.1
-commit = fdbb35c1cb9d1487e8350a0888877c0d74d4b611
+ref = v1.57.0
+commit = 6189ceff84f486ce766e9ebc6fff96eb3ef04e53
 kind = code
 added = 2026-08-02

@@ -1,1 +1,8 @@
-{}
+{
+  "local:agnix-tags-are-annotated-and-unsorted": {
+    "comments": 0,
+    "state": "local",
+    "title": "TWO probe traps live on this repo's tag list, both hit on the 0.49.0\nbump and both recorded in `sources/agnix.manifest`.\n\n1. **The tags are ANNOTATED.** `git ls-remote --tags --refs .../agnix v0.49.0`\n   returns `dc388699\u2026`, which is the TAG OBJECT, not the commit. The commit is\n   `b0401135\u2026` (`gh api repos/agent-sh/agnix/commits/v0.49.0 --jq .sha`). Two\n   routes, two different 40-hex strings, and only one of them is a commit \u2014 a\n   manifest pinned to the tag object still clones, so nothing would have\n   reported it. Contrast graphify and datamodel-code-generator, whose\n   lightweight tags make both routes agree.\n\n2. **The tag list is not sorted by version.** `git ls-remote --tags` ends at\n   `v0.9.3`, which reads like the latest and is THREE MINORS behind v0.49.0.\n   Ask `gh api repos/agent-sh/agnix/releases/latest --jq .tag_name` instead.\n   This is a display-order bound wearing the clothes of an answer \u2014 exactly\n   `probes-need-a-control-arm.md` rule 3.\n\nRe-probe both on each bump: an upstream that switches to lightweight tags\nretires (1), and nothing retires (2) short of a version-sorted listing.",
+    "updated_at": ""
+  }
+}
