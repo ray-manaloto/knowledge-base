@@ -83,6 +83,8 @@ def _print_usage() -> int:
         "session-state [--no-pr] | context | next-ticket | "
         "session-select (--current | --sessions <id>... | --last N | "
         "--since <ISO> [--until <ISO>]) | "
+        "session-search <pattern> [--agent A] [--since S] [--project P] "
+        "[--limit N] [--regex] [--include-children] [--no-sync] | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
         "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "
         "remember --question Q [--answer A|--answer-file F] "
@@ -442,6 +444,10 @@ def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
         from kb_setup import session_select
 
         return session_select.main(rest, repo_root)
+    if cmd == "session-search":
+        from kb_setup import agentsview
+
+        return agentsview.main(rest, repo_root)
     if cmd == "session-review-archive":
         from kb_setup import session_review_archive
 

@@ -1,0 +1,79 @@
+# Mutation arms for the round-1 cold-review fixes on `faf041ea95f8`.
+#
+# Two findings came from the cold lane (duplicate registry id; `--reveal=true`
+# slipping a raw-token match) and ONE came from re-reading my own code before
+# the lane reported: `parse_known_args` collected unknown flags and the module
+# forwards a curated argv, so an unrecognised flag was ACCEPTED, DROPPED, and
+# the search ran without it.
+#
+# That third one is the one worth arming hardest, because of where it sat. The
+# module's entire reason to exist is refusing a result that looks like an answer
+# to a question nobody asked -- and its own argument parser was doing exactly
+# that. A fix at one layer leaves the next; here the defect was in the layer
+# ABOVE the one the module was written to defend.
+#
+# The registry-id finding is NOT armed and cannot be: it is a uniqueness
+# property of a markdown table with no test to turn red. It was verified
+# directly instead -- `grep -n '^| 84 |'` returns two rows on the ref and one on
+# `origin/main`, and the table's highest id is 152, so the new row is 153.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: that the argv surface is now right. These
+# arms prove the REFUSALS fire. They say nothing about whether the curated flag
+# set is the right set, which no arm can settle.
+
+suites = ["tests/test_agentsview.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/agentsview.py"
+old = '''    args, extra = parser.parse_known_args(argv)'''
+new = '''    args, extra = parser.parse_known_args(argv)  # control'''
+
+# ── F1: MINE — an unknown flag must be refused, never swallowed ────────────
+[[arm]]
+id = "F1"
+test = "test_an_unknown_flag_is_refused_not_swallowed"
+file = "python/src/kb_setup/agentsview.py"
+old = '''    if extra:
+        parser.error(_unknown_flag_message(extra))'''
+new = '''    if False:
+        parser.error(_unknown_flag_message(extra))'''
+
+# ── F2: cold P3 — `--reveal=true` is the SAME flag as `--reveal` ───────────
+# Reverts to the raw-token match the cold lane refuted. `--reveal` alone still
+# refuses under this mutant; the `=` spellings are what go red, which is what
+# makes the parametrised test the right instrument.
+[[arm]]
+id = "F2"
+test = "test_reveal_is_refused_in_every_spelling"
+file = "python/src/kb_setup/agentsview.py"
+old = '''    names = {token.split("=", 1)[0] for token in extra if token.startswith("-")}'''
+new = '''    names = {token for token in extra if token.startswith("-")}'''
+
+# ── F3: the OVER-CORRECTION direction — refusing must not break a real search
+# One of the four fix-shapes this repo watches for is "the fix makes the
+# sequence unrunnable". A pattern beginning with `-` reaches argparse as an
+# unrecognised token, so a careless refusal would reject legitimate input.
+# The first mutation here was INERT -- `nargs="?"` still binds the pattern after
+# `--`, so the test could not tell. This one scans argv instead of the leftovers,
+# which is how a careless version of this refusal actually gets written.
+[[arm]]
+id = "F3"
+test = "test_a_pattern_that_looks_like_a_flag_still_works"
+file = "python/src/kb_setup/agentsview.py"
+old = '''    if extra:'''
+new = '''    if extra or any(a.startswith("-") for a in argv):'''
+
+# ── F4: cold ROUND 2 P3 — a bare word is a quoting mistake, not a bad flag ──
+# Round 2's only finding: refusing every extra also caught non-flag words, so an
+# unquoted multi-word pattern hard-refused with flag advice — telling the reader
+# to edit this module over a missing pair of quotes. The mutation removes the
+# bare-word branch, which returns the generic flag message.
+[[arm]]
+id = "F4"
+test = "test_an_unquoted_multi_word_pattern_says_to_quote_it"
+file = "python/src/kb_setup/agentsview.py"
+old = '''    if not any(token.startswith("-") for token in extra):'''
+new = '''    if False:'''

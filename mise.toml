@@ -63,6 +63,38 @@ rumdl = "0.2.62"
 # those two behaviors were not re-measured against 2.5.11.
 biome = "2.5.11"
 gitleaks = "8.30.1"
+# agentsview: local session viewer for Claude Code AND Codex transcripts
+# (kenn-io/agentsview, MIT). Adopted 2026-09-01 (Ray) so a round can be reviewed
+# against what the agents actually did, on BOTH vendors — `kb-session-select`
+# and friends read only `~/.claude/projects/`, and nothing here has ever read
+# `~/.codex/sessions/` (2,658 files) or `~/.codex/archived_sessions/` (978).
+#
+# WHY `github:` AND NOT `pipx:`, though it ships on PyPI. Two runtime risks the
+# release binary sidesteps, both measured rather than assumed:
+#   1. PATH SHADOWING. `CLAUDE.md` records a live defect where a stale
+#      `pipx-graphifyy/0.9.23/bin` sat on PATH *ahead of* the mise shims, so the
+#      version a shell reached disagreed with the pin. A self-contained binary
+#      has no such per-package bin dir to go stale.
+#   2. DEPENDENCY GRAPH. `pipx:` would resolve agentsview's deps against a python
+#      this repo pins at 3.14.7, where `graspologic`/`leidenalg`/`igraph` already
+#      auto-skip by PEP 508 marker. A standalone binary carries its own runtime.
+# Verified 2026-09-01: `v0.41.1` publishes 15 release assets including
+# `agentsview_0.41.1_darwin_arm64.tar.gz` and a `SHA256SUMS`, and
+# `mise ls-remote github:kenn-io/agentsview` resolves 0.41.1 as newest — so the
+# github backend both works here and carries checksum material, unlike the
+# `npm:` trade recorded for codex above.
+#
+# NOT in mise's registry (control arm: `mise registry | grep -i agentsview` -> 0,
+# while gitleaks/taplo BOTH resolve), which is why the `github:` prefix is
+# explicit rather than a bare name.
+#
+# NO `sources/agentsview.manifest` ON PURPOSE (advisor, 2026-09-01): `kb-build`
+# is currently FAILING and `graph-size` sits at 736 MiB of 1,024, so making an
+# already-red, capacity-bound graph responsible for an unmeasured new source is
+# strictly negative. Registered in `sources/REGISTRY.md` instead. `build = skip`
+# was considered and REJECTED — #417 measured that exact shape producing a stale
+# clone three readers then cited from the wrong version.
+"github:kenn-io/agentsview" = "0.41.1"
 # agnix: agent-documentation validator (CLAUDE.md / .claude/** / settings.json).
 # Same pin as dotfiles' shared set. Run with --strict everywhere — agnix exits 0
 # on warnings-only, so without it every warning is invisible (dotfiles #250).
@@ -1366,6 +1398,40 @@ description = "Resolve WHICH session transcripts a run covers: mise run kb-sessi
 # An empty resolution exits 127 (NOT_RUN), never `[]` with rc 0 -- a glob that
 # matches nothing looks exactly like a round with no sessions.
 run = "uv run kb-setup session-select"
+
+[tasks.kb-session-search]
+description = "Search Claude AND Codex session transcripts: mise run kb-session-search -- <pattern> [--agent A] [--since 14d] [--project P] [--limit N] [--regex] [--include-children] [--no-sync]"
+# The Codex half of session review, which nothing here could read until now.
+# `kb-session-select`/`kb-session-review-archive`/`kb-attribute-write` all read
+# `~/.claude/projects/` and only that; measured 2026-09-01 this machine also
+# holds 2,658 files under `~/.codex/sessions/` and 978 archived. Every lane in
+# this repo has run on codex since 2026-08-31, so the unreadable half was the
+# half doing the work.
+#
+# Wraps agentsview's JSON surface, NOT `agentsview serve`. A web UI gives an
+# agent no bounded output, and `long-running-command-hangs.md` rule 2 forbids
+# `&`-detaching a local `mise run` anyway (it is reaped when the turn idles).
+# The UI stays a plain `agentsview serve`, documented in sources/REGISTRY.md.
+#
+# IT MAY AUTOSTART A LOCAL DAEMON, and that is deliberate. Measured 2026-09-01
+# against the installed 0.41.1 with each command's own argv: ONLY `usage daily`
+# reads SQLite directly; `session search`, `session list`, `stats`, `projects`
+# and `health` all exit 1 with "daemon autostart is disabled" under
+# AGENTSVIEW_NO_DAEMON=1. The project's README says `session list` falls back to
+# SQLite -- the binary disagrees, so the README is wrong. End it with
+# `agentsview daemon stop`.
+#
+# IT REFUSES RATHER THAN ANSWERING FROM A STALE INDEX. agentsview reads a
+# derived SQLite index, so "0 results" has two causes that look identical: the
+# term is absent, or the index was never built. The second reported as the
+# first is a false conclusion ABOUT A SESSION. So the sync runs first, in the
+# foreground, and a failed or timed-out sync exits 127 -- never `[]` with rc 0.
+# A real zero carries `"searched": true`.
+#
+# `--reveal` is REFUSED by the module: it unredacts detected secrets, and
+# `secret_guard` (#441) exists so a credential never reaches a transcript.
+timeout = "20m"
+run = "uv run kb-setup session-search"
 
 [tasks.kb-session-review-archive]
 description = "Archive a session-review run's return into docs/session-review/runs/<date>-<n>/ and regenerate the README: mise run kb-session-review-archive -- --run-json PATH [--report-dir DIR] [--handoff PATH] [--date YYYY-MM-DD] [--dry-run]"

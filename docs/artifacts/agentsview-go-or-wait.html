@@ -1,0 +1,91 @@
+<title>Wait, or build the safe part</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Inconsolata:wght@400;600&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#F4F2EE;
+    --surface:#FFFFFF;
+    --ink:#1E1B16;
+    --muted:#6B655B;
+    --line:#DED8CE;
+    --stop:#8C3A1E;
+    --go:#2A5F3F;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    margin:0;padding:30px 20px 38px;display:flex;justify-content:center;
+  }
+  main{width:100%;max-width:670px;display:flex;flex-direction:column;gap:18px}
+  h1{font-family:Newsreader,Georgia,serif;font-weight:600;font-size:33px;line-height:1.12;margin:0;text-wrap:balance}
+  .sub{margin:0;color:var(--muted);font-size:15px;line-height:1.45}
+  figure{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:14px 12px 10px;overflow-x:auto}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{margin-top:8px;font-size:12.5px;color:var(--muted);text-align:center}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:14px 16px}
+  .card.stop{border-top:4px solid var(--stop)}
+  .card.go{border-top:4px solid var(--go)}
+  .card h2{margin:0 0 7px;font-family:Newsreader,Georgia,serif;font-size:17px;font-weight:600}
+  .card p{margin:0;font-size:14px;line-height:1.5;color:var(--ink)}
+  .card p+p{margin-top:7px;color:var(--muted);font-size:13px}
+  .ask{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--ink);border-radius:9px;padding:15px 18px;font-size:15.5px;line-height:1.5}
+  .ask strong{display:block;font-family:Newsreader,Georgia,serif;font-size:17px;margin-bottom:4px}
+  @media (max-width:560px){.cards{grid-template-columns:1fr}}
+</style>
+
+<main>
+  <h1>Two of us disagree about starting now</h1>
+  <p class="sub">You said build it. The reviewer said wait. Neither of us is wrong about a fact — only about timing.</p>
+
+  <figure>
+    <svg viewBox="0 0 630 186" role="img" aria-label="Three of the four pieces of agentsview work do not touch the broken rebuild; only the corpus entry did, and it has already been dropped from the plan.">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="#8C3A1E"/>
+        </marker>
+      </defs>
+
+      <text x="8" y="15" font-size="11.5" font-weight="600" fill="#6B655B" letter-spacing="1.3">THE WORK</text>
+      <rect x="8" y="25" width="196" height="26" rx="5" fill="#FFFFFF" stroke="#2A5F3F" stroke-width="1.5"/>
+      <text x="106" y="42" font-size="12.5" text-anchor="middle" fill="#1E1B16">install the app</text>
+      <rect x="8" y="57" width="196" height="26" rx="5" fill="#FFFFFF" stroke="#2A5F3F" stroke-width="1.5"/>
+      <text x="106" y="74" font-size="12.5" text-anchor="middle" fill="#1E1B16">a command we can re-run</text>
+      <rect x="8" y="89" width="196" height="26" rx="5" fill="#FFFFFF" stroke="#2A5F3F" stroke-width="1.5"/>
+      <text x="106" y="106" font-size="12.5" text-anchor="middle" fill="#1E1B16">write it in the list of tools</text>
+      <rect x="8" y="121" width="196" height="26" rx="5" fill="#FFFFFF" stroke="#DED8CE" stroke-dasharray="5 4"/>
+      <text x="106" y="138" font-size="12.5" text-anchor="middle" fill="#6B655B">add it to the search corpus</text>
+
+      <line x1="208" y1="134" x2="358" y2="134" stroke="#8C3A1E" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#a2)"/>
+      <text x="283" y="127" font-size="11" text-anchor="middle" fill="#8C3A1E">the only link</text>
+      <line x1="275" y1="146" x2="291" y2="162" stroke="#8C3A1E" stroke-width="2"/>
+      <line x1="291" y1="146" x2="275" y2="162" stroke="#8C3A1E" stroke-width="2"/>
+      <text x="300" y="160" font-size="11.5" fill="#8C3A1E">already dropped</text>
+
+      <text x="362" y="15" font-size="11.5" font-weight="600" fill="#8C3A1E" letter-spacing="1.3">ALREADY BROKEN</text>
+      <rect x="362" y="121" width="260" height="26" rx="5" fill="#FFFFFF" stroke="#8C3A1E" stroke-width="1.5"/>
+      <text x="492" y="138" font-size="12.5" text-anchor="middle" fill="#1E1B16">the search corpus rebuild</text>
+      <rect x="362" y="25" width="260" height="26" rx="5" fill="#FFFFFF" stroke="#8C3A1E" stroke-width="1.5"/>
+      <text x="492" y="42" font-size="12.5" text-anchor="middle" fill="#1E1B16">two tools updated themselves</text>
+      <text x="492" y="72" font-size="12" text-anchor="middle" fill="#6B655B">unrelated to any of this</text>
+    </svg>
+    <figcaption>Three green boxes touch nothing that is broken.</figcaption>
+  </figure>
+
+  <div class="cards">
+    <div class="card stop">
+      <h2>Why it says wait</h2>
+      <p>If something is already failing, you cannot tell a new failure from an old one.</p>
+      <p>Fair in general. Here it rests on the one piece we had already decided to leave out.</p>
+    </div>
+    <div class="card go">
+      <h2>Why I lean build</h2>
+      <p>Three of the four pieces cannot touch the broken thing. They are checked by different checks.</p>
+      <p>And waiting has its own cost: the broken rebuild has no owner or date yet.</p>
+    </div>
+  </div>
+
+  <p class="ask"><strong>What I need from you — pick one</strong>
+    Build the three safe pieces now and leave the corpus entry for later, or park all of it until the rebuild is fixed. I lean build; the reviewer leans park.</p>
+</main>
