@@ -143,6 +143,18 @@ def test_a_clean_continued_command_stays_clean(tmp_path: Path) -> None:
     assert lr.check(tmp_path, globs=_GLOBS).rc is Rc.OK
 
 
+def test_a_flag_split_across_a_continuation_is_still_the_flag(tmp_path: Path) -> None:
+    r"""The shell DELETES a backslash-newline pair: nothing is substituted.
+
+    So `--ephem\` at end of line followed by `eral` is ONE token,
+    `--ephemeral`. Joining fragments with a space invented a boundary the
+    shell never sees, and the flag slipped through split across a
+    continuation.
+    """
+    _write(tmp_path, "a.md", f"```bash\ncodex exec --ephem{_BS}\neral -\n```\n")
+    assert lr.check(tmp_path, globs=_GLOBS).rc is Rc.FINDINGS
+
+
 def test_a_wrapper_does_not_hide_the_lane(tmp_path: Path) -> None:
     """`mise exec --` is how you reach a pinned binary past a stale PATH here.
 

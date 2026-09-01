@@ -615,7 +615,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "research-links <URL...> [--out PATH] | "
         "research-packages <SYSTEM> <NAME> [--out PATH] | "
         "research-codesearch <QUERY> [--repo OWNER/REPO] [--language LANG] [--out PATH] | "
-        "session-state [--no-pr] | next-ticket | "
+        "session-state [--no-pr] | next-ticket | lane-recording | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
         "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "
         "remember [--audit] | cc | cc-doctor | "

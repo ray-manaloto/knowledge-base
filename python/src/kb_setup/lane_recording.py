@@ -125,6 +125,15 @@ def join_continuations(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
 
     The reported line number is the line the command STARTS on, which is where
     a reader should look.
+
+    FRAGMENTS ARE CONCATENATED WITH NO SEPARATOR, because that is what the
+    shell does: a backslash-newline pair is DELETED, nothing substituted. Any
+    token break comes from real whitespace (the space before the backslash or
+    the continuation line's indentation), which is why `check` feeds this RAW
+    lines rather than `command_lines`' stripped ones. Joining with `" "` (the
+    first shape of this function) invented a boundary, so `--ephem\` + `eral`
+    read as two tokens and the flag this gate exists to catch slipped through
+    split across a continuation.
     """
     joined: list[tuple[int, str]] = []
     start: int | None = None
@@ -134,7 +143,7 @@ def join_continuations(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
     def flush() -> None:
         nonlocal start, buffer
         if start is not None and buffer:
-            joined.append((start, " ".join(buffer)))
+            joined.append((start, "".join(buffer)))
         start, buffer = None, []
 
     for line_no, text in lines:
@@ -155,7 +164,10 @@ def join_continuations(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
         previous = line_no
         stripped = text.rstrip()
         if stripped.endswith("\\"):
-            buffer.append(stripped[:-1].rstrip())
+            # Drop ONLY the backslash. The whitespace before it is real shell
+            # whitespace and is the sole thing separating `exec \` from the
+            # next fragment's first token.
+            buffer.append(stripped[:-1])
             continue
         buffer.append(stripped)
         flush()
@@ -205,7 +217,14 @@ def check(root: Path, *, globs: tuple[str, ...] = DEFAULT_GLOBS) -> Report:
             continue
         rel = path.relative_to(root).as_posix()
         report.scanned.append(rel)
-        lines = list(skill_lint.command_lines(path.read_text(encoding="utf-8")))
+        text = path.read_text(encoding="utf-8")
+        raw_lines = text.splitlines()
+        # `command_lines` decides WHICH lines are instructions, but it strips
+        # indentation, and continuation joining is whitespace-sensitive (a
+        # backslash-newline is deleted, so only real whitespace separates
+        # tokens). Re-read each selected line raw so `join_continuations`
+        # sees the whitespace the shell would.
+        lines = [(no, raw_lines[no - 1]) for no, _ in skill_lint.command_lines(text)]
         for line_no, command in join_continuations(lines):
             if _is_ephemeral_codex(command):
                 report.findings.append(Finding(path=rel, line=line_no, command=command))
