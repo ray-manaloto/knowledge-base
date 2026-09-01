@@ -115,12 +115,68 @@ def test_non_json_output_is_not_run(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.usefixtures("_binary")
-def test_reveal_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`--reveal` unredacts secrets; argparse exits 2 on a parser error."""
+@pytest.mark.parametrize("spelling", ["--reveal", "--reveal=true", "--reveal=1"])
+def test_reveal_is_refused_in_every_spelling(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], spelling: str
+) -> None:
+    """`--reveal` unredacts secrets, and `=`-joined is the SAME flag.
+
+    The `=` forms are here because the first version matched the raw token and
+    missed them (cold review of `faf041ea95f8`, P3). Not exploitable — nothing
+    unrecognised ever reached the subprocess — but a guard that catches one
+    spelling of what it guards is not one to rely on.
+    """
     monkeypatch.setattr(agentsview, "_run", lambda *_a, **_k: _proc(0, out="{}"))
     with pytest.raises(SystemExit) as exc:
-        agentsview.main(["p", "--reveal"], Path())
+        agentsview.main(["p", spelling], Path())
     assert exc.value.code == Rc.BAD_REQUEST
+    # Asserting the MESSAGE, not just the code. Every unknown flag exits 2 since
+    # the refusal above, so an exit-code assertion here could not fail and the
+    # mutation arm SURVIVED against it -- the test was measuring F1's fix while
+    # wearing F2's name. The secrets sentence is what only this guard produces.
+    assert "unredacts detected secrets" in capsys.readouterr().err
+
+
+@pytest.mark.usefixtures("_binary")
+def test_an_unknown_flag_is_refused_not_swallowed(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The module's own failure mode, caught by re-reading it.
+
+    `parse_known_args` collects what it does not recognise, and this module
+    forwards a curated argv — so an unknown flag was accepted, dropped, and the
+    search ran WITHOUT it. `kb-session-search -- foo --fts` would return
+    ordinary results that read as an FTS search: a result that looks like an
+    answer to a question nobody asked, which is the exact class the sync
+    refusal exists to prevent.
+    """
+    monkeypatch.setattr(agentsview, "_run", lambda *_a, **_k: _proc(0, out="{}"))
+    with pytest.raises(SystemExit) as exc:
+        agentsview.main(["p", "--fts"], Path())
+    assert exc.value.code == Rc.BAD_REQUEST
+    assert "silently ignored" in capsys.readouterr().err
+
+
+@pytest.mark.usefixtures("_binary")
+def test_a_pattern_that_looks_like_a_flag_still_works(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A leading `-` in the PATTERN must not be read as an unknown flag.
+
+    `--` separates them, and this pins that the refusal above did not make a
+    legitimate search unrunnable — one of the four fix-shapes this repo watches
+    for is "the fix makes the sequence unrunnable".
+    """
+    seen: list[list[str]] = []
+
+    def fake(argv: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        del timeout
+        seen.append(argv)
+        return _proc(0, out="{}")
+
+    monkeypatch.setattr(agentsview, "_run", fake)
+    assert agentsview.main(["--", "--flag-like-pattern"], Path()) == Rc.OK
+    assert "--flag-like-pattern" in seen[-1]
 
 
 def test_forced_env_pins_telemetry_and_update_check(monkeypatch: pytest.MonkeyPatch) -> None:

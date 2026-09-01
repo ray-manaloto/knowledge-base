@@ -343,7 +343,7 @@ graphify KB (which we control), not external mirrors.
 
 | # | Source | Kind | Tier | Status | Why it's here |
 |---|---|---|---|---|---|
-| 84 | [kenn-io/agentsview](https://github.com/kenn-io/agentsview) | repo | T2 | tool | Local session viewer that reads Claude Code AND Codex transcripts. **Installed and wired**, not ingested — see below. |
+| 153 | [kenn-io/agentsview](https://github.com/kenn-io/agentsview) | repo | T2 | tool | Local session viewer that reads Claude Code AND Codex transcripts. **Installed and wired**, not ingested — see below. |
 
 **Adopted 2026-09-01 (Ray).** Pinned in `mise.toml` as
 `"github:kenn-io/agentsview" = "0.41.1"`; wrapped by `mise run kb-session-search`

@@ -133,6 +133,38 @@ def _run(args: list[str], timeout: int) -> subprocess.CompletedProcess[str] | No
         return None
 
 
+def _unknown_flag_message(extra: list[str]) -> str:
+    """Why an unrecognised flag is an ERROR here rather than a pass-through.
+
+    This module forwards a CURATED argv and nothing else, so anything argparse
+    does not recognise is silently DROPPED — `kb-session-search -- foo --fts`
+    would accept `--fts`, never send it, and return ordinary results that read
+    as an FTS search. That is precisely the failure the sync-refusal above
+    exists to prevent (a result that looks like an answer to a question nobody
+    asked), reappearing in the argument parser that guards it. Refusing is the
+    only honest option: forwarding blind would let `--reveal` through, and
+    ignoring silently is the bug.
+
+    `--reveal` gets its own sentence because the reason differs in kind. Note
+    the check is on the flag NAME, split at `=`: `--reveal=true` is the same
+    flag as `--reveal`, and matching the raw token missed it (cold review of
+    `faf041ea95f8`, P3). It was not exploitable — nothing unrecognised reached
+    the subprocess — but a guard that only catches one spelling of what it
+    guards is a guard nobody should rely on.
+    """
+    names = {token.split("=", 1)[0] for token in extra if token.startswith("-")}
+    if names & _REFUSED_FLAGS:
+        return (
+            f"refusing {' '.join(sorted(names & _REFUSED_FLAGS))}: it unredacts detected "
+            "secrets, which `secret_guard` (#441) exists to keep out of a transcript"
+        )
+    return (
+        f"unrecognised argument(s): {' '.join(extra)}. This task forwards a fixed set of "
+        "flags; anything else would be silently ignored and the results would still look "
+        "like an answer. Add the flag to kb_setup/agentsview.py, or run agentsview directly."
+    )
+
+
 def _search_argv(binary: str, args: argparse.Namespace) -> list[str]:
     """Build the search argv.
 
@@ -186,13 +218,8 @@ def main(argv: list[str], repo_root: Path) -> int:
         help="search the index as-is; the result is then explicitly unfreshened",
     )
     args, extra = parser.parse_known_args(argv)
-
-    refused = _REFUSED_FLAGS.intersection(extra)
-    if refused:
-        parser.error(
-            f"refusing {' '.join(sorted(refused))}: it unredacts detected secrets, "
-            "which `secret_guard` (#441) exists to prevent reaching a transcript"
-        )
+    if extra:
+        parser.error(_unknown_flag_message(extra))
 
     binary = shutil.which(_BIN)
     if binary is None:
