@@ -1,0 +1,119 @@
+<title>Codex Project Setup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    --paper:#FBFBF9;
+    --card:#FFFFFF;
+    --ink:#17191C;
+    --dim:#585D64;
+    --rule:#DCDDD9;
+    --go:#1F6B45;
+    --wait:#8A6100;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+    font-size:16.5px;
+    line-height:1.45;
+    margin:0;
+    padding:30px 20px 26px;
+    display:flex;
+    justify-content:center;
+  }
+  main{width:100%;max-width:660px}
+
+  h1{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-weight:600;
+    font-size:clamp(23px,4.2vw,30px);
+    line-height:1.15;
+    margin:0 0 6px;
+    letter-spacing:-.01em;
+    text-wrap:balance;
+  }
+  .sub{color:var(--dim);margin:0 0 20px;font-size:15.5px}
+
+  .item{
+    background:var(--card);
+    border:1px solid var(--rule);
+    border-radius:4px;
+    padding:13px 16px;
+    margin-bottom:11px;
+    display:grid;
+    grid-template-columns:28px 1fr;
+    gap:13px;
+  }
+  .n{
+    font-family:"IBM Plex Mono",monospace;
+    font-weight:600;
+    font-size:15px;
+    color:var(--go);
+    padding-top:1px;
+  }
+  .n.w{color:var(--wait)}
+  .item h2{font-size:17px;margin:0 0 4px;font-weight:600}
+  .item p{margin:0;color:var(--dim);font-size:15px}
+  .item p + p{margin-top:5px}
+  .item b{color:var(--ink);font-weight:600}
+
+  .ask{
+    margin:18px 0 0;
+    padding:15px 17px;
+    background:var(--ink);
+    color:#F7F7F5;
+    border-radius:4px;
+  }
+  .ask b{color:#fff}
+  .ask code{
+    font-family:"IBM Plex Mono",monospace;
+    background:#2C3037;
+    padding:2px 6px;
+    border-radius:3px;
+    font-size:14.5px;
+  }
+</style>
+
+<main>
+  <h1>Three fixes. One is yours.</h1>
+  <p class="sub">Graphify's own setup page and codex's own docs both answered it.</p>
+
+  <div class="item">
+    <div class="n">1</div>
+    <div>
+      <h2>One line is missing from our codex settings</h2>
+      <p>We told codex <b>where</b> the graph service is, but never <b>that it needs to sign in</b>. The address was right all along.</p>
+      <p>I can add that line.</p>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="n w">2</div>
+    <div>
+      <h2>Codex has to be told to sign in, once — and only you can</h2>
+      <p>Every other tool signs itself in the first time it connects. <b>Codex is the exception</b>, and it says so on graphify's own page. Nobody ever ran the sign-in, which is the whole reason it's been failing.</p>
+      <p>It opens a browser and asks for your account, so it has to be you.</p>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="n">3</div>
+    <div>
+      <h2>The seven-helper question answers itself</h2>
+      <p>You asked whether to write the brain into all seven copies. <b>You don't have to.</b> Codex has one project-wide setting that gives every helper a default brain — and any helper that names its own still wins.</p>
+      <p>So it's one line, not seven, and nothing gets locked in.</p>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="n">✓</div>
+    <div>
+      <h2>Our Claude side was already right</h2>
+      <p>I said earlier it looked broken on both sides. It didn't — our Claude file matches graphify's published example exactly.</p>
+    </div>
+  </div>
+
+  <p class="ask">→ <b>One command from you:</b> <code>codex mcp login graphify</code><br>
+    I'll do the two file changes now. Nothing else is waiting on you.</p>
+</main>
