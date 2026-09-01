@@ -388,6 +388,33 @@ blocker was **method** (a lane that mutated code to test its claim) rather than
 lane identity, which is the thread to pull if this bound ever needs revisiting:
 give the one lane a mutating instruction before adding a second lane back.
 
+**That thread was pulled on 2026-09-01, and it holds — so ADD THE INSTRUCTION,
+it is no longer a hypothesis.** PR #645 already carried two cold rounds and a
+receipt at `3f1ce491`. A third pass, identical in lane and scope but told *do not
+review by reading — construct the input that should trip each check and RUN it,
+plus one that should pass, and report the exit codes*, came back with nine arms
+against the gate under review (the realistic regression, the clean form, the
+cross-fence shape, a wrapper form, `--flag=value`, a prose-only mention that must
+NOT fire, an unparsable-quote fallback, a zero-match glob that must exit
+`NOT_RUN`, two commands in one fence) plus an end-to-end mutate-and-restore
+against the REAL tracked file the gate protects. It also left the repo to check
+two facts the diff *asserted* — a manifest SHA against the tag it claims, a TOML
+key against the upstream struct — rather than reading them.
+
+It found what both reading passes had walked over: a comment claiming the gate
+scanned "8 files" when running it prints **15**. Wrong on arrival, not stale.
+**Running the gate prints the count; reading the gate does not**, and a reviewer
+with no reason to doubt a comment has no reason to run it.
+
+So a round count is not a verification depth. When the diff contains a check, a
+gate or a guard, put the method paragraph in the dispatch prompt — it costs one
+paragraph and it is what separates a lane that could only agree from one that
+could disagree. Two cautions, both real: a read-only lane must mutate a COPY or
+say it could not, and a lane that mutates the working tree must restore it —
+**verify the tree yourself afterwards** (`a-review-lane-mutated-a-tracked-file`,
+
+# 399), rather than trusting the report's word that it did
+
 ## References
 
 - `references/repo-smells.md` — the repo-specific smells that are NOT in the
