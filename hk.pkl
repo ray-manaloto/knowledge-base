@@ -534,7 +534,11 @@ local lintSteps: Mapping<String, Step> = new {
   //     everything declared after it. At its old position (15 of 20) that split
   //     the run into THREE phases and stranded five unrelated steps — ty,
   //     no_lint_skip, agnix, md_size_budget, skill_lint — behind a 40 ms task
-  //     that was itself waiting on a 1,546 ms one. Declared last, the barrier
+  //     that was itself waiting on a 1,546 ms one. (`lane_recording` was added
+  //     2026-09-01 and would now be a SIXTH; the five are the 2026-08-19
+  //     measurement and are left as measured rather than silently extended —
+  //     the conclusion is unchanged and the count is not re-measured.)
+  //     Declared last, the barrier
   //     drains a pipeline with nothing left behind it, and the run is two phases.
   //
   //     MEASURED 2026-08-19 from hk's own `--format json` on one host. Old
