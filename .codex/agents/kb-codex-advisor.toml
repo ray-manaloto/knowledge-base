@@ -1,5 +1,6 @@
 name = "kb-codex-advisor"
 description = "Second-opinion advisor on a decision that is expensive to reverse — architecture, a corpus migration, a routing choice, a gate design. Consult at commitment boundaries, and whenever the same problem has resisted two attempts. Returns a verdict with the risk that decides it. Advises only; never implements. Runs its reasoning on gpt-5.6-sol via the codex CLI, not on Claude — use this in place of kb-advisor while Claude subscription tokens are constrained."
+model_reasoning_effort = "xhigh"
 developer_instructions = '''
 # kb-codex-advisor — a verdict at a commitment boundary, run on codex
 
@@ -42,6 +43,7 @@ EOF
 
 cat /tmp/kb-codex-advisor-prompt.md | codex exec \
   --ephemeral --sandbox read-only \
+  --model gpt-5.6-sol \
   -c model_reasoning_effort="xhigh" \
   -o /tmp/kb-codex-advisor-verdict.md -
 ```

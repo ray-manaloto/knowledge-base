@@ -1,0 +1,111 @@
+<title>Two Rulings Waiting</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;600&display=swap">
+<style>
+  :root{
+    --paper:#F4F4F1;
+    --card:#FFFFFF;
+    --ink:#1F1D1A;
+    --dim:#5E5A54;
+    --rule:#D8D6D0;
+    --teal:#175E63;
+    --plum:#4A3B75;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Public Sans",ui-sans-serif,system-ui,sans-serif;
+    font-size:16.5px;
+    line-height:1.45;
+    margin:0;
+    padding:30px 20px 26px;
+    display:flex;
+    justify-content:center;
+  }
+  main{width:100%;max-width:680px}
+
+  h1{
+    font-family:Fraunces,Georgia,serif;
+    font-weight:600;
+    font-size:clamp(26px,4.6vw,34px);
+    line-height:1.1;
+    margin:0 0 18px;
+    text-wrap:balance;
+  }
+
+  figure{margin:0 0 18px;background:var(--card);border:1px solid var(--rule);border-radius:4px;padding:14px 10px 10px}
+  svg{display:block;width:100%;height:auto}
+  figcaption{font-size:14px;color:var(--dim);text-align:center;margin-top:6px}
+
+  .q{
+    background:var(--card);
+    border:1px solid var(--rule);
+    border-radius:4px;
+    padding:14px 18px;
+    margin-bottom:12px;
+  }
+  .q h2{
+    font-family:Fraunces,Georgia,serif;
+    font-weight:600;
+    font-size:19px;
+    margin:0 0 6px;
+  }
+  .q p{margin:0;color:var(--dim);font-size:15.5px}
+  .q p + p{margin-top:6px}
+  .q b{color:var(--ink);font-weight:600}
+  .t{color:var(--teal);font-weight:600}
+  .p{color:var(--plum);font-weight:600}
+
+  .ask{
+    margin:16px 0 0;
+    padding:14px 18px;
+    background:var(--ink);
+    color:#F6F5F2;
+    border-radius:4px;
+  }
+  .ask b{color:#fff}
+</style>
+
+<main>
+  <h1>Both of these are now answered</h1>
+  <p class="sub" style="margin:-12px 0 18px">Published while they were open. Kept as written, with the answers added — the questions turned out to have better answers than the options I offered.</p>
+
+  <figure>
+    <svg viewBox="0 0 640 168" role="img" aria-label="One helper is described in two files: a Claude copy that names its brain, and a codex copy that names nothing. This repeats seven times.">
+      <rect x="238" y="6" width="164" height="34" rx="4" fill="#FFFFFF" stroke="#1F1D1A" stroke-width="1.5"/>
+      <text x="320" y="28" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="14.5" fill="#1F1D1A">one helper</text>
+
+      <path d="M320 40 L320 58 M320 58 L150 58 L150 74 M320 58 L490 58 L490 74"
+            fill="none" stroke="#5E5A54" stroke-width="1.5"/>
+
+      <rect x="36" y="74" width="228" height="72" rx="4" fill="#FFFFFF" stroke="#175E63" stroke-width="1.5"/>
+      <text x="150" y="95" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="14.5" font-weight="600" fill="#175E63">its Claude copy</text>
+      <text x="150" y="115" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="13.5" fill="#1F1D1A">says which brain to use</text>
+      <text x="150" y="133" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="13.5" fill="#1F1D1A">and how hard to think</text>
+
+      <rect x="376" y="74" width="228" height="72" rx="4" fill="#FFFFFF" stroke="#4A3B75" stroke-width="1.5"/>
+      <text x="490" y="95" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="14.5" font-weight="600" fill="#4A3B75">its codex copy</text>
+      <text x="490" y="115" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="13.5" fill="#1F1D1A">says how hard to think</text>
+      <text x="490" y="133" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="13.5" fill="#9C2B2B">but never which brain</text>
+
+      <text x="320" y="162" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="13.5" fill="#5E5A54">— and this pair exists seven times, one per helper —</text>
+    </svg>
+    <figcaption>That is what I meant by "mirrors": every helper is written down twice.</figcaption>
+  </figure>
+
+  <div class="q">
+    <h2><span class="t">1.</span> The graphify connection nobody can log into</h2>
+    <p>We tell both Claude and codex to reach a graphify service <b>over the internet</b>. Neither is given a password, so both are turned away every time. The tool sitting next to it in the same file <b>does</b> have one.</p>
+    <p>It also isn't our knowledge — ours is a file on this machine. That service holds a different, smaller thing.</p>
+    <p><b>Answered:</b> neither. There was no password to get — it signs in through your account, once, and nobody had ever done it. Ray ran it; all three services connect now.</p>
+  </div>
+
+  <div class="q">
+    <h2><span class="p">2.</span> Should the codex copies name a brain?</h2>
+    <p>Six of those seven helpers are Claude's. Writing a codex brain into their codex copy isn't a typo fix — it decides <b>what they become</b> if codex ever runs them directly.</p>
+    <p>Today they'd quietly fall back to a middling default instead.</p>
+    <p><b>Answered:</b> neither — codex already had a setting for exactly this. One line names a default for all seven, and any helper that names its own still wins.</p>
+  </div>
+
+  <p class="ask">→ <b>I need nothing from you here.</b> Both were settled the same way: by reading the vendor's own documentation instead of choosing between the options I'd invented.</p>
+</main>

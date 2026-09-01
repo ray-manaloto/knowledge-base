@@ -5,5 +5,46 @@ inherit = "core"
 CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD = "1"
 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"
 
+# Defaults for every subagent codex spawns from `.codex/agents/*.toml`.
+# An agent that declares its own model or effort still wins — the config
+# reference is explicit: "An explicit spawn model takes precedence"
+# (sources/codex-docs/.../config-file/config-reference/index.md:638,644).
+#
+# This is the NATIVE fix for the model never having been pinned. Before it,
+# every codex lane inherited its model from `~/.codex/config.toml` — a file
+# this repo neither owns nor watches, so the correct resolution to gpt-5.6-sol
+# was an accident of one machine's user config. Project config is layer 2 and
+# user config is layer 4 (config-basic/index.md:35), so this overrides it.
+#
+# Two lines here rather than a `model` key in all seven mirrors: the mirrors
+# stay free to differ, and nothing is locked in.
+[agents]
+default_subagent_model = "gpt-5.6-sol"
+default_subagent_reasoning_effort = "high"
+
+# graphify's OWN published Codex setup (app.graphify.com/<workspace>/mcp,
+# "Codex" tab) is these three lines, so `auth` is written out to match it.
+#
+# `auth` IS NOT WHAT WAS BROKEN, and saying so here would be worse than saying
+# nothing: `oauth` is the documented DEFAULT for `mcp_servers.<id>.auth`
+# (config-reference/index.md:504-509 — "`oauth` (default) uses stored MCP OAuth
+# credentials when available"), so this line is explicitness, not a repair. It
+# changes no behaviour.
+#
+# What was actually broken was the SIGN-IN, and nothing in any config file could
+# have fixed it. Codex is the one client that does not authenticate on first use
+# — graphify's page says so outright — so `codex mcp login graphify` has to be
+# run once, by hand, per server. It never had been, which is the whole of the
+# AuthRequired error every codex launch reported. The url was correct throughout.
+#
+# Run 2026-08-31 for graphify, exa and context7; all three read Auth=OAuth
+# afterwards. That state lives in `codex mcp list`, not here — ask it rather
+# than trusting this comment, which cannot know what has changed since.
+#
+# Auth is an OAuth handshake, so no key is stored here or anywhere.
+#
+# Project scope is graphify's own recommendation, not a local workaround:
+# "Scope it to one repo with .codex/config.toml".
 [mcp_servers.graphify]
 url = "https://api.graphify.com/mcp"
+auth = "oauth"

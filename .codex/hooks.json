@@ -40,6 +40,11 @@
             "type": "command",
             "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-currency-check",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-telemetry-prune",
+            "timeout": 30
           }
         ]
       }

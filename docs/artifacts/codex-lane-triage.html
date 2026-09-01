@@ -1,0 +1,138 @@
+<title>Codex Lane Triage</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+  :root{
+    --ink:#16202E;
+    --paper:#F6F8FA;
+    --card:#FFFFFF;
+    --rule:#D3DAE3;
+    --dim:#5A6879;
+    --loss:#A81E2D;
+    --safe:#1D6B5E;
+    --warn:#8A5A10;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Source Sans 3",ui-sans-serif,system-ui,sans-serif;
+    font-size:17px;
+    line-height:1.45;
+    margin:0;
+    padding:34px 20px 30px;
+    display:flex;
+    justify-content:center;
+  }
+  main{width:100%;max-width:660px}
+
+  h1{
+    font-family:Archivo,ui-sans-serif,system-ui,sans-serif;
+    font-weight:700;
+    font-size:clamp(28px,5.2vw,38px);
+    line-height:1.08;
+    letter-spacing:-.015em;
+    text-wrap:balance;
+    margin:0 0 4px;
+  }
+  .sub{color:var(--dim);margin:0 0 22px;font-size:16px}
+
+  .rows{
+    background:var(--card);
+    border:1px solid var(--rule);
+    border-radius:4px;
+    display:flex;
+    flex-direction:column;
+  }
+  .row{
+    display:grid;
+    grid-template-columns:104px 1fr;
+    gap:16px;
+    align-items:baseline;
+    padding:14px 18px;
+    border-bottom:1px solid var(--rule);
+  }
+  .row:last-child{border-bottom:0}
+  .k{
+    font-family:Archivo,sans-serif;
+    font-weight:600;
+    font-size:12px;
+    letter-spacing:.09em;
+    text-transform:uppercase;
+    color:var(--dim);
+  }
+  .v{margin:0}
+  .v b{font-weight:600}
+  .note{display:block;color:var(--dim);font-size:15px;margin-top:3px}
+
+  .bad{color:var(--loss);font-weight:600}
+  .ok{color:var(--safe);font-weight:600}
+  .hmm{color:var(--warn);font-weight:600}
+
+  .stripe-bad{box-shadow:inset 3px 0 0 var(--loss)}
+  .stripe-ok{box-shadow:inset 3px 0 0 var(--safe)}
+  .stripe-warn{box-shadow:inset 3px 0 0 var(--warn)}
+
+  .ask{
+    margin:22px 0 0;
+    padding:16px 18px;
+    background:var(--ink);
+    color:#F2F5F8;
+    border-radius:4px;
+    font-size:17px;
+  }
+  .ask b{color:#FFF}
+  footer{
+    margin-top:16px;
+    color:var(--dim);
+    font-size:14px;
+  }
+</style>
+
+<main>
+  <h1>Four fixed. The scary one turned out milder — and a new one is worse.</h1>
+  <p class="sub">Updated after the diagnosis came back. Two rows below changed.</p>
+
+  <div class="rows">
+
+    <div class="row stripe-warn">
+      <div class="k">Corrected</div>
+      <p class="v"><b class="hmm">Session notes get three seconds, total.</b>
+        <span class="note">They finish in about one and a half — on an idle machine. On a busy one they are killed halfway. Earlier today I told you they never save; that was too strong, and this row is the correction.</span>
+      </p>
+    </div>
+
+    <div class="row stripe-bad">
+      <div class="k">Losing now</div>
+      <p class="v"><b class="bad">A helper that dies leaves work nobody checks.</b>
+        <span class="note">It stops, writes nothing, and its half-finished changes sit in the folder looking like mine.</span>
+      </p>
+    </div>
+
+    <div class="row stripe-ok">
+      <div class="k">Done</div>
+      <p class="v"><b class="ok">Four settings that said one thing and did another.</b>
+        <span class="note">Fixed and checked. Nine lines. Helpers no longer take their brain from a file we don't control.</span>
+      </p>
+    </div>
+
+    <div class="row stripe-ok">
+      <div class="k">Now known</div>
+      <p class="v"><b class="ok">The three seconds are deliberate, not a bug.</b>
+        <span class="note">Codex caps this one step on purpose. So the fix is to stop doing the work there — not to argue with the cap.</span>
+      </p>
+    </div>
+
+    <div class="row stripe-bad">
+      <div class="k">Still open</div>
+      <p class="v"><b class="bad">We were reading the wrong copy of codex all along.</b>
+        <span class="note">The copy on disk is three versions behind the one running. Every line either of us quoted came from it.</span>
+      </p>
+    </div>
+
+  </div>
+
+  <p class="ask">→ <b>I need nothing from you right now.</b><br>
+    I'm committing the four fixes and writing the rest up as tickets. Stop me if you'd rather I kept going tonight.</p>
+
+  <footer>Measured today, three lane reports on disk. Six of the eight were broken before the move to codex and stay broken after Wednesday.</footer>
+</main>
