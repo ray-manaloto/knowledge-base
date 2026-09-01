@@ -85,6 +85,7 @@ def _print_usage() -> int:
         "--since <ISO> [--until <ISO>]) | "
         "session-search <pattern> [--agent A] [--since S] [--project P] "
         "[--limit N] [--regex] [--include-children] [--no-sync] | "
+        "lane-recording | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
         "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "
         "remember --question Q [--answer A|--answer-file F] "
@@ -448,6 +449,10 @@ def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
         from kb_setup import agentsview
 
         return agentsview.main(rest, repo_root)
+    if cmd == "lane-recording":
+        from kb_setup import lane_recording
+
+        return lane_recording.main(rest, repo_root)
     if cmd == "session-review-archive":
         from kb_setup import session_review_archive
 
@@ -610,7 +615,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "research-links <URL...> [--out PATH] | "
         "research-packages <SYSTEM> <NAME> [--out PATH] | "
         "research-codesearch <QUERY> [--repo OWNER/REPO] [--language LANG] [--out PATH] | "
-        "session-state [--no-pr] | next-ticket | "
+        "session-state [--no-pr] | next-ticket | lane-recording | "
         "session-review-archive --run-json PATH [--report-dir DIR] "
         "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "
         "remember [--audit] | cc | cc-doctor | "

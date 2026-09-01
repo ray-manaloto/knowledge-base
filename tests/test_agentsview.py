@@ -200,6 +200,51 @@ def test_an_unquoted_multi_word_pattern_says_to_quote_it(
     assert "kb_setup/agentsview.py" not in err, "the flag advice is wrong for a bare word"
 
 
+@pytest.mark.usefixtures("_binary")
+def test_lane_sessions_are_included_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One-shot and automated sessions are HIDDEN by agentsview unless asked for.
+
+    That default is the opposite of what this task is for: every `codex exec`
+    lane is a one-shot automated session. It announces the exclusion on stderr
+    ("Excluded 2846 sessions by default: 2669 one-shot, 177 automated"), which a
+    caller reading JSON on stdout never sees. Measured on one query: 11 sessions
+    by default against 31 with the flags — 20 hidden, 65%.
+    """
+    seen: list[list[str]] = []
+
+    def fake(argv: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        del timeout
+        seen.append(argv)
+        return _proc(0, out="{}")
+
+    monkeypatch.setattr(agentsview, "_run", fake)
+    assert agentsview.main(["p"], Path()) == Rc.OK
+    assert "--include-one-shot" in seen[-1]
+    assert "--include-automated" in seen[-1]
+
+
+@pytest.mark.usefixtures("_binary")
+def test_only_interactive_restores_the_tools_own_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The escape hatch, and the over-correction arm for the test above.
+
+    Inverting a tool's default must stay an opt-OUT, not a removal: someone
+    reviewing human sessions still needs the narrow view.
+    """
+    seen: list[list[str]] = []
+
+    def fake(argv: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        del timeout
+        seen.append(argv)
+        return _proc(0, out="{}")
+
+    monkeypatch.setattr(agentsview, "_run", fake)
+    assert agentsview.main(["p", "--only-interactive"], Path()) == Rc.OK
+    assert "--include-one-shot" not in seen[-1]
+    assert "--include-automated" not in seen[-1]
+
+
 def test_forced_env_pins_telemetry_and_update_check(monkeypatch: pytest.MonkeyPatch) -> None:
     """Telemetry off and update-check off must survive into the child process.
 

@@ -45,11 +45,24 @@ and any file:line evidence you gathered from the graph or Read/Grep>
 EOF
 
 cat /tmp/kb-codex-advisor-prompt.md | codex exec \
-  --ephemeral --sandbox read-only \
+  --sandbox read-only \
   --model gpt-5.6-sol \
   -c model_reasoning_effort="xhigh" \
   -o /tmp/kb-codex-advisor-verdict.md -
 ```
+
+**No `--ephemeral`, deliberately.** It means "run without persisting session
+files to disk" (`codex exec --help`), and a lane that persists nothing cannot be
+reviewed afterwards. Measured 2026-09-01, control-armed: `--ephemeral` adds 0
+files to `~/.codex/sessions`, without it +1, ~104 KB per run. `mise run
+kb-session-search` reads exactly those files, so this flag is the difference
+between a lane whose reasoning can be audited and one that leaves nothing.
+
+Known cost, stated because it is real: recorded lane runs become the newest
+recorded session, so `codex exec resume --last` will land on a lane rather than
+your own last session. Use `codex exec resume <session-id>`. `--thread-source`
+does NOT fix this — probed 0.151.0: it labels the file, does not validate its
+input, and does not exclude the run from `resume --last`.
 
 Never `--full-auto` and never a writable sandbox — you advise, you do not
 change anything, and codex must not be given permission to.

@@ -70,9 +70,18 @@ _FORCED_ENV = {
     #   session list --limit 2 --json   rc=1   same
     #   stats / projects / health       rc=1   same
     #
-    # Only `usage daily` reads SQLite directly. That contradicts the project's
-    # own README, which annotates `session list` as *"read from the daemon if
-    # warm, otherwise SQLite"* — so the doc is wrong, not this comment. The
+    # CONDITION, missing from this comment for one commit: those rc=1 rows were
+    # measured with NO DAEMON RUNNING. `AGENTSVIEW_NO_DAEMON` disables AUTOSTART,
+    # not use — re-measured with a daemon up, `session list --json` under the
+    # same variable returns rc=0. The accurate claim is "these commands need a
+    # daemon, and this variable stops one being started", not "these commands
+    # cannot read SQLite". The decision is unchanged; the reason is sharper. A
+    # fact that travels without its condition survives review and is still wrong
+    # where it is used (`verify-before-advancing.md`).
+    #
+    # Only `usage daily` runs with no daemon at all. That still contradicts the
+    # project's own README, which annotates `session list` as *"read from the
+    # daemon if warm, otherwise SQLite"* — there is no otherwise. The
     # daemon is therefore allowed to autostart; it is a local, loopback-bound
     # process the tool starts as an intrinsic consequence of the command the
     # user asked for. `agentsview daemon stop` ends it.
@@ -202,6 +211,24 @@ def _search_argv(binary: str, args: argparse.Namespace) -> list[str]:
         argv.append("--regex")
     if args.include_children:
         argv.append("--include-children")
+    if not args.only_interactive:
+        # INVERTED FROM agentsview's OWN DEFAULT, deliberately. It hides one-shot
+        # and automated sessions unless asked, and announces that only on stderr,
+        # where a caller reading JSON from stdout never sees it — its banner on
+        # this machine reported 2,846 sessions excluded, 2,669 one-shot and 177
+        # automated.
+        #
+        # Every `codex exec` lane this repo runs IS a one-shot automated session,
+        # so the tool's default hides precisely what this task exists to find.
+        # Measured 2026-09-01 on one query: 11 sessions by default against 31
+        # with these flags — 20 hidden, 65%.
+        #
+        # THIRD instance of one class in this module: the sync refusal was
+        # designed against it, the swallowed unknown flags were caught in review,
+        # and this one shipped. Here the silent incompleteness came from the
+        # TOOL'S default rather than from our code, which is why reading our own
+        # diff could not find it.
+        argv += ["--include-one-shot", "--include-automated"]
     return argv
 
 
@@ -223,6 +250,11 @@ def main(argv: list[str], repo_root: Path) -> int:
         "--include-children",
         action="store_true",
         help="include subagent sessions (this repo's lanes ARE subagents)",
+    )
+    parser.add_argument(
+        "--only-interactive",
+        action="store_true",
+        help="EXCLUDE one-shot and automated sessions (agentsview's default; not ours)",
     )
     parser.add_argument(
         "--no-sync",

@@ -200,7 +200,26 @@ gh = "2.98.0"
 # `~/.local/bin` is PATH position 2 against mise's shims at 159 — so a fresh
 # login shell reaches 1.1.2, three releases behind even the old pin. Control
 # arm: no `~/.local/bin/codex` exists, which is why codex resolves to its shim
-# correctly; the shadow is agy-specific, not a general PATH fault. The sibling
+# correctly; the shadow is agy-specific, not a general PATH fault.
+#
+# ⛔ THAT CONTROL ARM IS REFUTED — measured 2026-09-01, and it was wrong on both
+# halves. `~/.local/bin/codex` DOES exist: a symlink dated 2026-08-29 pointing at
+# `~/.codex/packages/standalone/current/bin/codex`, i.e. created AFTER the note
+# was written. And codex does NOT resolve to its shim — a bare `codex` reaches
+# `…/installs/npm-openai-codex/0.151.0/bin/codex` at **PATH position 17**, a
+# stale mise install dir baked in before tonight's 0.152.0 bump, while
+# `mise exec -- codex` reaches 0.152.0. So the shadow is NOT agy-specific; codex
+# has one too, by a different mechanism (a stale install dir ahead of the shims,
+# the recorded `pipx-graphifyy/0.9.23` shape, with `MISE_ENV_CACHE` set) rather
+# than a hand-installed binary. `~/.local/bin` sits at 163 and never wins here.
+#
+# The wrong half is left above rather than deleted because it is WHY this block
+# exists: a control arm that was true when written, refuted by a file created
+# three days later, and then quoted as settled. Neither file is this repo's to
+# touch (`do-not.md` #11) — the remedy is `mise exec --`, and Phase 2k tracks
+# making the skew observable instead of relying on a comment.
+#
+# The sibling
 # `antigravity` binary has no shadow and does resolve to this pin. Removing
 # that file is Ray's call — `do-not.md` #11 bars this repo from touching
 # anything under `~`. Until it goes, verify with `agy --version` in a FRESH
@@ -210,7 +229,7 @@ gh = "2.98.0"
 # `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
-"npm:@openai/codex" = "0.151.0"
+"npm:@openai/codex" = "0.152.0"
 antigravity-cli = "1.1.22"
 "npm:ctx7" = { version = "0.5.9", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.3"
@@ -1414,12 +1433,21 @@ description = "Search Claude AND Codex session transcripts: mise run kb-session-
 # The UI stays a plain `agentsview serve`, documented in sources/REGISTRY.md.
 #
 # IT MAY AUTOSTART A LOCAL DAEMON, and that is deliberate. Measured 2026-09-01
-# against the installed 0.41.1 with each command's own argv: ONLY `usage daily`
-# reads SQLite directly; `session search`, `session list`, `stats`, `projects`
-# and `health` all exit 1 with "daemon autostart is disabled" under
-# AGENTSVIEW_NO_DAEMON=1. The project's README says `session list` falls back to
-# SQLite -- the binary disagrees, so the README is wrong. End it with
-# `agentsview daemon stop`.
+# against the installed 0.41.1: only `usage daily` runs with no daemon at all;
+# `session search`, `session list`, `stats`, `projects` and `health` exit 1 with
+# "daemon autostart is disabled" under AGENTSVIEW_NO_DAEMON=1 WHEN NO DAEMON IS
+# RUNNING. That condition was missing here for one commit: the variable disables
+# AUTOSTART, not use -- with a daemon already up, the same command under the same
+# variable returns rc=0. The README's "read from the daemon if warm, otherwise
+# SQLite" is still wrong for `session list`; there is no otherwise. End the
+# daemon with `agentsview daemon stop`.
+#
+# IT ASKS FOR THE SESSIONS agentsview HIDES BY DEFAULT. The tool excludes
+# one-shot and automated sessions unless told otherwise, and says so only on
+# stderr -- 2,846 excluded on this machine, 2,669 one-shot and 177 automated.
+# Every `codex exec` lane is a one-shot automated session, so the default hides
+# exactly what this task is for: 11 sessions vs 31 on one measured query, 65%
+# hidden. `--only-interactive` restores the tool's own narrower view.
 #
 # IT REFUSES RATHER THAN ANSWERING FROM A STALE INDEX. agentsview reads a
 # derived SQLite index, so "0 results" has two causes that look identical: the
