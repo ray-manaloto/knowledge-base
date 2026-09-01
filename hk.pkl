@@ -514,14 +514,21 @@ local lintSteps: Mapping<String, Step> = new {
   //     recording", and that lives entirely in files.
   //
   //     It reuses skill_lint's CommonMark fence walker and check_first's shlex
-  //     tokeniser rather than grepping: both files it scans now DISCUSS
-  //     --ephemeral at length explaining why it is absent, and a literal search
-  //     would flag its own documentation — the false-positive class every
-  //     earlier guard here has been bitten by.
+  //     tokeniser rather than grepping: the mirrored kb-codex-advisor pair it
+  //     scans now DISCUSSES --ephemeral at length explaining why it is absent,
+  //     and a literal search would flag its own documentation — the
+  //     false-positive class every earlier guard here has been bitten by.
   //
-  //     Unglobbed, like md_size_budget and skill_lint: 8 files. Zero files
-  //     discovered exits NOT_RUN (127), never 0 — `hk run check -S <no-such-step>`
-  //     exits 0 and is labelled "passed", which is the trap this refuses.
+  //     Unglobbed, like md_size_budget and skill_lint. The scanned set is
+  //     DEFAULT_GLOBS in kb_setup.lane_recording — the two mirrored agent
+  //     directories plus the one rule file — deliberately not restated as a
+  //     count here: this comment said "8 files" while the gate reported 15 on
+  //     the very commit that wrote it (probes-need-a-control-arm.md rule 6 —
+  //     a figure a later commit invalidates reads as verified forever). Ask
+  //     the gate: `uv run kb-setup lane-recording` prints what it checked.
+  //     Zero files discovered exits NOT_RUN (127), never 0 —
+  //     `hk run check -S <no-such-step>` exits 0 and is labelled "passed",
+  //     which is the trap this refuses.
   ["lane_recording"] = new Step {
     check = "uv run kb-setup lane-recording"
   }
