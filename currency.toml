@@ -663,7 +663,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.15"
+expected = "2026.9.0"
 # ADDED 2026-08-08 (#242). The same SKIP-whose-reason-stopped-being-true hole
 # `[tool.hk]` records below, one tool over: `sources/mise.manifest` existed and
 # this table never named it, so `sync.py` reported a clean SKIP while the
@@ -720,6 +720,34 @@ argue against its own values.
 What that changes: `soft` is now INTENTIONALLY INERT at 2026.8.9, retained as a
 slot in case the two-tier split returns, per Ray. The "soft must stay ABOVE
 hard" rule above no longer applies and must not be used to "fix" the equality.
+
+MOVED 2026-09-01 for v2026.9.0, at the 2026.8.15 -> 2026.9.0 self-update: all
+three sites in the SAME change, per the ruling — `expected` here, `mise.toml`
+`min_version` (both keys, still equal and still intentionally inert), and
+`sources/mise.manifest` (ref v2026.9.0, commit
+c6f6130a03205ee1f9b63142244a8ebff4d1e918).
+
+Two releases were reviewed, v2026.8.16 and v2026.9.0; neither is breaking here.
+Two items are worth knowing rather than merely noting:
+
+- v2026.8.16 PRESERVES DOUBLE-DASH TASK ARGUMENTS with `double_dash="preserve"`
+  (jdx/mise#12628). Before it, the first `--` separator was consumed by the outer
+  CLI parser and lost before reaching the task. Every `mise run kb-* -- <args>`
+  in this repo goes through that path, so this is the release that made the form
+  reliable rather than incidentally-working.
+- v2026.9.0 FIXES POSTINSTALL HOOKS to activate the exact version being installed
+  (jdx/mise#12635), so nested `mise` calls inside a postinstall resolve that
+  version. That is ADJACENT to — not the same as — the 2026-08-24 renovate wedge,
+  which was a shim RE-ENTERING an install for a MISSING tool (`node-gyp`
+  resolving to a mise shim inside `dtrace-provider`'s postinstall).
+  Version-resolution and auto-install are different mechanisms, so treat this as
+  "worth re-probing the renovate install", never as "the wedge is fixed".
+
+The tag was resolved with the documented `gh api repos/jdx/mise/commits/<tag>`
+call and CONTROL-ARMED BOTH WAYS: that call reproduces the OLD pin
+(06c9ad7a39b162b7952c6c75beb879088f6c29b2) byte-for-byte, while the banned
+`git ls-remote --tags` form returns bf08cf20c24f13ba4d217a42421c1e61c4c4cf8b for
+v2026.9.0 — the TAG OBJECT, not the commit. The #395 trap is still live.
 
 What SURVIVES unchanged, and is now stronger: all three of `expected` (here),
 `min_version` (both keys) and `sources/mise.manifest` name ONE version and move

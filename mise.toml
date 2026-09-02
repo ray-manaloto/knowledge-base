@@ -37,7 +37,7 @@
 # `currency.toml`'s `expected` and `sources/mise.manifest`. All three now name
 # one version, so any disagreement between them is drift by definition. (They
 # drifted once under the old two-tier rule and the cold lane caught it.)
-min_version = { hard = "2026.8.15", soft = "2026.8.15" }
+min_version = { hard = "2026.9.0", soft = "2026.9.0" }
 
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
