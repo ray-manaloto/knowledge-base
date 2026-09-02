@@ -1,0 +1,177 @@
+<title>Counting What Nobody Checks</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ground: #FBFCFD;
+    --panel: #FFFFFF;
+    --ink: #16202B;
+    --muted: #5A6B7C;
+    --rule: #DCE3E9;
+    --flag: #A8481A;
+    --flag-wash: #FBF0E9;
+    --ok: #1C5946;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0;
+    padding: 34px 24px 40px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .sheet { width: 100%; max-width: 660px; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-family: "Newsreader", Georgia, serif;
+    font-weight: 600;
+    font-size: 33px;
+    line-height: 1.12;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+    margin: 0 0 22px;
+  }
+
+  h1 em { font-style: italic; color: var(--flag); }
+
+  dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 11px 18px;
+    align-items: baseline;
+  }
+
+  dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 2px;
+  }
+
+  dd { margin: 0; }
+  dd b { font-weight: 600; }
+  dd .hit { color: var(--flag); font-weight: 600; }
+
+  figure {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    margin: 24px 0 22px;
+    padding: 18px 20px 12px;
+  }
+
+  figure svg { display: block; width: 100%; height: auto; }
+
+  figcaption {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 10px;
+    padding-top: 9px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .ask {
+    margin-top: 24px;
+    padding: 15px 18px;
+    background: var(--flag-wash);
+    border-left: 3px solid var(--flag);
+    border-radius: 0 3px 3px 0;
+  }
+
+  .ask p { margin: 0; }
+  .ask p + p { margin-top: 7px; }
+  .ask .lead { font-weight: 600; }
+  .ask .opt { color: var(--muted); font-size: 14px; }
+  .ask .opt b { color: var(--ink); font-weight: 600; }
+</style>
+
+<div class="sheet">
+  <p class="eyebrow">Cold review · finding</p>
+  <h1>The broken-source count includes sources <em>nothing was ever going to check</em>.</h1>
+
+  <dl>
+    <dt>What</dt>
+    <dd>A new tool sweeps every source and reports which ones break the build. It said <b>11 are broken</b>.</dd>
+
+    <dt>The catch</dt>
+    <dd><span class="hit">One of those 11 is a text-only source.</span> The real build skips text-only sources entirely — it never opens them, so they cannot break it.</dd>
+
+    <dt>Why</dt>
+    <dd>The build asks two questions before reading a source. The sweep asks only the first one, so <b>8 text-only sources</b> get swept that the build sets aside.</dd>
+
+    <dt>Cost</dt>
+    <dd>That one source is among the three you marked “fine, leave them running.” <span class="hit">A second joins it</span> the moment this sweep is re-run — this round relabelled one more as text-only.</dd>
+  </dl>
+
+  <figure>
+    <svg viewBox="0 0 620 168" role="img" aria-label="The build filters sources twice — is it turned on, and is it code — while the sweep filters only once, so eight text-only sources reach it that the build never opens.">
+      <defs>
+        <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <polygon points="0,0 8,4 0,8" fill="currentColor"></polygon>
+        </marker>
+        <marker id="ahf" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <polygon points="0,0 8,4 0,8" fill="#A8481A"></polygon>
+        </marker>
+      </defs>
+
+      <rect x="1" y="62" width="96" height="44" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+      <text x="49" y="80" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="currentColor">79 sources</text>
+      <text x="49" y="96" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#5A6B7C">on the shelf</text>
+
+      <line x1="97" y1="84" x2="150" y2="46" stroke="currentColor" stroke-width="1.2" marker-end="url(#ah)"></line>
+      <line x1="97" y1="84" x2="150" y2="122" stroke="#A8481A" stroke-width="1.2" marker-end="url(#ahf)"></line>
+
+      <text x="118" y="52" font-family="IBM Plex Mono, monospace" font-size="10" fill="#5A6B7C">build</text>
+      <text x="112" y="136" font-family="IBM Plex Mono, monospace" font-size="10" fill="#A8481A">sweep</text>
+
+      <rect x="156" y="20" width="118" height="42" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+      <text x="215" y="37" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor">is it turned on?</text>
+      <text x="215" y="52" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#5A6B7C">79 → 79</text>
+
+      <line x1="274" y1="41" x2="316" y2="41" stroke="currentColor" stroke-width="1.2" marker-end="url(#ah)"></line>
+
+      <rect x="322" y="20" width="118" height="42" rx="2" fill="none" stroke="#1C5946" stroke-width="1.6"></rect>
+      <text x="381" y="37" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#1C5946">is it code?</text>
+      <text x="381" y="52" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#1C5946">79 → 71</text>
+
+      <line x1="440" y1="41" x2="482" y2="41" stroke="currentColor" stroke-width="1.2" marker-end="url(#ah)"></line>
+      <text x="552" y="37" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="currentColor">opens 71</text>
+      <text x="552" y="53" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#5A6B7C">sets 8 aside</text>
+
+      <rect x="156" y="102" width="118" height="42" rx="2" fill="none" stroke="#A8481A" stroke-width="1.2"></rect>
+      <text x="215" y="119" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#A8481A">is it turned on?</text>
+      <text x="215" y="134" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#A8481A">79 → 79</text>
+
+      <line x1="274" y1="123" x2="482" y2="123" stroke="#A8481A" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ahf)"></line>
+      <text x="378" y="116" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#A8481A">no second question</text>
+
+      <text x="552" y="119" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#A8481A">opens 79</text>
+      <text x="552" y="135" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#A8481A">11 broken</text>
+    </svg>
+    <figcaption>Same shelf, one missing question. The eight text-only sources the build sets aside are the gap between the two counts.</figcaption>
+  </figure>
+
+  <div class="ask">
+    <p class="lead">→ I need one decision from you.</p>
+    <p class="opt"><b>Fix it now</b> — small change, but it re-opens the “which sources do we leave running” call you already made, and the branch waits.</p>
+    <p class="opt"><b>File it and ship</b> — the branch goes out today; the count stays wrong until someone picks the ticket up.</p>
+  </div>
+</div>

@@ -151,3 +151,93 @@ def test_build_receipt_reads_the_schema_graphify_actually_writes() -> None:
     ):
         with pytest.raises(SystemExit, match="is not an array"):
             _graph_collections(broken)
+
+
+# --- Cold review of 69c126cbaef8: the census must not report clean without asking ---
+
+
+def test_a_bad_returncode_alone_blocks_a_source() -> None:
+    """The exit code is part of the verdict, not a printed column.
+
+    `fable-advisor` exits 1 with an empty graph. It happened to carry residue
+    that caught it, so a source failing closed with CLEAN stderr would have
+    printed `ok` — the gap this closes.
+    """
+    assert ec.SourceOutcome(name="rc-only", returncode=1).blocked
+    # The control arm: rc 0 and nothing else is still not blocked.
+    assert not ec.SourceOutcome(name="fine", returncode=0).blocked
+
+
+def test_docs_manifests_are_not_selected_because_the_build_never_opens_them(
+    tmp_path,
+) -> None:
+    """A `kind = docs` source cannot block a build that never AST-scans it.
+
+    Scanning one produced a blocked row for `codex-docs` that then drove a
+    registration. The predicate is `is_ast_scanned`, never `is_built`.
+    """
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    (sources / "a-code.manifest").write_text(
+        "url = https://example.com/a\nref = main\ncommit = " + "0" * 40 + "\nkind = code\n"
+    )
+    (sources / "b-docs.manifest").write_text(
+        "url = https://example.com/b\nref = main\ncommit = " + "0" * 40 + "\nkind = docs\n"
+    )
+    names = [m.name for m in ec.selected(tmp_path)]
+    assert names == ["a-code"], names
+
+
+def test_a_source_with_no_clone_is_recorded_not_dropped(tmp_path) -> None:
+    """`missing` is the visible record; `examined` is the honest denominator."""
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    (sources / "gone.manifest").write_text(
+        "url = https://example.com/g\nref = main\ncommit = " + "0" * 40 + "\nkind = code\n"
+    )
+    census = ec.run(tmp_path)
+    assert census.missing == ["gone"]
+    assert census.examined == 0
+    assert census.sources == []
+
+
+def test_an_all_missing_run_refuses_rather_than_reporting_zero_blocked(tmp_path) -> None:
+    """The house rule: never return "0 blocked" for a corpus nobody examined."""
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    (sources / "gone.manifest").write_text(
+        "url = https://example.com/g\nref = main\ncommit = " + "0" * 40 + "\nkind = code\n"
+    )
+    assert ec.main(tmp_path, []) == ec.Rc.NOT_RUN
+
+
+def test_an_only_name_matching_nothing_is_a_bad_request(tmp_path) -> None:
+    """A typo filtered the worklist to empty and still exited 0."""
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    (sources / "real.manifest").write_text(
+        "url = https://example.com/r\nref = main\ncommit = " + "0" * 40 + "\nkind = code\n"
+    )
+    assert ec.main(tmp_path, ["--only", "no-such-source"]) == ec.Rc.BAD_REQUEST
+    # The control arm: a name that DOES match gets past the request check.
+    assert ec.main(tmp_path, ["--only", "real"]) != ec.Rc.BAD_REQUEST
+
+
+def test_report_elides_long_stderr_but_says_how_many() -> None:
+    """The sibling collision branch said so; this one did not, under "verbatim"."""
+    residue = "\n".join(f"line {n}" for n in range(ec._MAX_LISTED_STDERR + 4))
+    census = ec.Census(started_at="2026-09-02T00:00:00+00:00")
+    census.sources = [ec.SourceOutcome(name="noisy", returncode=0, other_stderr=residue)]
+    rendered = ec._render(census)
+    assert "… 4 more line(s)" in rendered
+    assert "line 0" in rendered
+    assert "line 12" not in rendered
+
+
+def test_report_names_the_sources_it_could_not_examine() -> None:
+    census = ec.Census(started_at="2026-09-02T00:00:00+00:00")
+    census.sources = [ec.SourceOutcome(name="ok-one", returncode=0, nodes=5)]
+    census.missing = ["never-cloned"]
+    rendered = ec._render(census)
+    assert "NOT EXAMINED" in rendered
+    assert "`never-cloned`" in rendered

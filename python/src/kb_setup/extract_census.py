@@ -41,6 +41,7 @@ from pathlib import Path
 
 from kb_setup import manifest as mf
 from kb_setup.graphify_env import clean_env
+from kb_setup.result import Rc
 
 #: graphify's #2551 warning. The count is authoritative; the path list it carries
 #: is truncated by graphify itself ("(+5 more)"), so paths are recorded as a
@@ -55,6 +56,11 @@ _COLLISION = re.compile(r"node '([^']+)' is minted by two different files")
 #: show the SHAPE of a collision set (all `.d.ts`/`.js` siblings, say) without
 #: reprinting 1,138 of them.
 _MAX_LISTED_IDS = 12
+
+#: Unclassified stderr lines printed per source before the report elides the rest.
+#: Paired with an explicit "… N more" note: the elision is the thing that has to
+#: be visible, not the bound.
+_MAX_LISTED_STDERR = 10
 
 
 @dataclass
@@ -71,21 +77,42 @@ class SourceOutcome:
 
     @property
     def blocked(self) -> bool:
-        """Whether this source stops `kb-build`: any warning class at all."""
-        return bool(self.syntax_files or self.collision_ids or self.other_stderr)
+        """Whether this source stops `kb-build`: any warning class, or a bad rc.
+
+        `returncode` is part of the judgement, not just a printed column. It was
+        omitted at first, which made the predicate blind to the one source whose
+        ONLY signal is the exit status: `fable-advisor` exited 1 with an empty
+        graph and no classifiable stderr line of its own. It happened to carry
+        residue that caught it, so the gap never showed — a source failing
+        closed with clean stderr would have printed `ok`. (Cold review of
+        `69c126cbaef8`.)
+        """
+        return bool(self.returncode or self.syntax_files or self.collision_ids or self.other_stderr)
 
 
 @dataclass
 class Census:
-    """One sweep's outcomes, in the order the sources were extracted."""
+    """One sweep's outcomes, in the order the sources were extracted.
+
+    `examined` is the denominator every figure here is against, and it is
+    deliberately NOT `len(sources)`: a source selected but never extracted (no
+    clone on disk) belongs in `missing`, where it is visible, rather than
+    dropped. A run that examined nothing must be able to say so — see `main`.
+    """
 
     started_at: str
     sources: list[SourceOutcome] = field(default_factory=list)
+    missing: list[str] = field(default_factory=list)
 
     @property
     def blocked(self) -> list[SourceOutcome]:
         """Every source that would stop the build, build order preserved."""
         return [s for s in self.sources if s.blocked]
+
+    @property
+    def examined(self) -> int:
+        """How many sources were actually extracted. Never the selection size."""
+        return len(self.sources)
 
 
 def _classify(stderr: str) -> tuple[int, tuple[str, ...], tuple[str, ...], str]:
@@ -183,16 +210,29 @@ def _extract(repo_root: Path, name: str, clone: Path) -> subprocess.CompletedPro
     )
 
 
-def run(repo_root: Path, *, only: frozenset[str] | None = None) -> Census:
-    """Extract every buildable source once, past every failure."""
-    census = Census(started_at=datetime.now(UTC).isoformat())
-    manifests = [m for m in mf.load_all(repo_root / "sources") if m.is_built]
+def selected(repo_root: Path, *, only: frozenset[str] | None = None) -> list[mf.Manifest]:
+    """The manifests a census sweep covers: exactly what `kb-build` AST-scans.
+
+    `is_ast_scanned`, never `is_built`. The census exists to predict which
+    sources stop the build, so scanning one the build never opens produces a
+    blocked row for a blockage that cannot happen — which is what put
+    `codex-docs` on a census blocked list and then into a registration.
+    """
+    manifests = [m for m in mf.load_all(repo_root / "sources") if m.is_ast_scanned]
     if only is not None:
         manifests = [m for m in manifests if m.name in only]
+    return manifests
+
+
+def run(repo_root: Path, *, only: frozenset[str] | None = None) -> Census:
+    """Extract every AST-scanned source once, past every failure."""
+    census = Census(started_at=datetime.now(UTC).isoformat())
+    manifests = selected(repo_root, only=only)
     total = len(manifests)
     for index, m in enumerate(manifests, start=1):
         if not m.clone_dir.exists():
-            print(f"[{index}/{total}] {m.name}: NO CLONE — run kb-build first, skipping")
+            census.missing.append(m.name)
+            print(f"[{index}/{total}] {m.name}: NO CLONE — run kb-build first, NOT EXAMINED")
             continue
         proc = _extract(repo_root, m.name, m.clone_dir)
         unapproved = _unapproved_stderr(repo_root, m.name, proc.stderr or "")
@@ -231,8 +271,13 @@ def _render(census: Census) -> str:
         "# Extraction census",
         "",
         (
-            f"Started {census.started_at}. Sources extracted: {len(census.sources)}. "
+            f"Started {census.started_at}. Sources extracted: {census.examined}. "
             f"Blocked: {len(census.blocked)}."
+        ),
+        "",
+        (
+            "Scope: every source `kb-build` AST-scans (`Manifest.is_ast_scanned`) — "
+            "`kind = docs` manifests are excluded here because the build never opens them."
         ),
         "",
         "| source | rc | syntax-error files | distinct collision ids | nodes |",
@@ -255,26 +300,62 @@ def _render(census: Census) -> str:
             if len(s.collision_ids) > _MAX_LISTED_IDS:
                 lines.append(f"  - … {len(s.collision_ids) - _MAX_LISTED_IDS} more")
         if s.other_stderr:
+            residue = s.other_stderr.splitlines()
             lines.append("- UNCLASSIFIED stderr (verbatim):")
-            lines += [f"  > {line}" for line in s.other_stderr.splitlines()[:10]]
+            lines += [f"  > {line}" for line in residue[:_MAX_LISTED_STDERR]]
+            # The sibling collision branch above says how many it elided; this one
+            # did not, under a heading reading "verbatim". An unclassified line is
+            # precisely the class a summary must not silently shorten.
+            if len(residue) > _MAX_LISTED_STDERR:
+                lines.append(f"  - … {len(residue) - _MAX_LISTED_STDERR} more line(s)")
+        lines.append("")
+    if census.missing:
+        lines += [
+            "## NOT EXAMINED",
+            "",
+            (
+                f"{len(census.missing)} selected source(s) had no clone on disk and were "
+                "never extracted. They are neither clean nor blocked — run `mise run "
+                "kb-build` first, then re-run this census."
+            ),
+            "",
+        ]
+        lines += [f"- `{name}`" for name in census.missing]
         lines.append("")
     return "\n".join(lines) + "\n"
 
 
 def main(repo_root: Path, argv: list[str]) -> int:
-    """Run the sweep, write the report, and return 0 unless the request was bad.
+    """Run the sweep, write the report, and report what was actually examined.
 
-    `--only <name>...` narrows it to named sources. Exit 2 for a request that
-    cannot be honoured (`--only` with no names); never non-zero for a blocked
-    source, which is the thing this exists to find.
+    `--only <name>...` narrows it to named sources. A blocked source is never a
+    non-zero rc — it is the finding this exists to produce. Two other states are:
+
+    * `Rc.BAD_REQUEST` — `--only` with no names, or with a name matching no
+      AST-scanned source. A name that matches nothing silently filtered the
+      worklist to empty and still printed "0 BLOCKED", which is a clean bill of
+      health for a question nobody asked. The message NAMES the misses, because
+      the usual cause is a typo or a source that is `kind = docs`.
+    * `Rc.NOT_RUN` — the selection was fine and nothing was examined anyway
+      (no clones on disk). Same reasoning, different cause: "we did not look" is
+      a third state, and `kb-session-select`, `kb-attribute-write` and
+      `skill_lint` all already refuse rather than return an empty list.
+
+    (Both added after the cold review of `69c126cbaef8`.)
     """
     only: frozenset[str] | None = None
     if "--only" in argv:
         names = argv[argv.index("--only") + 1 :]
         if not names:
             print("--only needs at least one source name")
-            return 2
+            return Rc.BAD_REQUEST
         only = frozenset(names)
+        known = {m.name for m in selected(repo_root)}
+        unknown = sorted(only - known)
+        if unknown:
+            print(f"--only names no AST-scanned source: {', '.join(unknown)}")
+            print("(a `kind = docs` source is not scanned here — the build never opens it)")
+            return Rc.BAD_REQUEST
     census = run(repo_root, only=only)
     out_dir = repo_root / ".agent" / "kb" / "reports"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -282,6 +363,13 @@ def main(repo_root: Path, argv: list[str]) -> int:
     report = out_dir / f"extract-census-{stamp}.md"
     report.write_text(_render(census), encoding="utf-8")
     print()
-    print(f"extracted {len(census.sources)} source(s); {len(census.blocked)} BLOCKED")
+    if not census.examined:
+        print(f"NOT RUN — 0 source(s) examined, {len(census.missing)} with no clone on disk.")
+        print("This is not a clean corpus: run `mise run kb-build` first.")
+        print(f"report: {report}")
+        return Rc.NOT_RUN
+    print(f"extracted {census.examined} source(s); {len(census.blocked)} BLOCKED")
+    if census.missing:
+        print(f"NOT EXAMINED: {len(census.missing)} source(s) with no clone — {census.missing}")
     print(f"report: {report}")
-    return 0
+    return Rc.OK
