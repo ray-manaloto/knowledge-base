@@ -109,10 +109,10 @@
 <div class="sheet">
   <p class="eyebrow">graphify · openai-cli · measured 2026-09-02</p>
   <h1>Asking for the other engine gives you the old answer back.</h1>
-  <p class="standfirst">You wanted to re-run already-extracted sources on a different AI backend and compare. Right now that command <b>silently does nothing</b> — and nothing on disk would tell you.</p>
+  <p class="standfirst">You wanted to re-run already-extracted sources on a different AI backend and compare. Right now that command <b>silently does nothing</b> — and nothing the graph keeps would tell you.</p>
 
   <figure>
-    <svg viewBox="0 0 640 200" role="img" aria-label="A re-extraction request naming a new backend is matched against a saved-work key built only from file contents, the mode and the prompt. The backend name is not part of that key, so the request matches the old entry and the saved answer is returned without the new backend ever running.">
+    <svg viewBox="0 0 640 200" role="img" aria-label="A re-extraction request naming a new backend is matched against a saved-work key built only from file contents, the mode and the prompt. The backend name is not part of that key, so the request matches the old entry and the saved answer is returned without the new backend ever running. Nothing the graph keeps records which engine produced any of it.">
       <defs>
         <marker id="a1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
           <polygon points="0,0 8,4 0,8" fill="currentColor"></polygon>
@@ -145,8 +145,8 @@
 
       <rect x="1" y="104" width="400" height="76" fill="none" stroke="#E0E2DD" stroke-width="1.2"></rect>
       <text x="18" y="126" font-family="IBM Plex Sans, sans-serif" font-size="12.5" font-weight="600" fill="currentColor">Why you cannot check afterwards</text>
-      <text x="18" y="146" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#5C635C">Nothing saved to disk records which engine made</text>
-      <text x="18" y="163" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#5C635C">any piece of data. Not the graph. Not the cache.</text>
+      <text x="18" y="146" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#5C635C">Nothing the graph keeps records which engine</text>
+      <text x="18" y="163" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#5C635C">made any piece of it. Not the graph, not the cache.</text>
     </svg>
     <figcaption>The engine name reaches the screen and nothing else — it is printed, then dropped. Verified against the installed 0.9.53 source, control-armed.</figcaption>
   </figure>
@@ -156,13 +156,13 @@
     <dd>Already built — the fork can fall back to a second engine mid-run. <b>That part works.</b></dd>
 
     <dt>Proving it</dt>
-    <dd><span class="hit">Missing entirely.</span> No file anywhere says which engine produced which piece of data.</dd>
+    <dd><span class="hit">Missing where it counts.</span> Nothing the graph keeps says which engine produced which piece of data. Some throwaway local logs do — they are not kept, not shared, and not what anyone would read.</dd>
 
     <dt>Worse</dt>
     <dd>Falling back <b>mixes two engines into one graph on purpose</b>, and marks nothing. Any mixing that already happened is now invisible.</dd>
 
     <dt>Fix</dt>
-    <dd>Two small changes to our own copy: put the engine in the lookup key, and stamp it on what gets saved.</dd>
+    <dd>Two changes to our own copy — put the engine in the lookup key, stamp it on what gets saved. Small to describe; the plan to land them safely runs to <b>21 steps</b>.</dd>
   </dl>
 
   <div class="ask">
