@@ -42,9 +42,9 @@
 # its head verbatim; the branch has been rebased forward twice since.
 #
 # THE REF IS A BRANCH WE CREATED, and that contradicts the "never a branch head"
-# rule above for one specific reason: `refs/heads/kb-pin/openai-cli-backend-v0.9.50`
-# (the ref recorded below — the branch is renamed per rebase base) in
-# our fork exists ONLY to hold this commit. Nothing pushes to it, so it cannot
+# rule above for one specific reason: the branch recorded in `ref` below — named
+# per rebase base, so do not read a version out of this sentence; read it from
+# `ref` — in our fork exists ONLY to hold this commit. Nothing pushes to it, so it cannot
 # drift the way `v8` does. The `commit` below is still the authority; the branch
 # is there so the object survives if TelB-io (whose fork the PR head lives on)
 # deletes their branch. Forks share object storage within a network, which is how
