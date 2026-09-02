@@ -1,0 +1,66 @@
+<title>The Settled Round</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#F7F8FA; --card:#FFFFFF; --ink:#1B2027; --muted:#5F6875;
+    --rule:#DFE3E9; --accent:#2B4C7E; --codex:#2E6650; --claude:#93331F;
+    --display:"Newsreader",Georgia,serif;
+    --body:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);
+       margin:0;padding:32px 22px 38px;line-height:1.42;-webkit-font-smoothing:antialiased}
+  main{max-width:800px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+  h1{font-family:var(--display);font-weight:600;font-size:28px;line-height:1.15;
+     margin:0;text-wrap:balance;letter-spacing:-.01em}
+  .sub{font-size:14px;color:var(--muted);margin:5px 0 0}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--accent);margin:0 0 9px}
+  .rows{background:var(--card);border:1px solid var(--rule);border-radius:7px;overflow:hidden}
+  .r{display:grid;grid-template-columns:26px 70px 1fr;gap:12px;padding:11px 16px;
+     border-top:1px solid var(--rule);align-items:baseline;font-size:14px}
+  .r:first-child{border-top:none}
+  .n{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .who{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+       font-weight:500}
+  .who.codex{color:var(--codex)} .who.claude{color:var(--claude)} .who.me{color:var(--accent)}
+  .r b{font-weight:600} .r i{font-style:normal;color:var(--muted)}
+  .notes{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);
+         border-left:2px solid var(--accent);padding-left:13px}
+  .notes b{color:var(--ink);font-weight:600}
+  .ask{font-family:var(--display);font-size:18px;font-weight:500;
+       border-top:1px solid var(--rule);padding-top:16px;margin:0}
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">Settled by grilling · 2026-09-01 · one branch, one PR</p>
+    <h1>The round, in the order it runs</h1>
+    <p class="sub">Each line says who does it. Green is codex, red spends your Claude window, blue is me.</p>
+  </header>
+
+  <div class="rows">
+    <div class="r"><span class="n">1</span><span class="who codex">codex</span>
+      <div><b>Refresh 29 sources.</b> <i>Move every pin to today, then read the code ones into the graph — that part is free.</i></div></div>
+    <div class="r"><span class="n">2</span><span class="who claude">claude</span>
+      <div><b>Read the changed docs into the graph.</b> <i>You chose the proven path over the cheap one. This is the token spend.</i></div></div>
+    <div class="r"><span class="n">3</span><span class="who codex">codex</span>
+      <div><b>Rebuild, and see what breaks.</b> <i>We know it fails two different ways. File the tickets after, against what's actually true.</i></div></div>
+    <div class="r"><span class="n">4</span><span class="who codex">codex</span>
+      <div><b>Read the six new releases. Hunt for Fable 5.1.</b> <i>It's nowhere in our copy today. If refreshing doesn't find it, we go fetch it.</i></div></div>
+    <div class="r"><span class="n">5</span><span class="who codex">codex</span>
+      <div><b>Search all 181 past sessions</b> <i>for what we already worked out about the weekly reset and never wrote down.</i></div></div>
+    <div class="r"><span class="n">6</span><span class="who me">me</span>
+      <div><b>Rewrite the "codex only" rule</b> <i>to your new one, with no date in it. Add today's measurement to the write-only-memory ticket.</i></div></div>
+    <div class="r"><span class="n">7</span><span class="who codex">codex</span>
+      <div><b>A second lane fixes the gaps. A third, colder one checks it.</b> <i>The fixer never grades its own work.</i></div></div>
+  </div>
+
+  <div class="notes">
+    <p style="margin:0"><b>Two things I decided without asking:</b> the new phases go into the plan file you already have, not a new one — a second plan would switch the first one off. And I'll consult an advisor before each codex dispatch, as your standing rule requires.</p>
+    <p style="margin:0"><b>One thing I got wrong earlier:</b> I re-derived the weekly-reset mechanism from scratch instead of remembering it. That's why step 5 exists.</p>
+  </div>
+
+  <p class="ask">→ Say go, or change a line. Nothing has started.</p>
+</main>

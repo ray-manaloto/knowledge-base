@@ -2,7 +2,7 @@
 # Hacker News reading archive: 1,551 .org files, 342 MB. DEFERRED, not skipped — see build = defer below.
 url = https://github.com/thevibeworks/claude-reads-hn
 ref = main
-commit = b85eee0d478dfe2fdeac42a85b6f2ee3b472e8bd
+commit = 34d97e10c51fd962e8d9bb0d3fbd663ac2c64a7e
 kind = docs
 # DEFERRED ON COST 2026-08-24 (Ray's ruling, and the reason `build = defer`
 # exists at all — see `kb_setup.manifest.Manifest.build`).

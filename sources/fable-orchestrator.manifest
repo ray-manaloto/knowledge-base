@@ -2,6 +2,6 @@
 # Fable orchestrator reference (T1).
 url = https://github.com/mar3co/fable-orchestrator
 ref = main
-commit = cd43e27691e83a9c6239d33efd93cabf45aa8aac
+commit = 78f9cb566cd99597e4436d42c7b832f8109a0e7a
 kind = code
 added = 2026-07-22

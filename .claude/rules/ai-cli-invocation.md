@@ -36,7 +36,13 @@ auto-selects either. `agy` is not a backend. Key-detected backends stay stripped
 echo "prompt" | codex exec --sandbox read-only -
 
 # Implementation (with tool execution):
-echo "prompt" | codex exec --full-auto --sandbox workspace-write -
+echo "prompt" | codex exec --sandbox workspace-write --add-dir "$HOME/Library/Caches" -
+
+# Implementation that must reach the NETWORK (git ls-remote, kb-update, kb-build,
+# gh, any fetch) — add the network flag as well:
+echo "prompt" | codex exec --sandbox workspace-write \
+  --add-dir "$HOME/Library/Caches" \
+  -c sandbox_workspace_write.network_access=true -
 
 # With reasoning effort override:
 echo "prompt" | codex exec -c model_reasoning_effort="high" -
@@ -44,6 +50,54 @@ echo "prompt" | codex exec -c model_reasoning_effort="high" -
 # Capture to file (for background use):
 cat prompt.md | codex exec -o /tmp/result.md -
 ```
+
+**`--add-dir "$HOME/Library/Caches"` IS MANDATORY on any lane that runs a gate**
+(2026-09-01). `workspace-write` makes only the workspace writable, and uv's cache
+lives outside it — so `uv run …` and every uv-backed `mise run …` dies with
+`Failed to initialize cache at ~/Library/Caches/uv`, **exit 2**, which reads in a
+transcript exactly like the task under test failing.
+
+Two-armed, measured on codex-cli 0.152.0 against `mise run kb-context`:
+`codex exec -s workspace-write` -> **rc=2**, the cache error;
+the same call plus `--add-dir "$HOME/Library/Caches"` -> **rc=0**, clean output.
+
+This **refutes the standing note** that a codex lane cannot run this repo's gates
+at all (memory `codex-lane-cannot-write-agents-or-run-uv-gates`, measured
+2026-08-30 through the fable-orchestrator lane wrapper). The uv half was a
+missing flag, not a sandbox wall. The `.agents/` half of that note is untouched
+and still stands.
+
+**`workspace-write` ALSO BLOCKS NETWORK EGRESS, and that is the second wall**
+(2026-09-01). It is a separate mechanism from the write sandbox, so `--add-dir`
+does nothing for it — `-c sandbox_workspace_write.network_access=true` is the
+switch. Two-armed on codex-cli 0.152.0, `git ls-remote github.com`:
+without the flag -> **rc 128**, `fatal: unable to access …: Could not resolve
+host: github.com`; with it -> **rc 0**, the tag SHA.
+
+**The failure mode is what makes this expensive**, not the flag. `Could not
+resolve host` is the exact signature `persistence-gate-retry.md` classifies as a
+TRANSIENT worth one retry. It is not transient here — it is permanent and
+structural — so a lane told to "retry once on a network signature" retries,
+fails identically, and reports a network outage that does not exist. It cost
+**three** dispatches of one lane before the arms were run: the first blamed a
+preflight, the second a transient, the third retried the transient and got the
+same rc twice. The tell is the disagreement: the same command from an ordinary
+shell returns rc 0. **When a lane reports a network failure, run the command
+outside the lane before believing it.**
+
+Consequence for routing: **any lane that fetches — `kb-update`, `kb-build`,
+`gh`, `git ls-remote`, `mise install`, a doc fetch — needs the network flag, or
+it cannot do its job at all.** A read-only analysis lane does not.
+
+**`--full-auto` WAS IN THIS BLOCK AND DOES NOT EXIST.** On codex-cli 0.152.0 it
+hard-errors — `error: unexpected argument '--full-auto' found` — so every lane
+that followed this rule literally failed at its first call. It is not in
+`codex exec --help`. The nearest live flags are `--approve-for-me` (route
+approvals through automatic review under the workspace-write sandbox) and
+`--dangerously-bypass-approvals-and-sandbox` (no sandbox at all; for externally
+sandboxed environments only). This is the second time a flag documented here
+aged out silently, which is why the Reference section below says to re-probe the
+CLI rather than trust this file.
 
 **`--ephemeral` IS NO LONGER IN THESE PATTERNS** (2026-09-01, Ray). It means
 "run without persisting session files to disk", and a lane that persists nothing
@@ -66,6 +120,10 @@ leaves the run newest for `--last`.
 - `codex -p "prompt"` — `-p` is `--profile`, not prompt
 - `codex exec "prompt"` — positional arg without the `-` stdin flag
 - `codex --full-context` — flag does not exist
+- `codex exec --full-auto …` — **removed upstream**; hard-errors on 0.152.0
+- `codex exec -s workspace-write …` for anything that runs a gate — **no
+  `--add-dir`, so uv cannot open its cache and the gate exits 2**, which looks
+  identical to the gate failing
 
 The trailing `-` means "read prompt from stdin". Always pipe prompts via stdin
 to avoid ARG_MAX limits on large prompts.

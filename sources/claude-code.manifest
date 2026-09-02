@@ -1,6 +1,6 @@
 # Source manifest — reproducible-by-reference (Invariant 3).
 # Official Claude Code repo: CHANGELOG.md, feed.xml, plugins/, examples/. kind=docs — no product source to AST. The published changelog also reaches us via agent-harness-docs (docs/claude-code/changelog.md); this pin adds feed.xml, the plugin/example sources, and the git tags the mirror does not carry.
 url = https://github.com/anthropics/claude-code
-ref = v2.1.251
-commit = f1af9b1f4b1fd4c776135381606edada82ef638e
+ref = v2.1.258
+commit = aef74afe01f65b602258d6102b0da9730ac6f0aa
 kind = docs

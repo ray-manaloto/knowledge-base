@@ -1,5 +1,5 @@
 # Source manifest — reproducible-by-reference (Invariant 3).
 url = https://github.com/ray-manaloto/claude-code-marketplace
 ref = main
-commit = eb3ba054916fc20dbe7ac00178ba2fe983b19684
+commit = 6b5b092efa6bdf678815073db42f69fae3f07ab3
 kind = code

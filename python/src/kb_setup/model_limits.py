@@ -267,7 +267,18 @@ def read_snapshot(repo_root: Path) -> dict[str, ModelLimits] | None:
         raise LayoutChangedError(f"{SNAPSHOT_PATH} has a malformed entry: {exc}") from exc
 
 
-DEFAULT_ALIASES = ("claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5")
+DEFAULT_ALIASES = (
+    "claude-opus-5",
+    "claude-sonnet-5",
+    "claude-haiku-4-5",
+    "claude-fable-5",
+    # Shipped 2026-09-01 and is now the DEFAULT Fable model (1M context, 128K
+    # output, $10/$50 per MTok). `claude-fable-5` stays listed because a Claude
+    # apps gateway session still resolves bare `fable`/`best` to it — the two
+    # coexist, so tracking only the newer one would under-report what sessions
+    # actually run.
+    "claude-fable-5-1",
+)
 """Asked of the Models API when the caller names none.
 
 The endpoint answers per-id, so something has to supply the list. Reading it off

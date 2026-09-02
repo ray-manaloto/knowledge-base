@@ -1079,7 +1079,7 @@ setting, and task/lockfile/python fixes."""
 # change — `~/.local/bin/claude` is a SYMLINK to
 # `~/.local/share/claude/versions/2.1.241`, and the digest is of the target
 # either way, since `Path.read_bytes()` follows it.
-expected = "2.1.251"
+expected = "2.1.258"
 binary = "claude"
 github = "anthropics/claude-code"
 # ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted

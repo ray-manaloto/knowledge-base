@@ -1,0 +1,87 @@
+<title>Four Calls Before The Lanes Run</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#F7F8FA; --card:#FFFFFF; --ink:#1B2027; --muted:#5F6875;
+    --rule:#DFE3E9; --accent:#2B4C7E; --blocked:#93331F; --clear:#2E6650;
+    --display:"Newsreader",Georgia,serif;
+    --body:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);
+       margin:0;padding:34px 22px 40px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  main{max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-family:var(--display);font-weight:600;font-size:29px;line-height:1.15;
+     margin:0;text-wrap:balance;letter-spacing:-.01em}
+  .sub{font-size:14px;color:var(--muted);margin:5px 0 0}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--accent);margin:0 0 9px}
+  ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;
+           counter-reset:s}
+  ol.steps li{counter-increment:s;display:flex;gap:11px;align-items:baseline;font-size:14.5px}
+  ol.steps li::before{content:counter(s);font-family:var(--mono);font-size:11px;
+      color:var(--accent);border:1px solid var(--rule);border-radius:3px;
+      min-width:20px;height:20px;display:inline-flex;align-items:center;
+      justify-content:center;flex:none;background:var(--card)}
+  .qs{display:flex;flex-direction:column;gap:0;background:var(--card);
+      border:1px solid var(--rule);border-radius:7px;overflow:hidden}
+  .q{display:grid;grid-template-columns:56px 1fr;gap:14px;padding:13px 16px;
+     border-top:1px solid var(--rule);align-items:start}
+  .q:first-child{border-top:none}
+  .tag{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+       padding:3px 0;color:var(--blocked);font-weight:500}
+  .tag.ok{color:var(--clear)}
+  .q b{font-weight:600;font-size:14.5px;display:block;margin-bottom:2px}
+  .q span{font-size:13.5px;color:var(--muted);display:block}
+  .facts{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted);
+         border-left:2px solid var(--accent);padding-left:13px}
+  .facts b{color:var(--ink);font-weight:600}
+  .ask{font-family:var(--display);font-size:18px;font-weight:500;
+       border-top:1px solid var(--rule);padding-top:18px;margin:0}
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">Before I start · 2026-09-01</p>
+    <h1>Four calls I need from you before any lane runs</h1>
+    <p class="sub">Your order is clear. Four things inside it are not, and each one changes what the lanes actually do.</p>
+  </header>
+
+  <section>
+    <p class="eyebrow">What you asked for</p>
+    <ol class="steps">
+      <li>A codex lane: refresh the sources, read the new Claude release, hunt for the new Fable 5.1 model, save what it finds.</li>
+      <li>A second codex lane: check the first one's work and fix what it missed.</li>
+      <li>Wrap up, then go back to the plan we already had.</li>
+    </ol>
+  </section>
+
+  <section>
+    <p class="eyebrow">The four unclear things</p>
+    <div class="qs">
+      <div class="q"><span class="tag">Call 1</span>
+        <div><b>"Refresh the sources" — how many?</b>
+        <span>There are 97 of them and no button that does all of them. Four would take minutes. All 97 could take hours and the last full rebuild failed.</span></div></div>
+      <div class="q"><span class="tag">Call 2</span>
+        <div><b>"Save it to memory" — that shelf is write-only</b>
+        <span>Things saved there can be written but never read back: 271 notes are sitting in it and none can be found by a search. Saving there means nobody ever finds it again.</span></div></div>
+      <div class="q"><span class="tag">Call 3</span>
+        <div><b>Does this become its own piece of work?</b>
+        <span>Or does it fold into the plan we already had, ahead of everything in it?</span></div></div>
+      <div class="q"><span class="tag">Call 4</span>
+        <div><b>The rule saying "only use codex" expires tomorrow at 7am</b>
+        <span>You just relaxed it. Do I rewrite that rule now, or leave it to run out on its own?</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Two things I measured while you were reading</p>
+    <div class="facts">
+      <p style="margin:0"><b>Good news:</b> the codex helper was thought to be unable to run our checks. It can — it was one missing setting. I tested it failing, then passing.</p>
+      <p style="margin:0"><b>Bad news:</b> the new Fable 5.1 model appears <b>nowhere</b> in our copy of the docs. Not stale — absent. Our copy is three days old.</p>
+    </div>
+  </section>
+
+  <p class="ask">→ Answer the four above. I start the moment you do.</p>
+</main>
