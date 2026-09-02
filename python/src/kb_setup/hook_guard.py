@@ -297,6 +297,7 @@ def check_hook_call(raw: str) -> Result[str | None]:
             _graphify_redirect,
             _check_first,
             _stage_explicitly,
+            _inplace_edit,
             _absent_binary,
         ):
             reason = guard(tool_input)
@@ -377,6 +378,32 @@ def _secret_guard(tool_input: dict) -> str | None:
         from kb_setup import secret_guard
 
         return secret_guard.decide(command)
+    except Exception:
+        return None
+
+
+def _inplace_edit(tool_input: dict) -> str | None:
+    """Deny an in-place shell rewrite of a Python file. Never raises.
+
+    Placed after `_stage_explicitly` and before `_absent_binary`. Ahead of
+    `_absent_binary` because that one makes the weakest claim of the set — it is
+    only about the host you are on — while this one is about a measured
+    correctness hole (#671): a `sed -i`/`perl -pi` edit gets no ty diagnostic,
+    proven three-armed. Behind the three older guards because each of them names
+    a canonical replacement TASK, which is closer to what the author meant to do
+    than this guard's "use a different tool" is.
+
+    Reaches codex lanes unchanged: `.codex/hooks.json` wires this same entry
+    point on matcher `Bash`, a canonical codex tool name. One decision function,
+    two clients.
+    """
+    command = tool_input.get("command", "")
+    if not isinstance(command, str):
+        return None
+    try:
+        from kb_setup import inplace_edit
+
+        return inplace_edit.decide(command)
     except Exception:
         return None
 

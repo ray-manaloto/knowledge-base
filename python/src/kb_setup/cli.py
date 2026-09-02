@@ -486,6 +486,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import hook_guard
 
         return hook_guard.run()
+    if cmd == "edit-check":
+        from kb_setup import edit_check
+
+        return edit_check.run(repo_root)
     if cmd == "detect-census":
         from kb_setup import graph
 

@@ -153,6 +153,13 @@ ignore = [
 ]
 # Intentional catch-all fail-open: a crashed PreToolUse guard must NEVER brick Bash.
 "python/src/kb_setup/hook_guard.py" = ["BLE001"]
+# Same fail-open contract, one event later and in the other client: a crashed
+# codex PostToolUse hook must never cost a lane its turn. Codex reads a non-zero
+# exit plus stderr as BLOCKING feedback, so a leaked exception here would not
+# merely lose the diagnostics — it would replace the lane's tool result with a
+# traceback. The catch-all is what keeps a bug in this hook cheaper than the
+# problem it exists to report.
+"python/src/kb_setup/edit_check.py" = ["BLE001"]
 # The graph-size gate calls graphify's OWN `security._max_graph_file_bytes()`.
 # Private, and the lesser risk by a wide margin: the alternative is a second
 # parser for a suffix convention where `GB` means GiB (1024**3), so a
