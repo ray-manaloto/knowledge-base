@@ -16,5 +16,5 @@
 # (persistence-gate-retry.md), so it fails loudly rather than silently.
 url = https://github.com/mattpocock/skills
 ref = changeset-release/main
-commit = f34d927194a521688da962fff50708f6238d06af
+commit = a97b873866675db1084216f49dec798070377603
 kind = docs

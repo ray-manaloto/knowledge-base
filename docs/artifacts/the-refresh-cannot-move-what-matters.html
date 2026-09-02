@@ -1,0 +1,82 @@
+<title>The Refresh Skips What Matters</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#F7F8FA; --card:#FFFFFF; --ink:#1B2027; --muted:#5F6875;
+    --rule:#DFE3E9; --accent:#2B4C7E; --bad:#93331F; --ok:#2E6650;
+    --display:"Newsreader",Georgia,serif;
+    --body:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);
+       margin:0;padding:32px 22px 38px;line-height:1.42;-webkit-font-smoothing:antialiased}
+  main{max-width:790px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+  h1{font-family:var(--display);font-weight:600;font-size:28px;line-height:1.15;
+     margin:0;text-wrap:balance;letter-spacing:-.01em}
+  .sub{font-size:14px;color:var(--muted);margin:5px 0 0}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--bad);margin:0 0 9px}
+  figure{margin:0;background:var(--card);border:1px solid var(--rule);
+         border-radius:7px;padding:16px 16px 12px}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:9px;text-align:center}
+  svg{display:block;width:100%;height:auto}
+  .rows{background:var(--card);border:1px solid var(--rule);border-radius:7px;overflow:hidden}
+  .r{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:11px 16px;
+     border-top:1px solid var(--rule);align-items:baseline;font-size:14px}
+  .r:first-child{border-top:none}
+  .nm{font-family:var(--mono);font-size:11.5px;color:var(--bad);font-weight:500}
+  .r span{color:var(--muted)}
+  .ask{font-family:var(--display);font-size:18px;font-weight:500;
+       border-top:1px solid var(--rule);padding-top:16px;margin:0}
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">Stop · found before anything ran</p>
+    <h1>The refresh command can't move the two files you actually care about</h1>
+    <p class="sub">It doesn't fail. It reports success and does nothing. Two checks agree.</p>
+  </header>
+
+  <figure>
+    <svg viewBox="0 0 700 168" role="img" aria-label="A pinned source asks upstream for its own pinned version, gets the same answer back, and reports nothing to do.">
+      <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0 0 L10 5 L0 10 z" fill="#5F6875"/>
+        </marker>
+      </defs>
+      <rect x="8" y="42" width="176" height="62" rx="5" fill="#FFFFFF" stroke="#2B4C7E" stroke-width="1.5"/>
+      <text x="96" y="66" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="#1B2027">Our pin says</text>
+      <text x="96" y="86" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#2B4C7E">version 2.1.251</text>
+
+      <line x1="190" y1="73" x2="252" y2="73" stroke="#5F6875" stroke-width="1.5" marker-end="url(#a)"/>
+      <text x="221" y="63" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#5F6875">asks for</text>
+
+      <rect x="258" y="42" width="186" height="62" rx="5" fill="#FFFFFF" stroke="#5F6875" stroke-width="1.5"/>
+      <text x="351" y="66" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="#1B2027">“newest 2.1.251”</text>
+      <text x="351" y="86" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#93331F">not “newest anything”</text>
+
+      <line x1="450" y1="73" x2="512" y2="73" stroke="#5F6875" stroke-width="1.5" marker-end="url(#a)"/>
+      <text x="481" y="63" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#5F6875">answers</text>
+
+      <rect x="518" y="42" width="174" height="62" rx="5" fill="#FFFFFF" stroke="#93331F" stroke-width="1.5"/>
+      <text x="605" y="66" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="#93331F">“nothing to do”</text>
+      <text x="605" y="86" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#5F6875">success. no change.</text>
+
+      <text x="350" y="140" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#5F6875">2.1.257 exists upstream the whole time. Nobody ever asks for it.</text>
+    </svg>
+    <figcaption>Sources pinned to a version number, rather than to “latest”, can never refresh themselves.</figcaption>
+  </figure>
+
+  <section>
+    <p class="eyebrow">And four of the 22 are traps</p>
+    <div class="rows">
+      <div class="r"><span class="nm">claude-code</span><span>Pinned to a version. Silently skipped. <b>This is the release you asked about.</b></span></div>
+      <div class="r"><span class="nm">anthropic-sdk-python</span><span>Same skip — and our open bug #397 is anchored to its <i>current</i> version, so moving it erases the fix.</span></div>
+      <div class="r"><span class="nm">claude-reads-hn</span><span><b>342 MB.</b> You yourself excluded it on cost last week. Refreshing it downloads the lot.</span></div>
+      <div class="r"><span class="nm">mattpocock-skills</span><span>Its pin was chosen to match work we already paid to process. Moving it throws that away.</span></div>
+    </div>
+  </section>
+
+  <p class="ask">→ I need one decision: how we handle the two version-pinned ones. Nothing has run.</p>
+</main>

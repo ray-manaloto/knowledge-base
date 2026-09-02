@@ -4,3 +4,5 @@ url = https://github.com/sverweij/dependency-cruiser
 ref = main
 commit = 1f28f44a49c054dc128226543188220818b1ab52
 kind = code
+build = defer
+defer_reason = #654: measured by `mise run kb-extract-census` on graphify 0.9.53, 2026-09-02 — re-measured after the fork rebase and UNCHANGED from 0.9.50. 7 id collisions between `.d.ts` and `.js` siblings (types_dependency_cruiser, types_cruise_result, types_reporter_options, types_shared_types, types_strict_options, types_baseline_violations, test_extract_tsc_types), plus 10 deliberately-invalid fixture files under test/**/__mocks__. The collisions have no approver. Clears when sibling extensions are distinguished when an id is minted (#654) -- not by a manifest edit and not by a version bump; the v0.9.50 -> v0.9.53 rebase changed none of these figures.

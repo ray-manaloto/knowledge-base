@@ -5,7 +5,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: the mise binary itself (`mise --version`)
-#   pinned here:    2026.8.15
+#   pinned here:    2026.9.0
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -36,7 +36,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/jdx/mise
-ref = v2026.8.15
-commit = 06c9ad7a39b162b7952c6c75beb879088f6c29b2
+ref = v2026.9.0
+commit = c6f6130a03205ee1f9b63142244a8ebff4d1e918
 kind = code
 added = 2026-08-02

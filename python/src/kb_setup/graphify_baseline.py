@@ -240,12 +240,12 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.50"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.53"
 # FORKED 2026-08-24: this names WHAT RUNS, so it followed the pin onto the fork
 # (`currency.toml` binds it with `tracks = "manifest"`). Contrast the semantic
 # corpus/slice constants, which are snapshot identities of completed runs and
 # correctly hold at the upstream base `v0.9.48`.
-_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.50"
+_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.53"
 
 #: The public spelling of the version above, for the ONE cross-module consumer:
 #: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
@@ -296,14 +296,14 @@ _ACCEPTED_RUNTIME_HASHES = {
     # STRONGER identity — a wheel hash names a built artifact, a resolved
     # commit names the source tree it was built from. Reverts to the wheel/sdist
     # pair when #2981 merges and the pin returns to PyPI.
-    "git_commit": "0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956",
+    "git_commit": "157a957e89a16246bba3a078de2777711ee85e31",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956",
-    source_tree="38f958e839905df52ca48d799054e27dff95dab3",
-    catalog_sha256="dddef4925e07b2d7a018c245278fb19a24548243ebc098080eb1acdb9efb50b7",
-    source_manifest_sha256="8dda1b70d234943e3061f303f352945c3b153da382e231a2566b5c27339d7ffc",
+    source_commit="157a957e89a16246bba3a078de2777711ee85e31",
+    source_tree="707bdb5074beb3743e1c77f38db31c23a04f9497",
+    catalog_sha256="2a1f353a5d6ee0f087744197e56d07a8f2bcbf84bb048cfd6c8b281821bf5ac0",
+    source_manifest_sha256="b1c4aebb1f17dc9b473925797c1d9a8980d83fe18fbce3be419d7db11653d523",
     # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
     # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
     # RE-DERIVED by a real build against the installed 0.9.47, never carried
@@ -326,7 +326,21 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # ACCEPTED for every drifted key (#373). Before that it named the key only
     # and deleted its output, so the build could not tell you what to move the
     # constants to while refusing to run until you had.
-    detected_count=452,
+    # REBASED 2026-09-02 onto upstream v0.9.53: 452 -> 471 detected, 444 -> 463
+    # extracted. RE-DERIVED by a real `kb-graphify-baseline build` against the
+    # INSTALLED fork — `direct_url.json` reports 0.9.53 at
+    # 157a957e89a16246bba3a078de2777711ee85e31, the runtime rather than a claim
+    # about it — never carried forward.
+    #
+    # The +19/+19 is ACCOUNTED FOR rather than assumed:
+    # `git diff --diff-filter=A v0.9.50 v0.9.53` lists exactly NINETEEN added
+    # files and ZERO removed — 17 `.py` (the new Robot Framework extractor plus
+    # 16 test modules) and the 2 Robot fixtures `sample.robot` /
+    # `robot_keywords.resource`, which v0.9.53 added an extractor FOR. Every
+    # newly detected file was also extracted, so the gap between the two counts
+    # is UNCHANGED at 8 and no warning was emitted — the check that a
+    # backend-only fork has not altered EXTRACTION behaviour.
+    detected_count=471,
     # FORKED 2026-08-24, then REBASED onto upstream v0.9.49 the same day:
     # 429 -> 450 detected, 421 -> 442 extracted. RE-DERIVED
     # by a real `kb-graphify-baseline build` against the INSTALLED fork, never
@@ -360,7 +374,7 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # All three drifted authority values came from the build's own OBSERVED vs
     # ACCEPTED diagnostic (#373) rather than a hand derivation — which is the
     # thing that note says it exists to prevent, and it worked.
-    extracted_count=444,
+    extracted_count=463,
 )
 # The ignored-path control's fixture: an UNTRACKED file under a directory the
 # pinned source's own `.gitignore` matches. Untracked is load-bearing.

@@ -4,3 +4,5 @@ url = https://github.com/ijl/orjson
 ref = master
 commit = 705515d77b28429d0b7c30c3d781abe52e8a1e5a
 kind = code
+build = defer
+defer_reason = #654: ONE partially-extracted file, `include/yyjson/yyjson.h` (a 306 KB vendored C header), but the two verification routes DISAGREE and `approve_partial_extraction_warning` treats that as a finding rather than something to pick a side on: graphify's own message says 347 symbols extracted (implying extracted_nodes 348) while the sub-graph it wrote holds 330 for that path. The 18-node gap is dedup, which runs AFTER the warning is printed (same run: 'Deduplicated 35 node(s) (16 exact, 19 fuzzy)'). No reviewed entry can satisfy both routes, so registering one would mean lying to a check. Clears when the recovered-symbol count is emitted after dedup, or when the reviewer contract accepts the two numbers separately.

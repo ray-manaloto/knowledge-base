@@ -8,3 +8,5 @@ url = https://github.com/drumih/turbo-fieldfare
 ref = 0.4.1
 commit = 417f38934c7590db15e7a2baa35f3cea05828dda
 kind = code
+build = defer
+defer_reason = #654: measured by `mise run kb-extract-census` on graphify 0.9.53, 2026-09-02 — re-measured after the fork rebase and UNCHANGED from 0.9.50. 21 id collisions of the extension-only-sibling class, plus 1 syntax-error file. The collisions have no approver, so registering the one file would not unblock it. Clears when sibling extensions are distinguished when an id is minted (#654) -- not by a manifest edit and not by a version bump; the v0.9.50 -> v0.9.53 rebase changed none of these figures.

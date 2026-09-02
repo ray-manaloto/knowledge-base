@@ -13,5 +13,5 @@
 # sources/codex-docs.manifest instead.
 url = https://github.com/mrkhachaturov/agent-harness-docs
 ref = main
-commit = 6d496c1ba128664a75dea9d8c650bb65d8337b76
+commit = 9625db96360641da03257ea7b01ab5cbbee6410c
 kind = docs

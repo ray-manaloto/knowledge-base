@@ -2,7 +2,7 @@
 # Prior art for the self-reflection loop (#TBD): Rust MCP conversation-memory server — searches past transcripts, task outcomes and plan docs. 0 skills/agents; value is the architecture. scope=study.
 url = https://github.com/ramakay/claude-self-reflect
 ref = main
-commit = 86afb4a3f3ecfd615e1ef012bcfe5b2ef45cb2cc
+commit = e9c18ae74f1d54323953de3a9b289d25f9e8ef64
 kind = code
 # scope = study: an object of study (peer orchestration/memory tooling), not corpus
 # content we answer questions from. `scope` exists because pinned peer tools took

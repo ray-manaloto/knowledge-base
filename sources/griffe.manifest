@@ -4,3 +4,5 @@ url = https://github.com/mkdocstrings/griffe
 ref = main
 commit = b450abb0b372f594271a017153a297c75651531a
 kind = code
+build = defer
+defer_reason = #654: measured by `mise run kb-extract-census` on graphify 0.9.53, 2026-09-02 — re-measured after the fork rebase and UNCHANGED from 0.9.50. 24 id collisions between sibling files distinguished ONLY by extension, and ZERO syntax errors — the purest instance of the class. A collision has no approver (the only one covers same-FILE notes), so this can only be deferred, not registered. Clears when sibling extensions are distinguished when an id is minted (#654) -- not by a manifest edit and not by a version bump; the v0.9.50 -> v0.9.53 rebase changed none of these figures.

@@ -2,6 +2,6 @@
 # Fable-5 orchestrator reference (T1).
 url = https://github.com/Rylaa/fable5-orchestrator
 ref = main
-commit = afafe02ec7ff20af8fc9b8f698380f1ff0d6b47b
+commit = 809b0287ccfbf3f39c085a90ab41b81444faa279
 kind = code
 added = 2026-07-22

@@ -101,6 +101,28 @@ class Manifest:
         return self.build not in _EXCLUDED_BUILDS
 
     @property
+    def is_ast_scanned(self) -> bool:
+        """Whether `kb-build` runs an AST pass over this source's clone.
+
+        STRICTLY NARROWER than `is_built`, and the difference is the whole
+        reason this exists. `is_built` answers "does the build touch this source
+        at all"; the build then asks a SECOND question — `kind == "docs"` sources
+        get no AST pass, because `--code-only` over a docs mirror is a
+        guaranteed-empty scan and, more importantly, because "a docs manifest
+        that never ran" and "a code repo that ran and produced nothing" are
+        DIFFERENT ANSWERS (`kb_setup.graph`, the `docs_only` split).
+
+        `is_built`'s docstring says to ask it rather than re-derive it, and that
+        advice was followed literally by `extract_census`, which therefore swept
+        8 docs manifests the build never opens and reported one of them
+        (`codex-docs`) as a blocked source. The predicate was not wrong; it was
+        INCOMPLETE for a caller asking "what does the build actually read", and
+        the answer to that is a second named predicate, not a second inline
+        comparison at each call site. (Cold review of `69c126cbaef8`.)
+        """
+        return self.is_built and self.kind != "docs"
+
+    @property
     def exclusion_reason(self) -> str:
         """The stated reason this source is excluded, or `""` when it is built.
 

@@ -1,0 +1,76 @@
+<title>What The Resync Found</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#F7F8FA; --card:#FFFFFF; --ink:#1B2027; --muted:#5F6875;
+    --rule:#DFE3E9; --accent:#2B4C7E; --hot:#93331F; --ok:#2E6650;
+    --display:"Newsreader",Georgia,serif;
+    --body:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);
+       margin:0;padding:32px 22px 38px;line-height:1.42;-webkit-font-smoothing:antialiased}
+  main{max-width:800px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+  h1{font-family:var(--display);font-weight:600;font-size:28px;line-height:1.15;
+     margin:0;text-wrap:balance;letter-spacing:-.01em}
+  .sub{font-size:14px;color:var(--muted);margin:5px 0 0}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--accent);margin:0 0 9px}
+  .headline{background:var(--card);border:1px solid var(--rule);border-radius:7px;
+            padding:15px 18px;display:flex;gap:20px;align-items:baseline;flex-wrap:wrap}
+  .big{font-family:var(--display);font-size:34px;font-weight:600;color:var(--hot);
+       font-variant-numeric:tabular-nums;line-height:1}
+  .big small{font-family:var(--body);font-size:13.5px;font-weight:400;color:var(--muted);
+             display:block;margin-top:3px}
+  .big.ok{color:var(--ok)}
+  table{width:100%;border-collapse:collapse;background:var(--card);
+        border:1px solid var(--rule);border-radius:7px;overflow:hidden;font-size:13.5px}
+  th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.09em;
+     text-transform:uppercase;color:var(--muted);font-weight:500;padding:9px 14px;
+     border-bottom:1px solid var(--rule)}
+  td{padding:9px 14px;border-top:1px solid var(--rule);vertical-align:top}
+  td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;width:74px}
+  td.s{font-family:var(--mono);font-size:11.5px;color:var(--accent)}
+  tfoot td{font-weight:600;border-top:2px solid var(--rule);background:#F2F4F7}
+  .notes{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted);
+         border-left:2px solid var(--accent);padding-left:13px}
+  .notes b{color:var(--ink);font-weight:600}
+  .ask{font-family:var(--display);font-size:18px;font-weight:500;
+       border-top:1px solid var(--rule);padding-top:16px;margin:0}
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">Resync complete · 2026-09-01</p>
+    <h1>The refresh worked. Now something has to read 823 pages.</h1>
+    <p class="sub">15 of 22 sources moved. Reading them into the knowledge graph is the part that costs money.</p>
+  </header>
+
+  <div class="headline">
+    <div class="big ok">133<small>files now mention Fable 5.1 — it was <b>zero</b> this morning</small></div>
+    <div class="big">823<small>pages that changed and need reading in</small></div>
+    <div class="big">14<small>old pages to delete</small></div>
+  </div>
+
+  <table>
+    <thead><tr><th>Source</th><th>Pages to read</th><th>Worth it?</th></tr></thead>
+    <tbody>
+      <tr><td class="s">claude-code-docs</td><td class="n">389</td><td>The Fable 5.1 pages live here. <b>Yes.</b></td></tr>
+      <tr><td class="s">codex-docs</td><td class="n">218</td><td>Our main lane's own docs. Probably.</td></tr>
+      <tr><td class="s">agent-harness-docs</td><td class="n">113</td><td>Rival harnesses. Low urgency.</td></tr>
+      <tr><td class="s">mattpocock-skills</td><td class="n">95</td><td>Its old reading is now stale either way.</td></tr>
+      <tr><td class="s">claude-reads-hn</td><td class="n">7</td><td>The 513 MB one. Cheap to read, though.</td></tr>
+      <tr><td class="s">claude-code</td><td class="n">1</td><td>One page. Free. <b>Yes.</b></td></tr>
+    </tbody>
+    <tfoot><tr><td>6 sources</td><td class="n">823</td><td>You decide how many we pay for</td></tr></tfoot>
+  </table>
+
+  <div class="notes">
+    <p style="margin:0"><b>Fable 5.1 is real and it is the new default</b> — 1M context, same price as before. But a gateway session still silently gives you Fable 5 unless you pick 5.1 by hand.</p>
+    <p style="margin:0"><b>Claude Code updated twice while we worked</b> — 2.1.251 → 2.1.257 → 2.1.258. Both times after I'd written the number down.</p>
+    <p style="margin:0"><b>Nothing was read in yet.</b> Refreshing was free. Reading is not.</p>
+  </div>
+
+  <p class="ask">→ Pick which of the six get read. A fresh session does the reading.</p>
+</main>

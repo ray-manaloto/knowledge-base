@@ -2,6 +2,6 @@
 # Catalog — pointers, don't fan out (T2).
 url = https://github.com/hesreallyhim/awesome-claude-code
 ref = main
-commit = 020a9507f18efec015e92bdf2a59f8e4260036bf
+commit = 5efac766e408c62551a6825d962ed4ba8f77dd96
 kind = code
 added = 2026-07-22

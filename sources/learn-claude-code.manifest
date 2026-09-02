@@ -2,6 +2,6 @@
 # learn-claude-code — CC internals / harness engineering notes (T2).
 url = https://github.com/shareAI-lab/learn-claude-code
 ref = main
-commit = a9cafe953aa714f9cb1171f217d96bd2734bbcc7
+commit = 0dcafa2ae053a1ddd6a72f265431104b08a5aa13
 kind = code
 added = 2026-07-23
