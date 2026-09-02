@@ -124,6 +124,18 @@ graphify-out/.currency-stamp.json
 # shipped without its own rule for exactly this reason, and nothing revealed the
 # gap until the file first appeared.
 graphify-out/.build-failure.json
+# Its SUCCESS counterpart, and the THIRD file to shipped without an ignore rule
+# for the reason the paragraph above already names. `.build-failure.json` is
+# written when `kb-build` fails and deleted when it succeeds; `build-receipt.json`
+# is the mirror — written by a GREEN build, describing this host's node/edge
+# counts and the graph.json sha256. Equally machine-local, equally derived.
+#
+# It went unnoticed for a different reason than the other two, and the reason is
+# the lesson: there had not been a GREEN `kb-build` in weeks, so the success path
+# had never once executed here. A gate downstream of a long-standing failure is
+# unarmed in BOTH directions — this one was found by `kb-ship` refusing a dirty
+# tree on the first green build since the N0 resync, not by review.
+graphify-out/build-receipt.json
 # Count continuity ledger (#191) + the handoff file `_merge_docs.py` writes its
 # post-merge counts to. Both DERIVED and both machine-local: the ledger is only
 # meaningful next to the graph.json fingerprint it records, and graph.json is
