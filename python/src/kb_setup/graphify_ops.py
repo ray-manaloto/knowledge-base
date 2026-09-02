@@ -399,6 +399,20 @@ def _derive_prose(repo_root: Path, *, tag: str, did: str) -> int:
     return 0
 
 
+def _unaccounted_label_stderr(stderr: bytes) -> str:
+    """Label-pass stderr minus what Graphify narrates in the ordinary course.
+
+    A separate function so the refusal stays ONE branch: this repo's required
+    state — no LLM backend, per `do-not.md` #4, which `label`'s own comment
+    calls "the clean default" — is narrated on stderr, and the blanket refusal
+    failed a build for being configured correctly. Everything else still
+    refuses, line by line, through the same filter the receipt path uses.
+    """
+    from kb_setup import graphify_health
+
+    return graphify_health.strip_routine_narration(stderr.decode("utf-8", errors="replace")).strip()
+
+
 def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = False) -> int:
     """(Re)label communities WITHOUT Gemini.
 
@@ -490,7 +504,7 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
             sys.stderr.buffer.flush()
         if result.returncode != 0:
             return result.returncode
-        if result.stderr:
+        if result.stderr and _unaccounted_label_stderr(result.stderr):
             digest = hashlib.sha256(result.stderr).hexdigest()
             events.fail(
                 "label.stderr",

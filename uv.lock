@@ -654,8 +654,8 @@ wheels = [
 
 [[package]]
 name = "graphifyy"
-version = "0.9.50"
-source = { git = "https://github.com/ray-manaloto/graphify?rev=0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956#0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956" }
+version = "0.9.53"
+source = { git = "https://github.com/ray-manaloto/graphify?rev=157a957e89a16246bba3a078de2777711ee85e31#157a957e89a16246bba3a078de2777711ee85e31" }
 dependencies = [
     { name = "networkx" },
     { name = "numpy" },
@@ -704,6 +704,7 @@ all = [
     { name = "openpyxl" },
     { name = "pypdf" },
     { name = "python-docx" },
+    { name = "robotframework" },
     { name = "starlette" },
     { name = "tiktoken" },
     { name = "tree-sitter-commonlisp" },
@@ -1071,7 +1072,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=1.0.0" },
-    { name = "graphifyy", extras = ["all"], git = "https://github.com/ray-manaloto/graphify?rev=0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956" },
+    { name = "graphifyy", extras = ["all"], git = "https://github.com/ray-manaloto/graphify?rev=157a957e89a16246bba3a078de2777711ee85e31" },
     { name = "httpx2", specifier = ">=2.12.0" },
     { name = "msgspec", specifier = "==0.21.1" },
     { name = "skillopt", git = "https://github.com/microsoft/SkillOpt?rev=93bdf3d770b99128daf35278218e5a666fe392f3" },
@@ -1991,6 +1992,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179abd6d00ebd70bff6273f37fb3e0cc209f48b39d00cbf/requests-2.34.2.tar.gz", hash = "sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed", size = 142856, upload-time = "2026-05-14T19:25:27.735Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl", hash = "sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0", size = 73075, upload-time = "2026-05-14T19:25:26.443Z" },
+]
+
+[[package]]
+name = "robotframework"
+version = "7.4.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/f3/ad51daf85d95848831601851598640f951a47a9f9de88039235cf58c5bb9/robotframework-7.4.2.tar.gz", hash = "sha256:1c934e7f43600de407860cd2bd2fdc41adad4a4a785d8b46b1ed485fdc0f6c9f", size = 654405, upload-time = "2026-03-03T16:28:54.899Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ef/35/fd2385b15f6d814f1801bcbd3d54b4c61a1bfc3a1a0fe023dc15551c5fe4/robotframework-7.4.2-py3-none-any.whl", hash = "sha256:6e80f84cdc997bdde2abb6b729ac3531457ecf6d2e41abfb87a541877ab367bf", size = 807056, upload-time = "2026-03-03T16:28:51.638Z" },
 ]
 
 [[package]]

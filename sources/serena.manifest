@@ -4,3 +4,5 @@ url = https://github.com/oraios/serena
 ref = main
 commit = 7fcbca7e62555ec2287ddb2f083caee805848ea6
 kind = code
+build = defer
+defer_reason = #654: measured by `mise run kb-extract-census` on graphify 0.9.53, 2026-09-02 — re-measured after the fork rebase and UNCHANGED from 0.9.50. 1 id collision of the extension-only-sibling class, 12 syntax-error files, and an unsupported-language warning. The single collision is enough to block and cannot be registered. Clears when sibling extensions are distinguished when an id is minted (#654) -- not by a manifest edit and not by a version bump; the v0.9.50 -> v0.9.53 rebase changed none of these figures.

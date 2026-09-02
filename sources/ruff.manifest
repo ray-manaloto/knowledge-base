@@ -28,3 +28,5 @@ ref = 0.16.5
 commit = 9e4938c4a60bed3e87a11ee1e1db1bd23f4d964a
 kind = code
 added = 2026-08-02
+build = defer
+defer_reason = #654: measured by `mise run kb-extract-census` on graphify 0.9.53, 2026-09-02 — re-measured after the fork rebase and UNCHANGED from 0.9.50. 289 syntax-error files. ruff is a LINTER, so its fixture corpus is deliberately malformed by design — the biome case (#654) at a quarter the size. Registering 289 individually justified entries is the wrong shape for a fixture tree; no collisions here, so this clears if the fixtures can be accepted as a class. Clears when sibling extensions are distinguished when an id is minted (#654) -- not by a manifest edit and not by a version bump; the v0.9.50 -> v0.9.53 rebase changed none of these figures.

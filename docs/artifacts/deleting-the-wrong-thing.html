@@ -1,0 +1,83 @@
+<title>Deleting the Wrong Thing</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+  :root{
+    --ground:#F6F7F9; --card:#FFFFFF; --ink:#14171D; --muted:#5B6472;
+    --rule:#DDE1E7; --ok:#0F6B63; --hold:#A4462F;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Public Sans",system-ui,-apple-system,sans-serif;
+    margin:0; padding:38px 24px 30px; display:flex; justify-content:center;
+  }
+  main{width:100%;max-width:720px;display:flex;flex-direction:column;gap:22px}
+  .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0}
+  h1{font-family:"Newsreader",Georgia,serif;font-weight:600;font-size:38px;line-height:1.1;margin:6px 0 0;text-wrap:balance;letter-spacing:-.01em}
+  .sub{margin:10px 0 0;color:var(--muted);font-size:16px;line-height:1.5;max-width:56ch}
+
+  .score{display:flex;gap:0;background:var(--card);border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+  .score div{flex:1;padding:14px 20px;border-right:1px solid var(--rule)}
+  .score div:last-child{border-right:none}
+  .score b{display:block;font-size:26px;line-height:1.1;font-family:"Newsreader",Georgia,serif}
+  .score span{font-size:12px;color:var(--muted)}
+  .score .good b{color:var(--ok)}
+  .score .bad b{color:var(--hold)}
+
+  .rows{background:var(--card);border:1px solid var(--rule);border-radius:4px;display:flex;flex-direction:column}
+  .row{display:grid;grid-template-columns:92px 1fr;gap:18px;padding:15px 20px;border-bottom:1px solid var(--rule);align-items:baseline}
+  .row:last-child{border-bottom:none}
+  .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .v{font-size:16px;line-height:1.5;margin:0}
+  .v b{font-weight:600}
+
+  .ask{border-left:3px solid var(--ok);padding:2px 0 2px 18px}
+  .ask p{margin:0;font-size:17px;line-height:1.5}
+  .ask .lead{font-family:"Newsreader",Georgia,serif;font-size:21px;font-weight:600;margin-bottom:6px}
+
+  footer{border-top:1px solid var(--rule);padding-top:13px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--muted);line-height:1.7}
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">The count is finished</p>
+    <h1>Eleven sources stand between us and a green build</h1>
+    <p class="sub">One sweep, every source, no stopping at the first failure. The list that took five rebuilds to get 32 deep now goes all the way.</p>
+  </header>
+
+  <div class="score">
+    <div class="good"><b>76</b><span>rebuild clean</span></div>
+    <div class="bad"><b>11</b><span>blocked</span></div>
+    <div><b>321</b><span>broken files</span></div>
+    <div><b>71</b><span>name clashes</span></div>
+  </div>
+
+  <section class="rows">
+    <div class="row">
+      <div class="k">The split</div>
+      <p class="v">A <b>broken file</b> can be signed off one by one. A <b>name clash</b> cannot — nothing in the system can accept one, so those sources can only be set aside until the tool is fixed.</p>
+    </div>
+    <div class="row">
+      <div class="k">Set aside</div>
+      <p class="v"><b>Six.</b> Five have name clashes and no other option. One is <b>ruff</b> — 289 broken files, the same "checker with a pile of bad examples" shape as biome.</p>
+    </div>
+    <div class="row">
+      <div class="k">Sign off</div>
+      <p class="v"><b>Five</b>, small enough to be worth it: seven files between them, plus two odd cases that fit categories we already accept elsewhere.</p>
+    </div>
+    <div class="row">
+      <div class="k">Confidence</div>
+      <p class="v">One row was independently confirmed by a real rebuild and matched <b>exactly</b>. The other ten are predictions — from the same judgement the build itself uses.</p>
+    </div>
+  </section>
+
+  <div class="ask">
+    <p class="lead">What I need from you</p>
+    <p>Approve the split, or change it. Setting six aside gets a green build soonest and costs six sources; signing off more keeps them but is slower and each one needs its own justification.</p>
+  </div>
+
+  <footer>
+    Every figure measured this session, 87 of 87 sources, none skipped. The original blocker is fixed and verified cold.<br>
+    Earlier versions of this page blamed a stale cache, then 1,259 misfiled entries. Both real; neither was the cause.
+  </footer>
+</main>

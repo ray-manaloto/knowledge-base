@@ -3,3 +3,5 @@ url = https://github.com/biomejs/biome
 ref = @biomejs/biome@2.5.11
 commit = 4d9c1d53ff57c44247e7a32718e1c69a0c1735af
 kind = code
+build = defer
+defer_reason = #654: two problems, neither stale local state and neither cleared by a purge or a rebuild. (1) biome is a LINTER, so its fixture corpus is deliberately malformed -- 1138 files with syntax errors, partially extracted, which require_complete correctly fails closed on. (2) Four ids collide between sibling files distinguished ONLY by extension (Button.astro vs Button.svelte, App.tsx vs App.js), because the extension is stripped when an id is minted. Survives a cold --force extract, so #1504's path-qualified ids do not cover it. Clears when sibling extensions are distinguished AND a fixture corpus can be accepted without hand-registering 1138 reviewed entries -- not by a manifest edit.

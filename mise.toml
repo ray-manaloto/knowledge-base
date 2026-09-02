@@ -1630,3 +1630,15 @@ description = "Kill the stale tmux server, then launch a session whose env is bu
 # where killing the server would kill the process before it could relaunch.
 raw = true
 run = 'uv run kb-setup cc --fresh --root "$MISE_PROJECT_ROOT" --sibling "$MISE_PROJECT_ROOT/../dotfiles"'
+
+[tasks.kb-extract-census]
+description = "Extract EVERY buildable source once, past every failure: which sources block the build and why"
+# kb-build stops at the first source that fails closed, so enumerating N blocked
+# sources costs N full builds and re-extracts everything already known to pass
+# (measured 2026-09-02: 8 -> 16 -> 31 -> 32 sources over five builds, 65 manifests
+# never reached). This runs the SAME argv per source and keeps going. A
+# MEASUREMENT, never a gate: it always exits 0, because a blocked source is the
+# finding. Logic in kb_setup.extract_census.
+run = "uv run kb-setup extract-census"
+# Bound: extracts every source cold, so it is the most expensive read-only task here.
+timeout = "180m"

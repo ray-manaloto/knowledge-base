@@ -27,3 +27,5 @@ ref = 0.32.0
 commit = e51fb2f91774265666f94980ec630db794a4db2d
 kind = code
 added = 2026-08-02
+build = defer
+defer_reason = #654: FIVE partially-extracted Kotlin files, and `approve_partial_extraction_warning` 'deliberately handles ONE partially-extracted file per source' — graphify comma-joins the rest and that form does not match, so this source cannot be registered however carefully each file is measured. Two of the five also disagree between graphify's symbol count and the sub-graph (BaseOptions.kt: text 4 vs graph 3; PklBinaryDecoderTest.kt: text 11 vs graph 11 against an expected 12), the same dedup-ordering gap orjson hit. Clears when the reviewer contract accepts multiple files per source.

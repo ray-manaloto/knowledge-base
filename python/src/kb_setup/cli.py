@@ -490,6 +490,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import graph
 
         return graph.detection_census_main(repo_root, rest)
+    if cmd == "extract-census":
+        from kb_setup import extract_census
+
+        return extract_census.main(repo_root, rest)
     if cmd == "brain":
         from kb_setup import brain
 

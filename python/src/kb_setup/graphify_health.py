@@ -307,12 +307,41 @@ class GraphifyEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
 #: still sees the true on-disk baseline. Approving the narration therefore
 #: leaves the loss detector armed, which is the whole reason it is safe to
 #: approve; #231's buried 1,024 nodes are what that distinction is guarding.
+#: The label pass narrating THE CONFIGURATION THIS REPO REQUIRES. `do-not.md` #4
+#: forbids any key-detected backend, and `graphify_ops.label`'s own comment calls
+#: the no-backend path "the clean default" — then the blanket stderr refusal
+#: below it failed the build for reaching that default. Approving the LINE is not
+#: taking its ADVICE: it suggests setting `GOOGLE_API_KEY`, which is exactly the
+#: forbidden thing, and `clean_env()` strips it on every call regardless.
+#: Anchored end-to-end, so a label warning about anything else still refuses.
+_ROUTINE_LABEL_NARRATION = re.compile(
+    r"\A\[graphify label\] no LLM backend configured; keeping Community N placeholders\. "
+    r"Set an API key \(e\.g\. GOOGLE_API_KEY\) or pass --backend\.\Z"
+)
+
 _ROUTINE_MERGE_PROGRESS = re.compile(
     r"\A\[graphify\] (?:"
     r"Pruned \d+ (?:node|edge)\(s\) from(?: \d+)? deleted or excluded source file\(s\)"
     r"|Replaced \d+ node\(s\) from re-extracted source file\(s\)"
     r")\.\Z"
 )
+
+
+def strip_routine_narration(stderr: str) -> str:
+    """Drop the lines Graphify narrates in the ordinary course; keep the rest.
+
+    PUBLIC because two paths need the SAME judgement and only one of them had
+    it. `_unaccounted_stderr` (the receipt path) has filtered these since
+    2026-08-27, while `graph._run` — which is what actually runs the doc-chunk
+    merges — refused on ANY stderr at all. So `[graphify] Replaced 20 node(s)
+    from re-extracted source file(s).` was simultaneously approved as routine on
+    one path and fatal on the other, and on a fully cold rebuild (where every
+    source IS re-extracted) the fatal path is the one that fires.
+
+    Filtering, not blanket approval: everything else in the same stderr survives,
+    anchored line by line, exactly as `_unaccounted_stderr` does it.
+    """
+    return _unaccounted_stderr(stderr, None)
 
 
 def _unaccounted_stderr(stderr: str, residual_stderr: str | None) -> str:
@@ -326,7 +355,12 @@ def _unaccounted_stderr(stderr: str, residual_stderr: str | None) -> str:
     license to wave the rest of the same stderr through unread.
     """
     raw = stderr if residual_stderr is None else residual_stderr
-    kept = [line for line in raw.splitlines() if not _ROUTINE_MERGE_PROGRESS.match(line.strip())]
+    kept = [
+        line
+        for line in raw.splitlines()
+        if not _ROUTINE_MERGE_PROGRESS.match(line.strip())
+        and not _ROUTINE_LABEL_NARRATION.match(line.strip())
+    ]
     return "\n".join(kept)
 
 

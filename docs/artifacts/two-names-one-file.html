@@ -1,0 +1,181 @@
+<title>Two Names, One File</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper:  #F7F8FA;
+    --ink:    #1A1D23;
+    --muted:  #5A6270;
+    --rule:   #DDE1E8;
+    --stop:   #B03A2E;
+    --ok:     #1F6B4A;
+    --wait:   #8A6D1F;
+    --serif:  "Instrument Serif", Georgia, serif;
+    --sans:   "Source Sans 3", -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono:   "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.45;
+    margin: 0;
+    padding: 30px 26px 34px;
+  }
+
+  .sheet { max-width: 700px; margin: 0 auto; }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: 40px;
+    font-weight: 400;
+    line-height: 1.02;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+
+  .verdict {
+    font-size: 17px;
+    color: var(--muted);
+    margin: 0 0 22px;
+  }
+  .verdict b { color: var(--stop); font-weight: 600; }
+
+  figure { margin: 0 0 22px; }
+  svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin-top: 7px;
+    text-align: center;
+  }
+
+  .rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-top: 1px solid var(--rule);
+    margin-bottom: 22px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 108px 1fr;
+    gap: 16px;
+    align-items: baseline;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .tag {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  .tag.is-ok   { color: var(--ok); }
+  .tag.is-stop { color: var(--stop); }
+  .tag.is-wait { color: var(--wait); }
+  .row p { margin: 0; font-size: 15.5px; }
+  .row p span { color: var(--muted); }
+
+  .ask {
+    border-left: 3px solid var(--stop);
+    padding: 2px 0 2px 15px;
+  }
+  .ask h2 {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 400;
+    margin: 0 0 8px;
+  }
+  .ask ol { margin: 0; padding-left: 18px; font-size: 15.5px; }
+  .ask li { margin-bottom: 5px; }
+  .ask li:last-child { margin-bottom: 0; }
+  .ask em { color: var(--muted); font-style: normal; }
+</style>
+
+<div class="sheet">
+
+  <h1>The build stopped at 8 of 88</h1>
+  <p class="verdict">Found the cause. It is <b>old leftover labels</b>, not a broken tool.
+    <span style="display:block;font-size:14px;margin-top:3px">Updated after the first version of this page — that one only knew the symptom.</span></p>
+
+  <figure>
+    <svg viewBox="0 0 700 232" role="img"
+         aria-label="One file is known by two different names. Both names shorten to the same identifier, so the graph keeps one copy and throws the other away.">
+      <defs>
+        <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="#5A6270"/>
+        </marker>
+        <marker id="tipRed" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="#B03A2E"/>
+        </marker>
+      </defs>
+
+      <!-- one real file -->
+      <rect x="270" y="6" width="160" height="34" rx="4"
+            fill="none" stroke="#1A1D23" stroke-width="1.5"/>
+      <text x="350" y="27" text-anchor="middle" font-family="Source Sans 3, sans-serif"
+            font-size="13.5" fill="#1A1D23">one real file</text>
+
+      <!-- splits into two names -->
+      <line x1="320" y1="40" x2="170" y2="70" stroke="#5A6270" stroke-width="1.4" marker-end="url(#tip)"/>
+      <line x1="380" y1="40" x2="530" y2="70" stroke="#5A6270" stroke-width="1.4" marker-end="url(#tip)"/>
+
+      <text x="228" y="60" text-anchor="middle" font-family="Source Sans 3, sans-serif"
+            font-size="12" fill="#5A6270">its long name</text>
+      <text x="474" y="60" text-anchor="middle" font-family="Source Sans 3, sans-serif"
+            font-size="12" fill="#5A6270">its short name</text>
+
+      <!-- the two names -->
+      <rect x="14" y="76" width="312" height="32" rx="4" fill="#EEF1F5" stroke="#DDE1E8"/>
+      <text x="170" y="96" text-anchor="middle" font-family="JetBrains Mono, monospace"
+            font-size="11.5" fill="#1A1D23">sources/the-sdk/…/_base_client.py</text>
+
+      <rect x="374" y="76" width="312" height="32" rx="4" fill="#EEF1F5" stroke="#DDE1E8"/>
+      <text x="530" y="96" text-anchor="middle" font-family="JetBrains Mono, monospace"
+            font-size="11.5" fill="#1A1D23">…/_base_client.py</text>
+
+      <!-- both collapse to one id -->
+      <line x1="170" y1="108" x2="320" y2="140" stroke="#5A6270" stroke-width="1.4" marker-end="url(#tip)"/>
+      <line x1="530" y1="108" x2="380" y2="140" stroke="#5A6270" stroke-width="1.4" marker-end="url(#tip)"/>
+
+      <rect x="240" y="146" width="220" height="34" rx="4"
+            fill="none" stroke="#1A1D23" stroke-width="1.5"/>
+      <text x="350" y="167" text-anchor="middle" font-family="Source Sans 3, sans-serif"
+            font-size="13.5" fill="#1A1D23">both shorten to the same label</text>
+
+      <!-- one is discarded -->
+      <line x1="350" y1="180" x2="350" y2="204" stroke="#B03A2E" stroke-width="1.8" marker-end="url(#tipRed)"/>
+      <text x="350" y="223" text-anchor="middle" font-family="Source Sans 3, sans-serif"
+            font-size="14" font-weight="600" fill="#B03A2E">so one copy is thrown away — 11,990 times</text>
+    </svg>
+    <figcaption>The graph labels a file by its path. Two paths for one file means one label for two things — so it keeps one and drops the other.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <span class="tag is-ok">Why</span>
+      <p>An old leftover. Part of the corpus was labelled the long way by a tool version we no longer run — <b>1,259 entries out of 1.66 million</b>. Everything else uses the short way.</p>
+    </div>
+    <div class="row">
+      <span class="tag is-stop">Not a bug</span>
+      <p>Nothing is broken in the tool. Upgrading it would <b>not</b> help — the relevant code is unchanged across the three newer versions. <span>Checked both ways.</span></p>
+    </div>
+    <div class="row">
+      <span class="tag is-wait">Likely fix</span>
+      <p>Clear the stale leftovers and rebuild. Cheap and local. <span>Not yet tried — I stopped here.</span></p>
+    </div>
+  </div>
+
+  <div class="ask">
+    <h2>What I need from you</h2>
+    <ol>
+      <li>Try the cheap clear-and-rebuild now, <em>or stop and hand off — I am past the context threshold either way.</em></li>
+    </ol>
+  </div>
+
+</div>

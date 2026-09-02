@@ -3,5 +3,10 @@
 url = https://github.com/DannyMac180/fable-advisor
 ref = main
 commit = ad2bdc3b25b182171feda3b7dc77a2a9364d39cc
-kind = code
+kind = docs
 added = 2026-07-22
+# CORRECTED 2026-09-02: this was `kind = code` and the repo contains NO code —
+# measured, the whole tree is 5 .md, 3 .json, a LICENSE and a .gitignore. So the
+# AST pass ran, found nothing, and graphify exited 1 with 'graph is empty', which
+# `require_complete` correctly refused. `kind = docs` is the honest classification;
+# its content still reaches the graph through the host-agent prose wave.

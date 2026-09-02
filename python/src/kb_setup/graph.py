@@ -28,6 +28,7 @@ import sys
 import tempfile
 import time
 from collections import Counter, deque
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from multiprocessing.process import BaseProcess
 from pathlib import Path
@@ -46,6 +47,7 @@ from kb_setup.graphify_env import (
 )
 
 if TYPE_CHECKING:
+    from kb_setup import graphify_sdk
     from kb_setup.currency.config import ToolSpec
 
 
@@ -276,6 +278,21 @@ _UV_MANIFEST_PATHS = (
 )
 
 _EXPECTED_METADATA_ONLY = (
+    # codex-docs' `pyproject.toml` is 254 bytes of `[tool.ruff]` and
+    # `[tool.coverage.*]` with NO `[project]` table at all (`grep -c '^\[project\]'`
+    # -> 0), so `extract_package_manifest` parses it cleanly and finds no name to
+    # mint a node from. A correct zero-node result, and the same class
+    # `datamodel-code-generator` is already registered for — which is how the
+    # extraction census first wrongly reported this source as blocked: the census
+    # compared stderr against nothing until it was routed through
+    # `extract_warning_review` like the build.
+    graphify_health.ExpectedMetadataOnly(
+        source_name="codex-docs",
+        relative_path="pyproject.toml",
+        content_sha256="ca9fd4efd37b34a3e91618291b20399d864a0f125cf45b3569cbd44a3a40223c",
+        pinned_commit="cdc06dbff609d9dd221ebd0c94b727eddd8e722c",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
     graphify_health.ExpectedMetadataOnly(
         source_name="10x-Team",
         relative_path=".claude-plugin/marketplace.json",
@@ -538,7 +555,7 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         source_name="graphify",
         relative_path="tests/fixtures/sample.luau",
         content_sha256="c1aa998580d46b917014567ad39fe125c2a63ac540c3840fd27813d2004d2bd5",
-        pinned_commit="0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956",
+        pinned_commit="157a957e89a16246bba3a078de2777711ee85e31",
         first_error_line=8,
         extracted_nodes=5,
         lost_symbols=0,
@@ -559,6 +576,53 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         reason=(
             "graphify extract_astro parses the whole .astro file as JS and "
             "regex-rescues imports only; this file has none (#2551)"
+        ),
+    ),
+    # deer-flow ships a SKILL TEMPLATE, not a module: the file's own docstring
+    # says "Copy into backend/tests/blocking_io/test_<area>.py and adapt", and its
+    # single function is literally named
+    # `test_<entry_point>_offloads_blocking_io_on_<branch>`. Angle-bracket
+    # placeholders are not Python, so being unparsable is the file's purpose,
+    # exactly like the `malformed.py` entry above — and equally permanent, since
+    # no upstream fix makes a template parse.
+    #
+    # MEASURED against the emitted sub-graph, never assumed: exactly 1 node
+    # carries this path (the file stub `anchor.template.py`, type None), against a
+    # control of 28,584 nodes over 1,513 distinct source_file values, so the probe
+    # discriminates. The file defines ONE named symbol, and it is gone — this is
+    # the Attacca shape (stub only, symbols lost), not the OpenSymphony shape
+    # (recovery complete). `lost_symbols=1`, not 0.
+    graphify_health.ExpectedPartialExtraction(
+        source_name="deer-flow",
+        relative_path=".agent/skills/blocking-io-guard/templates/anchor.template.py",
+        content_sha256="7f308173a5df184f929255be4c2544b38e4d278074a6a5a08b1664713c0b385a",
+        pinned_commit="cb698832deaf876d204045a68d79acedcbb1d26c",
+        first_error_line=1,
+        extracted_nodes=1,
+        lost_symbols=1,
+        reason=(
+            "a 1,303-byte skill TEMPLATE whose only function is named "
+            "test_<entry_point>_offloads_blocking_io_on_<branch>; the angle-bracket "
+            "placeholders are not valid Python, so the file stub survives and the "
+            "one named symbol is lost"
+        ),
+    ),
+    # NOT JavaScript at all, despite the name. The file is 207 bytes of JINJA2 —
+    # a deprecation shim that warns and re-includes the moved template — so a JS
+    # parser failing at line 1 is the file working as intended. It declares ZERO
+    # named symbols, so nothing is lost: the OpenSymphony `malformed.py` shape,
+    # not the Attacca one. `lost_symbols=0` is a measurement, not an optimism.
+    graphify_health.ExpectedPartialExtraction(
+        source_name="pdoc",
+        relative_path="pdoc/templates/deprecated/elasticlunr.min.js",
+        content_sha256="faed434d6963c2dbe301cf17fa28458488b129a3dcb38c3fb99fc262fbcff7ea",
+        pinned_commit="00e18eb12ae2f06f3c245f796bfe7f6224db033a",
+        first_error_line=1,
+        extracted_nodes=1,
+        lost_symbols=0,
+        reason=(
+            "a 207-byte Jinja2 deprecation shim carrying a .js extension; it defines "
+            "no symbols, so the partial extraction loses nothing"
         ),
     ),
 )
@@ -647,11 +711,24 @@ def _run(cmd: list[str], cwd: Path) -> None:
     if result.returncode != 0:
         raise subprocess.CalledProcessError(result.returncode, cmd)
     if result.stderr:
-        digest = hashlib.sha256(result.stderr).hexdigest()
-        raise SystemExit(
-            "[graphify] refusing warning-bearing subprocess success "
-            f"(stderr_bytes={len(result.stderr)}, stderr_sha256={digest})"
-        )
+        # Routine merge narration is not a warning. `graphify_health` has
+        # classified these lines as such since 2026-08-27 with the reasoning
+        # written out beside `_ROUTINE_MERGE_PROGRESS`; this path simply never
+        # asked. On a fully cold rebuild EVERY source is re-extracted, so the
+        # `Replaced N node(s)` line is printed on an ordinary healthy merge —
+        # and refusing it here failed a build whose corpus was fine. Everything
+        # else in the same stderr still refuses, line by line.
+        from kb_setup import graphify_health
+
+        unaccounted = graphify_health.strip_routine_narration(
+            result.stderr.decode("utf-8", errors="replace")
+        ).strip()
+        if unaccounted:
+            digest = hashlib.sha256(result.stderr).hexdigest()
+            raise SystemExit(
+                "[graphify] refusing warning-bearing subprocess success "
+                f"(stderr_bytes={len(result.stderr)}, stderr_sha256={digest})"
+            )
 
 
 def _ensure_clone(m: mf.Manifest) -> None:
@@ -751,6 +828,31 @@ def _nodes_by_source_file(nodes: list[object]) -> dict[str, int]:
     return dict(counts)
 
 
+def extract_warning_review(name: str, nodes: list[object]) -> graphify_sdk.ExtractWarningReview:
+    """Everything reviewed about ONE source's extract warnings, in one place.
+
+    PUBLIC because `kb_setup.extract_census` needs the identical review to answer
+    "would this source block the build" — and a second copy of these three filters
+    is precisely the drift `mise-tasks-only.md` warns about. It already bit once:
+    the census's first version compared stderr against nothing and reported
+    `datamodel-code-generator` BLOCKED when the build accepts it by registration.
+
+    `nodes` is the sub-graph graphify just wrote; a reviewed partial extraction is
+    checked against THAT, never against its own claim.
+    """
+    from kb_setup import graphify_sdk
+
+    return graphify_sdk.ExtractWarningReview(
+        source_name=name,
+        metadata_inventory=tuple(i for i in _EXPECTED_METADATA_ONLY if i.source_name == name),
+        partial_inventory=tuple(i for i in _EXPECTED_PARTIAL_EXTRACTION if i.source_name == name),
+        unsupported_language_inventory=tuple(
+            i for i in _EXPECTED_UNSUPPORTED_LANGUAGE if i.source_name == name
+        ),
+        extracted_nodes_by_path=_nodes_by_source_file(nodes),
+    )
+
+
 def _extract_code(repo_root: Path, name: str) -> bool:
     """AST-extract one source's code into its own sub-graph; True iff it made nodes.
 
@@ -784,19 +886,8 @@ def _extract_code(repo_root: Path, name: str) -> bool:
     raw_nodes = data.get("nodes", [])
     if isinstance(raw_nodes, list):
         nodes = raw_nodes
-    inventory = tuple(item for item in _EXPECTED_METADATA_ONLY if item.source_name == name)
-    partial = tuple(item for item in _EXPECTED_PARTIAL_EXTRACTION if item.source_name == name)
-    unsupported = tuple(item for item in _EXPECTED_UNSUPPORTED_LANGUAGE if item.source_name == name)
     approved, residual = graphify_sdk.account_for_extract_stderr(
-        source_root,
-        proc.stderr or "",
-        graphify_sdk.ExtractWarningReview(
-            source_name=name,
-            metadata_inventory=inventory,
-            partial_inventory=partial,
-            unsupported_language_inventory=unsupported,
-            extracted_nodes_by_path=_nodes_by_source_file(nodes),
-        ),
+        source_root, proc.stderr or "", extract_warning_review(name, nodes)
     )
     receipt = graphify_health.assess(
         graphify_health.GraphifyOperation.EXTRACT,
@@ -3079,6 +3170,41 @@ def _strict_graphify_version(repo_root: Path) -> str:
     return match.group(1).decode() if match else ""
 
 
+def _graph_collections(payload: Mapping[str, object]) -> dict[str, list[object]]:
+    """The three node/edge/hyperedge arrays, read from the schema graphify WRITES.
+
+    `_write_build_receipt` demanded a top-level `edges` key, and `graph_counts`
+    states in its own comment that "there is no `edges` key on any graphify
+    graph" — the format is node-link JSON, so edges are `links`, and hyperedges
+    sit under `graph` unless promoted to the top level (`prose._derive` reads
+    exactly that pair). So the check could never pass, and never had: every
+    build for weeks failed earlier, so the first run to REACH the receipt is the
+    run that found it. A validator that has never validated is worse than none,
+    because it reads as coverage.
+
+    Split out so it can be armed in both directions without a full build.
+    """
+    edges = payload.get("links")
+    if edges is None:
+        edges = payload.get("edges")
+    meta = payload.get("graph")
+    hyperedges = payload.get("hyperedges")
+    if hyperedges is None and isinstance(meta, dict):
+        hyperedges = meta.get("hyperedges")
+    collections: dict[str, list[object]] = {}
+    for field, value in (
+        ("nodes", payload.get("nodes")),
+        ("edges", edges),
+        ("hyperedges", hyperedges),
+    ):
+        if not isinstance(value, list):
+            raise SystemExit(
+                f"[kb-build] refusing build receipt: graph field {field!r} is not an array"
+            )
+        collections[field] = value
+    return collections
+
+
 def _write_build_receipt(
     repo_root: Path,
     *,
@@ -3103,14 +3229,7 @@ def _write_build_receipt(
         raise SystemExit(f"[kb-build] refusing build receipt for unreadable graph.json: {e}") from e
     if not isinstance(payload, dict):
         raise SystemExit("[kb-build] refusing build receipt: graph.json root is not an object")
-    collections: dict[str, list[object]] = {}
-    for field in ("nodes", "edges", "hyperedges"):
-        value = payload.get(field)
-        if not isinstance(value, list):
-            raise SystemExit(
-                f"[kb-build] refusing build receipt: graph field {field!r} is not an array"
-            )
-        collections[field] = value
+    collections = _graph_collections(payload)
 
     receipt = GraphifyBuildReceipt(
         schema_version=1,

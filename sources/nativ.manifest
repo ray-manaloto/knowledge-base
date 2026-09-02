@@ -7,3 +7,5 @@ url = https://github.com/Blaizzy/nativ
 ref = v0.2.2
 commit = ab99cfa016766ca3f0c48b332a2714cd1f8c5ad6
 kind = code
+build = defer
+defer_reason = #654: measured by `mise run kb-extract-census` on graphify 0.9.53, 2026-09-02 — re-measured after the fork rebase and UNCHANGED from 0.9.50. 18 id collisions of the extension-only-sibling class, plus 2 syntax-error files. Same reason as turbo-fieldfare: the collisions are the blocker and cannot be registered. Clears when sibling extensions are distinguished when an id is minted (#654) -- not by a manifest edit and not by a version bump; the v0.9.50 -> v0.9.53 rebase changed none of these figures.

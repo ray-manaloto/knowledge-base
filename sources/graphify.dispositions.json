@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source": "graphify",
-  "source_ref": "kb-pin/openai-cli-backend-v0.9.50",
-  "source_commit": "0a2eb5fdd3110b821bc4fa2759bc964a8bc0a956",
-  "source_tree": "38f958e839905df52ca48d799054e27dff95dab3",
+  "source_ref": "kb-pin/openai-cli-backend-v0.9.53",
+  "source_commit": "157a957e89a16246bba3a078de2777711ee85e31",
+  "source_tree": "707bdb5074beb3743e1c77f38db31c23a04f9497",
   "entries": [
     {
       "path": ".dockerignore",
@@ -89,8 +89,8 @@
       "path": "uv.lock",
       "kind": "unsupported-file",
       "reason": "uv lockfile is unsupported by Graphify detection 0.9.42 through 0.9.47",
-      "sha256": "e194b6b2c53c37ae2d31e59893d1861eb43c7908d7d036fdb531e46853d64c43",
-      "size": 1014682,
+      "sha256": "c2e5f129d876af313191f2639c9ef5df58a34214113052c1f45e3e4f8ab4c71f",
+      "size": 1015646,
       "file_type": "regular"
     },
     {
