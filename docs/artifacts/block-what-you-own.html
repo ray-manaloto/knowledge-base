@@ -1,0 +1,89 @@
+<title>Block What You Own</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#EEF1F5; --surface:#FFFFFF; --ink:#14181F; --muted:#59636F;
+    --line:#C9D2DC; --dead:#B3261E; --warn:#A65A00; --live:#14663F; --accent:#1D4ED8;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:var(--sans);
+       margin:0;padding:26px 20px 32px;line-height:1.45}
+  .sheet{max-width:880px;margin:0 auto;background:var(--surface);
+         border:1px solid var(--line);padding:24px 30px 26px}
+  h1{font-family:var(--cond);font-size:27px;font-weight:700;margin:0 0 4px;
+     letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 18px}
+  figure{margin:0 0 18px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:8px}
+  .rows{border-top:1px solid var(--line)}
+  .row{display:grid;grid-template-columns:96px 1fr;gap:18px;
+       padding:11px 0;border-bottom:1px solid var(--line);align-items:baseline}
+  .tag{font-family:var(--cond);font-size:11.5px;font-weight:700;
+       letter-spacing:.07em;text-transform:uppercase}
+  .t-no{color:var(--dead)} .t-yes{color:var(--live)} .t-cost{color:var(--warn)}
+  .row p{margin:0;font-size:14.5px}
+  .row b{font-weight:600}
+  .ask{margin:18px 0 0;padding:13px 16px;background:#F4F7FB;
+       border-left:3px solid var(--accent);font-size:14.5px}
+</style>
+
+<div class="sheet">
+  <h1>Block What You Own</h1>
+  <p class="sub">The advisor's rule for every check we add: stop the work only when the person stopped can actually fix it. Otherwise just tell them.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 214" role="img" aria-label="A dividing line. On the left, things this project owns — the pinned version, the lock file, the installed copy — may block your work. On the right, things someone else owns — which plugin won, what the newest version is, another team's tool — may only report, never block.">
+      <line x1="350" y1="8" x2="350" y2="206" stroke="#C9D2DC" stroke-width="1.5" stroke-dasharray="5 5"/>
+
+      <text x="20" y="24" font-family="IBM Plex Sans Condensed" font-size="14" font-weight="700" fill="#14663F" letter-spacing="0.06em">WE OWN IT — MAY STOP YOU</text>
+      <text x="372" y="24" font-family="IBM Plex Sans Condensed" font-size="14" font-weight="700" fill="#A65A00" letter-spacing="0.06em">SOMEONE ELSE OWNS IT — TELL ONLY</text>
+
+      <rect x="20" y="38" width="306" height="40" fill="#FFFFFF" stroke="#14663F" stroke-width="1.5"/>
+      <text x="34" y="56" font-family="IBM Plex Sans" font-size="13" font-weight="600" fill="#14181F">The version we wrote down</text>
+      <text x="34" y="71" font-family="IBM Plex Sans" font-size="11" fill="#59636F">one command fixes it</text>
+
+      <rect x="20" y="88" width="306" height="40" fill="#FFFFFF" stroke="#14663F" stroke-width="1.5"/>
+      <text x="34" y="106" font-family="IBM Plex Sans" font-size="13" font-weight="600" fill="#14181F">The lock file that must move with it</text>
+      <text x="34" y="121" font-family="IBM Plex Sans" font-size="11" fill="#59636F">forget it and every command breaks</text>
+
+      <rect x="20" y="138" width="306" height="40" fill="#FFFFFF" stroke="#14663F" stroke-width="1.5"/>
+      <text x="34" y="156" font-family="IBM Plex Sans" font-size="13" font-weight="600" fill="#14181F">The copy actually installed here</text>
+      <text x="34" y="171" font-family="IBM Plex Sans" font-size="11" fill="#59636F">one command fixes it</text>
+
+      <rect x="372" y="38" width="308" height="40" fill="#FFFFFF" stroke="#A65A00" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="386" y="56" font-family="IBM Plex Sans" font-size="13" font-weight="600" fill="#14181F">Which plugin won the race</text>
+      <text x="386" y="71" font-family="IBM Plex Sans" font-size="11" fill="#59636F">we do not own that plugin</text>
+
+      <rect x="372" y="88" width="308" height="40" fill="#FFFFFF" stroke="#A65A00" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="386" y="106" font-family="IBM Plex Sans" font-size="13" font-weight="600" fill="#14181F">What &quot;newest&quot; happens to be today</text>
+      <text x="386" y="121" font-family="IBM Plex Sans" font-size="11" fill="#59636F">changes without us</text>
+
+      <rect x="372" y="138" width="308" height="40" fill="#FFFFFF" stroke="#A65A00" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="386" y="156" font-family="IBM Plex Sans" font-size="13" font-weight="600" fill="#14181F">Anything living outside this folder</text>
+      <text x="386" y="171" font-family="IBM Plex Sans" font-size="11" fill="#59636F">off-limits to change from here</text>
+
+      <text x="20" y="200" font-family="IBM Plex Sans" font-size="12" font-weight="600" fill="#B3261E">Block a right-hand item and people don't fix it — they silence it. That is what we did yesterday.</text>
+    </svg>
+    <figcaption>The same rule decides where each check lives: what we can fix may stop us; what we cannot may only speak.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <span class="tag t-no">Don't build</span>
+      <p><b>The thing you suggested — stopping grep and sed until ty gets asked.</b> It can't be obeyed: a search is usually how you find the name you'd ask ty about, and in cloud sessions and every codex lane there is no ty to ask. A block nobody can satisfy gets silenced, not followed.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-yes">Do build</span>
+      <p><b>Make the report tell the truth, then let it stop you.</b> Today it says "applying" and doesn't. Fix that, teach it to write the change, and only then let it block a release — on the version, the lock file, and the installed copy. Nothing else.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-cost">The bill</span>
+      <p><b>Expect it to stop you about weekly.</b> ty shipped three times in the twelve days to 1 September. Each stop costs one command — but only once the report can actually make the change, which today it can't.</p>
+    </div>
+  </div>
+
+  <p class="ask"><strong>What I need from you:</strong> yes or no to that split — block only what we own, report the rest — and whether a roughly weekly stop at release time is a price you want to pay.</p>
+</div>
