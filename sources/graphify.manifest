@@ -63,13 +63,35 @@
 #     print(distribution('graphifyy').read_text('direct_url.json'))"
 # That is the runtime speaking, where every file below is only a claim about it.
 #
-# WHAT WOULD RETURN THIS TO UPSTREAM — and it is no longer #2981. That PR was
-# CLOSED WITHOUT BEING MERGED (measured 2026-08-25: state closed, merged false,
-# last touched 2026-08-25T08:36Z), and upstream v0.9.50 still contains ZERO
-# mentions of `openai-cli` — control-armed against 23 mentions of `claude-cli`
-# in the same file, so the zero is an answer and not a broken search. This fork
-# is therefore where the capability LIVES, not a bridge waiting on a merge
-# (Ray's call, 2026-08-25). What would clear it is upstream shipping an
+# WHAT WOULD RETURN THIS TO UPSTREAM — watch #3073, not #2981.
+#
+# CORRECTED 2026-09-02. This block said #2981 was closed, concluded upstream was
+# "not getting ours", and recorded the fork as PERMANENT rather than a bridge.
+# The first clause is true and the conclusion does not follow: #2981 (closed
+# 2026-08-25T08:36Z) was RESUPPLIED two days later as **#3073** — same author
+# (Azeem1985), byte-identical title, **still OPEN** as of 2026-09-02. A closed PR
+# number is not the same fact as an abandoned capability, and reading it that way
+# is what made a bridge look permanent. The 2026-08-25 ruling was sound on the
+# evidence it had; the evidence moved and nothing re-asked.
+#
+# ORIGINATION, so it stops being lost (Ray, 2026-09-02): these patches did NOT
+# arrive by cherry-picking either upstream PR. The transport was fork-to-fork
+# from **TelB-io** — `origin/kb-pin/openai-cli-backend` carries `Merge pull
+# request #1..#4 from TelB-io/feat/*`, and three `# PATCHED FOR TELB-COCKPIT`
+# markers survive in our tree (`graphify/llm.py` x2, `graphify/__main__.py` x1).
+#
+# SCOPE OF THAT EVIDENCE, stated because the first version of this note did not:
+# the merge commits evidence FOUR of the branch's commits. The remaining four —
+# including the newest, `157a957` — are not shown by anything here to be TelB-io
+# transports; they may be ours. Establishing which is which is unfinished work,
+# not a settled record. (Cold review of `7b626a6e`.) Control-armed: 0 on tag
+# v0.9.53, and `openai-cli` in `llm.py` -> 9, so the probe discriminates. Their
+# survival IS the proof that commit history plus comments failed to preserve
+# where these patches came from.
+#
+# Upstream v0.9.50 still contained ZERO mentions of `openai-cli` — control-armed
+# against 23 mentions of `claude-cli` in the same file, so the zero is an answer
+# and not a broken search. What would clear it is upstream shipping an
 # openai-cli backend of its own; if that happens, revert `pyproject.toml` to
 # `graphifyy[all]==<that version>`, point url/ref/commit here back at
 # `Graphify-Labs` at the matching tag, and drop the fork block in currency.toml.
