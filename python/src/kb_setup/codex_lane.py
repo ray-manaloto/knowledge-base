@@ -114,7 +114,23 @@ def decide(command: str) -> str | None:
         # segment so another command's `--help` cannot excuse the lane beside it.
         if any(word in _INTROSPECTION for word in rest):
             continue
-        sub = next((word for word in rest if not word.startswith("-")), None)
-        if sub in _GUARDED_SUBCOMMANDS:
-            return _REMEDY.format(sub=sub)
+        # Scan EVERY token, not just the first non-flag one.
+        #
+        # The first-non-flag version shipped and was defeated within minutes by
+        # an ordinary invocation: `codex --cd /tmp exec "..."` reached the binary
+        # undenied, because `--cd`'s VALUE (`/tmp`) is the first non-flag token
+        # and `exec` was never looked at. Any value-taking flag before the
+        # subcommand did it — not an evasion technique, just how people write
+        # the command. 18 unit tests passed over that hole; driving the real CLI
+        # found it on the second probe.
+        #
+        # The residual false positive is a bare token spelled exactly `exec` or
+        # `review` that is NOT the subcommand — e.g. a directory argument of
+        # that exact name. `shlex` has already collapsed any quoted prompt into
+        # ONE token, so prose mentioning exec cannot trip it, and a path like
+        # `/path/to/exec` is a different token. That residue is accepted against
+        # a false NEGATIVE, which defeats the guard's entire purpose.
+        hit = next((word for word in rest if word in _GUARDED_SUBCOMMANDS), None)
+        if hit is not None:
+            return _REMEDY.format(sub=hit)
     return None

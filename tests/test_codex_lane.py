@@ -31,6 +31,14 @@ from kb_setup.result import Ok
         'env FOO=1 codex exec "x"',
         # Second segment of a chain is still a command position.
         'git status && codex exec "x"',
+        # A VALUE-TAKING FLAG BEFORE THE SUBCOMMAND. This shape defeated the
+        # first version of the guard LIVE: `--cd`'s value was read as the
+        # subcommand and `exec` was never looked at, so the command reached the
+        # real binary. 18 unit tests passed over that hole; driving the actual
+        # CLI found it on the second probe.
+        'codex --cd /tmp exec "x"',
+        "codex --sandbox read-only exec -",
+        'codex -C /some/dir review "x"',
     ],
 )
 def test_a_raw_codex_lane_is_denied(command: str) -> None:
