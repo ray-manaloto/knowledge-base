@@ -20,14 +20,17 @@
             "timeout": 20
           }
         ]
-      },
+      }
+    ],
+    "PostToolUse": [
       {
-        "matcher": "Read|Glob",
+        "matcher": "apply_patch",
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -C \"${CLAUDE_PROJECT_DIR:-.}\" -- graphify hook-guard read",
-            "timeout": 15
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR:-.}/python\" kb-setup edit-check",
+            "timeout": 90,
+            "additionalContextLimit": 2000
           }
         ]
       }

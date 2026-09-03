@@ -1,0 +1,90 @@
+<title>Who Turns ty Off</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#EEF1F5; --surface:#FFFFFF; --ink:#14181F; --muted:#59636F;
+    --line:#C9D2DC; --dead:#B3261E; --warn:#A65A00; --live:#14663F; --accent:#1D4ED8;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:var(--sans);
+       margin:0;padding:26px 20px 32px;line-height:1.45}
+  .sheet{max-width:860px;margin:0 auto;background:var(--surface);
+         border:1px solid var(--line);padding:24px 30px 26px}
+  h1{font-family:var(--cond);font-size:27px;font-weight:700;margin:0 0 4px;
+     letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 18px}
+  figure{margin:0 0 18px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:8px}
+  .rows{border-top:1px solid var(--line)}
+  .row{display:grid;grid-template-columns:100px 1fr;gap:18px;
+       padding:11px 0;border-bottom:1px solid var(--line);align-items:baseline}
+  .tag{font-family:var(--cond);font-size:11.5px;font-weight:700;
+       letter-spacing:.07em;text-transform:uppercase}
+  .t-ok{color:var(--live)} .t-bad{color:var(--dead)} .t-junk{color:var(--warn)}
+  .row p{margin:0;font-size:14.5px}
+  .row b{font-weight:600}
+  .ask{margin:18px 0 0;padding:13px 16px;background:#F4F7FB;
+       border-left:3px solid var(--accent);font-size:14.5px}
+  .corr{margin:14px 0 0;font-size:12.5px;color:var(--muted);
+        padding-top:12px;border-top:1px solid var(--line)}
+</style>
+
+<div class="sheet">
+  <h1>Who Turns ty Off</h1>
+  <p class="sub">Nobody. It was working the whole time — it just only wakes up when something asks it a question, and it wakes up wearing the wrong version.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 178" role="img" aria-label="Claude asks uvx for the newest ty, which starts a ty server. The version it starts has never once been the 0.0.77 the project's checks run: uv's cache shows twenty-six different ty versions installed since March, and 0.0.77 is not among them.">
+      <defs>
+        <marker id="k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#14181F"/>
+        </marker>
+      </defs>
+
+      <rect x="12" y="20" width="150" height="46" fill="#FFFFFF" stroke="#14181F" stroke-width="1.5"/>
+      <text x="87" y="41" text-anchor="middle" font-family="IBM Plex Sans" font-size="13.5" font-weight="600" fill="#14181F">Claude asks</text>
+      <text x="87" y="57" text-anchor="middle" font-family="IBM Plex Sans" font-size="11" fill="#59636F">only when it needs to</text>
+
+      <path d="M164 43 L242 43" fill="none" stroke="#14181F" stroke-width="1.8" marker-end="url(#k)"/>
+
+      <rect x="244" y="20" width="176" height="46" fill="#FFFFFF" stroke="#A65A00" stroke-width="2"/>
+      <text x="332" y="41" text-anchor="middle" font-family="IBM Plex Sans" font-size="13.5" font-weight="600" fill="#A65A00">&quot;give me the newest ty&quot;</text>
+      <text x="332" y="57" text-anchor="middle" font-family="IBM Plex Sans" font-size="11" fill="#59636F">Astral's plugin says this</text>
+
+      <path d="M422 43 L500 43" fill="none" stroke="#A65A00" stroke-width="1.8" marker-end="url(#k)"/>
+
+      <rect x="502" y="20" width="184" height="46" fill="#FFFFFF" stroke="#B3261E" stroke-width="2"/>
+      <text x="594" y="41" text-anchor="middle" font-family="IBM Plex Sans" font-size="13.5" font-weight="600" fill="#B3261E">a ty that isn't yours</text>
+      <text x="594" y="57" text-anchor="middle" font-family="IBM Plex Sans" font-size="11" fill="#59636F">whatever shipped most recently</text>
+
+      <!-- the receipt strip -->
+      <line x1="12" y1="96" x2="686" y2="96" stroke="#C9D2DC" stroke-width="1"/>
+      <text x="12" y="118" font-family="IBM Plex Sans" font-size="12.5" font-weight="600" fill="#14181F">What it actually fetched, from your own download cache:</text>
+      <text x="12" y="140" font-family="IBM Plex Mono" font-size="12" fill="#59636F">Mar 0.0.26 · Apr 0.0.29 · Jul 0.0.59 0.0.62 0.0.64 · Aug 0.0.69 0.0.72 0.0.75 · Sep 0.0.78</text>
+      <text x="12" y="164" font-family="IBM Plex Sans" font-size="12.5" font-weight="600" fill="#B3261E">26 versions since March. Yours — 0.0.77 — is not one of them.</text>
+    </svg>
+    <figcaption>Every one of those was downloaded automatically, on a different day, without anyone choosing it.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <span class="tag t-ok">Works</span>
+      <p><b>ty is running right now.</b> I asked it to list what's in a file and it answered correctly. It sleeps until something asks — which is why every check we ran for two days said "nothing there". Nothing was broken; nobody had knocked.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-bad">Wrong one</span>
+      <p><b>The ty answering you is not the ty your checks use.</b> Your checks run 0.0.77. Since late August the editor has been answering from 0.0.75, and as of this afternoon 0.0.78. They can disagree, and you'd have no way to tell which was right.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-junk">Litter</span>
+      <p><b>Two leftovers to sweep.</b> A settings file we added yesterday that does nothing at all, and an old copy of ty inside your research plugin. Neither is doing harm today; both will confuse the next person.</p>
+    </div>
+  </div>
+
+  <p class="ask"><strong>What I need from you:</strong> nothing is broken, so this is a preference — do you want the editor pinned to <em>your</em> ty, or is "always newest" fine? One answer, and I'll do the rest.</p>
+  <p class="corr">Corrected twice after publishing. First: you were right that a ty plugin was already set up — I'd searched filenames and it's declared inside the manifest. Second: this page said ty wasn't running. It runs on demand, and nothing had demanded it. Note I installed 0.0.78 myself while probing; before that the newest was 0.0.75 from 26 August.</p>
+</div>

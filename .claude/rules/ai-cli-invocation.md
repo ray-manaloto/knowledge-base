@@ -44,6 +44,11 @@ echo "prompt" | codex exec --sandbox workspace-write \
   --add-dir "$HOME/Library/Caches" \
   -c sandbox_workspace_write.network_access=true -
 
+# A lane that must run THIS REPO'S HOOKS (the guard stack, the ty edit-check):
+echo "prompt" | codex exec --sandbox workspace-write \
+  --add-dir "$HOME/Library/Caches" \
+  --dangerously-bypass-hook-trust -
+
 # With reasoning effort override:
 echo "prompt" | codex exec -c model_reasoning_effort="high" -
 
@@ -66,6 +71,31 @@ at all (memory `codex-lane-cannot-write-agents-or-run-uv-gates`, measured
 2026-08-30 through the fable-orchestrator lane wrapper). The uv half was a
 missing flag, not a sandbox wall. The `.agents/` half of that note is untouched
 and still stands.
+
+🔴 **A codex lane RUNS NO HOOK IT HAS NOT BEEN TRUSTED WITH, and trust is per-hook
+HASH** (2026-09-02, Ray). `hooks/index.md:74-77`: *"Before a non-managed hook can
+run, Codex requires you to review and trust the exact hook definition. Codex
+records trust against the hook's current hash, so new or changed hooks are marked
+for review and **skipped until trusted**."*
+
+Measured in `~/.codex/config.toml`'s `[hooks.state]`, control-armed: this repo's
+`.codex/hooks.json` had **3 trusted `pre_tool_use` entries and 0 for
+`post_tool_use`** — so the guard stack ran only because someone had trusted it at
+some point, and a newly added hook did **not** run at all.
+
+Three consequences, and the third is why this is a rule rather than a footnote:
+
+1. **`--dangerously-bypass-hook-trust` is the only lever this repo owns.** Trust
+   is granted interactively via `/hooks`, and it persists in
+   `~/.codex/config.toml` — a file `do-not.md` #11 forbids us to write. So a lane
+   that must run our hooks passes the flag, every time.
+2. **Editing a hook re-breaks its trust**, because the hash changes. This is not
+   one-time setup; it recurs on every change to `.codex/hooks.json`.
+3. **The failure is SILENT.** An untrusted hook is skipped, not reported — so a
+   lane runs with no guard stack and no ty diagnostics while every config file on
+   disk says otherwise. That is the same shape as the dead `Read|Glob` matcher
+   that sat in this repo's own `.codex/hooks.json` unnoticed: *written* is not
+   *running*, and only a live probe tells them apart.
 
 **`workspace-write` ALSO BLOCKS NETWORK EGRESS, and that is the second wall**
 (2026-09-01). It is a separate mechanism from the write sandbox, so `--add-dir`

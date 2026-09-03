@@ -1,0 +1,117 @@
+<title>Wiring ty and the Graph</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#EEF1F5; --surface:#FFFFFF; --ink:#14181F; --muted:#59636F;
+    --line:#C9D2DC; --dead:#B3261E; --warn:#A65A00; --live:#14663F; --accent:#1D4ED8;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:var(--sans);
+       margin:0;padding:28px 20px 34px;line-height:1.45}
+  .sheet{max-width:840px;margin:0 auto;background:var(--surface);
+         border:1px solid var(--line);padding:26px 30px 28px}
+  h1{font-family:var(--cond);font-size:27px;font-weight:700;margin:0 0 4px;
+     letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 20px}
+  figure{margin:0 0 22px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto;max-width:100%}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:8px}
+  .rows{display:flex;flex-direction:column;gap:0;
+        border-top:1px solid var(--line)}
+  .row{display:grid;grid-template-columns:112px 1fr;gap:18px;
+       padding:12px 0;border-bottom:1px solid var(--line);align-items:baseline}
+  .tag{font-family:var(--cond);font-size:12px;font-weight:700;
+       letter-spacing:.07em;text-transform:uppercase}
+  .t-dead{color:var(--dead)} .t-warn{color:var(--warn)} .t-none{color:var(--dead)}
+  .row p{margin:0;font-size:14.5px}
+  .row b{font-weight:600}
+  .ask{margin:22px 0 0;padding:14px 16px;background:#F4F7FB;
+       border-left:3px solid var(--accent);font-size:14.5px}
+  .ask strong{font-weight:600}
+  code{font-family:var(--mono);font-size:.9em;color:var(--muted)}
+  .corr{margin:14px 0 0;font-size:12.5px;color:var(--muted);
+        padding-top:12px;border-top:1px solid var(--line)}
+</style>
+
+<div class="sheet">
+  <h1>Wiring ty and the Graph</h1>
+  <p class="sub">You asked for four connections. One is broken, one cannot exist, and two go to the wrong place.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 296" role="img" aria-label="Claude Code and Codex on the left; ty, an online copy of the project map, and the full local map on the right. Claude's wire to ty is broken, Codex has no socket for ty at all, both clients are wired to the small online copy, and the full local map has nothing plugged into it.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#A65A00"/>
+        </marker>
+        <marker id="arRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#B3261E"/>
+        </marker>
+      </defs>
+
+      <!-- clients -->
+      <rect x="16" y="74" width="164" height="56" fill="#FFFFFF" stroke="#14181F" stroke-width="1.5"/>
+      <text x="98" y="99" text-anchor="middle" font-family="IBM Plex Sans" font-size="14" font-weight="600" fill="#14181F">Claude Code</text>
+      <text x="98" y="116" text-anchor="middle" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">this session</text>
+
+      <rect x="16" y="182" width="164" height="56" fill="#FFFFFF" stroke="#14181F" stroke-width="1.5"/>
+      <text x="98" y="207" text-anchor="middle" font-family="IBM Plex Sans" font-size="14" font-weight="600" fill="#14181F">Codex</text>
+      <text x="98" y="224" text-anchor="middle" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">the other lane</text>
+
+      <!-- targets -->
+      <rect x="432" y="16" width="252" height="58" fill="#FFFFFF" stroke="#14181F" stroke-width="1.5"/>
+      <text x="448" y="40" font-family="IBM Plex Sans" font-size="14" font-weight="600" fill="#14181F">ty — reads your Python</text>
+      <text x="448" y="58" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">installed here, version 0.0.77, works</text>
+
+      <rect x="432" y="118" width="252" height="58" fill="#FFFFFF" stroke="#A65A00" stroke-width="1.5"/>
+      <text x="448" y="142" font-family="IBM Plex Sans" font-size="14" font-weight="600" fill="#14181F">Online copy of the map</text>
+      <text x="448" y="160" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">13,126 things — this repo's own files</text>
+
+      <rect x="432" y="220" width="252" height="58" fill="#FFFFFF" stroke="#C9D2DC" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="448" y="244" font-family="IBM Plex Sans" font-size="14" font-weight="600" fill="#14181F">The full map, on this machine</text>
+      <text x="448" y="262" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">359,026 things — every source you fed it</text>
+
+      <!-- Claude -> ty : broken -->
+      <path d="M180 92 L300 92 L300 45 L426 45" fill="none" stroke="#B3261E" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arRed)"/>
+      <text x="306" y="36" font-family="IBM Plex Sans" font-size="11.5" font-weight="600" fill="#B3261E">never starts</text>
+
+      <!-- Codex -> ty : no socket -->
+      <path d="M180 210 L246 210" fill="none" stroke="#B3261E" stroke-width="1.8"/>
+      <path d="M252 199 L272 221 M272 199 L252 221" stroke="#B3261E" stroke-width="2.2" fill="none"/>
+      <text x="282" y="207" font-family="IBM Plex Sans" font-size="11.5" font-weight="600" fill="#B3261E">no socket for ty</text>
+      <text x="282" y="222" font-family="IBM Plex Sans" font-size="11" fill="#59636F">at all</text>
+
+      <!-- both -> online copy -->
+      <path d="M180 112 L300 112 L300 137 L426 137" fill="none" stroke="#A65A00" stroke-width="1.8" marker-end="url(#ar)"/>
+      <path d="M180 188 L340 188 L340 157 L426 157" fill="none" stroke="#A65A00" stroke-width="1.8" marker-end="url(#ar)"/>
+      <text x="306" y="128" font-family="IBM Plex Sans" font-size="11.5" font-weight="600" fill="#A65A00">wrong map</text>
+      <text x="346" y="176" font-family="IBM Plex Sans" font-size="11.5" font-weight="600" fill="#A65A00">wrong map</text>
+
+      <!-- nothing into the local map -->
+      <circle cx="352" cy="249" r="5" fill="none" stroke="#8D97A3" stroke-width="1.6"/>
+      <path d="M360 249 L426 249" fill="none" stroke="#8D97A3" stroke-width="1.6" stroke-dasharray="4 5"/>
+      <text x="200" y="253" font-family="IBM Plex Sans" font-size="11.5" font-weight="600" fill="#59636F">nothing plugged in</text>
+    </svg>
+    <figcaption>Both clients reach a small online copy of this project. The big local map — the one every source you ingested actually lives in — has no client wired to it.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <span class="tag t-dead">Broken</span>
+      <p><b>Claude → ty.</b> The settings file is real and correct, but it sits somewhere Claude Code never looks. Claude only picks up a code-reader that arrives as a <b>plugin</b>. Fixable today.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-none">Can't be done</span>
+      <p><b>Codex → ty.</b> Codex has no way to talk to a code-reader like this — asked for since January, never built. But a tool called <b>Serena</b> already bridges the gap, already knows ty, and is already sitting in this project's sources. <em>One catch: it brings its own much older ty unless we tell it not to.</em></p>
+    </div>
+    <div class="row">
+      <span class="tag t-warn">Wrong target</span>
+      <p><b>Both → the map.</b> Each one is wired to a small online copy holding this repo's own files. The full map, with every source you ingested, sits on this machine and nothing points at it. Fixable today, for both.</p>
+    </div>
+  </div>
+
+  <p class="ask"><strong>What I need from you:</strong> one answer — should Codex get ty through Serena, or something lighter? Everything else on this page I can wire up without asking.</p>
+  <p class="corr">Corrected after publishing, on your steer to check the tracker: the middle row first said only that Codex cannot do this. Serena — already here, already ty-aware — is the part I had missed. Issues #666, #667, #668.</p>
+</div>

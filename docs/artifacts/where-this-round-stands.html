@@ -1,0 +1,111 @@
+<title>Where This Round Stands</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#E9EDF1; --sheet:#FFFFFF; --ink:#161A20; --muted:#57626F;
+    --line:#C4CEDA; --rule:#E2E8EF;
+    --next:#0F5F63; --gap:#B3261E; --wait:#8A5300;
+    --disp:"Archivo",system-ui,-apple-system,sans-serif;
+    --body:"Source Sans 3",system-ui,-apple-system,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:22px 18px 30px;background:var(--ground);color:var(--ink);
+       font-family:var(--body);line-height:1.42;font-size:15px}
+  .sheet{max-width:790px;margin:0 auto;background:var(--sheet);
+         border:1px solid var(--line);padding:22px 28px 24px}
+
+  h1{font-family:var(--disp);font-size:26px;font-weight:700;margin:0 0 3px;
+     letter-spacing:-.015em;text-wrap:balance}
+  .where{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin:0 0 16px}
+  .where b{color:var(--ink);font-weight:500}
+
+  h2{font-family:var(--disp);font-size:11px;font-weight:600;text-transform:uppercase;
+     letter-spacing:.09em;color:var(--muted);margin:0 0 8px}
+
+  figure{margin:0 0 18px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto;min-width:520px}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:5px}
+
+  .rows{display:grid;gap:0;margin:0 0 18px;border-top:1px solid var(--rule)}
+  .row{display:grid;grid-template-columns:104px 1fr;gap:14px;
+       padding:9px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+  .tag{font-family:var(--disp);font-size:10.5px;font-weight:600;text-transform:uppercase;
+       letter-spacing:.07em;padding-top:2px}
+  .tag.gap{color:var(--gap)} .tag.wait{color:var(--wait)}
+  .row p{margin:0}
+  .row .said{color:var(--muted);display:block;font-size:13.5px}
+
+  .ask{border-left:3px solid var(--next);background:#F4F8F8;
+       padding:12px 16px;margin:0}
+  .ask p{margin:0;font-size:15.5px}
+  .ask b{font-family:var(--disp);font-weight:700}
+</style>
+
+<div class="sheet">
+
+  <h1>Where this round stands</h1>
+  <p class="where">on <b>feat/phase-t-codex-code-intel</b> &nbsp;·&nbsp; 4 pieces of work saved here &nbsp;·&nbsp; none sent up yet</p>
+
+  <h2>What has to happen, in order</h2>
+  <figure>
+    <svg viewBox="0 0 700 118" role="img" aria-label="Four ordered steps: a second opinion, then a sign-off, then send up and merge, then start the big one. The first step is where we are now.">
+      <defs>
+        <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <polygon points="0,1 10,5 0,9" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <!-- step 1 : current -->
+      <rect x="2" y="26" width="150" height="52" rx="3" fill="#F0F7F7" stroke="#0F5F63" stroke-width="2"/>
+      <text x="77" y="48" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="#0F5F63">A second opinion</text>
+      <text x="77" y="65" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11.5" fill="#0F5F63">on the code just written</text>
+      <text x="77" y="17" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em" fill="#0F5F63">YOU ARE HERE</text>
+
+      <line x1="158" y1="52" x2="182" y2="52" stroke="currentColor" stroke-width="1.5" marker-end="url(#tip)" opacity="0.55"/>
+
+      <rect x="188" y="26" width="150" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity="0.45"/>
+      <text x="263" y="48" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">A sign-off</text>
+      <text x="263" y="65" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11.5" fill="currentColor" opacity="0.72">written down, on this exact save</text>
+
+      <line x1="344" y1="52" x2="368" y2="52" stroke="currentColor" stroke-width="1.5" marker-end="url(#tip)" opacity="0.55"/>
+
+      <rect x="374" y="26" width="150" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity="0.45"/>
+      <text x="449" y="48" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">Send it up</text>
+      <text x="449" y="65" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11.5" fill="currentColor" opacity="0.72">then merge it in</text>
+
+      <line x1="530" y1="52" x2="554" y2="52" stroke="currentColor" stroke-width="1.5" marker-end="url(#tip)" opacity="0.55"/>
+
+      <rect x="560" y="26" width="138" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity="0.45"/>
+      <text x="629" y="48" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">The big one</text>
+      <text x="629" y="65" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11.5" fill="currentColor" opacity="0.72">the setup you asked for</text>
+
+      <text x="629" y="98" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11.5" fill="currentColor" opacity="0.6">a whole round of its own</text>
+    </svg>
+    <figcaption>Nothing later starts until the one before it is done — that was your call last session.</figcaption>
+  </figure>
+
+  <h2>Where the note and the repo disagree</h2>
+  <div class="rows">
+    <div class="row">
+      <span class="tag gap">Missing</span>
+      <p>No sign-off exists for any of this work yet.
+        <span class="said">The note pointed at one, but it belongs to an older save — so nothing can be sent up today without redoing it.</span></p>
+    </div>
+    <div class="row">
+      <span class="tag wait">Loose</span>
+      <p>One finished page is sitting outside the saved work.
+        <span class="said">The note said nothing was left lying around. Something was.</span></p>
+    </div>
+    <div class="row">
+      <span class="tag wait">Stale</span>
+      <p>Claude and one other tool both updated themselves. Four places still name yesterday's numbers.
+        <span class="said">Harmless today. It is the kind of thing that quietly makes a record wrong later.</span></p>
+    </div>
+  </div>
+
+  <div class="ask">
+    <p><b>What I need from you:</b> just a go-ahead to start step one. Nothing to decide — the order was already settled.</p>
+  </div>
+
+</div>
