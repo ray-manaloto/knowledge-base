@@ -4,15 +4,24 @@
 # TOOLCHAIN SOURCE — a tool this repo actually RUNS (#81, ingested 2026-08-02).
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
-#   version source: mise.toml `"npm:@openai/codex"` (line ~177)
-#   pinned here:    0.152.0
+#   version source: mise.toml `"npm:@openai/codex"` (line ~232)
+#   pinned here:    see `ref` below — this comment used to restate the number and
+#                   drifted from it (it read 0.152.0 while `ref` said
+#                   rust-v0.152.1). A version written twice in one file is a
+#                   version that will disagree with itself; `ref` is the value.
 # Note the tag prefix: releases are `rust-v<version>`, so `ref` is NOT the bare
 # version the two lines above name. Also: this manifest read 0.146.0 while
 # mise.toml ran 0.146.1, i.e. it was ALREADY drifting before the 0.147.0 bump —
 # back then the invariant above was stated in 13 manifests and enforced by
-# nothing. It still is: `currency.toml`'s `[tool.codex]` block deliberately
-# carries no `manifest` key — see that block for the why — so this pin is
-# advanced BY HAND and unenforced by `kb-currency-check`.
+# nothing.
+#
+# THAT IS NO LONGER TRUE, and this comment claimed otherwise until 2026-09-03.
+# It read: "`currency.toml`'s `[tool.codex]` block deliberately carries no
+# `manifest` key — so this pin is advanced BY HAND and unenforced by
+# `kb-currency-check`". `currency.toml` DOES declare
+# `manifest = "sources/codex.manifest"`, so the check runs and this pin is
+# enforced. The comment was worse than merely stale: it told a reader that
+# nothing would catch them, which is an invitation to hand-edit carelessly.
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -30,8 +39,8 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/openai/codex
-ref = rust-v0.152.1
-commit = 5adb68a49933ae446bf11935662c83dba55a0804
+ref = rust-v0.153.1
+commit = 985641272869835d01d025ed2a218fbbce35fa9f
 kind = code
 added = 2026-08-02
 # EXCLUDED FROM THE BUILD 2026-08-20 (Ray's ruling: skip any blocker, file it,

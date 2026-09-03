@@ -158,18 +158,20 @@ class Version:
             return None
         return cls(raw=raw, parts=parts)
 
-    def is_patch_bump_from(self, other: Version) -> bool:
-        """True when only the third component moved (0.9.25 -> 0.9.26).
-
-        Pre-1.0 projects use the MINOR slot as their breaking channel, so
-        0.9.x -> 0.10.0 is deliberately NOT a patch bump here.
-
-        The "is greater" half delegates to `__gt__` so the two comparisons cannot
-        disagree. Comparing `self.parts > other.parts` directly did disagree:
-        `1.2 -> 1.2.0` is the SAME version, but the raw tuples `(1, 2, 0) > (1, 2)`
-        made it look like a patch bump, which would auto-apply a no-op upgrade.
-        """
-        return self.parts[:2] == other.parts[:2] and self > other
+    # 🔴 `is_patch_bump_from` STOOD HERE and was removed on 2026-09-03, in the same
+    # round that removed the gate which was its only caller (`decide._gate_patch`,
+    # see the GATES block there for why). A cold lane found it: correct code, fully
+    # tested, and reachable from nothing but its own tests — which is exactly the
+    # shape a passing suite cannot tell apart from live code.
+    #
+    # Retired rather than kept "in case", per `tool-currency-and-native-first.md`
+    # rule 3: dead custom code rots and misleads, and a tested-but-uncalled method
+    # is the most misleading kind because its tests read as evidence it matters.
+    # Verified unused in the sibling `dotfiles` repo too, which consumes this
+    # package — control-armed, since a grep for `currency` there returns 3 files.
+    #
+    # `__gt__` below is what survives, and it is the half that was load-bearing:
+    # `_gate_readable` uses it to refuse a BACKWARDS move.
 
     def __gt__(self, other: Version) -> bool:
         """Compare numerically, padding the shorter version with zeros."""

@@ -144,11 +144,11 @@ mise run kb-currency          # the full loop; writes docs/currency/
   not be blocked over a version pin. Two things it does NOT stay silent about: a
   missing `currency.toml` (silence is this design's "clean", so an absent config
   must announce that step 1 did not run) and an unknown `--tool` (exit 2).
-- **An unambiguous bump may apply itself**, where unambiguous means all six gates
-  pass: patch-level · latest has a readable GitHub release · no breaking marker ·
-  extras unchanged · no tracked issue moved · step 1 green. It **fails closed** —
-  anything unreadable is ambiguity, not consent. PyPI is the installable truth
-  (mise installs from it); GitHub is only the narrative.
+- **An unambiguous bump may apply itself** — six gates: versions readable and
+  moving forward · readable GitHub release · no breaking marker · extras unchanged
+  · no tracked issue moved · step 1 green. **Fails closed.** PyPI is the
+  installable truth; GitHub the narrative. Gate 1 was "patch-level" until Ray
+  removed it 2026-09-03 — it measured digits, not risk; a MAJOR now applies.
 - **"Could not check" is never rendered as green.** Three distinct states, kept
   distinct because collapsing them is how every defect in this engine's review
   happened: DRIFT (checked, disagrees) · SKIP (not applicable here) · OK. A run of

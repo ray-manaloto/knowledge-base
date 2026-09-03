@@ -1442,3 +1442,143 @@ def test_backend_probes_reports_drift_when_one_is_missing() -> None:
     )
     assert finding.status is sync.DRIFT
     assert "no-such-backend" in finding.detail
+
+
+# ------------------------------------------- the project's own resolution ----
+#
+# `resolve_from_path` asks what a BARE call reaches. These cover the second and
+# third facts — what `mise which` selects and what `mise exec` runs — and, most
+# importantly, that the shallow path still cannot reach either of them.
+#
+# The worked case is real. On 2026-09-03 a bare `codex` reached 0.152.0 while
+# `mise exec -- codex` ran the pinned 0.152.1, so one `resolution` DRIFT was the
+# whole story and gate 6 blocked a bump over a stale shell PATH.
+
+
+class _FakeProc:
+    """Enough of `CompletedProcess` for `_proc.run_capture`'s callers."""
+
+    def __init__(self, stdout: str = "", stderr: str = "", returncode: int = 0) -> None:
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
+
+
+def _codex_spec() -> config.ToolSpec:
+    return config.ToolSpec(name="codex", mise_key="npm:@openai/codex", binary="codex")
+
+
+def _fake_mise(monkeypatch, *, which: str = "", version: str = "", rc: int = 0) -> list[list[str]]:
+    """Route `mise which` / `mise exec` to canned output; record every argv."""
+    calls: list[list[str]] = []
+
+    def _capture(cmd: list[str], *, cwd: object = None, timeout: float = 0.0) -> tuple:
+        del cwd, timeout  # signature parity with `_proc.run_capture`
+        calls.append(list(cmd))
+        if cmd[:2] == ["mise", "which"]:
+            return _FakeProc(stdout=which, returncode=rc if not which else 0), ""
+        return _FakeProc(stdout=version, returncode=rc), ""
+
+    monkeypatch.setattr(sync._proc, "run_capture", _capture)
+    return calls
+
+
+_INSTALL = "/home/u/.local/share/mise/installs/npm-openai-codex/0.152.1/bin/codex"
+
+
+def test_project_resolution_is_ok_when_mise_runs_the_pin(monkeypatch) -> None:
+    """The control arm. Without it a DRIFT below would prove nothing."""
+    _fake_mise(monkeypatch, which=_INSTALL, version="codex-cli 0.152.1")
+
+    finding = sync._check_project_resolution(Path(), _codex_spec(), "0.152.1")
+
+    assert finding.status is sync.OK
+    assert "0.152.1" in finding.detail
+
+
+def test_project_resolution_drifts_when_mise_runs_a_version_that_is_not_the_pin(
+    monkeypatch,
+) -> None:
+    """The realistic break: the pin advances and the install does not follow.
+
+    This is the exact shape of a half-finished bump — `mise.toml` moved to
+    0.153.0, the binary is still 0.152.1 — which is the state this check exists
+    to make visible while `resolution` alone would keep reporting the shell.
+    """
+    _fake_mise(monkeypatch, which=_INSTALL, version="codex-cli 0.152.1")
+
+    finding = sync._check_project_resolution(Path(), _codex_spec(), "0.153.0")
+
+    assert finding.status is sync.DRIFT
+    assert "0.152.1" in finding.detail
+    assert "0.153.0" in finding.detail
+
+
+def test_project_resolution_is_blind_not_drift_when_mise_cannot_answer(monkeypatch) -> None:
+    """A probe that never ran has found nothing — the distinction this module keeps.
+
+    Rendering an unreachable mise as DRIFT would assert a disagreement nobody
+    observed; BLIND still refuses an auto-apply (`decide._gate_sync`), so the
+    fail-closed direction survives without the false claim.
+    """
+    _fake_mise(monkeypatch, version="", rc=127)
+
+    finding = sync._check_project_resolution(Path(), _codex_spec(), "0.152.1")
+
+    assert finding.status is sync.BLIND
+
+
+def test_project_resolution_is_blind_when_the_version_pattern_misses(monkeypatch) -> None:
+    """A stale `version_pattern` must not read as agreement, nor as disagreement."""
+    _fake_mise(monkeypatch, which=_INSTALL, version="codex-cli 0.152.1")
+    spec = config.ToolSpec(
+        name="codex", mise_key="npm:@openai/codex", binary="codex", version_pattern=r"(NOPE\d+)"
+    )
+
+    finding = sync._check_project_resolution(Path(), spec, "0.152.1")
+
+    assert finding.status is sync.BLIND
+    assert "version_pattern" in finding.detail
+
+
+def test_shallow_check_sync_cannot_reach_a_subprocess(tmp_path, monkeypatch) -> None:
+    """The SessionStart contract, armed rather than asserted in a docstring.
+
+    `deep=False` must be structurally unable to spawn `mise` — so this makes any
+    spawn an outright failure and requires the shallow run to complete anyway.
+    A `project-resolution` row is ABSENT, not SKIP: a row that exists is a branch
+    a later edit can take.
+    """
+    root = _repo(tmp_path)
+
+    def _explode(*_args: object, **_kwargs: object) -> tuple:
+        raise AssertionError("deep=False reached a subprocess")
+
+    monkeypatch.setattr(sync._proc, "run_capture", _explode)
+
+    status = sync.check_sync(root, config.load(root)[0])
+
+    assert "project-resolution" not in {f.check for f in status.findings}
+
+
+def test_deep_check_sync_adds_the_project_resolution_row(tmp_path, monkeypatch) -> None:
+    """The other arm: the row appears when it is asked for, or the test above is vacuous."""
+    root = _repo(tmp_path)
+    _fake_mise(monkeypatch, which=_INSTALL, version="graphify 0.9.25")
+
+    status = sync.check_sync(root, config.load(root)[0], deep=True)
+
+    assert "project-resolution" in {f.check for f in status.findings}
+
+
+def test_parse_version_prefers_the_pattern_and_falls_back_to_the_last_field() -> None:
+    """One implementation, three call sites.
+
+    So a `version_pattern` cannot mean two different things depending on which
+    reading asked for it.
+    """
+    assert sync.parse_version("codex-cli 0.152.1") == "0.152.1"
+    assert sync.parse_version("mise 2026.9.1 macos-arm64", r"mise (\S+)") == "2026.9.1"
+    assert sync.parse_version("v1.2.3") == "1.2.3"
+    assert sync.parse_version("anything at all", r"(NOPE\d+)") == ""
+    assert sync.parse_version("") == ""

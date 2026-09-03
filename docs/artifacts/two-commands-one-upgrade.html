@@ -1,0 +1,125 @@
+<title>Two Commands, One Upgrade</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Public+Sans:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#FAFAFA; --ink:#141414; --muted:#5B6066; --faint:#8B9096;
+    --rule:#DCDEE0; --box:#FFFFFF;
+    --stop:#A4262C; --stop-wash:#FBEEEE;
+    --own-a:#0B6E4F; --own-a-wash:#E6F2ED;
+    --own-b:#1F4E8C; --own-b-wash:#E9EFF7;
+    --disp:Archivo,"Helvetica Neue",Arial,sans-serif;
+    --body:"Public Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+    --mono:"Roboto Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground); color:var(--ink); font-family:var(--body);
+    margin:0; padding:36px 24px 44px; line-height:1.45;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:900px; margin:0 auto;}
+  .eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--faint); margin:0 0 9px;}
+  h1{font-family:var(--disp); font-weight:700; font-size:34px; line-height:1.08;
+    letter-spacing:-.018em; margin:0 0 8px; text-wrap:balance;}
+  .lede{font-size:16px; color:var(--muted); margin:0 0 30px; max-width:64ch;}
+  .lede b{color:var(--ink); font-weight:600;}
+
+  figure{margin:0 0 26px; overflow-x:auto;}
+  svg{display:block; max-width:100%; height:auto;}
+  figcaption{font-size:12.5px; color:var(--faint); margin-top:9px;}
+
+  .gap{border-left:4px solid var(--stop); background:var(--stop-wash);
+    padding:13px 17px; margin:0 0 24px;}
+  .gap p{margin:0; font-size:15px;}
+  .gap b{font-weight:600;}
+
+  .ask{border-top:2px solid var(--ink); padding-top:15px; font-size:16px;
+    display:flex; gap:12px; align-items:flex-start;}
+  .ask .arrow{font-family:var(--mono); color:var(--own-a); font-weight:500;}
+  .ask strong{font-weight:600;}
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Phase U · step 0 · why nothing moves</p>
+  <h1>Two commands cover the whole upgrade. Both turn codex away at the door.</h1>
+  <p class="lede">Between them they already do every step a version bump needs —
+  and their coverage does not even overlap. Neither will accept
+  <b>codex</b>, and each refuses for a different reason.</p>
+
+  <figure>
+    <svg viewBox="0 0 900 300" role="img"
+         aria-label="Six upgrade steps in a row. An upper bracket labelled currency apply covers steps 1, 5 and 6; a lower bracket labelled kb-tool-sync covers steps 2, 3 and 4. Both brackets are marked as refusing codex, for different stated reasons.">
+      <defs>
+        <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0 0 L8 4 L0 8 z" fill="#8B9096"/>
+        </marker>
+      </defs>
+
+      <!-- upper bracket: currency apply -->
+      <rect x="14" y="14" width="176" height="26" fill="#E9EFF7" stroke="#1F4E8C" stroke-width="1.2"/>
+      <text x="26" y="32" font-family="Roboto Mono, monospace" font-size="12.5" fill="#1F4E8C">currency apply</text>
+      <text x="200" y="32" font-family="Public Sans, sans-serif" font-size="13.5" fill="#A4262C" font-weight="600">✕ refuses: it only auto-applies patch bumps</text>
+      <!-- bracket spans steps 1, 5 and 6 — not contiguous, hence the dashed run -->
+      <path d="M62 40 V72" stroke="#1F4E8C" stroke-width="1.4" fill="none"/>
+      <path d="M62 72 H762" stroke="#1F4E8C" stroke-width="1.4" fill="none" stroke-dasharray="5 5"/>
+      <path d="M62 72 V100 M610 72 V100 M762 72 V100" stroke="#1F4E8C" stroke-width="1.4" fill="none"/>
+
+      <!-- the six stage boxes -->
+      <g font-family="Public Sans, sans-serif" font-size="12.5" fill="#141414">
+        <rect x="14" y="100" width="96" height="52" fill="#E9EFF7" stroke="#1F4E8C" stroke-width="1.3"/>
+        <text x="62" y="122" text-anchor="middle">move the</text><text x="62" y="138" text-anchor="middle">pin</text>
+
+        <rect x="142" y="100" width="96" height="52" fill="#E6F2ED" stroke="#0B6E4F" stroke-width="1.3"/>
+        <text x="190" y="130" text-anchor="middle">lock</text>
+
+        <rect x="270" y="100" width="96" height="52" fill="#E6F2ED" stroke="#0B6E4F" stroke-width="1.3"/>
+        <text x="318" y="130" text-anchor="middle">install</text>
+
+        <rect x="398" y="100" width="120" height="52" fill="#E6F2ED" stroke="#0B6E4F" stroke-width="1.3"/>
+        <text x="458" y="122" text-anchor="middle">check what</text><text x="458" y="138" text-anchor="middle">actually runs</text>
+
+        <rect x="550" y="100" width="120" height="52" fill="#E9EFF7" stroke="#1F4E8C" stroke-width="1.3"/>
+        <text x="610" y="122" text-anchor="middle">find the real</text><text x="610" y="138" text-anchor="middle">upstream commit</text>
+
+        <rect x="702" y="100" width="120" height="52" fill="#E9EFF7" stroke="#1F4E8C" stroke-width="1.3"/>
+        <text x="762" y="122" text-anchor="middle">write the</text><text x="762" y="138" text-anchor="middle">source pin</text>
+      </g>
+
+      <!-- flow arrows -->
+      <g stroke="#8B9096" stroke-width="1.2" marker-end="url(#ar)" fill="none">
+        <path d="M110 126 H136"/><path d="M238 126 H264"/><path d="M366 126 H392"/>
+        <path d="M518 126 H544"/><path d="M670 126 H696"/>
+      </g>
+
+      <!-- lower bracket: kb-tool-sync -->
+      <path d="M190 152 V176 M318 152 V176 M458 152 V176" stroke="#0B6E4F" stroke-width="1.4" fill="none"/>
+      <path d="M190 176 H458" stroke="#0B6E4F" stroke-width="1.4" fill="none"/>
+      <path d="M233 176 V196" stroke="#0B6E4F" stroke-width="1.4" fill="none"/>
+      <rect x="142" y="196" width="182" height="26" fill="#E6F2ED" stroke="#0B6E4F" stroke-width="1.2"/>
+      <text x="154" y="214" font-family="Roboto Mono, monospace" font-size="12.5" fill="#0B6E4F">mise run kb-tool-sync</text>
+      <text x="336" y="214" font-family="Public Sans, sans-serif" font-size="13.5" fill="#A4262C" font-weight="600">✕ refuses: any tool that has a source in the corpus</text>
+
+      <!-- codex line -->
+      <rect x="14" y="248" width="872" height="38" fill="#FBEEEE" stroke="#A4262C" stroke-width="1.3"/>
+      <text x="32" y="272" font-family="Public Sans, sans-serif" font-size="14" fill="#141414">
+        <tspan font-weight="600">codex needs all six.</tspan>
+        <tspan dx="8">It is a corpus source, so the green one says no — and 0.152 to 0.153 is not a patch, so the blue one says no.</tspan>
+      </text>
+    </svg>
+    <figcaption>Blue steps belong to <code>currency apply</code>, green to <code>mise run kb-tool-sync</code>.
+      Coverage is complementary and complete; both entrances are closed to codex.
+      Refusal strings read from <code>tool_sync.py:214,220</code> and <code>decide.py:33</code>, this session.</figcaption>
+  </figure>
+
+  <div class="gap">
+    <p><b>Nothing here is missing machinery.</b> Every one of the six steps has
+    working code today. What is missing is that no single command owns all six —
+    so a real upgrade is carried by hand between two halves that each refuse it.</p>
+  </div>
+
+  <p class="ask">
+    <span class="arrow">→</span>
+    <span><strong>I want to make one command own all six, with the tool as an
+    argument and the graphify steps off unless asked for.</strong>
+    Say go and I will bring you the plan before any code.</span>
+  </p>
+</div>

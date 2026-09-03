@@ -30,21 +30,54 @@ if TYPE_CHECKING:
     from kb_setup.currency.sync import SyncStatus
     from kb_setup.currency.views import ViewStatus
 
-GATES = (
-    "patch-level bump",
-    # NOT "PyPI latest has a matching GitHub tag". What `_gate_tag` actually checks
-    # is `upstream.github_tag` — did a readable GitHub release exist for `latest` —
-    # and that is the same check whether the version came from PyPI or from GitHub
-    # itself. The old label hardcoded PyPI, so a GitHub-only tool's PASSING gate
-    # rendered as a check it never ran: `docs/currency/runs/2026-07-29-mise.md`
-    # committed `✅ PyPI latest has a matching GitHub tag` for mise, whose
-    # `currency.toml` block has no `pypi` key at all. (Cold lane, round 2.)
-    "latest version has a readable GitHub release",
-    "no breaking/removal/deprecation marker",
-    "extras unchanged",
-    "no tracked issue moved",
-    "step 1 currently green",
-)
+#: NOT "PyPI latest has a matching GitHub tag". What `_gate_tag` actually checks
+#: is `upstream.github_tag` — did a readable GitHub release exist for `latest` —
+#: and that is the same check whether the version came from PyPI or from GitHub
+#: itself. The old label hardcoded PyPI, so a GitHub-only tool's PASSING gate
+#: rendered as a check it never ran: `docs/currency/runs/2026-07-29-mise.md`
+#: committed `✅ PyPI latest has a matching GitHub tag` for mise, whose
+#: `currency.toml` block has no `pypi` key at all. (Cold lane, round 2.)
+#: Not a size test — what SURVIVED the removed patch-level gate, which was doing
+#: three unrelated jobs in one body. Two of them had to stay: a version neither
+#: side can parse, and a move BACKWARDS. `_has_upgrade` covers neither — it asks
+#: whether two releases differ, so both cases read as a genuine upgrade and would
+#: have auto-applied. Measured, not assumed; see `_gate_readable`.
+GATE_READABLE = "versions are readable and move forward"
+GATE_RELEASE = "latest version has a readable GitHub release"
+GATE_MARKERS = "no breaking/removal/deprecation marker"
+GATE_EXTRAS = "extras unchanged"
+GATE_ISSUES = "no tracked issue moved"
+GATE_SYNC = "step 1 currently green"
+
+#: The bar, in report order. **Named constants, not `GATES[n]` indices** — this
+#: tuple lost a member on 2026-09-03 (below), and every index after it would have
+#: shifted by one. A silent relabel is precisely the defect the `GATE_RELEASE`
+#: comment above records happening once already, and renumbering by hand is how
+#: it happens twice. A name cannot slide.
+GATES = (GATE_READABLE, GATE_RELEASE, GATE_MARKERS, GATE_EXTRAS, GATE_ISSUES, GATE_SYNC)
+
+# 🔴 A SIXTH GATE, "patch-level bump", STOOD HERE UNTIL 2026-09-03. Ray removed
+# it after asking where it came from — verbatim: *"we always want to be on the
+# latest version"*. It shipped in this engine's first commit
+# (`2302024ce50fbc1d8daf25eb652f62ea52f8c6a7`, 2026-07-23) as one of six, listed
+# rather than argued for, and two things were wrong with it.
+#
+# **It measured digit position, not risk.** Armed across the shapes actually in
+# front of us that day: `0.152.1 -> 0.153.1` (codex, a routine release) BLOCKED,
+# while `2026.9.0 -> 2026.9.1` (mise, an equally routine release) PASSED — mise
+# only because calver puts its releases in the patch slot. Same event, opposite
+# verdicts, decided by a numbering convention.
+#
+# **And a "no" could never become a "yes".** `_gate_local` takes `reviewed=` and
+# is cleared by `currency watch-reviewed`; `_gate_patch(current, latest)` took two
+# strings and consulted nothing. So `apply()`'s refusal — *"resolve them via the
+# interview first"* — named a door that was never built for this gate, and the
+# codex 0.153.1 bump had to be hand-carried past it.
+#
+# What still stops an unattended bump is the four gates that read the RELEASE
+# rather than the number, plus step 1. A major version with genuinely breaking
+# notes is caught by `GATE_MARKERS`; a major that says nothing about breaking
+# anything now self-applies, and that is the accepted trade, not an oversight.
 
 
 @dataclass(frozen=True)
@@ -147,34 +180,47 @@ class Verdict:
         return f"{self.tool} {version}: clean"
 
 
-def _gate_patch(current: str, latest: str) -> Ambiguity | None:
+def _gate_readable(current: str, latest: str) -> Ambiguity | None:
+    """Can these two versions be read as versions at all? Nothing about their size.
+
+    **This is what survived of the removed patch-level gate, and it had to.** That
+    function held two unrelated questions in one body: "is this bump small enough
+    to apply unattended" (removed 2026-09-03 — see the GATES block above) and "can
+    these strings be parsed at all". Deleting it whole would have taken the second
+    with it, and `_has_upgrade` does NOT cover the gap: measured this session,
+    `same_release("main", "feature-x")` is False, so two unparsable strings read as
+    a genuine upgrade and `auto_apply` would have been True for a version nothing
+    could classify. Fail-closed is the doctrine in this module's own docstring; a
+    removal that quietly opened that path would have been the worst kind of fix.
+
+    Deliberately silent on equality. The old body returned None for `2.1.220` vs
+    `v2.1.220` with a paragraph explaining why asking about a non-bump trains the
+    reader to skip the report — that case cannot reach an Ambiguity here at all
+    now, since the only branch left is the unparsable one.
+    """
     cur, new = Version.parse(current), Version.parse(latest)
     if cur is None or new is None:
         return Ambiguity(
-            gate=GATES[0],
+            gate=GATE_READABLE,
             question=f"Version {current!r} → {latest!r} could not be parsed. Adopt it?",
-            detail="A non-numeric version cannot be classified as patch/minor/major.",
+            detail="One of these does not read as a version, so nothing here can classify it.",
             recommendation="Hold — read the release manually before adopting.",
         )
-    if not (cur > new) and not (new > cur):
-        # SAME version, differing only in decoration (`2.1.220` vs the `v2.1.220`
-        # tag). There is nothing to adopt, so there is nothing to ask about — and
-        # asking anyway is worse than noise: claude-code sat exactly on its latest
-        # release and this gate demanded a decision on the non-bump every single
-        # run, which trains the reader to skip the one output this engine exists to
-        # produce. `is_patch_bump_from` already refuses the no-op in the APPLY
-        # direction (its docstring names the `1.2` vs `1.2.0` case); this is the
-        # same equality seen from the interview side, where it has to be silence.
-        return None
-    if not new.is_patch_bump_from(cur):
+    if cur > new:
+        # The SECOND thing the removed gate was silently doing. `_has_upgrade` asks
+        # whether the releases DIFFER, not whether the move is forward — measured:
+        # `_has_upgrade("1.0.5", "1.0.2")` is True — so with the old gate gone and
+        # nothing here, a BACKWARDS move would have auto-applied. A latest below
+        # the pin means the upstream lookup disagrees with reality (a yanked
+        # release, a misparsed tag), which is a human's problem every time.
         return Ambiguity(
-            gate=GATES[0],
-            question=f"{current} → {latest} is not a patch bump. Adopt it?",
+            gate=GATE_READABLE,
+            question=f"{current} → {latest} moves BACKWARDS. Adopt it?",
             detail=(
-                "Only the patch component may move unattended. Pre-1.0 projects use the "
-                "MINOR slot as their breaking channel, so 0.9.x → 0.10.0 stops here."
+                "Upstream reports a version below the current pin — usually a yanked "
+                "release or a tag this engine misparsed, not a real downgrade."
             ),
-            recommendation="Read the release notes, then decide.",
+            recommendation="Hold — confirm what upstream actually published.",
         )
     return None
 
@@ -184,7 +230,7 @@ def _gate_tag(upstream: UpstreamStatus, latest: str) -> Ambiguity | None:
         # A multi-patch jump adopts EVERY release in between. Judging it on the
         # ones we could read would be the absence-of-evidence trap again.
         return Ambiguity(
-            gate=GATES[1],
+            gate=GATE_RELEASE,
             question=(
                 f"Notes for {', '.join(upstream.unread_versions)} could not be read. "
                 f"Adopt {latest} anyway?"
@@ -199,10 +245,15 @@ def _gate_tag(upstream: UpstreamStatus, latest: str) -> Ambiguity | None:
         return None
     # Name the source that actually supplied the version. Saying "PyPI has X" about
     # a GitHub-only tool describes a lookup that never happened — the same
-    # mislabelling the `GATES[1]` comment records. (Cold lane, round 2.)
+    # mislabelling `GATE_RELEASE`'s own comment records. (Cold lane, round 2.)
+    #
+    # That citation read `GATES[1]` until a cold lane caught it here on
+    # 217b3537 — a stale index left behind by the very commit that replaced the
+    # indices with names *because* an index can slide. The docstring said a name
+    # cannot slide and the comment beside it still pointed at a number.
     where = "PyPI" if upstream.source == "pypi" else "upstream"
     return Ambiguity(
-        gate=GATES[1],
+        gate=GATE_RELEASE,
         question=f"{where} has {latest} but no matching GitHub release was found. Adopt it?",
         detail=(
             f"Could not read a release for {latest}"
@@ -222,7 +273,7 @@ def _gate_markers(upstream: UpstreamStatus) -> Ambiguity | None:
     # with no notes is precisely a release nobody has described, so it stops.
     if not upstream.notes.strip():
         return Ambiguity(
-            gate=GATES[2],
+            gate=GATE_MARKERS,
             question="The release has no notes at all. Adopt it unreviewed?",
             detail=(
                 "An empty release body cannot be scanned for breaking changes, so "
@@ -234,7 +285,7 @@ def _gate_markers(upstream: UpstreamStatus) -> Ambiguity | None:
     if not markers:
         return None
     return Ambiguity(
-        gate=GATES[2],
+        gate=GATE_MARKERS,
         question="The release notes flag a breaking change. Adopt it anyway?",
         detail=f"Markers found: {', '.join(markers)}.",
         recommendation="Read the notes; plan a rebuild and a re-verify before adopting.",
@@ -246,7 +297,7 @@ def _gate_extras(sync: SyncStatus) -> Ambiguity | None:
     if not bad:
         return None
     return Ambiguity(
-        gate=GATES[3],
+        gate=GATE_EXTRAS,
         question="The declared extras disagree with the pin. Fix before bumping?",
         detail=bad[0].detail,
         recommendation="Reconcile currency.toml and mise.toml first.",
@@ -268,7 +319,7 @@ def _gate_issues(
     unread = [o for o in observations if o.error]
     if unread:
         return Ambiguity(
-            gate=GATES[4],
+            gate=GATE_ISSUES,
             question=(
                 f"{len(unread)} tracked item(s) could not be read. Bump without checking them?"
             ),
@@ -282,7 +333,7 @@ def _gate_issues(
         return None
     names = ", ".join(o.key for o in moved)
     return Ambiguity(
-        gate=GATES[4],
+        gate=GATE_ISSUES,
         question="Tracked issues moved since the last run. Review before bumping?",
         detail=f"Changed: {names}.",
         recommendation="Read each change — one of them may be the reason to bump, or not to.",
@@ -329,7 +380,7 @@ def _gate_local(
     if not local:
         return None
     return Ambiguity(
-        gate=GATES[4],
+        gate=GATE_ISSUES,
         question=f"{len(local)} local watch item(s) must be re-probed against this release. Done?",
         detail="; ".join(f"{o.key}: {o.title}".replace("\n", " ") for o in local),
         recommendation=(
@@ -380,7 +431,7 @@ def _gate_sync(sync: SyncStatus, views: ViewStatus | None = None) -> Ambiguity |
     others = [f for f in sync.drifted if f.check != "extras"]
     if others:
         return Ambiguity(
-            gate=GATES[5],
+            gate=GATE_SYNC,
             question="The current install is already out of sync. Fix that before bumping?",
             detail="; ".join(f"{f.check}: {f.detail}" for f in others),
             recommendation=(
@@ -390,7 +441,7 @@ def _gate_sync(sync: SyncStatus, views: ViewStatus | None = None) -> Ambiguity |
         )
     if blind := sync.blind:
         return Ambiguity(
-            gate=GATES[5],
+            gate=GATE_SYNC,
             question="Step 1 could not actually verify this install. Bump anyway?",
             detail=(
                 "Not checked: "
@@ -401,7 +452,7 @@ def _gate_sync(sync: SyncStatus, views: ViewStatus | None = None) -> Ambiguity |
         )
     if views is not None and views.stale:
         return Ambiguity(
-            gate=GATES[5],
+            gate=GATE_SYNC,
             question="Derived views describe an earlier graph. Bump anyway?",
             detail=(
                 "Generated outputs out of date with the graph they came from: "
@@ -416,7 +467,7 @@ def _gate_sync(sync: SyncStatus, views: ViewStatus | None = None) -> Ambiguity |
         )
     if views is not None and views.state == views_mod.NOT_VERIFIABLE:
         return Ambiguity(
-            gate=GATES[5],
+            gate=GATE_SYNC,
             question="The derived views could not be verified at all. Bump anyway?",
             detail=(
                 f"{views.detail or 'no reason recorded'}"
@@ -507,7 +558,7 @@ def decide(
     upgrade_gates = [
         gate
         for gate in (
-            _gate_patch(current, latest),
+            _gate_readable(current, latest),
             _gate_tag(upstream, latest),
             _gate_markers(upstream),
             _gate_local(observations, reviewed=reviewed, target=latest),

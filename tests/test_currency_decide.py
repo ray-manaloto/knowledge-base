@@ -8,7 +8,7 @@ tested explicitly — an engine that treats "I could not check" as "go ahead" is
 the failure mode that matters here.
 """
 
-from kb_setup.currency.decide import GATES, _gate_patch, decide
+from kb_setup.currency.decide import GATES, _gate_readable, decide
 from kb_setup.currency.issues import Observation
 from kb_setup.currency.sync import BLIND, DRIFT, OK, SKIP, Finding, SyncStatus
 from kb_setup.currency.upstream import UpstreamStatus, Version
@@ -53,16 +53,44 @@ def test_no_upgrade_available_is_not_an_auto_apply() -> None:
 # ------------------------------------------------------------ each gate ----
 
 
-def test_minor_bump_stops_for_review() -> None:
-    """Pre-1.0 projects use MINOR as the breaking channel, so 0.9.x -> 0.10.0 stops."""
+def test_a_minor_bump_with_clean_notes_now_applies() -> None:
+    """Ray removed the patch-level gate on 2026-09-03: "we always want to be on latest".
+
+    This test asserted the OPPOSITE until that day — `0.9.26 -> 0.10.0` stopped
+    for review because the MINOR slot moved. The gate measured digit position
+    rather than risk, and disagreed with itself across versioning schemes: codex
+    `0.152.1 -> 0.153.1` blocked while mise `2026.9.0 -> 2026.9.1` passed, purely
+    because calver puts a release in the patch slot.
+
+    What still stops a bump is the release itself — gates 2 and 3 require a
+    readable GitHub release with no breaking/removal/deprecation marker, which
+    `_clean_upstream` supplies here precisely so this test isolates the size
+    question from the risk question.
+    """
     verdict = decide(sync=_sync(), upstream=_clean_upstream("0.10.0"), moved=())
-    assert not verdict.auto_apply
-    assert any(a.gate == GATES[0] for a in verdict.ambiguities)
+    assert verdict.auto_apply
+    assert not verdict.ambiguities
 
 
-def test_major_bump_stops_for_review() -> None:
-    verdict = decide(sync=_sync(), upstream=_clean_upstream("1.0.0"), moved=())
-    assert not verdict.auto_apply
+def test_a_major_bump_stops_only_when_its_notes_say_something() -> None:
+    """The furthest consequence of removing the patch-level gate, stated outright.
+
+    A major version is no longer stopped for BEING a major. It is stopped by what
+    its release notes say — which is the whole point of the change: the digits
+    were never the risk signal, the notes are. `_clean_upstream` fabricates notes
+    with no breaking/removal/deprecation marker, so `0.9.25 -> 1.0.0` now applies.
+
+    This test asserted `not verdict.auto_apply` until 2026-09-03 and is kept, in
+    both directions, because that is a real widening and it should be visible
+    rather than inferred from a deleted test. The second half is the arm: put a
+    marker in the notes and the bump stops again, so `GATE_MARKERS` is genuinely
+    carrying what `_gate_patch` used to.
+    """
+    clean = decide(sync=_sync(), upstream=_clean_upstream("1.0.0"), moved=())
+    assert clean.auto_apply
+
+    breaking = _clean_upstream("1.0.0", notes="BREAKING CHANGE: the API moved.")
+    assert not decide(sync=_sync(), upstream=breaking, moved=()).auto_apply
 
 
 def test_pypi_version_with_no_github_release_stops() -> None:
@@ -138,13 +166,19 @@ def _v(raw: str) -> Version:
     return parsed
 
 
-def test_patch_bump_detection_both_directions() -> None:
+def test_version_ordering_both_directions() -> None:
+    """What replaced `test_patch_bump_detection_both_directions` on 2026-09-03.
+
+    That test asserted `is_patch_bump_from`, which went with the patch-level gate
+    — its only caller. `__gt__` is the half that survives, and it is the one
+    `_gate_readable` uses to refuse a BACKWARDS move, so it is what needs a test.
+    """
     base = _v("0.9.25")
-    assert _v("0.9.26").is_patch_bump_from(base)
-    assert not _v("0.10.0").is_patch_bump_from(base)
-    assert not _v("1.0.0").is_patch_bump_from(base)
-    # A downgrade is not a bump.
-    assert not _v("0.9.24").is_patch_bump_from(base)
+    assert _v("0.9.26") > base
+    assert _v("0.10.0") > base
+    assert _v("1.0.0") > base
+    # The direction that still stops an unattended bump.
+    assert not _v("0.9.24") > base
 
 
 def test_version_parse_rejects_non_numeric() -> None:
@@ -182,14 +216,20 @@ def test_a_real_release_body_with_no_markers_still_auto_applies() -> None:
 def test_same_version_written_differently_is_not_a_bump() -> None:
     """`1.2` and `1.2.0` are the SAME version — bumping to it is a no-op.
 
-    The raw-tuple comparison `(1, 2, 0) > (1, 2)` used to call this a patch bump,
-    so the two comparison paths disagreed and an unattended no-op upgrade could
-    be authorized. `is_patch_bump_from` now delegates to `__gt__`.
+    The raw-tuple comparison `(1, 2, 0) > (1, 2)` used to call this an upgrade,
+    so two comparison paths disagreed and an unattended no-op could be authorized.
+    `__gt__` pads the shorter version, which is what makes them equal.
+
+    RETARGETED from `is_patch_bump_from` to `__gt__` on 2026-09-03, deliberately
+    rather than deleted with the method: the regression it guards belongs to the
+    padding in `__gt__`, which survives and which `_gate_readable` now depends on
+    to refuse a backwards move. Deleting this test with its old subject would
+    have dropped a live guard along with dead code.
     """
-    assert not _v("1.2.0").is_patch_bump_from(_v("1.2"))
-    assert not _v("1.2").is_patch_bump_from(_v("1.2.0"))
-    # Control arm: a genuine patch bump is still recognised.
-    assert _v("1.2.1").is_patch_bump_from(_v("1.2"))
+    assert not _v("1.2.0") > _v("1.2")
+    assert not _v("1.2") > _v("1.2.0")
+    # Control arm: a genuine forward move is still recognised.
+    assert _v("1.2.1") > _v("1.2")
 
 
 def test_json_null_release_body_does_not_defeat_the_empty_notes_gate() -> None:
@@ -464,29 +504,52 @@ def test_being_exactly_current_asks_nothing() -> None:
     a question with no answer, on a bump that does not exist. Noise in the one
     channel this engine exists to keep signal-bearing.
     """
-    assert _gate_patch("2.1.220", "v2.1.220") is None
+    assert _gate_readable("2.1.220", "v2.1.220") is None
 
 
 def test_zero_padded_equality_is_also_a_non_bump() -> None:
     """`1.2` and `1.2.0` are the same version written two ways."""
-    assert _gate_patch("1.2", "1.2.0") is None
-    assert _gate_patch("1.2.0", "1.2") is None
+    assert _gate_readable("1.2", "1.2.0") is None
+    assert _gate_readable("1.2.0", "1.2") is None
 
 
 def test_a_downgrade_still_stops() -> None:
-    """The equality short-circuit must not widen into 'any non-forward move is fine'.
+    """A latest BELOW the pin means the upstream lookup disagrees with reality.
 
-    A latest BELOW the pin means the upstream lookup disagrees with reality
-    (a yanked release, a misparsed tag). That is exactly a human's problem.
+    A yanked release, or a tag this engine misparsed — a human's problem every
+    time. This survived the 2026-09-03 removal of the patch-level gate BECAUSE
+    the removal nearly took it: the old body caught a downgrade only incidentally,
+    as one more "not a patch bump", and `_has_upgrade` does not cover it —
+    measured, `_has_upgrade("1.0.5", "1.0.2")` is True, so a backwards move read
+    as a genuine upgrade and would have auto-applied.
     """
-    gate = _gate_patch("1.0.5", "1.0.2")
+    gate = _gate_readable("1.0.5", "1.0.2")
     assert gate is not None
-    assert "not a patch bump" in gate.question
+    assert "BACKWARDS" in gate.question
 
 
-def test_a_real_minor_bump_still_stops() -> None:
-    """Control arm: the short-circuit did not disable the gate."""
-    assert _gate_patch("0.9.26", "0.10.0") is not None
+def test_an_unparsable_version_stops() -> None:
+    """The other half the removal nearly took, and the other `_has_upgrade` gap.
+
+    Measured: `same_release("main", "feature-x")` is False, so two strings that
+    are not versions at all read as an upgrade. Fail-closed is this module's
+    stated doctrine; without this branch the removal would have quietly opened
+    the one path the doctrine exists to close.
+    """
+    gate = _gate_readable("main", "feature-x")
+    assert gate is not None
+    assert "could not be parsed" in gate.question
+
+
+def test_a_minor_bump_no_longer_stops_here() -> None:
+    """The control arm for the removal itself, in the direction that changed.
+
+    Before 2026-09-03 this asserted `is not None`. If a future edit reintroduces
+    a size test in this gate, this is the test that goes red.
+    """
+    assert _gate_readable("0.9.26", "0.10.0") is None
+    assert _gate_readable("0.152.1", "0.153.1") is None
+    assert _gate_readable("1.2.3", "2.0.0") is None
 
 
 def test_an_exactly_current_tool_asks_nothing_and_applies_nothing() -> None:
