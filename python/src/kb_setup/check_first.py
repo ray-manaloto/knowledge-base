@@ -122,13 +122,212 @@ _HAND_GATE_FALLBACK = re.compile(
 )
 
 
-#: A heredoc opener: `<<EOF`, `<<-EOF`, `<<'EOF'`, `<<"EOF"`. Captures the
-#: delimiter word so the body can be cut at its closing line.
-_HEREDOC_OPEN = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?")
+#: Characters that END an unquoted heredoc delimiter. Everything else is part of
+#: it — including `-` and `.`, which a `\w+` capture silently truncates.
+#:
+#: **`<` is in this set, and that membership is what makes `<<<` safe.** A
+#: HERESTRING (`cmd <<<word`) takes one word on the SAME line rather than a
+#: delimited body, so reading its operand as a delimiter would invent a heredoc
+#: no later line can close and discard the rest of the command. `_scan_line`
+#: carried an explicit `<<<` branch for this until an arm proved the branch
+#: INERT: `_read_delimiter` stops immediately on the third `<`, returns None, and
+#: the unreadable-delimiter path resumes scanning — the same outcome by a
+#: shorter route. The branch was removed and the invariant written here instead,
+#: because two mechanisms for one behaviour means a test can only ever arm one
+#: of them. `test_a_herestring_consumes_nothing` covers this, and the
+#: `herestring-via-delimiter-stop` arm removes `<` from this set to prove it.
+_DELIMITER_STOP = frozenset(" \t;&|<>()'\"")
+
+
+def _read_delimiter(line: str, i: int) -> tuple[str | None, int]:
+    r"""Read the heredoc delimiter starting at ``i``, or ``None`` to refuse one.
+
+    Quoted (`<<'END-MSG'`, `<<"END-MSG"`, and the ANSI-C / locale forms
+    `<<$'END-MSG'` and `<<$"END-MSG"`) reads to the closing quote; unquoted reads
+    to the first character that cannot be part of a word.
+
+    Returns ``(delimiter, index just past the delimiter TOKEN)``. The second
+    element is the position in the SOURCE, not ``start + len(delimiter)``:
+    `<<'A'` yields a one-character delimiter from a three-character token, and
+    resuming inside it left the scanner on the closing quote — which then opened
+    quote state and hid the `<<B` in `cat <<'A' <<B`.
+
+    **REFUSING IS NOT AUTOMATICALLY THE SAFE ANSWER, and two refusals that read
+    that way were WRONG.** The first version of this function refused a trailing
+    backslash and any delimiter containing `$`, reasoning that an invented
+    delimiter never closes and silences the guard. True, but refusing a delimiter
+    that IS real leaves its body exposed instead — and a body is attacker-shaped
+    text: one containing `<<NEVER` opens a heredoc nothing closes, blinding the
+    guard by the other route, while one containing `codex exec -` produces a
+    false denial. Both refusals were removed after checking real bash:
+
+    - `cat <<\\` + `EOF` — bash JOINS the continued line and the delimiter is
+      `EOF`. Handled in :func:`strip_heredoc_bodies` by joining first.
+    - `<<$VAR` — **bash performs NO expansion on the delimiter word**; it closes
+      on a literal `$VAR`. Verified by running it: the `EOF` line printed as
+      body and the `$VAR` line terminated the heredoc. So `$` is an ordinary
+      delimiter character.
+
+    One refusal remains and is genuinely a refusal: an unterminated quote has no
+    closing quote to read to, so there is no delimiter to have.
+    """
+    n = len(line)
+    if i >= n:
+        return None, i
+    # `$'…'` (ANSI-C) and `$"…"` (locale) quoting IS applied to the delimiter
+    # word — checked against bash, where `<<$'END-MSG'` closes on `END-MSG`. The
+    # `$` is quoting syntax here, unlike the `$VAR` case above.
+    if line[i] == "$" and i + 1 < n and line[i + 1] in "'\"":
+        i += 1
+    if line[i] in "'\"":
+        quote = line[i]
+        end = line.find(quote, i + 1)
+        if end == -1:
+            return None, n
+        return (line[i + 1 : end] or None), end + 1
+    out: list[str] = []
+    while i < n and line[i] not in _DELIMITER_STOP:
+        if line[i] == "\\" and i + 1 < n:
+            out.append(line[i + 1])
+            i += 2
+            continue
+        out.append(line[i])
+        i += 1
+    return ("".join(out) or None), i
+
+
+def _is_continued(line: str) -> bool:
+    r"""Whether ``line``'s newline is escaped, so the command continues below.
+
+    An ODD number of trailing backslashes escapes the newline; an even number is
+    escaped backslashes followed by a real line end. `printf 'a\\\\'` ends the
+    command, `cat <<\\` does not.
+    """
+    return (len(line) - len(line.rstrip("\\"))) % 2 == 1
+
+
+def _delimiter_start(line: str, i: int) -> int:
+    """Index where the delimiter begins, given `<<` starts at ``i``.
+
+    Steps over the `-` of the `<<-` (tab-stripping) form and any whitespace
+    between the operator and the word.
+    """
+    n = len(line)
+    j = i + 2
+    if j < n and line[j] == "-":
+        j += 1
+    while j < n and line[j] in " \t":
+        j += 1
+    return j
+
+
+def _advance_in_quote(line: str, i: int, stack: list[str | None]) -> int:
+    r"""Step one position inside a quoted word, mutating ``stack`` in place.
+
+    Inside single quotes a backslash is literal — `'a\\'` is a complete token —
+    while inside double quotes it escapes the next character, including the
+    closing quote. Collapsing the two is how a scanner loses track of where a
+    string ends.
+
+    A `$(` inside DOUBLE quotes opens a FRESH quoting context: bash re-enters
+    command-substitution parsing, so the inner `"` in `"$(printf "%s" x)"` opens
+    a new string rather than closing the outer one. A single flat quote variable
+    read that inner quote as a CLOSE, left the scanner outside any string, and
+    then took a following quoted `<<EOF` for a real opener — blinding all three
+    guards. Single quotes take no substitution, so this is scoped to `"`.
+    """
+    if line[i] == "\\" and stack[-1] == '"' and i + 1 < len(line):
+        return i + 2
+    if stack[-1] == '"' and line.startswith("$(", i):
+        stack.append(None)
+        return i + 2
+    if line[i] == stack[-1]:
+        stack[-1] = None
+    return i + 1
+
+
+def _scan_line(line: str, stack: list[str | None]) -> list[str]:
+    """Return EVERY heredoc delimiter opened on ``line``, in order.
+
+    ``stack`` is the quoting context, mutated in place so it carries to the next
+    line: a shell string spans newlines, so `git commit -m 'first line` +
+    `second line <<EOF'` is still inside one single-quoted token on line two.
+    Its last element is the open quote (or ``None``); `$(` pushes a frame and a
+    matching `)` pops one.
+
+    A regex cannot do any of this. `<<` is only a redirection when the shell is
+    not already reading a quoted word, and the implementation this replaced
+    matched it anywhere, so `printf '<<EOF'` opened a heredoc that never closed.
+
+    **A LIST, not one delimiter.** `cat <<A <<B` is valid bash and reads BOTH
+    bodies, in order. Returning only the first was documented in this module as
+    a conservative limit that "can only make the guard see MORE" — that claim
+    was FALSE, and a cold lane disproved it by running the shape rather than
+    reading the note: with A closed and B's body read as code, a `<<NEVER`
+    inside B's body opened a heredoc nothing closes, and the guarded command
+    after it vanished. The reassuring limit was itself a blinding path, which is
+    the argument for never writing "this can only fail safely" without an arm.
+    """
+    found: list[str] = []
+    i, n = 0, len(line)
+    while i < n:
+        ch = line[i]
+        if stack[-1] is not None:
+            i = _advance_in_quote(line, i, stack)
+            continue
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == "(":
+            # EVERY unquoted `(` pushes, not just the one in `$(`. An ordinary
+            # nested subshell closes with a `)` too, and popping the
+            # substitution frame on the FIRST `)` ended the frame early: in
+            # `x="$( (printf x); printf "%s" "<<EOF")"` the inner `)` restored
+            # the outer double quote's context, the quoted `<<EOF` read as a
+            # real opener, and the guard went blind. Counting depth is what
+            # makes the pairing right.
+            stack.append(None)
+            i += 1
+            continue
+        if ch == ")" and len(stack) > 1:
+            stack.pop()
+            i += 1
+            continue
+        if ch in "'\"":
+            stack[-1] = ch
+            i += 1
+            continue
+        if ch == "<" and line.startswith("<<", i):
+            i = _consume_opener(line, i, found)
+            continue
+        i += 1
+    return found
+
+
+def _consume_opener(line: str, i: int, found: list[str]) -> int:
+    """Read one `<<` opener at ``i``, appending any delimiter; return the resume index.
+
+    Split out of :func:`_scan_line` to keep that loop under the complexity limit
+    once multiple openers per line had to be queued.
+
+    Resumes past the delimiter TOKEN, which is what `_read_delimiter` returns —
+    not past the delimiter's own length. `<<'A'` yields `A` from three source
+    characters, and `j + len("A")` left the scanner sitting on the closing
+    quote: it opened quote state there and never saw the `<<B` in
+    `cat <<'A' <<B`, so B's legitimate body was retained and falsely denied.
+
+    An unreadable delimiter opens no body we can close, so scanning continues
+    from the same place rather than swallowing the rest of the command.
+    """
+    j = _delimiter_start(line, i)
+    delimiter, end = _read_delimiter(line, j)
+    if delimiter is not None:
+        found.append(delimiter)
+    return max(end, j)
 
 
 def strip_heredoc_bodies(command: str) -> str:
-    """Remove heredoc BODIES, keeping the command line that opened them.
+    r"""Remove heredoc BODIES, keeping the command line that opened them.
 
     A heredoc body is stdin DATA, never a command position — but `shlex` has no
     idea, so every word in it arrives as a bare token. That is a false positive
@@ -149,22 +348,56 @@ def strip_heredoc_bodies(command: str) -> str:
     opening line itself (it holds the real command) and everything after the
     body. An unterminated heredoc drops the remainder, which is correct: there
     is no command after it, only data.
+
+    **Both halves of the opener were wrong until 2026-09-03, and both failed in
+    the direction that BLINDS the guard rather than the one that trips it.** The
+    opener was `<<-?\s*['"]?(\w+)['"]?`, so:
+
+    - `\w+` truncated the delimiter at the first `-` or `.`. `<<'END-MSG'`
+      captured `END`, no later line ever equals `END`, and every command after
+      the heredoc was dropped as body.
+    - the match was quote-blind. `git commit -m 'see <<EOF note'` — a message
+      about heredocs, which this repo writes routinely — opened a heredoc that
+      never closed, with the same result.
+
+    Both are now handled by :func:`_scan_line`, which tracks quote state instead
+    of pattern-matching, and :func:`_read_delimiter`, which reads a whole word.
+
+    KNOWN LIMIT, stated rather than left to be discovered: only the FIRST heredoc
+    **`cmd <<A <<B` reads BOTH bodies, in order, and this tracks both.** An
+    earlier version of this docstring called tracking only the first a
+    conservative limit that "can only make the guard see MORE, never less". That
+    was wrong, and a cold lane disproved it by running the shape: with only A
+    tracked, B's body was read as code, a `<<NEVER` inside it opened a heredoc
+    nothing closes, and the guarded command after B vanished from all three
+    guards. See :func:`_scan_line`.
     """
-    match = _HEREDOC_OPEN.search(command)
-    if match is None:
+    if "<<" not in command:
         return command
     lines = command.splitlines()
     out: list[str] = []
-    delimiter: str | None = None
-    for line in lines:
-        if delimiter is not None:
-            if line.strip() == delimiter:
-                delimiter = None
+    pending: list[str] = []
+    stack: list[str | None] = [None]
+    i, total = 0, len(lines)
+    while i < total:
+        if pending:
+            if lines[i].strip() == pending[0]:
+                pending.pop(0)
+            i += 1
             continue
+        # A trailing backslash CONTINUES the command line, so the delimiter may
+        # be on the NEXT physical line: `cat <<\` + `EOF` opens a heredoc whose
+        # delimiter is `EOF`, confirmed against real bash. Joining happens only
+        # on lines being SCANNED — never inside a body, where a trailing
+        # backslash is ordinary text and joining would merge the closing
+        # delimiter line into the body and blind the guard.
+        line = lines[i]
+        while _is_continued(line) and i + 1 < total:
+            i += 1
+            line = line[:-1] + lines[i]
         out.append(line)
-        opener = _HEREDOC_OPEN.search(line)
-        if opener is not None:
-            delimiter = opener.group(1)
+        pending = _scan_line(line, stack)
+        i += 1
     return "\n".join(out)
 
 
