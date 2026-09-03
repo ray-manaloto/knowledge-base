@@ -98,6 +98,16 @@ conversations that never call the tool pay that context tax.
 tool **requires** MCP for its features, registering it is allowed, done
 knowingly. This is a documented **preference**, not a gate.
 
+**The required companion: check before you register.** `codex mcp add --url`
+once wrote a USER-GLOBAL `~/.codex/config.toml` entry that collided by NAME
+with this repo's PROJECT `[mcp_servers.kb]` entry and broke codex outright
+(`url is not supported for stdio` — `.codex/config.toml:122`). Ray accepted
+that risk knowingly, on the condition that this check runs first: before any
+registration command, establish (a) whether it writes user-global or
+project-scoped config, and (b) if user-global, whether a project entry of
+the SAME NAME already exists. Do not register under a name already claimed
+in the other scope.
+
 Judgement call: query it rarely → `mcp2cli` wins on cost; the plugin's value
 depends on Claude selecting its tools natively and you'll use it often →
 register it. When unsure, reach for `mcp2cli` first.

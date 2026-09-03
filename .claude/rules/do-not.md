@@ -160,12 +160,12 @@ The authoritative list of things agents (and humans) must not do in this repo.
 
 ## On MCP
 
-Native MCP registration is **allowed only when it stays PROJECT-scoped** —
-never via a registration command that writes USER-GLOBAL client config.
-`codex mcp add` is the concrete case: `.codex/config.toml:122` documents it
-writing the global config, which entry 11 forbids. `mcp2cli` (no
-schema-injection tax) stays *preferred* for one-off calls. See
-`research-doc-sources.md`.
+Native MCP registration is **allowed** when a plugin/tool genuinely requires
+it — Ray's ruling, replacing this section's prior project-only wording. See
+`research-doc-sources.md` § "MCP registration is allowed when required" for
+the policy plus Ray's condition: a check-before-registering step (user-global
+or project config? same name elsewhere?), since `codex mcp add --url` once
+broke codex by writing a USER-GLOBAL entry over this repo's own (`.codex/config.toml:122`).
 
 ## Two codex-sandbox invariants (missing until this round)
 
