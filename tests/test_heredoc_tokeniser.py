@@ -282,6 +282,70 @@ HOOK_CASES: list[tuple[str, str, bool]] = [
     ),
     ("herestring-then-gate", "cat <<<'note'\nuv run ty check foo.py", True),
     ("quoted-printf-then-gate", "printf '<<EOF'\nuv run ruff check foo.py", True),
+    # --- the four P1s a cold lane found in the FIRST version of this fix ------
+    #
+    # Two were REGRESSIONS the scanner introduced against the regex it replaced
+    # (ANSI-C, backslash continuation): the old code denied these and the new
+    # code did not. Two were pre-existing and newly discovered (nested command
+    # substitution, multiple heredocs per line) — the old regex was blind to
+    # them too, so they are not regressions; but a fix that hardens a guard
+    # while leaving known blind spots in it is not a hardened guard.
+    #
+    # All four fail in the BLINDING direction, which is why all four are here
+    # rather than deferred. Every one was found by RUNNING the shape, not by
+    # reading the scanner — the third round in a row where that is what worked.
+    (
+        "ansi-c-delimiter-then-gate",
+        "cat <<$'END-MSG'\nbody\nEND-MSG\nuv run ruff check foo.py",
+        True,
+    ),
+    # `codex exec -`, NOT a `ruff` gate, and the difference is the whole test.
+    # This case first shipped with `uv run ruff check foo.py` and its arm
+    # SURVIVED: `check_first` has a regex fallback (`_HAND_GATE_FALLBACK`) that
+    # matches the raw command text without consulting the tokeniser at all, so
+    # the chain denied whether or not the heredoc had swallowed the line. The
+    # test could not fail. Measured by simulating the mutation: with the
+    # backslash taken as a delimiter, the `codex exec -` form goes blind
+    # (denies=False) while the `ruff` form still denies=True.
+    #
+    # GENERAL FORM: when arming a SHARED tokeniser, pick a guard with no
+    # independent fallback, or the fallback answers for it.
+    (
+        "backslash-continuation-then-lane",
+        "cat <<\\\nEOF\nbody\nEOF\ncodex exec -",
+        True,
+    ),
+    # `<<$VAR` is a delimiter only bash can resolve, so `_read_delimiter` refuses
+    # it. Nothing covered that until an arm removed the refusal and survived.
+    ("expansion-delimiter-then-lane", "cat <<$VAR\nbody\nEOF\ncodex exec -", True),
+    (
+        "nested-command-substitution-then-gate",
+        'x="$(printf "%s" "<<EOF")"\nuv run ruff check foo.py',
+        True,
+    ),
+    (
+        "second-heredoc-body-hides-a-fake-opener",
+        "cat <<A <<B\nbodyA\nA\n<<NEVER\nB\nuv run ruff check foo.py",
+        True,
+    ),
+    ("two-heredocs-then-gate", "cat <<A <<B\nbodyA\nA\nbodyB\nB\nuv run ruff check foo.py", True),
+    # ...and the matching negative: BOTH bodies must still be stripped, or the
+    # queue fix would have bought visibility by giving up the function's purpose.
+    (
+        "two-heredoc-bodies-stay-hidden",
+        "cat <<A <<B\nuv run ruff check foo.py\nA\nuv run ruff check foo.py\nB",
+        False,
+    ),
+    # The ANSI-C step-over is load-bearing HERE, not in the case above it.
+    # Refusing `$'END-MSG'` outright would still keep the guard un-blinded (the
+    # `$`-in-delimiter refusal catches it), so only a BODY case can tell the two
+    # apart: reading the delimiter correctly is what lets the body be stripped.
+    # Without this the step-over is redundant and its arm survives.
+    (
+        "ansi-c-body-stays-hidden",
+        "git commit -q -F - <<$'END-MSG'\ncodex exec -\nEND-MSG",
+        False,
+    ),
 ]
 
 

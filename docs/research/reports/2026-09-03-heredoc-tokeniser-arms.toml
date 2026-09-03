@@ -40,7 +40,7 @@ id = "absent-quote-state"
 test = "test_a_quoted_redirection_operator_opens_no_heredoc"
 file = "python/src/kb_setup/check_first.py"
 old = '''        if ch in "'\"":
-            quote = ch
+            stack[-1] = ch
             i += 1
             continue'''
 new = '''        if False:
@@ -53,8 +53,8 @@ new = '''        if False:
 id = "quote-not-carried-across-lines"
 test = "test_a_quote_left_open_carries_to_the_next_line"
 file = "python/src/kb_setup/check_first.py"
-old = "        delimiter, quote = _scan_line(line, quote)"
-new = "        delimiter, _carried = _scan_line(line, quote)"
+old = "        pending = _scan_line(line, stack)"
+new = "        pending = _scan_line(line, [None])"
 
 # --- defect 1: `\w+` truncated the delimiter ---------------------------------
 
@@ -127,8 +127,74 @@ new = '''    return command
 id = "unreadable-delimiter-swallows-rest"
 test = "test_an_unreadable_delimiter_does_not_swallow_the_rest"
 file = "python/src/kb_setup/check_first.py"
-old = '''            # An unreadable delimiter opens no body we can close. Keep scanning
-            # rather than swallowing the rest of the command.
-            i = j
-            continue'''
-new = '''            return "UNREADABLE-DELIMITER-NEVER-MATCHED", quote'''
+old = '''    if delimiter is None:
+        return j'''
+new = '''    if delimiter is None:
+        found.append("UNREADABLE-DELIMITER-NEVER-MATCHED")
+        return j'''
+
+# ============================================================================
+# ROUND 2 — the four P1s the cold lane found in the first version of this fix.
+# ============================================================================
+#
+# Two were REGRESSIONS against the regex being replaced: the OLD code denied
+# `cat <<$'END-MSG' … END-MSG` and `cat <<\` + `EOF`, and the new scanner did
+# not. Measured by reconstructing the old stripper and running both.
+#
+# All four blind the guard. None was reachable by reading the scanner; every one
+# came from a lane instructed to CONSTRUCT the shell shape and run it through
+# `check_hook_call`.
+
+# `$'…'` is ANSI-C quoting: the `$` is syntax, not delimiter. Stepping over it is
+# one line, and without it `_read_delimiter` returns `$` — a delimiter no closing
+# line can equal.
+[[arm]]
+id = "ansi-c-quoting-not-stepped-over"
+test = "test_the_whole_guard_chain_sees_past_a_heredoc"
+file = "python/src/kb_setup/check_first.py"
+old = '''    if line[i] == "$" and i + 1 < n and line[i + 1] in "'\"":
+        i += 1'''
+new = '''    if False:
+        i += 1'''
+
+# A trailing backslash CONTINUES the line. Recording `\` as the delimiter is the
+# regression; refusing it is the fix.
+[[arm]]
+id = "trailing-backslash-taken-as-delimiter"
+test = "test_the_whole_guard_chain_sees_past_a_heredoc"
+file = "python/src/kb_setup/check_first.py"
+old = '''            if i + 1 >= n:
+                return None  # continuation, not a delimiter'''
+new = '''            if i + 1 >= n:
+                out.append(line[i])
+                break'''
+
+# `$VAR` as a delimiter is resolvable only by bash. Accepting it invents one.
+[[arm]]
+id = "expansion-accepted-as-delimiter"
+test = "test_the_whole_guard_chain_sees_past_a_heredoc"
+file = "python/src/kb_setup/check_first.py"
+old = '''    if not delimiter or "$" in delimiter:
+        return None'''
+new = '''    if not delimiter:
+        return None'''
+
+# `$(` inside double quotes opens a FRESH quoting context. Without the push, the
+# inner `"` reads as closing the outer string and a quoted `<<EOF` becomes real.
+[[arm]]
+id = "command-substitution-not-nested"
+test = "test_the_whole_guard_chain_sees_past_a_heredoc"
+file = "python/src/kb_setup/check_first.py"
+old = '''    if stack[-1] == '"' and line.startswith("$(", i):
+        stack.append(None)
+        return i + 2'''
+new = '''    if False:
+        return i + 2'''
+
+# Only the first opener on a line: the "conservative limit" that was not.
+[[arm]]
+id = "only-first-heredoc-queued"
+test = "test_the_whole_guard_chain_sees_past_a_heredoc"
+file = "python/src/kb_setup/check_first.py"
+old = "        pending = _scan_line(line, stack)"
+new = "        pending = _scan_line(line, stack)[:1]"
