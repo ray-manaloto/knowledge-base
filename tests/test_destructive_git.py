@@ -168,3 +168,54 @@ def test_the_guard_is_wired_into_hook_guard() -> None:
 
 def test_hook_guard_still_allows_the_safe_form() -> None:
     assert _through_the_chain("git reset --soft HEAD~1") is None
+
+
+# ---------------------------------------------------------------------------
+# Findings from `codex review`, each confirmed by running it before the fix.
+# ---------------------------------------------------------------------------
+
+
+def test_the_dirtiness_probe_asks_the_target_repo_not_cwd() -> None:
+    """P1: `-C` was parsed to find the subcommand, then ignored when asking git.
+
+    With this checkout dirty, `git -C /tmp reset --hard` was DENIED without /tmp
+    ever being consulted. /tmp is not a git repository, so the probe there
+    cannot answer — and an unanswerable probe must ALLOW, not refuse.
+    """
+    assert destructive_git.decide("git -C /tmp reset --hard") is None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # `--worktree` is git's DEFAULT for restore, so a bare path is
+        # destructive with no flag at all. The flag-list version missed it.
+        "git restore src/thing.py",
+        # Long-form and clustered force spellings the list did not enumerate.
+        "git clean --force -d",
+        "git clean -dfx",
+        "git clean -xdf",
+    ],
+)
+def test_ordinary_destructive_forms_the_spelling_list_missed(command: str) -> None:
+    assert destructive_git.decide(command, dirty=True) is not None, command
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # `--staged` ALONE only unstages; the worktree is untouched. Denying it
+        # was a false positive on a safe command.
+        "git restore --staged src/thing.py",
+        # Dry runs never delete, whatever else is on the line.
+        "git clean --dry-run -d",
+        "git clean -n -d -x",
+    ],
+)
+def test_safe_forms_the_spelling_list_wrongly_denied(command: str) -> None:
+    assert destructive_git.decide(command, dirty=True) is None, command
+
+
+def test_staged_and_worktree_together_are_destructive() -> None:
+    """The exception to the exception: `--staged --worktree` does touch it."""
+    assert destructive_git.decide("git restore --staged --worktree x.py", dirty=True) is not None

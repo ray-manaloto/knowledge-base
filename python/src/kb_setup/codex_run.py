@@ -65,6 +65,79 @@ def _codex_argv(
     return argv
 
 
+def _review_argv(*, base: str, title: str | None) -> list[str]:
+    """Build the argv for `codex review`, which is NOT `codex exec` with a flag.
+
+    Measured on 0.152.1 from `codex review --help`: it accepts `-c key=value`,
+    `--strict-config`, `--enable`/`--disable`, `--uncommitted`, `--base`,
+    `--commit`, `--title`, and a `[PROMPT]` that may be `-` for stdin.
+
+    🔴 **It accepts NONE of the four flags `_codex_argv` exists to enforce** —
+    no `--sandbox`, no `--add-dir`, no `--dangerously-bypass-hook-trust`. So the
+    lane-flag argument does not carry over, and building this by adding a flag
+    to the exec argv would produce a command codex rejects. Different surface,
+    different builder.
+
+    What DOES carry over is the reason `kb-codex` exists at all: routing through
+    mise gets the pinned binary rather than whatever a shell's PATH baked in.
+
+    `--base` is the review's fixed point, matching `kb-review`'s own default of
+    `origin/main` — the ref `ship`/`land` gate against, not local `main`, which
+    can have drifted along this branch's ancestry and would silently shrink the
+    reviewed diff.
+
+    **OBSERVED 2026-09-03:** `codex review --base <BRANCH> … -` is rejected with
+    `error: the argument '--base <BRANCH>' cannot be used with '[PROMPT]'`. So
+    this builder passes no prompt when a base is given, and `_run_review` tells
+    the caller on stderr that the METHOD paragraph was not delivered — a review
+    that silently used codex's default instructions, reported as though it had
+    ours, is worse than one that never ran.
+
+    ⚠️ **DO NOT READ THAT AS "custom instructions are impossible with a base."**
+    That is one error string, not a reading of the CLI's argument definitions,
+    and drawing a design conclusion from it is the exact failure #672 exists to
+    stop. `codex review` also takes `-c key=value` config overrides and
+    `--enable <FEATURE>`, either of which may carry review instructions by
+    another route; `--commit <SHA>` may pair with a prompt where `--base` does
+    not. **The pinned source is local** — `sources/codex/` at
+    `rust-v0.152.1`, the exact version we run — so the clap definitions settle
+    this and the help text does not. A lane is reading them; until it reports,
+    the constraint above is an OBSERVATION about one invocation, not a statement
+    about what the subcommand can do.
+    """
+    argv = ["codex", "review", "--base", base]
+    if title:
+        argv += ["--title", title]
+    return argv
+
+
+def _run_review(args: argparse.Namespace) -> int:
+    """Spawn `codex review`, prompt on stdin. Returns codex's own exit code."""
+    built = _review_argv(base=args.base, title=args.title)
+
+    if args.print_argv:
+        print(" ".join(built))
+        return Rc.OK
+
+    if shutil.which("codex") is None:
+        print("kb-codex: `codex` is not installed or not on PATH.", file=sys.stderr)
+        return Rc.NOT_RUN
+
+    # `--base` forbids a prompt, so the METHOD paragraph cannot be delivered on
+    # this path. SAY SO rather than letting the caller believe it was passed —
+    # a review that silently used codex's default instructions, reported as
+    # though it had ours, is worse than one that never ran.
+    print(
+        f"kb-codex --review: reviewing against {args.base} with CODEX'S OWN review\n"
+        "instructions. `--base` and a custom prompt are mutually exclusive on\n"
+        "codex 0.152.1, so no METHOD paragraph was delivered — findings that need\n"
+        "a check to be RUN rather than read may not appear (#672 U2).",
+        file=sys.stderr,
+    )
+    completed = subprocess.run(built, check=False, env=os.environ.copy())
+    return completed.returncode
+
+
 def run(argv: list[str] | None = None) -> int:
     """Parse the task's flags, build the argv, and spawn the lane.
 
@@ -96,7 +169,21 @@ def run(argv: list[str] | None = None) -> int:
         action="store_true",
         help="print the argv that WOULD run and exit; spawns nothing",
     )
+    parser.add_argument(
+        "--review",
+        action="store_true",
+        help="run `codex review` against --base instead of `codex exec` (#672 U2)",
+    )
+    parser.add_argument(
+        "--base",
+        default="origin/main",
+        help="review fixed point; origin/main, not local main, matching kb-review",
+    )
+    parser.add_argument("--title", default=None, help="title shown in the review summary")
     args = parser.parse_args(argv)
+
+    if args.review:
+        return _run_review(args)
 
     # `--network` without `--write` is not a refusal but it IS a correction:
     # `sandbox_workspace_write.network_access` is a write-sandbox key and does

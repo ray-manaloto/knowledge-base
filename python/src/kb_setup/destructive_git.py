@@ -40,14 +40,89 @@ from kb_setup import check_first
 #: `codex_lane` hit live: `git -C /some/dir reset --hard` must still be seen.
 _GIT_VALUE_FLAGS = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"})
 
-#: `(subcommand, the flag that makes it destructive)`. Each entry destroys
-#: UNCOMMITTED work specifically — that is the line, not "modifies the repo".
-_DESTRUCTIVE = {
+#: The subset of `_GIT_VALUE_FLAGS` that selects WHICH repository or worktree the
+#: command acts on. These must be forwarded to the dirtiness probe; the others
+#: (`-c`, `--exec-path`) change behaviour but not the target.
+_GIT_TARGET_FLAGS = frozenset({"-C", "--git-dir", "--work-tree", "--namespace"})
+
+#: `(subcommand, what makes it destructive)`. Each entry destroys UNCOMMITTED
+#: work specifically — that is the line, not "modifies the repo".
+#:
+#: 🔴 THE FIRST VERSION ENUMERATED SPELLINGS AND THAT WAS THE WRONG SHAPE, found
+#: by `codex review`. Three concrete misses, all ordinary usage:
+#:   - `git restore <path>` is destructive with NO flag at all — `--worktree` is
+#:     git's documented DEFAULT (`git restore --help`). The flag list required a
+#:     flag, so the commonest destructive form sailed through.
+#:   - `git clean --force -d` and `git clean -dfx` are valid and were missed,
+#:     because only a handful of joined spellings were listed.
+#:   - `git restore --staged <path>` was DENIED although it only unstages and
+#:     leaves the worktree intact — a false positive on a safe command.
+#:
+#: So `clean` and `restore` are now decided by a predicate over the whole
+#: argument list rather than by membership in a spelling set.
+_DESTRUCTIVE_FLAGS = {
     "reset": frozenset({"--hard"}),
-    "clean": frozenset({"-fd", "-fdx", "-xdf", "-df", "-f"}),
     "checkout": frozenset({"--", "-f", "--force"}),
-    "restore": frozenset({"--worktree", "-W", "--staged"}),
 }
+
+
+def _clean_is_destructive(args: list[str]) -> bool:
+    """`git clean` deletes only with force; `-n`/`--dry-run` makes it safe."""
+    if any(a in {"-n", "--dry-run"} for a in args):
+        return False
+    if "--force" in args:
+        return True
+    # Short clusters: -f, -fd, -dfx, -xdf … force is the `f` anywhere in a
+    # single-dash cluster of short flags.
+    return any(
+        a.startswith("-") and not a.startswith("--") and "f" in a[1:] and a[1:].isalpha()
+        for a in args
+    )
+
+
+def _restore_is_destructive(args: list[str]) -> bool:
+    """`--worktree` is git's DEFAULT, so a bare `git restore <path>` overwrites.
+
+    `--staged` ALONE only unstages and is safe; `--staged --worktree` together
+    do touch the worktree and are not.
+    """
+    staged = any(a in {"-S", "--staged"} for a in args)
+    worktree = any(a in {"-W", "--worktree"} for a in args)
+    return not (staged and not worktree)
+
+
+def _split_git(rest: list[str]) -> tuple[str | None, list[str], list[str]]:
+    """`(subcommand, its args, the target-selection options)`.
+
+    Walks git's own value-taking options to reach the subcommand, KEEPING the
+    ones that choose a repository so the dirtiness probe can ask the right one.
+    Split out of `decide` to keep that function under the complexity gate rather
+    than raising the gate — the same trade `use-tool-builtins.md` asks for.
+    """
+    index = 0
+    selectors: list[str] = []
+    while index < len(rest) and rest[index].startswith("-"):
+        if rest[index] in _GIT_VALUE_FLAGS:
+            if rest[index] in _GIT_TARGET_FLAGS and index + 1 < len(rest):
+                selectors += [rest[index], rest[index + 1]]
+            index += 2
+        else:
+            index += 1
+    if index >= len(rest):
+        return None, [], selectors
+    return rest[index], rest[index + 1 :], selectors
+
+
+def _is_destructive(sub: str, args: list[str]) -> bool:
+    """Does this subcommand, with these args, destroy uncommitted work?"""
+    if sub == "clean":
+        return _clean_is_destructive(args)
+    if sub == "restore":
+        return _restore_is_destructive(args)
+    if sub in _DESTRUCTIVE_FLAGS:
+        return any(arg in _DESTRUCTIVE_FLAGS[sub] for arg in args)
+    return False
+
 
 _REMEDY = {
     "reset": (
@@ -102,16 +177,25 @@ _REMEDY = {
 }
 
 
-def _tree_is_dirty() -> bool | None:
+def _tree_is_dirty(selectors: list[str] | None = None) -> bool | None:
     """True/False, or None when git could not be asked.
 
     None is NOT False: the caller must fail open on it rather than treat an
     unanswered question as a clean tree. This repo has the rule written down —
     "could not check" is never rendered as green.
+
+    🔴 `selectors` CARRIES THE TARGET-SELECTION OPTIONS THROUGH, and the first
+    version did not. It parsed PAST `-C`, `--git-dir` and `--work-tree` to reach
+    the subcommand, then ran `git status` in the hook process's OWN directory —
+    so `git -C /other/repo reset --hard` was judged against this checkout. Wrong
+    in both directions: a clean cwd would allow a destructive command in a dirty
+    repo, and a dirty cwd denies a safe one elsewhere. Found by `codex review`,
+    then confirmed by running it — with this tree dirty, `git -C /tmp reset
+    --hard` was DENIED without /tmp ever being consulted.
     """
     try:
         done = subprocess.run(
-            ["git", "status", "--porcelain"],
+            ["git", *(selectors or []), "status", "--porcelain"],
             capture_output=True,
             text=True,
             check=False,
@@ -159,24 +243,13 @@ def decide(command: str, *, dirty: bool | _Ask | None = _ASK) -> str | None:
         if not words or words[0] != "git":
             continue
 
-        rest = words[1:]
-        # Skip git's own value-taking options to reach the subcommand.
-        index = 0
-        while index < len(rest) and rest[index].startswith("-"):
-            index += 2 if rest[index] in _GIT_VALUE_FLAGS else 1
-        if index >= len(rest):
+        sub, args, selectors = _split_git(words[1:])
+        if sub is None or not _is_destructive(sub, args):
             continue
 
-        sub = rest[index]
-        triggers = _DESTRUCTIVE.get(sub)
-        if triggers is None:
-            continue
-        args = rest[index + 1 :]
-        if not any(arg in triggers for arg in args):
-            continue
-
-        # Only NOW ask the expensive question, and only for a matching command.
-        state = _tree_is_dirty() if isinstance(dirty, _Ask) else dirty
+        # Only NOW ask the expensive question, and only for a matching command —
+        # and ask it of the repository the command TARGETS, not of cwd.
+        state = _tree_is_dirty(selectors) if isinstance(dirty, _Ask) else dirty
         if state is not True:
             # Clean tree, or git could not be asked. Both allow: a guard that
             # cannot ask must not refuse.

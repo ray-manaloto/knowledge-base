@@ -250,3 +250,21 @@ def test_a_real_lane_after_a_heredoc_is_still_denied() -> None:
     reason = codex_lane.decide(command)
     assert reason is not None
     assert "mise run kb-codex" in reason
+
+
+def test_a_mise_task_elsewhere_does_not_exempt_a_raw_lane() -> None:
+    """P1 from `codex review`, confirmed by running it before fixing.
+
+    The exemption was a whole-string `if "mise run kb-" in command` evaluated
+    BEFORE tokenising, so one mention anywhere waved the entire command through.
+    Now judged per SEGMENT, like every other question in this guard.
+    """
+    reason = codex_lane.decide("mise run kb-query -- x; codex exec -")
+    assert reason is not None
+    assert "mise run kb-codex" in reason
+
+
+def test_the_task_segment_itself_is_still_exempt() -> None:
+    """The ALLOW half of the same fix: the task really does shell out to codex."""
+    assert codex_lane.decide('mise run kb-codex -- "do the thing"') is None
+    assert codex_lane.decide("mise run kb-query -- x && mise run kb-codex -- y") is None

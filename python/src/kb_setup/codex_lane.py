@@ -128,10 +128,6 @@ def decide(command: str) -> str | None:
     if not isinstance(command, str) or not command.strip():
         return None
 
-    # The task shells out to codex itself, so anything going through it is fine.
-    if "mise run kb-" in command:
-        return None
-
     parsed = check_first.segments(command)
     if parsed is None:
         # `shlex` could not parse it. Degrade to allowing rather than denying —
@@ -141,6 +137,18 @@ def decide(command: str) -> str | None:
 
     for tokens in parsed:
         words = check_first.command_word(tokens)
+        # The task shells out to codex itself, so a `mise run kb-…` SEGMENT is
+        # fine — but only that segment.
+        #
+        # 🔴 This was a whole-string `if "mise run kb-" in command: return None`
+        # BEFORE tokenising, which meant one mention anywhere exempted
+        # everything: `mise run kb-query -- x; codex exec -` bypassed the guard
+        # completely. Found by `codex review` and confirmed by running it. Same
+        # shape as the `app-server` hole an hour earlier — an exemption judged
+        # over the wrong scope — which is why it is now decided per segment like
+        # every other question here.
+        if words[:2] == ["mise", "run"] and any(w.startswith("kb-") for w in words[2:4]):
+            continue
         if not words or words[0] != "codex":
             continue
         rest = words[1:]
