@@ -22,9 +22,9 @@ parsing; every edge tagged EXTRACTED/INFERRED; no vector store).
    itself, or a `sources/<name>.manifest` pointing at a pinned upstream commit
    re-cloned at build time. `graphify-out/graph.json` is gitignored and rebuilt
    from sources.
-4. **One MCP server per graph — both clients reach the LOCAL one now** (#668):
-   `.mcp.json` + `.codex/config.toml` register `uv run kb-setup serve` over stdio
-   as `graphify`; hosted is in NEITHER. Why + figures: `docs/setup-inventory.md`.
+4. **TWO graph servers, two names** (#668): `graphify` = hosted (23 tools we
+   lack); **`kb`** = `uv run kb-setup serve`, the 359k aggregate + PR tools
+   hosted lacks. One shared name BROKE codex. Why: `docs/setup-inventory.md`.
 5. **Every source is ingested THROUGH graphify (and its extensions), never an
    ad-hoc fetch.** `graphify clone`/`add`/`extract` are the entry points (see the
    `kb-curator` skill MANDATE). `curl`/WebFetch is a fallback only when graphify

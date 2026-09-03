@@ -28,16 +28,72 @@ reachable benefit.
 
 | what | configured | observed | proved by |
 |---|---|---|---|
-| Claude → graphify | `.mcp.json` → `https://api.graphify.com/mcp` (http) | same — **hosted** | `uv run python -c` reading `.mcp.json` |
-| codex → graphify | `.codex/config.toml` `[mcp_servers.graphify]` | same — **hosted**, Auth `OAuth` | `codex mcp list` |
+| Claude → graphify | `.mcp.json` → `https://api.graphify.com/mcp` (http) | hosted, kept; **`kb` added** for the local graph | `uv run python -c` reading `.mcp.json` |
+| codex → graphify | global `~/.codex/config.toml` | hosted, Auth `OAuth`; project adds **`kb`** | `codex mcp list` |
 | hosted index size | — | **13,126 nodes / 23,160 edges / 1,484 communities**, at commit `295955dbeb84` | `mcp__graphify__graph_stats` |
 | local aggregate graph | `graphify-out/graph.json` | **359,026 nodes / 806,869 edges / 553,479,428 bytes** | `json.load` on the file |
 | local prose graph | `graphify-out/graph-prose.json` | **11,330 nodes / 16,864,486 bytes** | same |
-| `kb-serve` (local stdio MCP) | exists, documented in `CLAUDE.md` as *the* way consumers reach this graph | **registered in NEITHER client** | `grep -l 'kb-serve' .mcp.json .codex/config.toml` → no match |
+| `kb-serve` (local stdio MCP) | exists, documented in `CLAUDE.md` as *the* way consumers reach this graph | **was registered in NEITHER client** at the start of the round | `grep -l 'kb-serve' .mcp.json .codex/config.toml` → no match |
 
-**So the hosted index is 3.7% of the corpus**, and it is pinned to a commit that
-is already one merge behind `main`. The 359,026-node graph — every source ever
-ingested, the entire point of this project — is wired to nobody.
+### How it was settled — and the swap I first shipped was WRONG
+
+I read hosted-vs-local as two routes to one graph and swapped both clients to
+local. Ray corrected it: *"the app.graphify.com mcp provides more features we
+dont yet support / so we should keep that / and our code for the rest"*. A codex
+lane's 319-line capability comparison confirmed him — and found the reverse gap
+too. **Neither is a subset of the other**, counted from
+`sources/graphify/graphify/serve.py:1614-1744`:
+
+| | hosted `graphify` | local `kb` |
+|---|---|---|
+| tools | **23** (2026-08-17 inventory) | **10** |
+| corpus | this repo's own files | the **359,146**-node aggregate: every ingested source |
+| only there | seed search, file ranking, callers/callees/references, traces, file-neighbors, imports/exports, tests-for, `impact_and_risk`, `remember`/`recall`, workspace + repository discovery, Formal Verification | `list_prs`, `get_pr_impact`, `triage_prs` |
+
+Seven tool names exist on both, which is why they carry distinct prefixes.
+
+🔴 **THE NAME IS LOAD-BEARING — SHARING ONE BREAKS CODEX OUTRIGHT.** Ray ran
+`codex mcp add graphify --url …`, which writes a **global** entry (its own output
+says "Added global MCP server"). With this repo's project entry using the same
+key as a stdio command, codex refused to start at all:
+
+```text
+Error: failed to load bootstrap configuration
+Caused by: url is not supported for stdio   in `mcp_servers.graphify`
+```
+
+Not a soft ambiguity about which server answers — a total outage of the CLI,
+reproduced and fixed 2026-09-03 by renaming ours to `kb`.
+
+**The 23 is August's and is UNVERIFIED CURRENT.** The lane could not
+authenticate (HTTP 401, OAuth challenge); its own session's `graph_stats` was
+refused by approval policy; and its second attempt was **blocked by this round's
+own `codex_lane` guard**, which denies raw `codex exec` and routes to
+`mise run kb-codex`, whose project config was already the local server. Ray has
+since signed in, so a current re-count is now possible and is tracked as U-R0.
+
+**The gap is a BACKLOG, not a border.** Ray: *"one of our goals is to be able to
+replicate the functionality the remote one does and its formal verification and
+other features"*. The lane framed every hosted-only row as a permanent division
+of labour because nothing it read said otherwise — recorded because that is a
+defect in the lane's brief, not only in its output.
+
+**The hosted index holds 3.7% of the corpus by node count** — but that is a
+statement about SCOPE, not about quality, and it is not an argument against
+hosted. Hosted indexes this repo's own files with 23 tools; `kb` holds every
+ingested source with 10. Both are now reachable, under distinct names.
+
+⚠️ **Two corrections this document earned on ITSELF, within one session**, kept
+rather than smoothed away because both are the shape it exists to prevent:
+
+1. An earlier line called the hosted index "pinned to a commit already one merge
+   behind `main`", measured at `295955dbeb84`. It **re-indexes** — a later call
+   the same session reported `72fd9b834c2b`. Staleness was never its problem.
+2. The node counts in the table above (**359,026** / 806,869) were measured
+   BEFORE this round's rebuild. The rebuild finished green and the aggregate is
+   now **359,146 nodes / 807,085 edges**. Correctly measured, wrong within the
+   hour — `probes-need-a-control-arm.md` rule 6 arriving from a measurement
+   rather than an inheritance.
 
 ### `kb-build` was broken, and only running it showed that
 

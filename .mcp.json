@@ -1,6 +1,10 @@
 {
   "mcpServers": {
     "graphify": {
+      "type": "http",
+      "url": "https://api.graphify.com/mcp"
+    },
+    "kb": {
       "type": "stdio",
       "command": "uv",
       "args": ["run", "kb-setup", "serve"]

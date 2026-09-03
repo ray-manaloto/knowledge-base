@@ -22,24 +22,39 @@ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"
 default_subagent_model = "gpt-5.6-sol"
 default_subagent_reasoning_effort = "high"
 
-# graphify now points at THIS REPO'S LOCAL GRAPH, not the hosted service (#668,
-# Ray's ruling 2026-09-03: "swap it — local only").
+# TWO SERVERS, TWO NAMES. `graphify` is the HOSTED service; `kb` is this repo's
+# own graph. Ray's ruling 2026-09-03, after a capability comparison: *"the
+# app.graphify.com mcp provides more features we dont yet support / so we should
+# keep that / and our code for the rest"* and *"can we just name ours
+# knowledge-graph or kb for short"*.
 #
-# What the swap fixes, measured 2026-09-03 and re-derived rather than quoted:
-# the hosted service held 13,126 nodes for this repo (`mcp__graphify__graph_stats`)
-# while `graphify-out/graph.json` holds 359,026 — so every ingested source, which
-# is the entire point of this project, was reachable by NO client. The hosted
-# index is this repo's own files and nothing else: 3.7% of the corpus.
+# 🔴 THE NAMES ARE NOT COSMETIC — SHARING ONE BREAKS CODEX OUTRIGHT. This block
+# briefly defined `mcp_servers.graphify` as a stdio command while
+# `~/.codex/config.toml` defined the same key as a URL. codex merged them and
+# refused to start at all: `Error: failed to load bootstrap configuration /
+# Caused by: url is not supported for stdio / in mcp_servers.graphify`. Not a
+# soft ambiguity about which server answers — a total outage of the CLI. Renaming
+# this entry to `kb` fixed it; `codex mcp list` then shows both.
 #
-# ONE server, deliberately. Registering both would leave two servers advertising
-# the same tool names, and whichever the model asks first wins — a wrong pick
-# then looks like a correct answer from a graph that simply lacks the source.
-# The cost accepted with that: graphify lookups across the other 14 repos in the
-# hosted workspace are no longer reachable from inside this project.
+# WHAT EACH IS FOR, measured 2026-09-03 from the code we run
+# (`sources/graphify/graphify/serve.py:1614-1744`), not from a docs page:
+#   graphify (hosted, 23 tools as of 2026-08-17) — workspace/repository
+#     discovery, seed search, file ranking, callers/callees/references, traces,
+#     import-export maps, tests-for, impact_and_risk, remember/recall. Roughly
+#     thirteen capabilities the local server has no answer for. Its corpus is
+#     this repo's own files only.
+#   kb (local, 10 tools) — the 359,146-node aggregate: every ingested source,
+#     which is the whole point of this project and is reachable nowhere else. It
+#     also carries `list_prs`, `get_pr_impact` and `triage_prs`, which the
+#     hosted inventory did NOT list — so this is not a subset either way.
 #
-# The NAME is kept as `graphify` on purpose, so every existing `mcp__graphify__*`
-# reference in skills and docs stays valid. It is the same graphify MCP server —
-# only the graph behind it changed.
+# Seven tool names exist on both. That is precisely why they are registered
+# under distinct prefixes: `mcp__graphify__query_graph` and
+# `mcp__kb__query_graph` are distinguishable, where one shared name would leave
+# the model picking blind.
+#
+# `kb` is expected to GROW — replicating the hosted formal-verification and
+# review surfaces locally is a project goal, tracked in the plan.
 #
 # `uv run kb-setup serve` is what `mise run kb-serve` runs (mise.toml:1061). It
 # is registered DIRECTLY rather than through mise because the task depends on
@@ -52,9 +67,18 @@ default_subagent_reasoning_effort = "high"
 # against the REAL `graphify-out/graph.json` and skips loudly if that file is
 # absent ("it is NOT a pass"). 14 passed 2026-09-03.
 #
-# No auth line: a stdio server on this machine has nothing to authenticate to.
-# `codex mcp login graphify` is no longer needed and no longer applies.
-[mcp_servers.graphify]
+# No auth line on `kb`: a stdio server on this machine has nothing to
+# authenticate to. `graphify` DOES need `codex mcp login graphify` — codex is the
+# one client that does not sign in on first use, which graphify's own MCP page
+# states outright. Ray ran it 2026-09-03 and it reported "Successfully logged
+# in"; that state lives in `codex mcp list`'s Auth column, not here, so ask it
+# rather than trusting this comment.
+#
+# ⚠️ `codex mcp add graphify --url …` writes a GLOBAL entry
+# (`~/.codex/config.toml`) — its own output says "Added global MCP server". That
+# is what collided with this file's entry. Nothing here may write that file
+# (`do-not.md` #11); this repo owns only the `kb` half.
+[mcp_servers.kb]
 command = "uv"
 args = ["run", "kb-setup", "serve"]
 
