@@ -317,10 +317,27 @@ def test_live_eligibility_census_is_exactly_the_two_mise_only_pins() -> None:
     `lychee = "0.24.2"` in `mise.toml` (the link checker behind the hk `lychee`
     steps and `mise run kb-links`) — mise-only, exact, no `python_package`, no
     `manifest`. Six now. Same rule: the tuple moves, the assertion stays exact.
+
+    **It SHRANK on 2026-09-03** — the first entry to LEAVE rather than join.
+    `antigravity-cli` had qualified since 2026-08-19 as a mise-only pin with no
+    `manifest`, no `python_package`, no `skill_dir`. Commit `575fb5be` (the
+    1.1.23->1.1.25 pin bump) gave `[tool.antigravity-cli]` a
+    `manifest = "sources/antigravity-cli.manifest"` key, and `_selection`
+    (`tool_sync.py:220`) refuses any tool that carries one — "manifest-bearing
+    tools require the separate provenance workflow" — so that commit already
+    disqualified it; this test's own suite was not run against it before merge.
+    The round-2 cold review of `575fb5be` separately found the row's currency
+    check was comparing the `mise.toml` pin against itself rather than the
+    running `agy` binary (`self_managed` is `bool(self.expected)`, and a row
+    with no `expected` never reaches `_check_self_managed`), and the fix added
+    `expected = "1.1.25"` — which disqualifies it a second, independent way
+    (`_selection` also refuses on `spec.self_managed`). Either edit alone would
+    have shrunk this census; both are now true. Correct shrink, not a
+    loosening: the tuple is still asserted exact, and the tool left because it
+    grew a real currency check, not because the test relaxed.
     """
     repo_root = Path(__file__).parents[1]
     assert tool_sync.eligible_tools(repo_root) == (
-        "antigravity-cli",
         "coreutils",
         "ctx7",
         "ffmpeg",
