@@ -1,0 +1,116 @@
+<title>What the Generator Does</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#EEF1F5; --surface:#FFFFFF; --ink:#14181F; --muted:#59636F;
+    --line:#C9D2DC; --dead:#B3261E; --warn:#A65A00; --live:#14663F; --accent:#1D4ED8;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:var(--sans);
+       margin:0;padding:26px 20px 32px;line-height:1.45}
+  .sheet{max-width:860px;margin:0 auto;background:var(--surface);
+         border:1px solid var(--line);padding:24px 30px 26px}
+  h1{font-family:var(--cond);font-size:27px;font-weight:700;margin:0 0 4px;
+     letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 18px}
+  figure{margin:0 0 18px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:8px}
+  .rows{border-top:1px solid var(--line)}
+  .row{display:grid;grid-template-columns:104px 1fr;gap:18px;
+       padding:11px 0;border-bottom:1px solid var(--line);align-items:baseline}
+  .tag{font-family:var(--cond);font-size:11.5px;font-weight:700;
+       letter-spacing:.07em;text-transform:uppercase}
+  .t-now{color:var(--dead)} .t-after{color:var(--live)} .t-keep{color:var(--accent)}
+  .row p{margin:0;font-size:14.5px}
+  .row b{font-weight:600}
+  .ask{margin:18px 0 0;padding:13px 16px;background:#F4F7FB;
+       border-left:3px solid var(--accent);font-size:14.5px}
+</style>
+
+<div class="sheet">
+  <h1>What the Generator Does</h1>
+  <p class="sub">Today the index is written by hand and drifts. The generator builds it from the notes themselves — so it can't drift, and it can't outgrow its limit.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 250" role="img" aria-label="Today: 447 note files, each with its own one-line summary, and a hand-written index that is edited separately and drifts. After: the generator reads each note's own summary and assembles the index automatically, sorting notes into always-listed, listed-this-round, and collapsed-to-one-line.">
+      <defs>
+        <marker id="k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#14181F"/>
+        </marker>
+        <marker id="kg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#14663F"/>
+        </marker>
+      </defs>
+
+      <text x="14" y="16" font-family="IBM Plex Sans Condensed" font-size="13.5" font-weight="700" fill="#B3261E" letter-spacing=".05em">TODAY — WRITTEN TWICE</text>
+
+      <rect x="14" y="28" width="200" height="62" fill="#FFFFFF" stroke="#14181F" stroke-width="1.5"/>
+      <text x="28" y="48" font-family="IBM Plex Sans" font-size="13" font-weight="600" fill="#14181F">447 note files</text>
+      <text x="28" y="65" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">each already carries its own</text>
+      <text x="28" y="80" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">one-line summary at the top</text>
+
+      <path d="M216 59 L286 59" fill="none" stroke="#B3261E" stroke-width="1.6" stroke-dasharray="5 4"/>
+      <text x="224" y="52" font-family="IBM Plex Sans" font-size="11" font-weight="600" fill="#B3261E">copied by hand</text>
+
+      <rect x="290" y="28" width="212" height="62" fill="#FFFFFF" stroke="#B3261E" stroke-width="1.8"/>
+      <text x="304" y="48" font-family="IBM Plex Sans" font-size="13" font-weight="600" fill="#14181F">the index, hand-written</text>
+      <text x="304" y="65" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">a second copy of every summary</text>
+      <text x="304" y="80" font-family="IBM Plex Sans" font-size="11.5" fill="#B3261E">drifts · 64 notes now unlisted</text>
+
+      <text x="516" y="46" font-family="IBM Plex Sans" font-size="12" font-weight="600" fill="#B3261E">grows past the</text>
+      <text x="516" y="61" font-family="IBM Plex Sans" font-size="12" font-weight="600" fill="#B3261E">limit, then goes</text>
+      <text x="516" y="76" font-family="IBM Plex Sans" font-size="12" font-weight="600" fill="#B3261E">dark, silently</text>
+
+      <line x1="14" y1="108" x2="686" y2="108" stroke="#C9D2DC" stroke-width="1"/>
+
+      <text x="14" y="130" font-family="IBM Plex Sans Condensed" font-size="13.5" font-weight="700" fill="#14663F" letter-spacing=".05em">AFTER — WRITTEN ONCE, ASSEMBLED</text>
+
+      <rect x="14" y="142" width="200" height="62" fill="#FFFFFF" stroke="#14181F" stroke-width="1.5"/>
+      <text x="28" y="162" font-family="IBM Plex Sans" font-size="13" font-weight="600" fill="#14181F">the same 447 notes</text>
+      <text x="28" y="179" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">unchanged — still the only</text>
+      <text x="28" y="194" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">place a summary is written</text>
+
+      <path d="M216 173 L286 173" fill="none" stroke="#14663F" stroke-width="2" marker-end="url(#kg)"/>
+      <text x="222" y="166" font-family="IBM Plex Sans" font-size="11" font-weight="600" fill="#14663F">read automatically</text>
+
+      <rect x="290" y="130" width="212" height="86" fill="#FFFFFF" stroke="#14663F" stroke-width="2"/>
+      <text x="304" y="150" font-family="IBM Plex Sans" font-size="13" font-weight="600" fill="#14181F">the index, assembled</text>
+      <text x="304" y="170" font-family="IBM Plex Sans" font-size="11.5" fill="#14663F">▸ dangers — always listed</text>
+      <text x="304" y="187" font-family="IBM Plex Sans" font-size="11.5" fill="#14663F">▸ this round — always listed</text>
+      <text x="304" y="204" font-family="IBM Plex Sans" font-size="11.5" fill="#59636F">▸ the rest — moved next door</text>
+
+      <path d="M504 173 L560 173" fill="none" stroke="#14663F" stroke-width="2" marker-end="url(#kg)"/>
+      <text x="516" y="160" font-family="IBM Plex Sans" font-size="12" font-weight="600" fill="#14663F">fits, by</text>
+      <text x="516" y="176" font-family="IBM Plex Sans" font-size="12" font-weight="600" fill="#14663F">construction</text>
+      <text x="516" y="196" font-family="IBM Plex Sans" font-size="11" fill="#59636F">nothing deleted</text>
+
+      <text x="14" y="238" font-family="IBM Plex Sans" font-size="12" font-weight="600" fill="#14181F">It runs at the end of a round — the one moment the new note exists and you know how important it is.</text>
+    </svg>
+    <figcaption>The summaries already exist. Today they are copied into a second file by hand; after, that file is built from them.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <span class="tag t-now">The problem</span>
+      <p><b>Every note's summary is written twice</b> — once in the note, once in the index. Two copies of the same sentence, kept in step by hand. They fall out of step, and the index grows until it quietly stops being read at all.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-after">The fix</span>
+      <p><b>Stop writing the second copy.</b> A small program reads each note's own summary and builds the index from them. One source, so it cannot disagree with itself, and nothing can be missing from it.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-keep">Why it fits</span>
+      <p><b>Older entries move to a second list next door.</b> Only one list is read at the start of a session; the other sits beside it, costing nothing, holding every older summary in full. <em>Nothing is deleted and nothing becomes unfindable.</em></p>
+    </div>
+    <div class="row">
+      <span class="tag t-keep">The catch</span>
+      <p><b>The short list has to say, in plain words, where the long one is.</b> A list nobody is told about is the same as a list that doesn't exist — that is exactly how 64 notes fell off the current one.</p>
+    </div>
+  </div>
+
+  <p class="ask"><strong>Settled — nothing needed from you.</strong> Your question replaced my answer: move the tail to a second list rather than shrink it away. Recorded on #454, and it means nothing ever has to be thrown out.</p>
+</div>
