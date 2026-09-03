@@ -1956,11 +1956,7 @@ version_pattern = '^v?(\d+\.\d+\.\d+)$'
 # directory name is mise's label and `mise which` can never answer "which
 # version is this". `binary` above is what makes this row honest; a
 # path-derived check here would be decoration.
-#
-# `manifest` is deliberately absent for now: there is no
-# `sources/antigravity-cli.manifest`, and declaring one before the source is
-# pinned would report DRIFT against a file that does not exist — the same false-
-# DRIFT shape `[tool.codex]` above documents at length. Add both together.
+manifest = "sources/antigravity-cli.manifest"
 
 [tool.agnix]
 # The agent-documentation validator. Ray, 2026-08-19: "make a critical/currency
