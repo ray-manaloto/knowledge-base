@@ -169,7 +169,9 @@ def _argv(
 ) -> str:
     return " ".join(
         codex_run._codex_argv(
-            write=write, network=network, effort=effort, sandbox_override=sandbox_override
+            codex_run.LaneSpec(
+                write=write, network=network, effort=effort, sandbox_override=sandbox_override
+            )
         )
     )
 
@@ -268,3 +270,16 @@ def test_the_task_segment_itself_is_still_exempt() -> None:
     """The ALLOW half of the same fix: the task really does shell out to codex."""
     assert codex_lane.decide('mise run kb-codex -- "do the thing"') is None
     assert codex_lane.decide("mise run kb-query -- x && mise run kb-codex -- y") is None
+
+
+@pytest.mark.parametrize("command", ["codex e -", 'codex a "x"', "codex cloud-tasks list"])
+def test_the_short_aliases_are_guarded(command: str) -> None:
+    """P1 from the METHOD-instructed `codex review`, confirmed in the source.
+
+    `codex-rs/cli/src/main.rs:137` declares `visible_alias = "e"` for exec, `:188`
+    `visible_alias = "a"` for apply, `:213` `alias = "cloud-tasks"`. A guard that
+    matches only the long spelling of a command with a one-letter alias is
+    decoration; the lane ran `codex e --help` and `codex a --help` and got rc 0
+    from both while the guard allowed them.
+    """
+    assert codex_lane.decide(command) is not None, command

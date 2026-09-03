@@ -219,3 +219,65 @@ def test_safe_forms_the_spelling_list_wrongly_denied(command: str) -> None:
 def test_staged_and_worktree_together_are_destructive() -> None:
     """The exception to the exception: `--staged --worktree` does touch it."""
     assert destructive_git.decide("git restore --staged --worktree x.py", dirty=True) is not None
+
+
+# ---------------------------------------------------------------------------
+# Round 2 of `codex review`, this time WITH the METHOD paragraph. It built
+# scratch repos and destroyed real files to prove each of these.
+# ---------------------------------------------------------------------------
+
+
+def test_a_bare_checkout_pathspec_is_destructive(tmp_path) -> None:
+    """P1: `git checkout <path>` overwrites with no `--` and no force.
+
+    The lane proved it by running the real command in a dirty scratch repo and
+    watching the modification vanish. Discriminated by whether the operand
+    EXISTS as a path — `git checkout main` must stay allowed.
+    """
+    victim = tmp_path / "victim.txt"
+    victim.write_text("x")
+    assert destructive_git.decide(f"git checkout {victim}", dirty=True) is not None
+
+
+def test_a_branch_switch_is_still_allowed() -> None:
+    """The ALLOW half, and the reason the naive fix was wrong.
+
+    Treating every single operand as destructive denies the commonest git
+    command there is on any dirty tree — and git already refuses a switch that
+    would lose changes. Caught by this repo's own ALLOW test, not by a reviewer.
+    """
+    assert destructive_git.decide("git checkout main", dirty=True) is None
+    assert destructive_git.decide("git checkout -b feat/x", dirty=True) is None
+
+
+def test_equals_form_selectors_reach_the_dirtiness_probe() -> None:
+    """P1: `--git-dir=/x` was skipped as an unknown flag, so cwd was judged."""
+    sub, _args, selectors = destructive_git._split_git(
+        ["--git-dir=/repo/.git", "--work-tree=/repo", "reset", "--hard"]
+    )
+    assert sub == "reset"
+    assert "--git-dir=/repo/.git" in selectors
+    assert "--work-tree=/repo" in selectors
+
+
+@pytest.mark.parametrize(
+    "command", ["git clean -xdf", "git clean -x -f -d", "git clean --force -X"]
+)
+def test_clean_x_asks_about_ignored_files(command: str) -> None:
+    """P1: ignored files are invisible to a plain porcelain status.
+
+    So a repo full of them read as CLEAN while `clean -x` would delete every one.
+
+    The lane proved it with a scratch repo holding only an ignored
+    `cache.secret`: status was empty, `clean -ndfx` said `Would remove`.
+    """
+    sub, args, _ = destructive_git._split_git(command.split()[1:])
+    assert sub is not None
+    assert destructive_git._targets_ignored_files(sub, args) is True
+
+
+def test_a_clean_without_x_does_not_ask_about_ignored() -> None:
+    """The control: `-fd` leaves ignored files alone, so the wider probe is noise."""
+    sub, args, _ = destructive_git._split_git(["clean", "-fd"])
+    assert sub is not None
+    assert destructive_git._targets_ignored_files(sub, args) is False

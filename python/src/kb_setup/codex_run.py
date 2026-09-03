@@ -33,6 +33,7 @@ import os
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from kb_setup.result import Rc
@@ -43,21 +44,49 @@ from kb_setup.result import Rc
 _UV_CACHE = Path.home() / "Library" / "Caches"
 
 
-def _codex_argv(
-    *, write: bool, network: bool, effort: str, sandbox_override: str | None
-) -> list[str]:
-    """Build the argv. Separated from `run` so a test can assert it without spawning."""
-    sandbox = sandbox_override or ("workspace-write" if write else "read-only")
+@dataclass(frozen=True)
+class LaneSpec:
+    """What an exec lane needs, as one object.
+
+    A dataclass rather than six keyword arguments because the argument count
+    tripped the complexity gate, and raising the gate to admit a wider signature
+    is the trade `use-tool-builtins.md` asks us not to make.
+    """
+
+    write: bool = False
+    network: bool = False
+    effort: str = "xhigh"
+    sandbox_override: str | None = None
+    model: str | None = None
+    output: str | None = None
+
+
+def _codex_argv(spec: LaneSpec) -> list[str]:
+    """Build the argv. Separated from `run` so a test can assert it without spawning.
+
+    `model` and `output` exist because THE GUARD BROKE AN EXISTING WORKFLOW
+    without them. `codex review` (P1) found that `kb-codex-advisor`'s own
+    documented command — `codex exec --model gpt-5.6-sol … -o <file> -` — is
+    denied the moment `codex_lane` is wired in, and this task offered no
+    equivalent, so the advisor became unrunnable. That is this repo's own
+    recorded lesson: *a guard whose redirect target cannot perform the redirected
+    action is not enforcement, it is an outage.*
+    """
+    sandbox = spec.sandbox_override or ("workspace-write" if spec.write else "read-only")
     argv = ["codex", "exec", "--sandbox", sandbox]
+    if spec.model:
+        argv += ["--model", spec.model]
+    if spec.output:
+        argv += ["-o", spec.output]
 
     # `--add-dir` only means anything under a write sandbox; adding it to a
     # read-only lane would be noise that reads as though it granted something.
     if sandbox == "workspace-write":
         argv += ["--add-dir", str(_UV_CACHE)]
-        if network:
+        if spec.network:
             argv += ["-c", "sandbox_workspace_write.network_access=true"]
 
-    argv += ["-c", f"model_reasoning_effort={effort}"]
+    argv += ["-c", f"model_reasoning_effort={spec.effort}"]
     # Trust is per-hook-HASH and editing a hook re-breaks it, so this is not
     # one-time setup — it is required on every invocation, forever.
     argv.append("--dangerously-bypass-hook-trust")
@@ -65,7 +94,22 @@ def _codex_argv(
     return argv
 
 
-def _review_argv(*, base: str, title: str | None) -> list[str]:
+def _toml_str(value: str) -> str:
+    """Quote a value as a TOML basic string, for `-c key=value`.
+
+    `-c` parses the value portion as TOML and falls back to a literal string if
+    that fails (`utils/cli/src/config_override.rs:47-83`). A METHOD paragraph
+    contains newlines and quotes, so it is quoted explicitly rather than left to
+    that fallback — an unescaped `"` would otherwise truncate the instructions
+    silently, which is the failure mode this whole channel exists to avoid.
+    """
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    return f'"{escaped}"'
+
+
+def _review_argv(
+    *, base: str, title: str | None, commit: str | None, instructions: str | None
+) -> list[str]:
     """Build the argv for `codex review`, which is NOT `codex exec` with a flag.
 
     Measured on 0.152.1 from `codex review --help`: it accepts `-c key=value`,
@@ -86,34 +130,57 @@ def _review_argv(*, base: str, title: str | None) -> list[str]:
     can have drifted along this branch's ancestry and would silently shrink the
     reviewed diff.
 
-    **OBSERVED 2026-09-03:** `codex review --base <BRANCH> … -` is rejected with
-    `error: the argument '--base <BRANCH>' cannot be used with '[PROMPT]'`. So
-    this builder passes no prompt when a base is given, and `_run_review` tells
-    the caller on stderr that the METHOD paragraph was not delivered — a review
-    that silently used codex's default instructions, reported as though it had
-    ours, is worse than one that never ran.
+    **THE TARGET FLAGS AND `[PROMPT]` ARE MUTUALLY EXCLUSIVE — AND THAT DOES NOT
+    COST US THE METHOD PARAGRAPH.** Both halves were settled from the pinned
+    source at `sources/codex/` (`rust-v0.152.1`, the version we run), not from
+    help text, after an earlier version of this docstring asserted the first half
+    from a single error string.
 
-    ⚠️ **DO NOT READ THAT AS "custom instructions are impossible with a base."**
-    That is one error string, not a reading of the CLI's argument definitions,
-    and drawing a design conclusion from it is the exact failure #672 exists to
-    stop. `codex review` also takes `-c key=value` config overrides and
-    `--enable <FEATURE>`, either of which may carry review instructions by
-    another route; `--commit <SHA>` may pair with a prompt where `--base` does
-    not. **The pinned source is local** — `sources/codex/` at
-    `rust-v0.152.1`, the exact version we run — so the clap definitions settle
-    this and the help text does not. A lane is reading them; until it reports,
-    the constraint above is an OBSERVATION about one invocation, not a statement
-    about what the subcommand can do.
+    `codex-rs/exec/src/cli.rs:272-305`: `--uncommitted`, `--base`, `--commit` and
+    `[PROMPT]` each declare `conflicts_with` the other three — no two may
+    co-occur, confirmed by a six-pairing runtime matrix all returning rc 2. They
+    are variants of ONE `ReviewTarget` enum
+    (`codex-rs/protocol/src/protocol.rs:3310-3344`), so the prompt IS how you
+    choose a scope, never supplemental instructions alongside one.
+
+    🔴 **`-c developer_instructions=…` IS THE OTHER CHANNEL, and it is global —
+    flattened into `MultitoolCli`, so it is NOT in the conflict set**
+    (`codex-rs/cli/src/main.rs:99-129`). Traced through the source to the
+    reviewer child: it is a real `ConfigToml` key
+    (`config/src/config_toml.rs:223-228`); review clones the effective config and
+    replaces only `base_instructions` with its rubric, leaving
+    `developer_instructions` intact (`core/src/tasks/review.rs:99-127`); the
+    spawned child copies it into session state and renders it as a developer
+    message (`core/src/session/mod.rs:718-734,3808-3817`).
+
+    So this builder selects the diff with `--base` AND delivers our METHOD
+    paragraph with `-c`. #672 U2's stated risk — that a native subcommand's
+    prompt is not ours to shape — is resolved rather than accepted.
+
+    `--title` is deliberately NOT passed with a base: it declares
+    `requires = "commit"`, and `build_review_request` reads it only in the commit
+    branch (`exec/src/lib.rs:2132-2149`), so a title beside `--base` parses and is
+    then silently IGNORED. This code passed one for an entire review run before
+    the source said so.
     """
     argv = ["codex", "review", "--base", base]
-    if title:
+    if title and commit:
         argv += ["--title", title]
+    if instructions:
+        argv += ["-c", f"developer_instructions={_toml_str(instructions)}"]
     return argv
 
 
 def _run_review(args: argparse.Namespace) -> int:
     """Spawn `codex review`, prompt on stdin. Returns codex's own exit code."""
-    built = _review_argv(base=args.base, title=args.title)
+    # Instructions come from the positional prompt or stdin, and are delivered
+    # through `-c developer_instructions=` rather than as `[PROMPT]`, which the
+    # target flags conflict with. See `_review_argv`.
+    instructions = args.prompt
+    if instructions is None and not sys.stdin.isatty():
+        instructions = sys.stdin.read()
+
+    built = _review_argv(base=args.base, title=args.title, commit=None, instructions=instructions)
 
     if args.print_argv:
         print(" ".join(built))
@@ -123,17 +190,23 @@ def _run_review(args: argparse.Namespace) -> int:
         print("kb-codex: `codex` is not installed or not on PATH.", file=sys.stderr)
         return Rc.NOT_RUN
 
-    # `--base` forbids a prompt, so the METHOD paragraph cannot be delivered on
-    # this path. SAY SO rather than letting the caller believe it was passed —
-    # a review that silently used codex's default instructions, reported as
-    # though it had ours, is worse than one that never ran.
-    print(
-        f"kb-codex --review: reviewing against {args.base} with CODEX'S OWN review\n"
-        "instructions. `--base` and a custom prompt are mutually exclusive on\n"
-        "codex 0.152.1, so no METHOD paragraph was delivered — findings that need\n"
-        "a check to be RUN rather than read may not appear (#672 U2).",
-        file=sys.stderr,
-    )
+    if instructions and instructions.strip():
+        print(
+            f"kb-codex --review: reviewing against {args.base}, with our instructions\n"
+            "delivered as `developer_instructions`. Codex's own review rubric still\n"
+            "applies as base_instructions; ours is additive.",
+            file=sys.stderr,
+        )
+    else:
+        # A review with no METHOD paragraph is the #672 U2 risk. It is allowed —
+        # codex's own rubric is not nothing — but never silently.
+        print(
+            f"kb-codex --review: reviewing against {args.base} with CODEX'S OWN review\n"
+            "instructions ONLY. No METHOD paragraph was supplied, so findings that need\n"
+            "a check to be RUN rather than read may not appear (#672 U2).",
+            file=sys.stderr,
+        )
+
     completed = subprocess.run(built, check=False, env=os.environ.copy())
     return completed.returncode
 
@@ -179,7 +252,9 @@ def run(argv: list[str] | None = None) -> int:
         default="origin/main",
         help="review fixed point; origin/main, not local main, matching kb-review",
     )
-    parser.add_argument("--title", default=None, help="title shown in the review summary")
+    parser.add_argument("--title", default=None, help="review title; needs --commit to apply")
+    parser.add_argument("--model", default=None, help="model override, e.g. gpt-5.6-sol")
+    parser.add_argument("--output", default=None, help="write the transcript to this file (-o)")
     args = parser.parse_args(argv)
 
     if args.review:
@@ -192,7 +267,14 @@ def run(argv: list[str] | None = None) -> int:
     write = args.write or args.network
 
     built = _codex_argv(
-        write=write, network=args.network, effort=args.effort, sandbox_override=args.sandbox
+        LaneSpec(
+            write=write,
+            network=args.network,
+            effort=args.effort,
+            sandbox_override=args.sandbox,
+            model=args.model,
+            output=args.output,
+        )
     )
 
     if args.print_argv:

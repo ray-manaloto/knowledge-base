@@ -41,11 +41,10 @@ cat > /tmp/kb-codex-advisor-prompt.md <<'EOF'
 and any file:line evidence you gathered from the graph or Read/Grep>
 EOF
 
-cat /tmp/kb-codex-advisor-prompt.md | codex exec \
-  --sandbox read-only \
+cat /tmp/kb-codex-advisor-prompt.md | mise run kb-codex -- \
   --model gpt-5.6-sol \
-  -c model_reasoning_effort="xhigh" \
-  -o /tmp/kb-codex-advisor-verdict.md -
+  --effort xhigh \
+  --output /tmp/kb-codex-advisor-verdict.md
 ```
 
 **No `--ephemeral`.** It means "run without persisting session files to disk",

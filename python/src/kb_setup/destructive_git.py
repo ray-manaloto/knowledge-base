@@ -33,6 +33,7 @@ allowed, because nothing uncommitted is lost and the reflog still holds the rest
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 from kb_setup import check_first
 
@@ -62,8 +63,51 @@ _GIT_TARGET_FLAGS = frozenset({"-C", "--git-dir", "--work-tree", "--namespace"})
 #: argument list rather than by membership in a spelling set.
 _DESTRUCTIVE_FLAGS = {
     "reset": frozenset({"--hard"}),
-    "checkout": frozenset({"--", "-f", "--force"}),
 }
+
+#: Branch-shaped `checkout` operands that do NOT overwrite the worktree. Anything
+#: else given to `checkout` is a PATHSPEC, and a pathspec overwrites.
+_CHECKOUT_BRANCH_FLAGS = frozenset({"-b", "-B", "--orphan", "--track", "-t", "--detach"})
+
+#: `git checkout <tree-ish> <path>` — at this many operands it can only be a
+#: path overwrite, never a branch switch.
+_CHECKOUT_TREEISH_AND_PATH = 2
+
+
+def _checkout_is_destructive(args: list[str]) -> bool:
+    """`git checkout <path>` overwrites that path — no `--` and no force needed.
+
+    🔴 The flag table required `--`, `-f` or `--force`. `codex review` disproved
+    it the expensive way: in an isolated dirty repository it ran
+    `decide("git checkout victim.txt")`, got ALLOW, then ran the real command and
+    watched the modification disappear, leaving a clean porcelain status.
+
+    Branch switching is not destructive — git refuses on its own when a switch
+    would lose changes — so the discriminator is whether an operand is present
+    that is not a branch-creating flag.
+    """
+    if any(a in {"-f", "--force", "--"} for a in args):
+        return True
+    if any(a in _CHECKOUT_BRANCH_FLAGS for a in args):
+        return False
+    operands = [a for a in args if not a.startswith("-")]
+    if not operands:
+        return False
+    # `checkout <tree-ish> <path>` — two or more operands is always a path
+    # overwrite.
+    if len(operands) >= _CHECKOUT_TREEISH_AND_PATH:
+        return True
+    # ONE operand is ambiguous by syntax: `git checkout main` switches branch,
+    # `git checkout victim.txt` overwrites a file. Treating every single operand
+    # as destructive was tried and is the wrong trade — it denies the commonest
+    # git command there is, on any dirty tree, and git ALREADY refuses a branch
+    # switch that would lose changes. My own ALLOW test caught it.
+    #
+    # So ask the filesystem. A path that exists is a pathspec; anything else is
+    # a ref. The collision — a branch and a file sharing a name — resolves
+    # toward destructive, which is the right way for an ambiguity about
+    # overwriting to fall.
+    return Path(operands[0]).exists()
 
 
 def _clean_is_destructive(args: list[str]) -> bool:
@@ -102,9 +146,20 @@ def _split_git(rest: list[str]) -> tuple[str | None, list[str], list[str]]:
     index = 0
     selectors: list[str] = []
     while index < len(rest) and rest[index].startswith("-"):
-        if rest[index] in _GIT_VALUE_FLAGS:
-            if rest[index] in _GIT_TARGET_FLAGS and index + 1 < len(rest):
-                selectors += [rest[index], rest[index + 1]]
+        token = rest[index]
+        # 🔴 EQUALS FORM. `--git-dir=/repo/.git` and `--work-tree=/repo` are
+        # valid and were skipped as unknown flags, so the dirtiness probe went on
+        # asking cwd. `codex review` proved it from a clean scratch repo: a reset
+        # targeting another DIRTY repository through equals-form selectors was
+        # ALLOWED, while the same selectors handed to `git status --porcelain`
+        # reported `M base` in the real target.
+        head = token.split("=", 1)[0]
+        if "=" in token and head in _GIT_TARGET_FLAGS:
+            selectors.append(token)
+            index += 1
+        elif token in _GIT_VALUE_FLAGS:
+            if token in _GIT_TARGET_FLAGS and index + 1 < len(rest):
+                selectors += [token, rest[index + 1]]
             index += 2
         else:
             index += 1
@@ -119,9 +174,27 @@ def _is_destructive(sub: str, args: list[str]) -> bool:
         return _clean_is_destructive(args)
     if sub == "restore":
         return _restore_is_destructive(args)
+    if sub == "checkout":
+        return _checkout_is_destructive(args)
     if sub in _DESTRUCTIVE_FLAGS:
         return any(arg in _DESTRUCTIVE_FLAGS[sub] for arg in args)
     return False
+
+
+def _targets_ignored_files(sub: str, args: list[str]) -> bool:
+    """Does this command reach IGNORED files, which plain `status` cannot see?
+
+    Only `git clean -x`/`-X` does. Without this the dirtiness probe reports a
+    clean tree over a directory full of ignored data and the guard allows its
+    permanent deletion.
+    """
+    if sub != "clean":
+        return False
+    return any(
+        a in {"-x", "-X"}
+        or (a.startswith("-") and not a.startswith("--") and ("x" in a[1:] or "X" in a[1:]))
+        for a in args
+    )
 
 
 _REMEDY = {
@@ -177,7 +250,7 @@ _REMEDY = {
 }
 
 
-def _tree_is_dirty(selectors: list[str] | None = None) -> bool | None:
+def _tree_is_dirty(selectors: list[str] | None = None, *, ignored: bool = False) -> bool | None:
     """True/False, or None when git could not be asked.
 
     None is NOT False: the caller must fail open on it rather than treat an
@@ -192,10 +265,21 @@ def _tree_is_dirty(selectors: list[str] | None = None) -> bool | None:
     repo, and a dirty cwd denies a safe one elsewhere. Found by `codex review`,
     then confirmed by running it — with this tree dirty, `git -C /tmp reset
     --hard` was DENIED without /tmp ever being consulted.
+
+    🔴 `ignored=True` ADDS `--ignored`, and without it `git clean -x` slipped
+    through. `codex review` built a scratch repo holding only an IGNORED
+    `cache.secret`: `git status --porcelain` exited 0 with EMPTY output — a clean
+    tree by this probe — while `git clean -ndfx` reported `Would remove
+    cache.secret`. So the guard allowed permanent deletion of data it could not
+    see. `-x`/`-X` are exactly the flags that make ignored files the target, so
+    the probe has to be told to look at them.
     """
+    status = ["status", "--porcelain"]
+    if ignored:
+        status.append("--ignored")
     try:
         done = subprocess.run(
-            ["git", *(selectors or []), "status", "--porcelain"],
+            ["git", *(selectors or []), *status],
             capture_output=True,
             text=True,
             check=False,
@@ -248,8 +332,13 @@ def decide(command: str, *, dirty: bool | _Ask | None = _ASK) -> str | None:
             continue
 
         # Only NOW ask the expensive question, and only for a matching command —
-        # and ask it of the repository the command TARGETS, not of cwd.
-        state = _tree_is_dirty(selectors) if isinstance(dirty, _Ask) else dirty
+        # of the repository the command TARGETS, not cwd, and including ignored
+        # files when the command is one that deletes them.
+        state = (
+            _tree_is_dirty(selectors, ignored=_targets_ignored_files(sub, args))
+            if isinstance(dirty, _Ask)
+            else dirty
+        )
         if state is not True:
             # Clean tree, or git could not be asked. Both allow: a guard that
             # cannot ask must not refuse.

@@ -69,8 +69,27 @@ from kb_setup import check_first
 #:   `stage_explicitly`). Denied here as the immediate remedy; the general class
 #:   — a command-running wrapper defeats a command-inspecting guard — is filed
 #:   separately rather than being recorded as solved by this one line.
+#: 🔴 THE ALIASES ARE IN THIS SET AND THEY WERE MISSED. `codex review` (with a
+#: METHOD paragraph) ran `codex e --help` and `codex a --help`, got rc 0 from
+#: both, and showed the guard allowed them. Confirmed against the pinned source
+#: rather than the help text: `codex-rs/cli/src/main.rs:137` declares
+#: `visible_alias = "e"` for exec, `:188` `visible_alias = "a"` for apply, and
+#: `:213` `alias = "cloud-tasks"` for cloud. A guard that matches only the long
+#: spelling of a command with a one-letter alias is decoration.
 _GUARDED_SUBCOMMANDS = frozenset(
-    {"exec", "review", "resume", "fork", "queue", "cloud", "apply", "sandbox"}
+    {
+        "exec",
+        "e",
+        "review",
+        "resume",
+        "fork",
+        "queue",
+        "cloud",
+        "cloud-tasks",
+        "apply",
+        "a",
+        "sandbox",
+    }
 )
 
 #: A help/version FLAG exempts the segment outright — asking a guarded
