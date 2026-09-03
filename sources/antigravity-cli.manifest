@@ -1,5 +1,44 @@
 # Source manifest — reproducible-by-reference (Invariant 3).
+# Re-clone at build time; the working tree under sources/antigravity-cli/ is
+# gitignored.
+#
+# TOOLCHAIN SOURCE — a tool this repo actually RUNS (Google's Antigravity CLI,
+# Gemini 3.x; see `[tool.antigravity-cli]` in currency.toml, which Ray graded a
+# CRITICAL currency dependency 2026-08-19). This file existed since 2026-08-02
+# (#496) with none of the header its peers (`sources/hk.manifest`,
+# `sources/mise.manifest`, `sources/codex.manifest`) carry, which the
+# 2026-09-03 cold review of 575fb5be flagged as plausibly why it sat at 1.1.20
+# through the 1.1.21/1.1.22/1.1.23 bumps unnoticed. This header is that fix.
+#
+# ⚠️ INVARIANT: this pin MUST track the version we actually run.
+#   version source: mise.toml `[tools] antigravity-cli` (`aqua:` backend)
+#   pinned here:    1.1.25
+# A pin that drifts from the installed version makes the corpus answer
+# questions about code we are not running. Not hypothetical —
+# `sources/graphify.manifest` records exactly that failure: it sat two
+# releases behind for weeks, so every "how does graphify work?" answer came
+# from the wrong source.
+#
+# Pin the RELEASE TAG, never a branch head — a branch drifts ahead of the
+# release. Tags here are LIGHTWEIGHT (confirmed 2026-09-03: zero `^{}` peeled
+# lines across all 39 tags), so the plain `git ls-remote --tags <url> <tag>`
+# commit is the one to record — the annotated-tag trap in
+# `sources/hk.manifest`/`sources/mise.manifest` (#395/#500) does not apply
+# here, but re-check it on every bump rather than assuming.
+# To bump:
+#   git ls-remote --tags https://github.com/google-antigravity/antigravity-cli <version>
+# and set ref/commit here to that line's SHA, then `mise run kb-build`.
+#
+# kind = docs, NOT code (changed 2026-09-03, cold review of 575fb5be). At the
+# pinned commit the repo is 15 blobs and zero source files — the CLI itself
+# ships as prebuilt release tarballs, not as source in this tree. `kind = code`
+# would extract nothing (its two `.sh` files live under `examples/`, demo
+# scripts, not the tool) while silently skipping `CHANGELOG.md` and
+# `README.md` by design — the one artifact that lets the corpus answer "what
+# changed between 1.1.20 and 1.1.25". `kind = docs` ingests exactly those two
+# files instead.
 url = https://github.com/google-antigravity/antigravity-cli
 ref = 1.1.25
 commit = 7e1316ca775dc3805aac13b2db5cd37d89d5aae8
-kind = code
+kind = docs
+added = 2026-08-02
