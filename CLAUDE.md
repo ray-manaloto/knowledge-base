@@ -11,11 +11,11 @@ parsing; every edge tagged EXTRACTED/INFERRED; no vector store).
 
 ## Invariants (do NOT violate)
 
-1. **graphify is PROJECT-SCOPED, never global.** Install only with
-   `graphify install --project`. Never bare `graphify install` (mutates
-   `~/.claude`), never `graphify extract --global` / `graphify global add`
-   (shared mutable machine state → non-reproducible, collides across hosts).
-   The graph lives in this repo's `graphify-out/`.
+1. **graphify is PROJECT-SCOPED, never global.** Never run `graphify install`
+   by hand — the hook denies it even with `--project`; use
+   `mise run kb-skill-refresh`. Never `graphify extract --global` /
+   `graphify global add` (shared mutable machine state → non-reproducible,
+   collides across hosts). The graph lives in this repo's `graphify-out/`.
 2. **This repo edits only PROJECT settings.** It never touches `~/.claude` or
    any global/system/user config.
 3. **Inputs are reproducible.** Every source is committed — either the content
@@ -87,7 +87,7 @@ Concretely:
 
 ```bash
 mise install && mise deps                     # tools + locked Python runtime (Graphify SDK/CLI)
-graphify install --project                    # project-scoped skill + graphify-out/
+mise run kb-skill-refresh                     # install + repair project-scoped skill + graphify-out/
 mise run kb-build                             # reproduce graph.json from committed inputs (no LLM)
 mise run kb-query -- "what does this corpus cover?"
 mise run kb-serve                             # read-only MCP server for other agents
