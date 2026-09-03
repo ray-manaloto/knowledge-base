@@ -36,19 +36,29 @@ default_subagent_reasoning_effort = "high"
 # soft ambiguity about which server answers — a total outage of the CLI. Renaming
 # this entry to `kb` fixed it; `codex mcp list` then shows both.
 #
-# WHAT EACH IS FOR, measured 2026-09-03 from the code we run
-# (`sources/graphify/graphify/serve.py:1614-1744`), not from a docs page:
+# WHAT EACH IS FOR, both measured 2026-09-03 — but from TWO DIFFERENT PRIMARY
+# SOURCES, which this block previously collapsed into one citation:
+#   - the LOCAL ten come from the code we run,
+#     `sources/graphify/graphify/serve.py:1614-1744`;
+#   - the HOSTED twenty-four come from the CLIENT'S OWN TOOL REGISTRY after an
+#     authenticated `tools/list`. That pinned file defines the local server and
+#     cannot derive a hosted count — proved by the cold lane on `2c24aeb4d046`,
+#     which AST-walked its `list_tools` and got the local ten back.
+#   Neither figure is from a docs page.
 #   graphify (hosted, 24 tools — RE-COUNTED AUTHENTICATED 2026-09-03, see below)
 #     — workspace/repository discovery, seed search, file ranking,
 #     callers/callees/references, traces, import-export maps, tests-for,
 #     impact_and_risk, subgraph rendering, remember/recall/memories_about.
-#     21 of its 24 tool names exist ONLY here (24 minus the 3 shared below) —
+#     21 of its 24 tool NAMES exist only here (24 minus the 3 shared below) —
 #     a tool count, not a capability count, and deliberately stated as the
-#     thing that was actually measured. Its corpus is
-#     one indexed repository per entry, not our aggregate: hosted holds 15
-#     repositories for this workspace, and `ray-manaloto/knowledge-base` is
-#     ready and queryable at 13,152 nodes — this repo's OWN files, none of the
-#     ingested sources.
+#     thing that was actually measured: several hosted names have a local
+#     ANSWER under a different name (`graphify_node` vs `get_node`,
+#     `graphify_callers` vs `get_neighbors` with a relation filter). Its corpus
+#     is one indexed repository per entry, not our aggregate: hosted holds 15
+#     repository ENTRIES for this workspace of which 14 are ready and
+#     queryable (`ray-manaloto/pydantic-deepagent-auto-claude` is
+#     `not_started`), and `ray-manaloto/knowledge-base` is ready and queryable
+#     at 13,152 nodes — this repo's OWN files, none of the ingested sources.
 #   kb (local, 10 tools) — the 359,146-node aggregate: every ingested source,
 #     which is the whole point of this project and is reachable nowhere else. It
 #     also carries `list_prs`, `get_pr_impact` and `triage_prs`, which the

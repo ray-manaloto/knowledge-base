@@ -41,13 +41,19 @@ I read hosted-vs-local as two routes to one graph and swapped both clients to
 local. Ray corrected it: *"the app.graphify.com mcp provides more features we
 dont yet support / so we should keep that / and our code for the rest"*. A codex
 lane's 319-line capability comparison confirmed him — and found the reverse gap
-too. **Neither is a subset of the other**, counted from
-`sources/graphify/graphify/serve.py:1614-1744`:
+too. **Neither is a subset of the other.** The two columns have **different
+provenance and must not be attributed to one file** — the local ten come from
+the pinned source `sources/graphify/graphify/serve.py:1614-1744`; the hosted
+twenty-four come from the **client's own tool registry after an authenticated
+`tools/list`**, because that file defines the local server and cannot derive a
+hosted count. (An earlier version of this line cited the pinned source for both;
+the cold lane on `2c24aeb4d046` proved it could not, by AST-walking that file's
+`list_tools` and getting the local ten back.)
 
 | | hosted `graphify` | local `kb` |
 |---|---|---|
 | tools | **24** — re-counted authenticated 2026-09-03 (U-R0) | **10** |
-| corpus | this repo's own files, **13,152 nodes**, one of 15 indexed repositories in the workspace | the **359,146**-node aggregate: every ingested source |
+| corpus | this repo's own files, **13,152 nodes**, one of **14 queryable** repositories in the workspace (15 configured; `ray-manaloto/pydantic-deepagent-auto-claude` is `not_started`, `queryable: false`) | the **359,146**-node aggregate: every ingested source |
 | only there | seed search, file ranking, callers/callees/references, traces, file-neighbors, imports/exports, tests-for, `impact_and_risk`, `graphify_render_subgraph`, `remember`/`recall`/`memories_about`, workspace + repository discovery, Formal Verification | `list_prs`, `get_pr_impact`, `triage_prs` |
 
 **THREE** tool names exist on both — `graph_stats`, `query_graph`,
@@ -97,10 +103,18 @@ independent count on one server is not silently truncating the other.
 
 **Liveness, not merely a schema.** `mcp__graphify__list_workspaces` answered —
 workspace `ray-manaloto`, plan Pro, role owner, `boundVia: token_claim` — and
-`mcp__graphify__list_repositories` returned 15 repositories, of which
+`mcp__graphify__list_repositories` returned 15 repository entries, of which
 `ray-manaloto/knowledge-base` is `status: ready`, `queryable: true`, **13,152
 nodes**. The count comes from a server that answered, not from a registration
 that merely exists.
+
+**15 entries is not 15 indexes**, and the difference is a status field it would
+have been easy not to read: **14** are `ready`/`queryable`; one —
+`ray-manaloto/pydantic-deepagent-auto-claude` — is `status: not_started`,
+`queryable: false`, `nodeCount: null`. Re-called 2026-09-03 by the caller after
+the cold lane on `2c24aeb4d046` raised it, so this row has two independent
+routes. A configured repository that has never been indexed answers nothing;
+counting it as coverage is the same species of error as the *seven* above.
 
 **The gap is a BACKLOG, not a border.** Ray: *"one of our goals is to be able to
 replicate the functionality the remote one does and its formal verification and
