@@ -72,10 +72,23 @@ _CHECKED_SUFFIXES = frozenset({".py", ".pyi"})
 #: and `long-running-command-hangs.md` rule 2 forbids waiting blind.
 _TIMEOUT_SECONDS = 60
 
-#: Self-imposed cap, below codex's ~2,500-token spill threshold so the model
-#: gets the diagnostics inline rather than a preview plus a temp-file path.
-#: Characters, not tokens, because that is what we can count exactly.
-_MAX_CONTEXT_CHARS = 6000
+#: Self-imposed cap, derived from the limit this repo actually CONFIGURES rather
+#: than from codex's default. `.codex/hooks.json` sets
+#: `additionalContextLimit: 2000` on this handler; codex's own default is ~2,500,
+#: and an earlier version of this constant was sized against that default while
+#: the config next to it said 2000 — two numbers in one commit that disagreed.
+#:
+#: The derivation, measured on real ty output rather than assumed: ty's report is
+#: symbol-dense and runs about **3.1 characters per token**, so the 2000-token
+#: limit is roughly 6,200 characters. The preamble below costs ~250 of those, so
+#: a 6,000-char report could exceed the limit — which is what the cold lane
+#: found. 4,500 leaves real margin instead of landing on the boundary.
+#:
+#: Exceeding it is not a crash: codex spills the full text to
+#: `<temp_dir>/hook_outputs/…` and shows a head-and-tail preview. That degrades
+#: gracefully and it defeats the point, which is diagnostics the lane can read
+#: inline.
+_MAX_CONTEXT_CHARS = 4500
 
 
 def _patched_python_files(command: str, repo_root: Path) -> list[Path]:

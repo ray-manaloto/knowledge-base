@@ -17,6 +17,7 @@ a way the hook could silently do nothing while looking wired:
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -143,6 +144,29 @@ def test_output_is_capped_below_the_spill_threshold(
     context = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
     assert len(context) < 8000
     assert "truncated" in context
+
+
+def test_run_ty_swallows_a_missing_binary(tmp_path: Path) -> None:
+    """`_run_ty`'s except clause had ZERO coverage — every other test mocks it.
+
+    The cold lane on `1b7f686c4aff` caught that, and it matters more than a
+    usual uncovered line: this is the PEP 758 unparenthesised `except A, B:`
+    form, which is valid on Python 3.14 and looks like a Python 2 syntax error
+    to anyone reading it. An untested line that also looks wrong is one a future
+    reader "fixes" by hand.
+    """
+    assert edit_check._run_ty(tmp_path / "no-such-ty", [tmp_path / "a.py"], tmp_path) is None
+
+
+def test_run_ty_swallows_a_timeout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The other arm of the same except clause — a hook must never hang a lane."""
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise subprocess.TimeoutExpired(cmd="ty", timeout=1)
+
+    monkeypatch.setattr(subprocess, "run", _boom)
+
+    assert edit_check._run_ty(tmp_path / "ty", [tmp_path / "a.py"], tmp_path) is None
 
 
 @pytest.mark.parametrize(

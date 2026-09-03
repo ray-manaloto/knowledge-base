@@ -70,16 +70,38 @@ def test_unparsable_command_fails_open() -> None:
     assert inplace_edit.decide("sed -i 's/foo/bar/ python/src/kb_setup/events.py") is None
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        # The cold lane confirmed both of these bypass the guard: the command
+        # word is `find`/`xargs`, and `sed` is merely an argument.
+        "find python -name '*.py' -exec sed -i 's/a/b/' {} +",
+        "find python -name '*.py' | xargs sed -i 's/a/b/'",
+    ],
+)
+def test_known_bypasses_are_not_denied(command: str) -> None:
+    """These SHOULD get through — and the remedy text must say so.
+
+    Pinned as an ALLOW rather than left undefined, because the alternative is a
+    guard that quietly grows to catch them and starts firing on `find` commands
+    that touch no Python at all. The disclosure is the contract, not the catch.
+    """
+    assert inplace_edit.decide(command) is None, command
+
+
 def test_reason_states_what_it_cannot_cover() -> None:
     """A guard naming two commands must not let silence imply the rest are safe.
 
     Pinned because the omission is invisible: nothing fails if the caveat is
-    dropped, and the next reader concludes a heredoc is checked.
+    dropped, and the next reader concludes a heredoc is checked. `find`/`xargs`
+    were missing from this list until the cold lane on `1b7f686c4aff` confirmed
+    they bypass — the disclosure was wrong by omission, which is the same defect
+    as a wrong claim and harder to see.
     """
     reason = inplace_edit.decide("sed -i 's/a/b/' python/src/kb_setup/events.py")
     assert reason is not None
-    assert "heredoc" in reason
-    assert "tee" in reason
+    for uncovered in ("heredoc", "tee", "python -c", "find", "xargs"):
+        assert uncovered in reason, uncovered
 
 
 def test_wired_into_the_shared_decision_function() -> None:

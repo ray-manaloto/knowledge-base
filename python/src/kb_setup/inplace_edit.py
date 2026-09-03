@@ -94,8 +94,10 @@ _REMEDY = (
     "language server.\n"
     "\n"
     "SCOPE, stated so silence does not imply coverage: this guard sees `sed`/`perl`\n"
-    "in-place edits only. A heredoc (`cat > f.py`), `tee`, or a `python -c` that\n"
-    "writes a file has the SAME blind spot and is NOT denied."
+    "at a COMMAND POSITION only. All of these have the same blind spot and are NOT\n"
+    "denied — a heredoc (`cat > f.py`), `tee`, a `python -c` that writes a file,\n"
+    "and — confirmed by the cold lane — `find … -exec sed -i` and `xargs sed -i`,\n"
+    "where the command word is `find`/`xargs` and `sed` is an argument."
 )
 
 
