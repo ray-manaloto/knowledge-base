@@ -30,7 +30,7 @@ reachable benefit.
 |---|---|---|---|
 | Claude → graphify | `.mcp.json` → `https://api.graphify.com/mcp` (http) | hosted, kept; **`kb` added** for the local graph | `uv run python -c` reading `.mcp.json` |
 | codex → graphify | global `~/.codex/config.toml` | hosted, Auth `OAuth`; project adds **`kb`** | `codex mcp list` |
-| hosted index size | — | **13,126 nodes / 23,160 edges / 1,484 communities**, at commit `295955dbeb84` | `mcp__graphify__graph_stats` |
+| hosted index size | — | **13,126 nodes / 23,160 edges / 1,484 communities**, at commit `295955dbeb84`; **13,152 nodes** when re-read 2026-09-03 — it re-indexes, so this figure moves | `mcp__graphify__graph_stats`, then `mcp__graphify__list_repositories` |
 | local aggregate graph | `graphify-out/graph.json` | **359,026 nodes / 806,869 edges / 553,479,428 bytes** | `json.load` on the file |
 | local prose graph | `graphify-out/graph-prose.json` | **11,330 nodes / 16,864,486 bytes** | same |
 | `kb-serve` (local stdio MCP) | exists, documented in `CLAUDE.md` as *the* way consumers reach this graph | **was registered in NEITHER client** at the start of the round | `grep -l 'kb-serve' .mcp.json .codex/config.toml` → no match |
@@ -41,16 +41,27 @@ I read hosted-vs-local as two routes to one graph and swapped both clients to
 local. Ray corrected it: *"the app.graphify.com mcp provides more features we
 dont yet support / so we should keep that / and our code for the rest"*. A codex
 lane's 319-line capability comparison confirmed him — and found the reverse gap
-too. **Neither is a subset of the other**, counted from
-`sources/graphify/graphify/serve.py:1614-1744`:
+too. **Neither is a subset of the other.** The two columns have **different
+provenance and must not be attributed to one file** — the local ten come from
+the pinned source `sources/graphify/graphify/serve.py:1614-1744`; the hosted
+twenty-four come from the **client's own tool registry after an authenticated
+`tools/list`**, because that file defines the local server and cannot derive a
+hosted count. (An earlier version of this line cited the pinned source for both;
+the cold lane on `2c24aeb4d046` proved it could not, by AST-walking that file's
+`list_tools` and getting the local ten back.)
 
 | | hosted `graphify` | local `kb` |
 |---|---|---|
-| tools | **23** (2026-08-17 inventory) | **10** |
-| corpus | this repo's own files | the **359,146**-node aggregate: every ingested source |
-| only there | seed search, file ranking, callers/callees/references, traces, file-neighbors, imports/exports, tests-for, `impact_and_risk`, `remember`/`recall`, workspace + repository discovery, Formal Verification | `list_prs`, `get_pr_impact`, `triage_prs` |
+| tools | **24** — re-counted authenticated 2026-09-03 (U-R0) | **10** |
+| corpus | this repo's own files, **13,152 nodes**, one of **14 queryable** repositories in the workspace (15 configured; `ray-manaloto/pydantic-deepagent-auto-claude` is `not_started`, `queryable: false`) | the **359,146**-node aggregate: every ingested source |
+| only there | seed search, file ranking, callers/callees/references, traces, file-neighbors, imports/exports, tests-for, `impact_and_risk`, `graphify_render_subgraph`, `remember`/`recall`/`memories_about`, workspace + repository discovery, Formal Verification | `list_prs`, `get_pr_impact`, `triage_prs` |
 
-Seven tool names exist on both, which is why they carry distinct prefixes.
+**THREE** tool names exist on both — `graph_stats`, `query_graph`,
+`shortest_path` — which is why they carry distinct prefixes. This line said
+*seven* until 2026-09-03; where that figure came from is not established, so it
+is corrected rather than explained, and it was equally wrong against the
+2026-08-17 inventory, whose overlap with the local ten is the same three.
+Measured with `comm` over the two sorted name lists.
 
 🔴 **THE NAME IS LOAD-BEARING — SHARING ONE BREAKS CODEX OUTRIGHT.** Ray ran
 `codex mcp add graphify --url …`, which writes a **global** entry (its own output
@@ -65,12 +76,45 @@ Caused by: url is not supported for stdio   in `mcp_servers.graphify`
 Not a soft ambiguity about which server answers — a total outage of the CLI,
 reproduced and fixed 2026-09-03 by renaming ours to `kb`.
 
-**The 23 is August's and is UNVERIFIED CURRENT.** The lane could not
-authenticate (HTTP 401, OAuth challenge); its own session's `graph_stats` was
-refused by approval policy; and its second attempt was **blocked by this round's
-own `codex_lane` guard**, which denies raw `codex exec` and routes to
-`mise run kb-codex`, whose project config was already the local server. Ray has
-since signed in, so a current re-count is now possible and is tracked as U-R0.
+**U-R0 — DONE 2026-09-03. The count is now measured, not inherited: 24.**
+
+Why it took a second round to get: the August lane could not authenticate (HTTP
+401, OAuth challenge); its own session's `graph_stats` was refused by approval
+policy; and its second attempt was **blocked by that round's own `codex_lane`
+guard**, which denies raw `codex exec` and routes to `mise run kb-codex`, whose
+project config was already the local server. Ray ran `codex mcp login graphify`
+on 2026-09-03, which is what made asking possible.
+
+| | count | delta |
+|---|---|---|
+| 2026-08-17 (last complete inventory) | 23 | — |
+| 2026-09-03 (authenticated, this session) | **24** | +`graphify_render_subgraph`, +`memories_about`, −`ingest_turns` |
+
+`memories_about` is the row worth reading twice: the August report recorded it as
+*proposed but unverified* and found it absent from every bounded evidence set it
+could reach. It is live. That is an absence-of-evidence being retired by
+evidence, which is the whole reason U-R0 was a ticket rather than a shrug.
+
+**Control arm**, because a tool-registry count is a probe like any other: the
+same session listing reports `kb` at exactly **10**, matching the count measured
+independently from the pinned source (`python/src/kb_setup/mcp_serve.py:4` —
+"10 tools + 6 resources unconditionally"). A listing that agrees with an
+independent count on one server is not silently truncating the other.
+
+**Liveness, not merely a schema.** `mcp__graphify__list_workspaces` answered —
+workspace `ray-manaloto`, plan Pro, role owner, `boundVia: token_claim` — and
+`mcp__graphify__list_repositories` returned 15 repository entries, of which
+`ray-manaloto/knowledge-base` is `status: ready`, `queryable: true`, **13,152
+nodes**. The count comes from a server that answered, not from a registration
+that merely exists.
+
+**15 entries is not 15 indexes**, and the difference is a status field it would
+have been easy not to read: **14** are `ready`/`queryable`; one —
+`ray-manaloto/pydantic-deepagent-auto-claude` — is `status: not_started`,
+`queryable: false`, `nodeCount: null`. Re-called 2026-09-03 by the caller after
+the cold lane on `2c24aeb4d046` raised it, so this row has two independent
+routes. A configured repository that has never been indexed answers nothing;
+counting it as coverage is the same species of error as the *seven* above.
 
 **The gap is a BACKLOG, not a border.** Ray: *"one of our goals is to be able to
 replicate the functionality the remote one does and its formal verification and
@@ -80,7 +124,7 @@ defect in the lane's brief, not only in its output.
 
 **The hosted index holds 3.7% of the corpus by node count** — but that is a
 statement about SCOPE, not about quality, and it is not an argument against
-hosted. Hosted indexes this repo's own files with 23 tools; `kb` holds every
+hosted. Hosted indexes this repo's own files with 24 tools; `kb` holds every
 ingested source with 10. Both are now reachable, under distinct names.
 
 ⚠️ **Two corrections this document earned on ITSELF, within one session**, kept
@@ -261,6 +305,20 @@ uv run graphify --version
 mise run kb-query -- "hook_guard deny" --prose    # rc 3 = truncated, not failed
 mise run kb-query -- "xqzzy vlurbnak thopwis kreegan" --prose   # the control arm
 ```
+
+**Re-counting the hosted tool surface (U-R0's own probe).** There is no CLI for
+it: the count comes from the client's own registry after a `tools/list`
+handshake, so ask the client, not the network. In a Claude session, list the
+`mcp__graphify__*` names and the `mcp__kb__*` names, sort each, and `comm` them.
+Then run the two arms, or the number is an opinion:
+
+- **control arm** — `mcp__kb__*` must come to exactly **10**, the count
+  independently fixed by `python/src/kb_setup/mcp_serve.py:4`. If it does not,
+  the listing is truncating and the hosted number is worthless too.
+- **liveness arm** — call `mcp__graphify__list_workspaces`. A registration that
+  exists is not a server that answers, and hosted needs
+  `codex mcp login graphify` (codex is the one client that does not sign in on
+  first use).
 
 Hook trust, graph sizes and plugin counts are read with short `uv run python -c`
 snippets over `~/.codex/config.toml`, `graphify-out/*.json` and
