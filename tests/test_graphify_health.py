@@ -400,3 +400,87 @@ def test_a_replace_line_for_edges_is_not_silently_approved() -> None:
         ),
     )
     assert receipt.state is GraphifyState.INCOMPLETE
+
+
+# The exact line a real `mise run kb-build` failed closed on, 2026-09-03, on the
+# OpenSymphony source — whose extract had SUCCEEDED (11,004 nodes, 34,665 edges
+# written) immediately above it in the same log. Verbatim from the traceback,
+# em dash included, not reconstructed from the f-string.
+_ALREADY_CLEAN_LINE = (
+    "[graphify] 3 source file(s) deleted or excluded since last run — "
+    "no matching nodes or edges in graph, already clean."
+)
+
+#: Graphify's SUSPICIOUS sibling, from the `if` branch immediately above the
+#: benign `else` (`graphify/build.py:1983-1991`, READ 2026-09-03). Prune entries
+#: that matched nothing usually mean the effective root is wrong, so this one
+#: must keep failing the build closed.
+_PRUNE_MATCHED_NOTHING_LINE = (
+    "[graphify] WARNING: 3 prune source(s) matched no nodes or edges — nothing "
+    "was removed. Prune entry 'a/b.py' does not correspond to any stored "
+    "source_file (e.g. 'src/a/b.py'). If these files should have been pruned, "
+    "pass root= to build_merge so absolute paths relativize to the graph's "
+    "source_file keys. (#2446)"
+)
+
+
+def test_the_already_clean_line_is_not_unaccounted_stderr() -> None:
+    """GREEN ARM: the zero-count sibling of the prune narration is benign.
+
+    Verified against the vendor source rather than its wording
+    (`graphify/build.py:1969-1997`): this is the `else` of a branch on
+    `(prune_set or prune_abs) and not _matched_prune_entries`, so it is reached
+    only when the prune entries DID match or there were none. Reverting the
+    third alternative in `_ROUTINE_MERGE_PROGRESS` makes this fail.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(observed=True, stderr=_ALREADY_CLEAN_LINE),
+    )
+    assert receipt.state is GraphifyState.COMPLETE
+    assert receipt.reasons == ()
+    require_complete(receipt)  # must not raise
+
+
+def test_the_prune_matched_nothing_warning_still_refuses() -> None:
+    r"""RED ARM, and the control arm for the addition above.
+
+    These two lines are the two branches of ONE `if`/`else` in Graphify. If a
+    pattern written for the benign branch also swallowed the suspicious one,
+    approving it would hide a wrong-root prune — exactly the failure #2446 was
+    filed for.
+
+    WHAT ACTUALLY REFUSES IT IS THE ANCHOR, NOT THE WORDING, and the difference
+    was found by a mutation that SURVIVED. The enclosing pattern ends `\\.\\Z`
+    and this line ends `(#2446)`, so no widening of the alternation alone can
+    make it match — a mutation that only broadens the wording is inert here and
+    proves nothing. The arm that does kill this test
+    (`.agent/kb/arms/already-clean-narration.toml::pattern-widened-and-unanchored`)
+    widens the alternation AND drops the end anchor, which is the sloppy pattern
+    a person would really write. Stated because the first version of this
+    docstring credited the wording, which would have disarmed the next reader.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(observed=True, stderr=_PRUNE_MATCHED_NOTHING_LINE),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert "stderr" in receipt.reasons
+
+
+def test_the_already_clean_line_is_anchored_like_its_siblings() -> None:
+    r"""RED ARM: trailing text on the same line is NOT approved by association.
+
+    Same reason the `Replaced` and `Pruned` patterns are anchored `\A…\Z`:
+    Graphify reuses the `[graphify] ` prefix for genuine warnings a few
+    statements away in the same function.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(
+            observed=True,
+            stderr=f"{_ALREADY_CLEAN_LINE} WARNING: the root may be wrong",
+        ),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert "stderr" in receipt.reasons

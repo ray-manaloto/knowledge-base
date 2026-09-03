@@ -1,0 +1,92 @@
+<title>Which Graph Should Answer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+  :root{
+    --ground:#EAEFEA; --sheet:#FFFFFF; --ink:#141A16; --muted:#54625A;
+    --line:#C2CFC6; --rule:#E3EAE5;
+    --small:#8A5300; --big:#14663F; --pick:#0F5F63;
+    --disp:"Space Grotesk",system-ui,sans-serif;
+    --body:"Source Sans 3",system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:20px 18px 28px;background:var(--ground);color:var(--ink);
+       font-family:var(--body);font-size:15px;line-height:1.4}
+  .sheet{max-width:800px;margin:0 auto;background:var(--sheet);
+         border:1px solid var(--line);padding:20px 26px 22px}
+  h1{font-family:var(--disp);font-size:25px;font-weight:700;margin:0 0 3px;
+     letter-spacing:-.02em;text-wrap:balance}
+  .sub{color:var(--muted);font-size:13.5px;margin:0 0 16px}
+  h2{font-family:var(--disp);font-size:10.5px;font-weight:600;text-transform:uppercase;
+     letter-spacing:.1em;color:var(--muted);margin:0 0 7px}
+  figure{margin:0 0 16px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto;min-width:500px}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:5px}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 16px}
+  .opt{border:1px solid var(--line);padding:12px 14px}
+  .opt.lean{border:2px solid var(--pick);background:#F3F8F8}
+  .opt h3{font-family:var(--disp);font-size:14.5px;font-weight:700;margin:0 0 6px}
+  .opt.lean h3{color:var(--pick)}
+  .opt p{margin:0 0 6px;font-size:13.5px}
+  .opt .cost{color:var(--small);font-size:13px;margin:0}
+  .ask{border-left:3px solid var(--pick);background:#F3F8F8;padding:12px 16px;margin:0}
+  .ask p{margin:0;font-size:15px}
+  .ask b{font-family:var(--disp);font-weight:700}
+</style>
+
+<div class="sheet">
+
+  <h1>Which graph should answer</h1>
+  <p class="sub">Right now both Claude and codex ask the small one. The big one is connected to nothing.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 152" role="img" aria-label="Both Claude and codex currently query a hosted index holding 13,126 nodes, which is only this repo's own files. A local graph holding 359,026 nodes, containing every source ever ingested, is connected to neither.">
+      <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <polygon points="0,1 10,5 0,9" fill="#141A16"/>
+        </marker>
+      </defs>
+
+      <rect x="2" y="16" width="112" height="40" rx="3" fill="#FFFFFF" stroke="#141A16" stroke-width="1.4"/>
+      <text x="58" y="41" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="14" font-weight="700" fill="#141A16">Claude</text>
+
+      <rect x="2" y="86" width="112" height="40" rx="3" fill="#FFFFFF" stroke="#141A16" stroke-width="1.4"/>
+      <text x="58" y="111" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="14" font-weight="700" fill="#141A16">codex</text>
+
+      <path d="M118 36 L300 36" fill="none" stroke="#141A16" stroke-width="1.6" marker-end="url(#a)"/>
+      <path d="M118 106 L300 106 L300 52" fill="none" stroke="#141A16" stroke-width="1.6" marker-end="url(#a)"/>
+      <text x="150" y="28" font-family="Source Sans 3, sans-serif" font-size="11.5" fill="#54625A">both ask this one</text>
+
+      <rect x="306" y="12" width="180" height="48" rx="3" fill="#FDF6EC" stroke="#8A5300" stroke-width="1.8"/>
+      <text x="396" y="32" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13.5" font-weight="700" fill="#141A16">the small one</text>
+      <text x="396" y="49" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11.5" fill="#8A5300">13,126 — this repo's own files</text>
+
+      <rect x="306" y="88" width="180" height="48" rx="3" fill="#FFFFFF" stroke="#14663F" stroke-width="1.8" stroke-dasharray="6 4"/>
+      <text x="396" y="108" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13.5" font-weight="700" fill="#14663F">the big one</text>
+      <text x="396" y="125" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11.5" fill="#14663F">359,026 — every source we ingested</text>
+
+      <text x="500" y="107" font-family="Source Sans 3, sans-serif" font-size="12" font-weight="600" fill="#B3261E">connected to</text>
+      <text x="500" y="123" font-family="Source Sans 3, sans-serif" font-size="12" font-weight="600" fill="#B3261E">nothing at all</text>
+    </svg>
+    <figcaption>Measured today, both numbers re-derived rather than quoted. The small one is 3.7% of the big one.</figcaption>
+  </figure>
+
+  <h2>Your choice</h2>
+  <div class="opts">
+    <div class="opt lean">
+      <h3>Swap it</h3>
+      <p>Connect the big one, disconnect the small one. Each assistant has exactly one place to ask, so it can't pick wrong.</p>
+      <p class="cost">Cost: you lose lookups across your other 14 repos.</p>
+    </div>
+    <div class="opt">
+      <h3>Keep both</h3>
+      <p>Add the big one, leave the small one. Nothing is lost, and sibling repos stay reachable.</p>
+      <p class="cost">Cost: two places to ask, same question. Whichever one gets asked first wins, and it may be the wrong one.</p>
+    </div>
+  </div>
+
+  <div class="ask">
+    <p><b>What I need from you:</b> pick one. Everything else in this round is already decided — this is the only fork.</p>
+  </div>
+
+</div>

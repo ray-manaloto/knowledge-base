@@ -1,0 +1,93 @@
+<title>How Wide Should The Guard Go</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Karla:wght@400;600&display=swap">
+<style>
+  :root{
+    --ground:#EDEFEA; --sheet:#FFFFFF; --ink:#171A16; --muted:#5A6157;
+    --line:#C8CFC4; --rule:#E4E9E1;
+    --held:#14663F; --open:#7A4B00; --bad:#B3261E;
+    --disp:"Sora",system-ui,sans-serif;
+    --body:"Karla",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:20px 18px 26px;background:var(--ground);color:var(--ink);
+       font-family:var(--body);font-size:15px;line-height:1.4}
+  .sheet{max-width:800px;margin:0 auto;background:var(--sheet);
+         border:1px solid var(--line);padding:20px 26px 22px}
+  h1{font-family:var(--disp);font-size:25px;font-weight:700;margin:0 0 3px;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:13.5px;margin:0 0 15px}
+  figure{margin:0 0 15px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto;min-width:520px}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:5px}
+  .rows{border-top:1px solid var(--rule);margin:0 0 15px}
+  .row{display:grid;grid-template-columns:96px 1fr;gap:14px;padding:9px 0;
+       border-bottom:1px solid var(--rule);align-items:baseline}
+  .tag{font-family:var(--disp);font-size:10.5px;font-weight:600;
+       text-transform:uppercase;letter-spacing:.08em}
+  .t-held{color:var(--held)} .t-bad{color:var(--bad)} .t-open{color:var(--open)}
+  .row p{margin:0;font-size:14.5px}
+  .row b{font-weight:600}
+  .ask{border-left:3px solid var(--open);background:#FBF6EE;padding:12px 16px;margin:0}
+  .ask p{margin:0;font-size:15px}
+  .ask b{font-family:var(--disp);font-weight:700}
+</style>
+
+<div class="sheet">
+
+  <h1>How wide should the guard go</h1>
+  <p class="sub">Codex has 28 commands. I wrote the guard for two of them.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 150" role="img" aria-label="Codex's 28 commands sort into four groups by what they can do. The guard currently covers only part of the first group. The other three groups are entirely unguarded, including one that edits your files and one that runs any command at all.">
+      <rect x="4" y="26" width="150" height="52" rx="3" fill="#EAF3EE" stroke="#14663F" stroke-width="2"/>
+      <text x="79" y="47" text-anchor="middle" font-family="Sora, sans-serif" font-size="13" font-weight="700" fill="#14663F">spends money</text>
+      <text x="79" y="64" text-anchor="middle" font-family="Karla, sans-serif" font-size="11.5" fill="#14663F">6 commands · 2 guarded</text>
+
+      <rect x="166" y="26" width="150" height="52" rx="3" fill="#FDF2F1" stroke="#B3261E" stroke-width="2"/>
+      <text x="241" y="47" text-anchor="middle" font-family="Sora, sans-serif" font-size="13" font-weight="700" fill="#B3261E">edits your files</text>
+      <text x="241" y="64" text-anchor="middle" font-family="Karla, sans-serif" font-size="11.5" fill="#B3261E">none guarded</text>
+
+      <rect x="328" y="26" width="150" height="52" rx="3" fill="#FDF2F1" stroke="#B3261E" stroke-width="2"/>
+      <text x="403" y="47" text-anchor="middle" font-family="Sora, sans-serif" font-size="13" font-weight="700" fill="#B3261E">runs anything</text>
+      <text x="403" y="64" text-anchor="middle" font-family="Karla, sans-serif" font-size="11.5" fill="#B3261E">none guarded</text>
+
+      <rect x="490" y="26" width="150" height="52" rx="3" fill="#FBF6EE" stroke="#7A4B00" stroke-width="2"/>
+      <text x="565" y="47" text-anchor="middle" font-family="Sora, sans-serif" font-size="13" font-weight="700" fill="#7A4B00">throws things away</text>
+      <text x="565" y="64" text-anchor="middle" font-family="Karla, sans-serif" font-size="11.5" fill="#7A4B00">none guarded</text>
+
+      <path d="M4 88 L154 88" fill="none" stroke="#14663F" stroke-width="2.5"/>
+      <path d="M4 84 L4 92 M154 84 L154 92" stroke="#14663F" stroke-width="2.5"/>
+      <text x="79" y="106" text-anchor="middle" font-family="Sora, sans-serif" font-size="11.5" font-weight="700" fill="#14663F">the guard reaches here</text>
+
+      <path d="M166 88 L640 88" fill="none" stroke="#B3261E" stroke-width="2.5" stroke-dasharray="7 5"/>
+      <path d="M166 84 L166 92 M640 84 L640 92" stroke="#B3261E" stroke-width="2.5"/>
+      <text x="403" y="106" text-anchor="middle" font-family="Sora, sans-serif" font-size="11.5" font-weight="700" fill="#B3261E">and stops here</text>
+
+      <text x="4" y="136" font-family="Karla, sans-serif" font-size="12" fill="#5A6157">The four safe ones — asking what version it is, and the like — need no guard and never did.</text>
+    </svg>
+    <figcaption>Sorted by what each command can do to you, not by how it is spelled.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <span class="tag t-bad">A hole I made</span>
+      <p><b>One safe-looking word lets the rest through.</b> I let a command skip the guard if any part of it looks harmless — so pairing a harmless word with a costly one gets past. That is my mistake, not a design choice, and I will fix it either way.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-bad">The worst gap</span>
+      <p><b>One command edits your working files directly, and nothing anywhere stops it.</b> Not this guard, not any other, and not in your other repo either.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-bad">The widest gap</span>
+      <p><b>One command runs whatever you hand it.</b> Everything we have built to catch bad commands can be walked around by going through that one.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-open">The quiet one</span>
+      <p><b>Some commands delete saved sessions, and we already lose a day of them every day.</b> Not urgent, but it is the kind of loss nobody notices until it is asked for.</p>
+    </div>
+  </div>
+
+  <div class="ask">
+    <p><b>What I need from you:</b> tell me how far to take it — the money ones only, or the file-and-command ones too.</p>
+  </div>
+
+</div>

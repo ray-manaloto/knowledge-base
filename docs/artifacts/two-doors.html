@@ -1,0 +1,110 @@
+<title>Two Doors</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;600&display=swap">
+<style>
+  :root{
+    --ground:#F1EEF3; --sheet:#FFFFFF; --ink:#1A1620; --muted:#5E5668;
+    --line:#CFC7D4; --rule:#E7E1EB;
+    --ours:#4C2A6B; --shut:#B3261E; --open:#A65A00;
+    --disp:"Bricolage Grotesque",system-ui,sans-serif;
+    --body:"Public Sans",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:20px 18px 26px;background:var(--ground);color:var(--ink);
+       font-family:var(--body);font-size:15px;line-height:1.4}
+  .sheet{max-width:790px;margin:0 auto;background:var(--sheet);
+         border:1px solid var(--line);padding:20px 26px 22px}
+  h1{font-family:var(--disp);font-size:26px;font-weight:700;margin:0 0 3px;
+     letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:13.5px;margin:0 0 15px}
+  figure{margin:0 0 15px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto;min-width:520px}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:5px}
+  .rows{border-top:1px solid var(--rule);margin:0 0 15px}
+  .row{display:grid;grid-template-columns:92px 1fr;gap:14px;padding:9px 0;
+       border-bottom:1px solid var(--rule);align-items:baseline}
+  .tag{font-family:var(--disp);font-size:10.5px;font-weight:600;
+       text-transform:uppercase;letter-spacing:.08em}
+  .t-ok{color:var(--ours)} .t-shut{color:var(--shut)} .t-open{color:var(--open)}
+  .row p{margin:0;font-size:14.5px}
+  .row b{font-weight:600}
+  .ask{border-left:3px solid var(--ours);background:#F6F2F9;padding:12px 16px;margin:0}
+  .ask p{margin:0;font-size:15px}
+  .ask b{font-family:var(--disp);font-weight:700}
+</style>
+
+<div class="sheet">
+
+  <h1>Two doors</h1>
+  <p class="sub">You already own the front door. The question is only ever whether a side door is still open.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 176" role="img" aria-label="An agent can reach an outside tool two ways. The front door runs through a skill, then a mise task, then python, which is where every setting lives. The side door goes straight to the tool, skipping all of it; a guard now blocks that path.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <polygon points="0,1 10,5 0,9" fill="#4C2A6B"/>
+        </marker>
+        <marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <polygon points="0,1 10,5 0,9" fill="#B3261E"/>
+        </marker>
+      </defs>
+
+      <rect x="4" y="52" width="84" height="62" rx="3" fill="#FFFFFF" stroke="#1A1620" stroke-width="1.5"/>
+      <text x="46" y="80" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-size="13.5" font-weight="700" fill="#1A1620">me, or</text>
+      <text x="46" y="96" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-size="13.5" font-weight="700" fill="#1A1620">a lane</text>
+
+      <text x="116" y="18" font-family="Bricolage Grotesque, sans-serif" font-size="12" font-weight="700" fill="#4C2A6B" letter-spacing=".06em">THE FRONT DOOR — WE BUILT IT</text>
+
+      <rect x="116" y="26" width="86" height="36" rx="3" fill="#F6F2F9" stroke="#4C2A6B" stroke-width="1.6"/>
+      <text x="159" y="49" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="12.5" font-weight="600" fill="#1A1620">a skill</text>
+
+      <rect x="222" y="26" width="96" height="36" rx="3" fill="#F6F2F9" stroke="#4C2A6B" stroke-width="1.6"/>
+      <text x="270" y="49" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="12.5" font-weight="600" fill="#1A1620">a mise task</text>
+
+      <rect x="338" y="26" width="104" height="36" rx="3" fill="#F6F2F9" stroke="#4C2A6B" stroke-width="2.2"/>
+      <text x="390" y="44" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="12.5" font-weight="600" fill="#1A1620">our python</text>
+      <text x="390" y="57" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="10.5" fill="#4C2A6B">every setting lives here</text>
+
+      <path d="M88 70 L102 70 L102 44 L114 44" fill="none" stroke="#4C2A6B" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M202 44 L220 44" fill="none" stroke="#4C2A6B" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M318 44 L336 44" fill="none" stroke="#4C2A6B" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M442 44 L470 44 L470 72 L528 72" fill="none" stroke="#4C2A6B" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <path d="M88 100 L286 100" fill="none" stroke="#B3261E" stroke-width="1.6" stroke-dasharray="6 4"/>
+      <path d="M318 100 L528 100" fill="none" stroke="#B3261E" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ax)"/>
+      <line x1="302" y1="84" x2="302" y2="116" stroke="#B3261E" stroke-width="4"/>
+      <text x="302" y="132" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-size="12" font-weight="700" fill="#B3261E">the guard</text>
+      <text x="150" y="94" font-family="Public Sans, sans-serif" font-size="11.5" fill="#B3261E">the side door — skips all of it</text>
+
+      <rect x="530" y="52" width="150" height="62" rx="3" fill="#FFFFFF" stroke="#1A1620" stroke-width="1.5"/>
+      <text x="605" y="80" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-size="13.5" font-weight="700" fill="#1A1620">the outside</text>
+      <text x="605" y="96" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-size="13.5" font-weight="700" fill="#1A1620">thing</text>
+
+      <text x="116" y="160" font-family="Public Sans, sans-serif" font-size="12" fill="#5E5668">Same shape twice — the outside thing is <tspan font-weight="600" fill="#1A1620">codex</tspan>, and it is also <tspan font-weight="600" fill="#1A1620">the graph</tspan>.</text>
+    </svg>
+    <figcaption>The front door is the chain you described. The guard exists only because the side door exists.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <span class="tag t-ok">You're right</span>
+      <p><b>We do own the front door, and it's already built.</b> One place decides how codex is called, so nothing can be wrong by leaving a setting out.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-shut">The catch</span>
+      <p><b>Owning it doesn't close the other one.</b> Anything can still type the raw command and skip the whole chain — that is exactly what happened, and the guard is the only thing that stops it.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-open">Your point</span>
+      <p><b>The graph has the same two doors — and we opened the side one ourselves.</b> Asking for the graph over a live connection was never needed; our own task already reads it straight off the disk.</p>
+    </div>
+    <div class="row">
+      <span class="tag t-open">So</span>
+      <p><b>Closing it is cheaper, not just tidier.</b> A live connection makes every session carry a description of its tools whether or not anything asks.</p>
+    </div>
+  </div>
+
+  <div class="ask">
+    <p><b>What I need from you:</b> say whether to close the graph's side door entirely — front door only — or keep it open for now.</p>
+  </div>
+
+</div>

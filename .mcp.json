@@ -4,6 +4,11 @@
       "type": "http",
       "url": "https://api.graphify.com/mcp"
     },
+    "kb": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "kb-setup", "serve"]
+    },
     "repowise": {
       "type": "http",
       "url": "https://api.repowise.dev/mcp/ray-manaloto/knowledge-base",

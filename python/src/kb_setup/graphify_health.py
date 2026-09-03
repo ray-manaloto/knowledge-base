@@ -319,10 +319,31 @@ _ROUTINE_LABEL_NARRATION = re.compile(
     r"Set an API key \(e\.g\. GOOGLE_API_KEY\) or pass --backend\.\Z"
 )
 
+#: The third alternation is the ZERO-COUNT SIBLING of the first, and approving it
+#: is safe for a reason read out of Graphify's own source rather than inferred
+#: from the wording: `sources/graphify/graphify/build.py:1969-1997` (READ
+#: 2026-09-03) branches on `(prune_set or prune_abs) and not
+#: _matched_prune_entries`. The SUSPICIOUS branch — prune entries that matched
+#: nothing, which usually means the effective root is wrong — prints
+#: `[graphify] WARNING: N prune source(s) matched no nodes or edges — nothing
+#: was removed. … (#2446)`. The benign branch below is the `else`, reached only
+#: when the prune entries DID match or there were none to begin with.
+#:
+#: So Graphify distinguishes the two cases itself, with different wording, and
+#: only the benign wording is approved here. The `WARNING:` form is NOT matched
+#: by this pattern and still fails the build closed — which is the control arm
+#: for this addition, and is asserted as a test rather than left as a claim.
+#:
+#: Found by running `mise run kb-build` 2026-09-03: the OpenSymphony extract
+#: SUCCEEDED (11,004 nodes, 34,665 edges written) and the build then failed on
+#: this one narrated line. Same class as #438 — a stderr-is-a-refusal rule
+#: breaking on the tool's own routine narration.
 _ROUTINE_MERGE_PROGRESS = re.compile(
     r"\A\[graphify\] (?:"
     r"Pruned \d+ (?:node|edge)\(s\) from(?: \d+)? deleted or excluded source file\(s\)"
     r"|Replaced \d+ node\(s\) from re-extracted source file\(s\)"
+    r"|\d+ source file\(s\) deleted or excluded since last run — no matching "
+    r"nodes or edges in graph, already clean"
     r")\.\Z"
 )
 
