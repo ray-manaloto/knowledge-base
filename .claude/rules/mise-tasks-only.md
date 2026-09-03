@@ -20,6 +20,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | `graphify cluster` / `label` | `mise run kb-label` |
 | `graphify save-result` | `mise run kb-remember -- --question Q --answer-file A.md --outcome useful` — now a `kb_setup` module, not a bare seam: it REFUSES `--outcome corrected` with no `--correction`/`--correction-file`, because that field is the only thing `reflect` renders and **21 of 32** recorded corrections reached `LESSONS.md` empty. `-- --audit` names the survivors |
 | `graphify reflect` | `mise run kb-reflect` |
+| grepping `graphify-out/memory/*.md` by hand, or scanning filenames to find a prior lesson | `mise run kb-recall -- "<question>"` (`kb_setup.recall`, knowledge-base#540) — graphify ships no `recall` verb at all, so there was nothing to redirect to before this task existed. Ranks the memory store by BM25 (reusing `kb_setup.lexical`'s math over a fresh index, not `lexical.build_index()`), `corrected` at least as high as `useful`, `--outcome`/`--since` to narrow, `--json` for a script |
 | the bundled interpreter / `_merge_docs.py` | `mise run kb-merge -- <chunk>` |
 | `graphify transcribe` | `mise run kb-transcribe -- <audio>` |
 | regenerating wiki/graphml/svg by hand | `mise run kb-artifacts` |

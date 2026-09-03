@@ -91,6 +91,8 @@ def _print_usage() -> int:
         "remember --question Q [--answer A|--answer-file F] "
         "[--outcome useful|dead_end|corrected] "
         "[--correction C|--correction-file F] [--nodes N...] | remember --audit | "
+        "recall <question> [--top N] [--outcome useful|dead_end|corrected|all] "
+        "[--since YYYY-MM-DD] [--json] [--memory-dir PATH] | "
         "goal-check <path|--text ...> | "
         "goal-outcome <pair> --result R [--turns N] [--note ...] | "
         "cc | cc-doctor | eval [--live] [--slow] | "
@@ -465,6 +467,10 @@ def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
         from kb_setup import remember
 
         return remember.main(repo_root, rest)
+    if cmd == "recall":
+        from kb_setup import recall
+
+        return recall.main(repo_root, rest)
     if cmd == "goal-check":
         from kb_setup import goal
 
