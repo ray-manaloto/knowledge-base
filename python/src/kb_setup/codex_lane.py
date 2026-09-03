@@ -47,18 +47,52 @@ from __future__ import annotations
 
 from kb_setup import check_first
 
-#: The subcommands that actually spend tokens and act on the repo. `exec` is the
-#: lane; `review` is the same engine pointed at a diff (#672 U2 is deciding
-#: whether it becomes the `kb-review` cold lane — either way it needs the flags).
-_GUARDED_SUBCOMMANDS = frozenset({"exec", "review"})
+#: The subcommands that spend the subscription, edit the tree, or route around
+#: the guard stack. Codex 0.152.1 has **28**; these are the ones where being
+#: wrong costs money, files, or the guards themselves.
+#:
+#: Ray's constraint (2026-09-03): *"we only have a chatgpt/codex subscription
+#: plan (so only cli) / we cant use or have access to anything that requires an
+#: api key"*. So this set is scoped to CLI subcommands reachable on a
+#: subscription. Guarding one we cannot run costs nothing — the guard simply
+#: never fires — while missing one we CAN run is the failure this exists to stop.
+#:
+#: - `exec` `review` `resume` `fork` `queue` `cloud` — spend the subscription and
+#:   need all four flags. `resume`/`fork` matter as much as `exec`: a resumed
+#:   lane without `--dangerously-bypass-hook-trust` runs with the guard stack
+#:   SILENTLY OFF, which is the exact defect #672 was filed for.
+#: - `apply` — literally `git apply` onto the working tree. Nothing in this repo
+#:   or in dotfiles guards destructive git today (measured 2026-09-03), so this
+#:   is the only thing standing in front of it.
+#: - `sandbox` — runs arbitrary commands, which routes around EVERY Bash guard
+#:   here (`check_first`, `graph_first`, `secret_guard`, `inplace_edit`,
+#:   `stage_explicitly`). Denied here as the immediate remedy; the general class
+#:   — a command-running wrapper defeats a command-inspecting guard — is filed
+#:   separately rather than being recorded as solved by this one line.
+_GUARDED_SUBCOMMANDS = frozenset(
+    {"exec", "review", "resume", "fork", "queue", "cloud", "apply", "sandbox"}
+)
 
-#: Introspection: never denied, and deliberately including the whole `mcp`
-#: family. `codex mcp login <name>` is the sanctioned way to authenticate a
-#: server and `codex mcp list` is how you read the Auth column — a guard that
-#: refused the procedure it protects would be worse than no guard, which is the
-#: lesson `secret_guard`'s ALLOW set already pins with half its test file.
-_INTROSPECTION = frozenset(
-    {"--version", "-V", "--help", "-h", "mcp", "login", "logout", "completion", "app-server"}
+#: A help/version FLAG exempts the segment outright — asking a guarded
+#: subcommand for its usage spends nothing.
+_HELP_FLAGS = frozenset({"--help", "-h", "--version", "-V"})
+
+#: Introspection SUBCOMMANDS: never denied. `codex mcp login <name>` is the
+#: sanctioned way to authenticate a server and `codex mcp list` is how you read
+#: the Auth column — a guard that refused the procedure it protects would be
+#: worse than no guard, the lesson `secret_guard`'s ALLOW set pins with half its
+#: test file.
+#:
+#: 🔴 `app-server` WAS IN THIS SET AND DID NOT BELONG. Its own help says *"Run
+#: the app server or related tooling"* — it starts a daemon, it does not report
+#: state. Combined with the old rule that an introspection token ANYWHERE in a
+#: segment exempted the whole segment, `codex app-server exec …` sailed past.
+#: That was a hole of my own making, found by enumerating the real subcommand
+#: list rather than by any test. Both halves are fixed: `app-server` is no
+#: longer introspection, and exemption is now decided by the SUBCOMMAND POSITION
+#: rather than by any token happening to appear.
+_INTROSPECTION_SUBCOMMANDS = frozenset(
+    {"mcp", "login", "logout", "completion", "agents", "doctor", "features", "help"}
 )
 
 _REMEDY = (
@@ -110,27 +144,33 @@ def decide(command: str) -> str | None:
         if not words or words[0] != "codex":
             continue
         rest = words[1:]
-        # An introspection token ANYWHERE in this segment exempts it, judged per
-        # segment so another command's `--help` cannot excuse the lane beside it.
-        if any(word in _INTROSPECTION for word in rest):
+        # A help/version FLAG exempts the segment: asking a guarded subcommand
+        # for its usage spends nothing. Judged per segment, so another command's
+        # `--help` cannot excuse the lane beside it.
+        if any(word in _HELP_FLAGS for word in rest):
             continue
-        # Scan EVERY token, not just the first non-flag one.
+        # Find the FIRST token that is a known subcommand, guarded or not, and
+        # let that one decide. Scanning all tokens rather than taking the first
+        # non-flag one is deliberate: `codex --cd /tmp exec "..."` reached the
+        # binary undenied under the first-non-flag rule, because `--cd`'s VALUE
+        # (`/tmp`) was read as the subcommand and `exec` was never looked at.
+        # Any value-taking flag before the subcommand did it — not an evasion
+        # technique, just how people write the command. 18 unit tests passed over
+        # that hole; driving the real CLI found it on the second probe.
         #
-        # The first-non-flag version shipped and was defeated within minutes by
-        # an ordinary invocation: `codex --cd /tmp exec "..."` reached the binary
-        # undenied, because `--cd`'s VALUE (`/tmp`) is the first non-flag token
-        # and `exec` was never looked at. Any value-taking flag before the
-        # subcommand did it — not an evasion technique, just how people write
-        # the command. 18 unit tests passed over that hole; driving the real CLI
-        # found it on the second probe.
+        # Deciding on the FIRST known subcommand rather than on "is any guarded
+        # word present" is what closes the second hole: `codex app-server exec`
+        # used to be exempted by `app-server`, and `codex mcp list` must stay
+        # allowed. First-wins gives both the right answer without a special case.
         #
-        # The residual false positive is a bare token spelled exactly `exec` or
-        # `review` that is NOT the subcommand — e.g. a directory argument of
-        # that exact name. `shlex` has already collapsed any quoted prompt into
-        # ONE token, so prose mentioning exec cannot trip it, and a path like
-        # `/path/to/exec` is a different token. That residue is accepted against
-        # a false NEGATIVE, which defeats the guard's entire purpose.
-        hit = next((word for word in rest if word in _GUARDED_SUBCOMMANDS), None)
-        if hit is not None:
+        # The residual false positive is a bare token spelled exactly like a
+        # subcommand that is NOT one — a directory argument named `exec`, say.
+        # `shlex` has already collapsed any quoted prompt into ONE token, so
+        # prose mentioning exec cannot trip it, and `/path/to/exec` is a
+        # different token. That residue is accepted against a false NEGATIVE,
+        # which defeats the guard's entire purpose.
+        known = _GUARDED_SUBCOMMANDS | _INTROSPECTION_SUBCOMMANDS
+        hit = next((word for word in rest if word in known), None)
+        if hit in _GUARDED_SUBCOMMANDS:
             return _REMEDY.format(sub=hit)
     return None

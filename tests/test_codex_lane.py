@@ -39,6 +39,21 @@ from kb_setup.result import Ok
         'codex --cd /tmp exec "x"',
         "codex --sandbox read-only exec -",
         'codex -C /some/dir review "x"',
+        # THE SECOND HOLE: `app-server` sat in the introspection set and an
+        # introspection token ANYWHERE exempted the whole segment, so pairing it
+        # with a guarded subcommand sailed past. Found by enumerating codex's
+        # real 28 subcommands, not by any test.
+        'codex app-server exec "x"',
+        # Widened set (#672 U1, Ray's CLI-only constraint): a resumed or forked
+        # lane spends the subscription AND, without the hook-trust flag, runs
+        # with this repo's guard stack silently off.
+        "codex resume --last",
+        'codex fork "x"',
+        # `apply` is literally `git apply` onto the working tree, and nothing in
+        # this repo or dotfiles guards destructive git.
+        "codex apply",
+        # `sandbox` runs arbitrary commands — a route around every Bash guard.
+        "codex sandbox rm -rf /tmp/x",
     ],
 )
 def test_a_raw_codex_lane_is_denied(command: str) -> None:
@@ -79,6 +94,12 @@ def test_the_remedy_names_every_flag_a_lane_cannot_be_right_without() -> None:
         "codex mcp list",
         "codex mcp login graphify",
         "codex logout",
+        "codex doctor",
+        "codex features",
+        "codex agents",
+        # `mcp` is the introspection subcommand and comes FIRST, so first-wins
+        # keeps it allowed even though later tokens could look guarded.
+        "codex mcp add somename",
         # The task itself shells out to codex.
         'mise run kb-codex -- "do the thing"',
         # A quoted mention can never sit at a command position — this is the
@@ -189,3 +210,43 @@ def test_the_prompt_goes_on_stdin() -> None:
 def test_ephemeral_is_never_passed() -> None:
     """A lane that persists nothing is invisible to `kb-session-search` afterwards."""
     assert "--ephemeral" not in _argv(write=True, network=True)
+
+
+# ---------------------------------------------------------------------------
+# Heredoc bodies are DATA, not command positions.
+# ---------------------------------------------------------------------------
+
+
+def test_a_heredoc_body_mentioning_a_guarded_subcommand_is_not_denied() -> None:
+    """The false positive that blocked this very change from being committed.
+
+    `git commit -F - <<'EOF' … codex resume --last … EOF` was DENIED while
+    committing the commit that added `resume` to the guarded set. The `-m "…"`
+    form is safe because the message is one quoted token; a heredoc body is not
+    quoted, so every word in it arrived as a bare token at command position.
+
+    Fixed in `check_first.strip_heredoc_bodies`, which both this guard and
+    `absent_binary` inherit — they carried the same latent hole.
+    """
+    command = (
+        "git commit -q -F - <<'EOF'\n"
+        "fix: widen the guard\n"
+        "\n"
+        "  codex resume --last     spends the subscription\n"
+        "  codex apply             writes to the tree\n"
+        "  codex sandbox echo hi   routes around every guard\n"
+        "EOF"
+    )
+    assert codex_lane.decide(command) is None
+
+
+def test_a_real_lane_after_a_heredoc_is_still_denied() -> None:
+    """Stripping the BODY must not blind the guard to what follows it.
+
+    The opening line is kept and so is everything after the closing delimiter,
+    so a genuine lane on the far side of a heredoc still reports.
+    """
+    command = "cat <<'EOF' > /tmp/p.md\nsome prompt text\nEOF\ncodex exec -"
+    reason = codex_lane.decide(command)
+    assert reason is not None
+    assert "mise run kb-codex" in reason

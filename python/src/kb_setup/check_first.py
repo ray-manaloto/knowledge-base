@@ -122,6 +122,52 @@ _HAND_GATE_FALLBACK = re.compile(
 )
 
 
+#: A heredoc opener: `<<EOF`, `<<-EOF`, `<<'EOF'`, `<<"EOF"`. Captures the
+#: delimiter word so the body can be cut at its closing line.
+_HEREDOC_OPEN = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?")
+
+
+def strip_heredoc_bodies(command: str) -> str:
+    """Remove heredoc BODIES, keeping the command line that opened them.
+
+    A heredoc body is stdin DATA, never a command position — but `shlex` has no
+    idea, so every word in it arrives as a bare token. That is a false positive
+    waiting for any guard that looks for a command word.
+
+    It did not wait: `git commit -F - <<'EOF' … codex resume --last … EOF` was
+    DENIED by `codex_lane` while committing the very change that added `resume`
+    to its guarded set. The `-m "…"` form is safe because the message is one
+    quoted token; a heredoc body is not quoted, which is exactly the difference
+    `segments`' own docstring relies on and did not extend this far.
+
+    `check_first` and `absent_binary` share this tokeniser, so both carried the
+    same latent hole — a heredoc mentioning `ruff check` or `nproc` would have
+    tripped them identically. Fixed here rather than in one caller so it is
+    fixed once.
+
+    Cuts from the opener's line-end to the closing delimiter line, keeping the
+    opening line itself (it holds the real command) and everything after the
+    body. An unterminated heredoc drops the remainder, which is correct: there
+    is no command after it, only data.
+    """
+    match = _HEREDOC_OPEN.search(command)
+    if match is None:
+        return command
+    lines = command.splitlines()
+    out: list[str] = []
+    delimiter: str | None = None
+    for line in lines:
+        if delimiter is not None:
+            if line.strip() == delimiter:
+                delimiter = None
+            continue
+        out.append(line)
+        opener = _HEREDOC_OPEN.search(line)
+        if opener is not None:
+            delimiter = opener.group(1)
+    return "\n".join(out)
+
+
 def segments(command: str) -> list[list[str]] | None:
     """Tokenise the command and split it at shell operators, None if unparsable.
 
@@ -142,7 +188,7 @@ def segments(command: str) -> list[list[str]] | None:
     and hands `_segment_is_a_gate` its second line as a command. (Round 2
     finding 1; the round-1 fix introduced it.)
     """
-    lexer = shlex.shlex(command, posix=True, punctuation_chars="();<>|&\n")
+    lexer = shlex.shlex(strip_heredoc_bodies(command), posix=True, punctuation_chars="();<>|&\n")
     lexer.whitespace = " \t\r"
     lexer.whitespace_split = True
     try:
