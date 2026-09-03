@@ -1,0 +1,47 @@
+# Arms for the P3 round on the cold review of `217b3537`.
+#
+# Only one thing here needs arming, and it is a claim I made rather than code I
+# wrote: I retargeted `test_same_version_written_differently_is_not_a_bump` from
+# the deleted `is_patch_bump_from` onto `__gt__`, and asserted in its docstring
+# that this PRESERVES the regression guard rather than dropping it with the dead
+# method. If the retargeted test cannot catch the original padding defect, that
+# docstring is a confident false claim sitting exactly where the next reader will
+# believe it — the shape `kb-review` 4a names as the worst kind of fix comment.
+#
+# A1 reintroduces the REAL historical defect, verbatim from the deleted method's
+# own docstring: comparing raw tuples so that `(1, 2, 0) > (1, 2)` reads as an
+# upgrade when `1.2` and `1.2.0` are the same version.
+#
+# A2 arms the direction that now depends on `__gt__` in production: `_gate_readable`
+# refuses a BACKWARDS move, and it has no other way to know a move is backwards.
+#
+# WHAT THIS DOES NOT SHOW: that removing `is_patch_bump_from` was safe. No
+# mutation can demonstrate the absence of a caller — that rests on a grep of this
+# repo and of the sibling `dotfiles` repo that consumes this package, control-armed
+# (a grep for `currency` there returns 3 files, so the probe discriminates).
+
+suites = ["tests/test_currency_decide.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/currency/upstream.py"
+old = '''        width = max(len(self.parts), len(other.parts))'''
+new = '''        width = max(len(self.parts), len(other.parts))  # control'''
+
+# ── A1: the padding must survive, or `1.2.0` > `1.2` returns True again ────
+[[arm]]
+id = "A1"
+test = "test_same_version_written_differently_is_not_a_bump"
+file = "python/src/kb_setup/currency/upstream.py"
+old = '''        return self._padded(width) > other._padded(width)'''
+new = '''        return self.parts > other.parts'''
+
+# ── A2: and `_gate_readable`'s backwards refusal rests on the same operator ─
+[[arm]]
+id = "A2"
+test = "test_a_downgrade_still_stops"
+file = "python/src/kb_setup/currency/upstream.py"
+old = '''        return self._padded(width) > other._padded(width)'''
+new = '''        return False'''

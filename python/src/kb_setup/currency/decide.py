@@ -245,7 +245,12 @@ def _gate_tag(upstream: UpstreamStatus, latest: str) -> Ambiguity | None:
         return None
     # Name the source that actually supplied the version. Saying "PyPI has X" about
     # a GitHub-only tool describes a lookup that never happened — the same
-    # mislabelling the `GATES[1]` comment records. (Cold lane, round 2.)
+    # mislabelling `GATE_RELEASE`'s own comment records. (Cold lane, round 2.)
+    #
+    # That citation read `GATES[1]` until a cold lane caught it here on
+    # 217b3537 — a stale index left behind by the very commit that replaced the
+    # indices with names *because* an index can slide. The docstring said a name
+    # cannot slide and the comment beside it still pointed at a number.
     where = "PyPI" if upstream.source == "pypi" else "upstream"
     return Ambiguity(
         gate=GATE_RELEASE,

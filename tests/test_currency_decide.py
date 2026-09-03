@@ -166,13 +166,19 @@ def _v(raw: str) -> Version:
     return parsed
 
 
-def test_patch_bump_detection_both_directions() -> None:
+def test_version_ordering_both_directions() -> None:
+    """What replaced `test_patch_bump_detection_both_directions` on 2026-09-03.
+
+    That test asserted `is_patch_bump_from`, which went with the patch-level gate
+    — its only caller. `__gt__` is the half that survives, and it is the one
+    `_gate_readable` uses to refuse a BACKWARDS move, so it is what needs a test.
+    """
     base = _v("0.9.25")
-    assert _v("0.9.26").is_patch_bump_from(base)
-    assert not _v("0.10.0").is_patch_bump_from(base)
-    assert not _v("1.0.0").is_patch_bump_from(base)
-    # A downgrade is not a bump.
-    assert not _v("0.9.24").is_patch_bump_from(base)
+    assert _v("0.9.26") > base
+    assert _v("0.10.0") > base
+    assert _v("1.0.0") > base
+    # The direction that still stops an unattended bump.
+    assert not _v("0.9.24") > base
 
 
 def test_version_parse_rejects_non_numeric() -> None:
@@ -210,14 +216,20 @@ def test_a_real_release_body_with_no_markers_still_auto_applies() -> None:
 def test_same_version_written_differently_is_not_a_bump() -> None:
     """`1.2` and `1.2.0` are the SAME version — bumping to it is a no-op.
 
-    The raw-tuple comparison `(1, 2, 0) > (1, 2)` used to call this a patch bump,
-    so the two comparison paths disagreed and an unattended no-op upgrade could
-    be authorized. `is_patch_bump_from` now delegates to `__gt__`.
+    The raw-tuple comparison `(1, 2, 0) > (1, 2)` used to call this an upgrade,
+    so two comparison paths disagreed and an unattended no-op could be authorized.
+    `__gt__` pads the shorter version, which is what makes them equal.
+
+    RETARGETED from `is_patch_bump_from` to `__gt__` on 2026-09-03, deliberately
+    rather than deleted with the method: the regression it guards belongs to the
+    padding in `__gt__`, which survives and which `_gate_readable` now depends on
+    to refuse a backwards move. Deleting this test with its old subject would
+    have dropped a live guard along with dead code.
     """
-    assert not _v("1.2.0").is_patch_bump_from(_v("1.2"))
-    assert not _v("1.2").is_patch_bump_from(_v("1.2.0"))
-    # Control arm: a genuine patch bump is still recognised.
-    assert _v("1.2.1").is_patch_bump_from(_v("1.2"))
+    assert not _v("1.2.0") > _v("1.2")
+    assert not _v("1.2") > _v("1.2.0")
+    # Control arm: a genuine forward move is still recognised.
+    assert _v("1.2.1") > _v("1.2")
 
 
 def test_json_null_release_body_does_not_defeat_the_empty_notes_gate() -> None:
