@@ -64,11 +64,12 @@ Two hard mandates (Ray, 2026-07-22, machine-enforced):
    / `_merge_docs.py` / graphify-bundled-python call and prints the task to use. See
    `.claude/skills/kb-curator` for the full workflow.
 2. **Corpus LLM work runs on `claude-cli` or `openai-cli`, chosen by an EXPLICIT
-   `--backend`** (Ray, 2026-08-25); a key-detected backend is forbidden. A global
-   `GEMINI_API_KEY` (a mise secret) exists, so it is a *forbidden* key: `kb_setup.graphify_env.clean_env()`
-   strips every key trigger (Gemini/Google/OpenAI/Kimi/DeepSeek/Azure/**Bedrock via
-   `AWS_REGION`**/Ollama) from every graphify subprocess. The two CLI backends are
-   explicit-only by graphify's own `detect_backend()`, not by the cleaner.
+   `--backend`** (Ray, 2026-08-25); every NON-ANTHROPIC key-detected backend is
+   forbidden — `ANTHROPIC_API_KEY` is a deliberate, test-locked exception
+   (`do-not.md` #4; open question #685/#686). A global `GEMINI_API_KEY` (a mise
+   secret) exists, so it is *forbidden*: `clean_env()` strips every non-Claude
+   key trigger (Gemini/Google/OpenAI/Kimi/DeepSeek/Azure/**Bedrock via
+   `AWS_REGION`**/Ollama). Both CLI backends are explicit-only by `detect_backend()`.
 
 Concretely:
 
@@ -78,8 +79,7 @@ Concretely:
 - **Prose (docs/URLs/blogs)**: `mise run kb-add -- <url>` fetches to `./raw`; semantic
   extraction is the **Claude host agent** (a Workflow fan-out of `general-purpose`
   subagents that read each raw file → `{nodes,edges}` → one combined chunk in
-  `sources/extractions/`), then `mise run kb-merge -- <chunk>`. Key-detected
-  backends (Gemini/OpenAI-key/Ollama/…) are stripped.
+  `sources/extractions/`), then `mise run kb-merge -- <chunk>`.
 - **Video**: `mise run kb-add -- <yt-url>` then `mise run kb-transcribe -- raw/<yt>.m4a` (local faster-whisper — no key, no LLM), then host-agent extract the transcript.
 - **Label** after every merge: `mise run kb-label` — deterministic hub labels (no LLM, Gemini-free); LLM-named communities via claude-cli remain untested (#2076).
 
