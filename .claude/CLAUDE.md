@@ -66,7 +66,7 @@ note: `codex@openai-codex`, `mcp2cli@claude-community`, `eli5@claude-community`,
 and the count next to it has now drifted stale four times** ("Nine" until
 2026-08-23 → stale by three → bolded as 12 → stale by six → 18, stale by one on 2026-08-27), each time by being
 quoted instead of measured. `.claude/settings.json` currently declares
-**19** plugins `true` in `enabledPlugins` — re-derive, never quote:
+**21** plugins `true` in `enabledPlugins` — re-derive, never quote:
 `jq '.enabledPlugins | to_entries | map(select(.value)) | length' .claude/settings.json`. That is not the same as how many actually run:
 `.claude/settings.local.json` overrides two of the 19 back to `false`
 (`claude-md-management@claude-plugins-official`, `mise@brentmitchell25`), so the

@@ -22,32 +22,41 @@ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"
 default_subagent_model = "gpt-5.6-sol"
 default_subagent_reasoning_effort = "high"
 
-# graphify's OWN published Codex setup (app.graphify.com/<workspace>/mcp,
-# "Codex" tab) is these three lines, so `auth` is written out to match it.
+# graphify now points at THIS REPO'S LOCAL GRAPH, not the hosted service (#668,
+# Ray's ruling 2026-09-03: "swap it — local only").
 #
-# `auth` IS NOT WHAT WAS BROKEN, and saying so here would be worse than saying
-# nothing: `oauth` is the documented DEFAULT for `mcp_servers.<id>.auth`
-# (config-reference/index.md:504-509 — "`oauth` (default) uses stored MCP OAuth
-# credentials when available"), so this line is explicitness, not a repair. It
-# changes no behaviour.
+# What the swap fixes, measured 2026-09-03 and re-derived rather than quoted:
+# the hosted service held 13,126 nodes for this repo (`mcp__graphify__graph_stats`)
+# while `graphify-out/graph.json` holds 359,026 — so every ingested source, which
+# is the entire point of this project, was reachable by NO client. The hosted
+# index is this repo's own files and nothing else: 3.7% of the corpus.
 #
-# What was actually broken was the SIGN-IN, and nothing in any config file could
-# have fixed it. Codex is the one client that does not authenticate on first use
-# — graphify's page says so outright — so `codex mcp login graphify` has to be
-# run once, by hand, per server. It never had been, which is the whole of the
-# AuthRequired error every codex launch reported. The url was correct throughout.
+# ONE server, deliberately. Registering both would leave two servers advertising
+# the same tool names, and whichever the model asks first wins — a wrong pick
+# then looks like a correct answer from a graph that simply lacks the source.
+# The cost accepted with that: graphify lookups across the other 14 repos in the
+# hosted workspace are no longer reachable from inside this project.
 #
-# Run 2026-08-31 for graphify, exa and context7; all three read Auth=OAuth
-# afterwards. That state lives in `codex mcp list`, not here — ask it rather
-# than trusting this comment, which cannot know what has changed since.
+# The NAME is kept as `graphify` on purpose, so every existing `mcp__graphify__*`
+# reference in skills and docs stays valid. It is the same graphify MCP server —
+# only the graph behind it changed.
 #
-# Auth is an OAuth handshake, so no key is stored here or anywhere.
+# `uv run kb-setup serve` is what `mise run kb-serve` runs (mise.toml:1061). It
+# is registered DIRECTLY rather than through mise because the task depends on
+# `raw = true` to connect stdio: without it mise reads the task's stdio by LINE,
+# the server hits EOF on its first read and exits rc=0 with empty stderr —
+# serving nothing, silently, on the path every rule points consumers at
+# (2026-08-02). Invoking the underlying command removes that dependency entirely.
 #
-# Project scope is graphify's own recommendation, not a local workaround:
-# "Scope it to one repo with .codex/config.toml".
+# Proven live, not assumed: `tests/test_mcp_serve.py` speaks real JSON-RPC
+# against the REAL `graphify-out/graph.json` and skips loudly if that file is
+# absent ("it is NOT a pass"). 14 passed 2026-09-03.
+#
+# No auth line: a stdio server on this machine has nothing to authenticate to.
+# `codex mcp login graphify` is no longer needed and no longer applies.
 [mcp_servers.graphify]
-url = "https://api.graphify.com/mcp"
-auth = "oauth"
+command = "uv"
+args = ["run", "kb-setup", "serve"]
 
 # `update_plan` became OPT-IN in codex 0.152.0 (PR #41744, "Make the update_plan
 # tool opt-in", merged 2026-08-31T00:55:03Z — verified via `gh api`, before the
