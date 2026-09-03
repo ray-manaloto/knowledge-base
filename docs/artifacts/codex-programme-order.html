@@ -1,0 +1,135 @@
+<title>Fix Codex Before Asking It</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  :root{
+    --ground:#FBFBF9;
+    --card:#FFFFFF;
+    --ink:#1A1A17;
+    --muted:#63625C;
+    --rule:#E2E1DB;
+    --go:#2E3A8C;
+    --go-bg:#E8EAF6;
+    --stop:#A33A2E;
+    --stop-bg:#F7EAE7;
+    --display:"Sora","Helvetica Neue",Arial,sans-serif;
+    --body:"Newsreader",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:17px;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{max-width:680px;margin:0 auto;padding:42px 24px 38px;display:flex;flex-direction:column;gap:24px;}
+
+  header{display:flex;flex-direction:column;gap:7px;}
+  h1{
+    font-family:var(--display);font-weight:700;font-size:36px;line-height:1.04;
+    letter-spacing:-0.025em;margin:0;text-wrap:balance;
+  }
+  .standfirst{font-size:17px;color:var(--muted);margin:0;text-wrap:balance;}
+
+  /* the blocker leads: it is why the order changed */
+  .blocker{
+    background:var(--stop-bg);
+    border-left:3px solid var(--stop);
+    border-radius:0 3px 3px 0;
+    padding:13px 16px;
+    display:flex;flex-direction:column;gap:5px;
+  }
+  .blocker .lead{
+    font-family:var(--display);font-weight:600;font-size:13px;
+    letter-spacing:0.08em;text-transform:uppercase;color:var(--stop);
+  }
+  .blocker p{margin:0;font-size:16px;}
+  .v{font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums;}
+
+  /* the ordered chain — numbering is real here: each step needs the one before */
+  ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px;}
+  li{
+    display:grid;grid-template-columns:34px 1fr;gap:14px;
+    background:var(--card);border:1px solid var(--rule);
+    padding:14px 16px;
+  }
+  li:first-child{border-radius:4px 4px 0 0;}
+  li:last-child{border-radius:0 0 4px 4px;}
+  li + li{border-top:none;}
+  .n{
+    font-family:var(--display);font-weight:700;font-size:15px;
+    color:var(--go);background:var(--go-bg);
+    border-radius:3px;height:26px;width:26px;
+    display:flex;align-items:center;justify-content:center;
+    font-variant-numeric:tabular-nums;
+  }
+  .step{display:flex;flex-direction:column;gap:3px;}
+  .step .what{font-family:var(--display);font-weight:600;font-size:16px;letter-spacing:-0.01em;}
+  .step .why{font-size:15.5px;color:var(--muted);}
+
+  .ask{border-top:2px solid var(--ink);padding-top:15px;display:flex;flex-direction:column;gap:8px;}
+  .ask .lead{font-family:var(--display);font-weight:600;font-size:19px;margin:0;letter-spacing:-0.012em;}
+  .ask p{margin:0;font-size:16px;color:var(--muted);}
+
+  @media (max-width:520px){
+    h1{font-size:29px;}
+    li{grid-template-columns:1fr;gap:8px;}
+  }
+</style>
+
+<div class="page">
+
+  <header>
+    <h1>Fix Codex Before Asking It</h1>
+    <p class="standfirst">You called it: we were designing against a copy of the tool we don&rsquo;t run.</p>
+  </header>
+
+  <div class="blocker">
+    <span class="lead">Why the order changed</span>
+    <p>Our local copy of the codex source sits at <span class="v">0.152.0</span>.
+    The version we say we use is <span class="v">0.152.1</span>. The one that exists is
+    <span class="v">0.153.0</span>. Every fact we gathered today came from the oldest of the three.</p>
+  </div>
+
+  <ol>
+    <li>
+      <span class="n">1</span>
+      <span class="step">
+        <span class="what">Get the real thing</span>
+        <span class="why">Upgrade, and make the local copy match. An old spare part is sitting in front of the new one &mdash; that has to go first or nothing else takes.</span>
+      </span>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <span class="step">
+        <span class="what">Read it properly</span>
+        <span class="why">Feed the real source and its handbook into the knowledge graph, then let it reflect and draw what it found. Free for the code; we pay only for the prose.</span>
+      </span>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <span class="step">
+        <span class="what">Then ask the questions</span>
+        <span class="why">How to configure it, how to review with it, how its helpers fit &mdash; answered from the graph instead of from guesswork.</span>
+      </span>
+    </li>
+    <li>
+      <span class="n">4</span>
+      <span class="step">
+        <span class="what">Cheap first, careful last</span>
+        <span class="why">The wide searching runs on the cheap setting. Only the thinking-together and the double-check run on the expensive one.</span>
+      </span>
+    </li>
+  </ol>
+
+  <div class="ask">
+    <p class="lead">&rarr; Say go, and I start at step 1.</p>
+    <p>One thing I can&rsquo;t promise yet: step 1 is blocked by a gate that is right to block it,
+    and clearing it means removing a stale copy from your machine. I&rsquo;ll show you what
+    before I touch anything.</p>
+  </div>
+
+</div>
