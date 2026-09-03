@@ -229,7 +229,7 @@ gh = "2.98.0"
 # `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
-"npm:@openai/codex" = "0.152.0"
+"npm:@openai/codex" = "0.152.1"
 antigravity-cli = "1.1.23"
 "npm:ctx7" = { version = "0.5.9", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.3"
@@ -1057,6 +1057,26 @@ run = "uv run kb-setup manifest-audit"
 # Offline tier 1 is milliseconds; tier 2 hashes and scans whatever clones
 # happen to be present. Nowhere near the outer 1800s `gates._GATE_TIMEOUT`.
 timeout = "120s"
+
+[tasks.kb-codex]
+description = "Run a codex lane with this repo's mandatory flags (#672 U1)"
+# The ONE place that owns the codex flags, so a lane cannot be wrong by
+# OMISSION — which is exactly how `--dangerously-bypass-hook-trust` was missing
+# from every invocation until Ray pointed it out. `kb_setup.codex_lane` denies a
+# raw `codex exec` at the PreToolUse hook and prints this task, because the
+# warning-only form of this rule scored 0 compliance in 19 chances here while
+# the deny that replaced its sibling took violations 62 -> 0.
+#
+# `raw` is required for the same reason `kb-serve` needs it: the lane reads its
+# prompt from stdin (`-`), and without `raw` mise reads the task's stdio by line
+# instead of connecting it.
+#
+# Running through mise is not incidental — it is how the lane gets the PINNED
+# codex. Measured 2026-09-03 on this machine: `mise exec -- codex` resolved
+# 0.152.1 while a bare `codex` on the same PATH resolved 0.152.0.
+raw = true
+run = "uv run kb-setup codex"
+timeout = "1800s"
 
 [tasks.kb-serve]
 description = "Start the read-only MCP server pinned to THIS graph (stdio)"
