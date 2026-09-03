@@ -1,0 +1,125 @@
+<title>The Stale Codex Path</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#EEF1F2; --panel:#FFFFFF; --ink:#141B1D; --muted:#5A686C;
+    --rule:#C9D2D4; --accent:#0E6E63; --warn:#9A4A16; --dim:#8A979A;
+    --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --cond:"IBM Plex Sans Condensed","IBM Plex Sans",-apple-system,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink); font-family:var(--sans);
+    margin:0; padding:34px 22px 40px; line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  .panel{max-width:760px; margin:0 auto; background:var(--panel);
+    border:1px solid var(--rule); padding:30px 32px 26px;}
+  .eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.13em;
+    text-transform:uppercase; color:var(--dim); margin:0 0 10px;}
+  h1{font-family:var(--cond); font-weight:700; font-size:33px; line-height:1.1;
+    margin:0 0 6px; text-wrap:balance; letter-spacing:-.01em;}
+  .sub{color:var(--muted); font-size:15px; margin:0 0 24px; max-width:56ch;}
+
+  .facts{display:flex; flex-direction:column; gap:0; margin:0 0 26px;
+    border-top:1px solid var(--rule);}
+  .fact{display:grid; grid-template-columns:126px 1fr; gap:18px;
+    padding:11px 0; border-bottom:1px solid var(--rule); align-items:baseline;}
+  .fact dt{font-family:var(--mono); font-size:11px; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--dim); margin:0;}
+  .fact dd{margin:0; font-size:15.5px;}
+  .num{font-family:var(--mono); font-weight:600; font-variant-numeric:tabular-nums;}
+  .bad{color:var(--warn); font-weight:600;}
+  .good{color:var(--accent); font-weight:600;}
+
+  h2{font-family:var(--cond); font-size:13px; letter-spacing:.11em;
+    text-transform:uppercase; color:var(--dim); font-weight:600;
+    margin:0 0 12px;}
+  .opts{display:flex; flex-direction:column; gap:10px; margin:0 0 26px;}
+  .opt{display:grid; grid-template-columns:20px 1fr; gap:16px;
+    padding:13px 16px 13px 0; background:#F7F9F9; border:1px solid var(--rule);}
+  .opt .stripe{align-self:stretch; width:5px; margin-left:15px;}
+  .s-now{background:var(--accent)}
+  .s-next{background:#7F9BA0}
+  .s-out{background:var(--warn)}
+  .opt h3{font-family:var(--sans); font-size:16px; font-weight:600;
+    margin:0 0 3px; letter-spacing:-.005em;}
+  .opt p{margin:0; font-size:14px; color:var(--muted);}
+  .tag{font-family:var(--mono); font-size:10.5px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--dim); margin-left:8px;
+    font-weight:400; white-space:nowrap;}
+
+  .ask{border-top:2px solid var(--ink); padding-top:15px;
+    font-size:16px; display:flex; gap:12px; align-items:flex-start;}
+  .ask .arrow{font-family:var(--mono); color:var(--accent); font-weight:600;}
+  .ask strong{font-weight:600;}
+  .corr{margin:16px 0 0; font-size:13px; color:var(--muted); line-height:1.4;}
+  .corr span{font-family:var(--mono); font-size:10.5px; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--warn); font-weight:600; margin-right:7px;}
+</style>
+
+<div class="panel">
+  <p class="eyebrow">Phase U · step 0</p>
+  <h1>Two answers to “which codex are we running?”</h1>
+  <p class="sub">Both are true right now, on this machine, in this session. That
+  disagreement is what is holding up the codex upgrade.</p>
+
+  <dl class="facts">
+    <div class="fact">
+      <dt>Typing it</dt>
+      <dd><span class="num bad">0.152.0</span> — an old copy sitting early in the search path</dd>
+    </div>
+    <div class="fact">
+      <dt>Through mise</dt>
+      <dd><span class="num good">0.152.1</span> — the version we actually pinned</dd>
+    </div>
+    <div class="fact">
+      <dt>The snag</dt>
+      <dd>Our version checker only asks the first question, sees a mismatch,
+        and refuses the upgrade to 0.153.0</dd>
+    </div>
+    <div class="fact">
+      <dt>So</dt>
+      <dd>Nothing is broken with the pin. The <em>measurement</em> is one-sided.</dd>
+    </div>
+  </dl>
+
+  <h2>Three pieces of work, and you pick how far</h2>
+  <div class="opts">
+    <div class="opt">
+      <div class="stripe s-now"></div>
+      <div>
+        <h3>A · Teach the checker to ask both questions<span class="tag">in the repo</span></h3>
+        <p>Keep the current check, add “what does mise pick” and “what does that actually run”.
+          This is the piece that unblocks the upgrade.</p>
+      </div>
+    </div>
+    <div class="opt">
+      <div class="stripe s-next"></div>
+      <div>
+        <h3>B · Make the codex plumbing take the tool as an argument<span class="tag">in the repo</span></h3>
+        <p>Today it is spelled “codex” all the way down. Turn each tool into a row of
+          data — its name, its risky commands, its required flags — so antigravity and
+          Claude are two rows, not two more copies of everything.</p>
+      </div>
+    </div>
+    <div class="opt">
+      <div class="stripe s-out"></div>
+      <div>
+        <h3>C · Clear out the old copies<span class="tag">outside the repo</span></h3>
+        <p>Sixteen versions of codex are installed on this Mac; we run one.
+          An old one is what won the search path in the first place.</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="ask">
+    <span class="arrow">→</span>
+    <span><strong>Pick A, A+B, or all three.</strong> I would start with A —
+    it is the only one that unblocks the upgrade, and it is the smallest.</span>
+  </p>
+
+  <p class="corr"><span>Corrected</span> B first read “add a task per tool.”
+  Ray: one parameterised path, tools passed in as arguments. Rewritten above.</p>
+</div>

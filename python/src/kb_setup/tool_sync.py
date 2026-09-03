@@ -297,17 +297,25 @@ def _lock_converged(repo_root: Path, spec: ToolSpec, pinned: str) -> None:
 
 
 def _observed(repo_root: Path, spec: ToolSpec) -> str:
+    """The version `mise exec` actually runs, read through the currency engine.
+
+    The parse used to live here as a third copy of the same two rules. It now
+    delegates to `sync._parse_version`, so this reading, `sync.observed_version`
+    and `sync.project_version` cannot disagree about what a `version_pattern`
+    means — one implementation, three call sites (advisor verdict, Q3).
+
+    The SUBPROCESS deliberately stays here rather than calling
+    `sync.project_version`: `_checked` is this module's refusal contract — it
+    raises `ToolSyncError` so a failed probe rolls the transaction back — while
+    the currency engine's contract is the opposite, degrade to a status string.
+    Folding them would force one of the two to grow a second failure mode.
+    """
     proc = _checked(
         "version probe",
         ["mise", "exec", "--", spec.binary, *spec.version_args],
         repo_root,
     )
-    text = proc.stdout.strip()
-    if spec.version_pattern:
-        match = re.search(spec.version_pattern, text)
-        return match.group(1).lstrip("v") if match else ""
-    fields = text.split()
-    return fields[-1].lstrip("v") if fields else ""
+    return sync.parse_version(proc.stdout.strip(), spec.version_pattern)
 
 
 def _same_version(left: str, right: str) -> bool:

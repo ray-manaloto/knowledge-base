@@ -1,0 +1,91 @@
+# Mutation arms for the three-fact resolution probe (Phase U step 0, piece 1).
+#
+# The fix is the least-reviewed code in the diff, and this repo has now measured
+# that four times: four cold passes, four defects found INSIDE a fix. So the
+# probe and its deep/shallow gating are armed before anything else sees them.
+#
+# What each arm is actually about:
+#
+# A1 is the one that matters. `deep=False` must be STRUCTURALLY unable to reach a
+# subprocess, because that is the SessionStart hook's contract (offline, ~10ms,
+# silent when clean). The realistic break is not exotic — it is someone
+# simplifying the condition, or "fixing" what looks like a redundant guard. If
+# that lands, every session pays two mise spawns per tool and nothing says so,
+# because the output is identical when the tool is in sync.
+#
+# A2 arms the OVER-CORRECTION in the same place: gating it away entirely would
+# also satisfy A1 while deleting the feature. The pair is what pins the condition
+# rather than its direction.
+#
+# A3/A4 are the check's own two failure directions. A3: BLIND must not be
+# rendered as DRIFT — an unreachable mise has found nothing, and asserting a
+# disagreement nobody observed is exactly the false-green/false-red confusion the
+# three-state model exists to prevent. A4: a runtime that disagrees with the pin
+# must actually go DRIFT, or the check can only ever say yes.
+#
+# A5 arms the shared parser. Three readings (`observed_version`,
+# `project_version`, `tool_sync._observed`) now delegate to one implementation;
+# the reason that is worth doing is that a `version_pattern` which misses must
+# return "" rather than falling back to the last field, which would hide a stale
+# pattern behind a plausible-looking number.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN. These arms speak about the TESTS, never
+# about the premise. In particular they say nothing about whether keeping the
+# ambient `resolution` DRIFT blocking is the right call — that is a judgment
+# recorded in the module docstring, and no mutation can settle it. They also do
+# not cover `project_path`'s parsing of a non-install-dir path, which is
+# exercised only through the OK branch's detail string.
+
+suites = ["tests/test_currency_sync.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    runtime, error = project_version(repo_root, spec)'''
+new = '''    runtime, error = project_version(repo_root, spec)  # control'''
+
+# ── A1: the shallow path must not be able to spawn mise ────────────────────
+# The realistic break: the `deep` guard is dropped as redundant.
+[[arm]]
+id = "A1"
+test = "test_shallow_check_sync_cannot_reach_a_subprocess"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''        if deep and spec.mise_key and not spec.python_package'''
+new = '''        if spec.mise_key and not spec.python_package'''
+
+# ── A2: ...and the deep path must still get the row ────────────────────────
+# The over-correction. Gating the row off entirely also passes A1.
+[[arm]]
+id = "A2"
+test = "test_deep_check_sync_adds_the_project_resolution_row"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''        if deep and spec.mise_key and not spec.python_package'''
+new = '''        if False and deep and spec.mise_key and not spec.python_package'''
+
+# ── A3: an unreachable mise is BLIND, never DRIFT ──────────────────────────
+[[arm]]
+id = "A3"
+test = "test_project_resolution_is_blind_not_drift_when_mise_cannot_answer"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''            "project-resolution", BLIND, f"`mise exec` could not read a version: {error}"'''
+new = '''            "project-resolution", DRIFT, f"`mise exec` could not read a version: {error}"'''
+
+# ── A4: a runtime that is not the pin must go DRIFT ────────────────────────
+# The realistic break is the comparison inverting or being weakened to a truthy
+# check, which is how a half-finished bump would start reading as complete.
+[[arm]]
+id = "A4"
+test = "test_project_resolution_drifts_when_mise_runs_a_version_that_is_not_the_pin"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    if runtime != pinned:'''
+new = '''    if False:'''
+
+# ── A5: a pattern that misses returns "", never the last-field fallback ────
+[[arm]]
+id = "A5"
+test = "test_parse_version_prefers_the_pattern_and_falls_back_to_the_last_field"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''        return match.group(1).lstrip("v") if match else ""'''
+new = '''        return match.group(1).lstrip("v") if match else text.split()[-1]'''

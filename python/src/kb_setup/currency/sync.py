@@ -268,6 +268,118 @@ def _is_mise_shim(resolved: Path) -> bool:
     return any(resolved.is_relative_to(root) for root in _mise_shim_dirs())
 
 
+# ------------------------------------------- the project's own resolution ----
+#
+# `resolve_from_path` above answers ONE question — *what would a bare call in
+# this process reach?* — and that question is worth keeping: it is precisely the
+# probe that detects a stale activated PATH, and replacing it with a mise-only
+# reading would make the engine blind to the exact skew it was built to catch.
+#
+# But it is not the only question, and reporting its answer alone conflates two
+# different worlds. Measured on this host 2026-09-03, control-armed against the
+# pin in `mise.toml`:
+#
+#     bare `codex --version`            -> 0.152.0   (a stale install dir, PATH #18)
+#     `mise which codex`                -> .../0.152.1/bin/codex
+#     `mise exec -- codex --version`    -> 0.152.1   (the pin, correctly installed)
+#
+# One `resolution` DRIFT was the whole story, so gate 6 ("step 1 currently
+# green") blocked a bump over a session's PATH rather than over anything wrong
+# with the tool. The root cause is `activate_aggressive = true` in the USER mise
+# config, which pushes tools' bin-paths to the front of PATH — a file this repo
+# is forbidden to edit (`do-not.md` #11).
+#
+# So the deep check asks all three, and reports them as SEPARATE facts. What it
+# deliberately does NOT do is silence the ambient finding: an agent in this shell
+# can still reach the stale binary, so that mismatch stays real. What changes is
+# that a reader (and gate 6) can now tell "your shell is stale" from "the pinned
+# version is not installed", which are the same colour today and are not the same
+# problem.
+#
+# `deep=False` is structurally incapable of reaching either probe: `check_sync`
+# does not build the finding at all in shallow mode, so the SessionStart hook's
+# contract (offline, subprocess-free, ~10ms) is preserved by construction rather
+# than by a flag someone must remember to honour.
+
+#: Bound on one mise subprocess. `mise which` is Rust and returns in
+#: milliseconds; the ceiling exists so an unreachable mise degrades to a BLIND
+#: finding rather than hanging the deep run.
+_MISE_PROBE_TIMEOUT = 30.0
+
+
+def parse_version(text: str, pattern: str = "") -> str:
+    """Pull a version out of a tool's `--version` output.
+
+    Extracted so the three readings in this codebase cannot drift apart: this
+    one, `observed_version` (the ambient binary) and `tool_sync._observed` (the
+    mise-routed binary) previously each carried their own copy of the same two
+    rules. A pattern that does not match returns `""` — rendered by every caller
+    as "could not read", never as agreement, because silently falling back to the
+    last-field heuristic would hide a stale pattern behind a plausible number.
+    """
+    if pattern:
+        match = re.search(pattern, text)
+        return match.group(1).lstrip("v") if match else ""
+    parts = text.split()
+    return parts[-1].lstrip("v") if parts else ""
+
+
+def project_path(repo_root: Path, binary: str) -> tuple[str, str]:
+    """What THIS PROJECT's mise config selects for `binary`, as (version, how).
+
+    `mise which` run with `cwd=repo_root`, so the answer is the one this repo's
+    `mise.toml` produces regardless of what the calling shell baked in. Returns
+    `("", "unresolved:<reason>")` when mise cannot answer — never a guess, and
+    never the pin, which would be the caller's own assumption read back to it.
+    """
+    proc, error = _proc.run_capture(
+        ["mise", "which", binary], cwd=repo_root, timeout=_MISE_PROBE_TIMEOUT
+    )
+    if proc is None:
+        return "", f"unresolved:{error}"
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout).strip().splitlines()
+        return "", f"unresolved:{detail[0] if detail else f'exit {proc.returncode}'}"
+    found = proc.stdout.strip()
+    if not found:
+        return "", "unresolved:mise which printed nothing"
+    parts = Path(found).absolute().parts
+    if "installs" in parts:
+        # rindex for the same reason `resolve_from_path` uses it: an earlier
+        # directory called `installs` would otherwise supply the "version".
+        idx = len(parts) - 1 - parts[::-1].index("installs")
+        if len(parts) > idx + 2:
+            return parts[idx + 2], "install-dir"
+    # Selected, but the path carries no version segment — a real answer about
+    # WHICH file, and no answer at all about which version. `project_version`
+    # is the one that settles that.
+    return "", f"unversioned:{found}"
+
+
+def project_version(repo_root: Path, spec: ToolSpec) -> tuple[str, str]:
+    """The version that ACTUALLY RUNS through this project's mise, as (version, error).
+
+    `mise exec -- <binary> <version_args>` with `cwd=repo_root`. This is the only
+    reading that survives a self-updating CLI: `agy` has been observed reporting a
+    newer version than the install directory it sits in (`mise.toml:228`), so a
+    path is evidence about selection and never about bytes.
+
+    Authoritative and therefore expensive — one process spawn plus the tool's own
+    startup — which is why it is reachable only from the deep path.
+    """
+    proc, error = _proc.run_capture(
+        ["mise", "exec", "--", spec.binary, *spec.version_args],
+        cwd=repo_root,
+        timeout=_MISE_PROBE_TIMEOUT,
+    )
+    if proc is None:
+        return "", error
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout).strip().splitlines()
+        return "", detail[0] if detail else f"exit {proc.returncode}"
+    return parse_version((proc.stdout or proc.stderr).strip(), spec.version_pattern), ""
+
+
 def observed_version(
     binary: str,
     pattern: str = "",
@@ -302,16 +414,10 @@ def observed_version(
         return ""
     if res.returncode != 0:
         return ""
-    text = (res.stdout or res.stderr).strip()
-    if pattern:
-        match = re.search(pattern, text)
-        # A pattern that does not match returns "" — the caller renders that as
-        # "could not read", never as agreement. Silently falling back to the
-        # last-field heuristic here would hide a stale pattern behind a
-        # plausible-looking version.
-        return match.group(1).lstrip("v") if match else ""
-    parts = text.split()
-    return parts[-1].lstrip("v") if parts else ""
+    # `parse_version` holds the two rules — pattern first, last-field fallback,
+    # and "" for a pattern that misses. Shared so this reading and the two
+    # mise-routed ones cannot drift apart.
+    return parse_version((res.stdout or res.stderr).strip(), pattern)
 
 
 # -------------------------------------------------------------- the stamp ----
@@ -879,6 +985,56 @@ def _check_resolution(repo_root: Path, spec: ToolSpec, pinned: str) -> tuple[Fin
             resolved,
         )
     return Finding("resolution", OK, f"PATH reaches the pinned {resolved}"), resolved
+
+
+def _check_project_resolution(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
+    """Deep-only: does THIS PROJECT's mise reach the pin, whatever the shell reaches?
+
+    The companion to `_check_resolution`, never its replacement. That one asks
+    what a bare call reaches; this one asks what `mise which` selects and what
+    `mise exec` actually runs. Both answers are kept because the pair is what
+    separates "this shell's PATH is stale" from "the pinned version is not
+    installed" — indistinguishable while only the first was asked, and the reason
+    gate 6 blocked the codex bump over a session rather than over a tool.
+
+    The RUNTIME reading decides the status, not the path. A path proves selection;
+    only execution proves bytes, and `agy` is the standing counter-example — an
+    older install directory reporting a newer version because the tool updated
+    itself in place (`mise.toml:228`).
+
+    BLIND, not DRIFT, when mise cannot answer: a probe that never ran has found
+    nothing, and this module keeps that distinct everywhere else. Gate 6 already
+    refuses to auto-apply while any finding is BLIND, so the fail-closed direction
+    is preserved without this function asserting a disagreement it did not see.
+    """
+    runtime, error = project_version(repo_root, spec)
+    selected, how = project_path(repo_root, spec.binary)
+    if error:
+        return Finding(
+            "project-resolution", BLIND, f"`mise exec` could not read a version: {error}"
+        )
+    if not runtime:
+        return Finding(
+            "project-resolution",
+            BLIND,
+            "`mise exec` ran but no version could be parsed from its output"
+            + (f" (version_pattern={spec.version_pattern!r})" if spec.version_pattern else ""),
+        )
+    if runtime != pinned:
+        return Finding(
+            "project-resolution",
+            DRIFT,
+            f"mise runs {runtime} but the pin is {pinned} — the pinned version is not "
+            f"what this project reaches, so this is the tool, not the shell",
+        )
+    # Agrees. Say so in the terms the reader needs, because this OK is what makes
+    # a `resolution` DRIFT beside it legible rather than alarming.
+    where = f"; `mise which` selects {selected}" if selected else f"; `mise which` -> {how}"
+    return Finding(
+        "project-resolution",
+        OK,
+        f"`mise exec` runs the pinned {runtime}{where}",
+    )
 
 
 def _check_python_resolution(
@@ -1882,6 +2038,17 @@ def check_sync(repo_root: Path, spec: ToolSpec, *, deep: bool = False) -> SyncSt
         if spec.python_package
         else f"mise.toml pins {spec.mise_key} at {pinned}"
     )
+    # Deep-only, and ABSENT rather than SKIP in shallow mode. Omitting the row is
+    # what makes `deep=False` structurally unable to reach a subprocess: there is
+    # no branch a future edit can accidentally take, and the hook's output does
+    # not gain a line that is silent-when-clean in name only. A python-packaged
+    # tool is excluded too — `_check_python_resolution` already reads the locked
+    # `.venv` executable, which is the project's resolution for that family.
+    project: tuple[Finding, ...] = (
+        (_check_project_resolution(repo_root, spec, pinned),)
+        if deep and spec.mise_key and not spec.python_package
+        else ()
+    )
     return SyncStatus(
         tool=spec.name,
         pinned=pinned,
@@ -1889,6 +2056,7 @@ def check_sync(repo_root: Path, spec: ToolSpec, *, deep: bool = False) -> SyncSt
         findings=(
             Finding("pin", OK, pin_owner),
             resolution,
+            *project,
             _check_extras(spec, declared_extras),
             _check_extra_probes(repo_root, spec, deep=deep),
             _check_backend_probes(spec),
