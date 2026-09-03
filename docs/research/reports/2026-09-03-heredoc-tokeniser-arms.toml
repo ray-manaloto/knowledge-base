@@ -1,0 +1,134 @@
+# Revert arms for the heredoc-tokeniser fix (§0b).
+#
+# Each row REVERTS one property of the fix to the behaviour that shipped before
+# it, and the row's named test must go RED. A fix whose own test still passes
+# without it is decoration (`probes-need-a-control-arm.md` rule 2).
+#
+# THIS SUITE IS ALL-NEW, WHICH IS EXACTLY WHY IT NEEDS ARMING. Every test in
+# `tests/test_heredoc_tokeniser.py` was written alongside the fix, by the person
+# who wrote the fix, in the same sitting. That is the shape `kb-review` §4a calls
+# the least-reviewed code in the diff, and a mutation sweep over PRODUCTION code
+# is structurally blind to a test that asserts nothing. Reverting is the only
+# cheap probe for it.
+#
+# THE MUTATIONS ARE THE REAL OLD CODE, not convenient no-ops. `absent-quote-state`
+# and `narrow-delimiter` between them reconstruct the two halves of the regex
+# that shipped — `<<-?\s*['"]?(\w+)['"]?` — so a survivor here would mean the
+# suite cannot see the defect it was written for.
+
+suites = [
+  "tests/test_heredoc_tokeniser.py",
+  "tests/test_check_first.py",
+  "tests/test_codex_lane.py",
+  "tests/test_absent_binary.py",
+]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/check_first.py"
+old = '''_DELIMITER_STOP = frozenset(" \t;&|<>()'\"")'''
+new = '''_DELIMITER_STOP = frozenset(" \t;&|<>()'\"")  # inert control edit'''
+
+# --- defect 2: the opener matched inside quotes ------------------------------
+
+# Deleting the branch that OPENS a quote is the realistic break: it is one line,
+# it is the line a refactor would drop, and it restores the regex's exact
+# blindness — `<<` becomes a redirection everywhere, including inside a string.
+[[arm]]
+id = "absent-quote-state"
+test = "test_a_quoted_redirection_operator_opens_no_heredoc"
+file = "python/src/kb_setup/check_first.py"
+old = '''        if ch in "'\"":
+            quote = ch
+            i += 1
+            continue'''
+new = '''        if False:
+            i += 1
+            continue'''
+
+# The quote state must SURVIVE a newline. Resetting it per line is the shape a
+# regex forces and the shape a careless loop reintroduces.
+[[arm]]
+id = "quote-not-carried-across-lines"
+test = "test_a_quote_left_open_carries_to_the_next_line"
+file = "python/src/kb_setup/check_first.py"
+old = "        delimiter, quote = _scan_line(line, quote)"
+new = "        delimiter, _carried = _scan_line(line, quote)"
+
+# --- defect 1: `\w+` truncated the delimiter ---------------------------------
+
+# Adding `-` and `.` to the stop set reproduces `\w+`'s truncation for an
+# UNQUOTED delimiter exactly.
+[[arm]]
+id = "narrow-delimiter"
+test = "test_a_command_after_an_awkward_delimiter_is_still_seen"
+file = "python/src/kb_setup/check_first.py"
+old = '''_DELIMITER_STOP = frozenset(" \t;&|<>()'\"")'''
+new = '''_DELIMITER_STOP = frozenset(" \t;&|<>()'\"-.+")'''
+
+# The QUOTED path bypasses `_DELIMITER_STOP` entirely, so the arm above cannot
+# reach it — a separate mutation is required, or `<<'END-MSG'` would be covered
+# by nothing. This is the "prove the mutant differs AT THE LINE" check from
+# `probes-need-a-control-arm.md`: two arms because there are two code paths, not
+# because two look thorough.
+[[arm]]
+id = "quoted-delimiter-truncated"
+test = "test_a_command_after_an_awkward_delimiter_is_still_seen"
+file = "python/src/kb_setup/check_first.py"
+old = "        return None if end == -1 else (line[i + 1 : end] or None)"
+new = '''        import re as _re
+
+        _m = _re.match(r"\w+", line[i + 1 : end])
+        return None if end == -1 or _m is None else _m.group(0)'''
+
+# --- `<<<` is a herestring, not a heredoc ------------------------------------
+
+# THIS ARM REPLACES ONE THAT SURVIVED, and the survivor is the finding.
+#
+# The first version mutated an explicit `if line.startswith("<<<", i): i += 3`
+# branch in `_scan_line` to `if False:`. It SURVIVED — no test failed — because
+# the branch was INERT: `<` is in `_DELIMITER_STOP`, so `_read_delimiter` already
+# stopped on the third `<`, returned None, and the unreadable-delimiter path
+# resumed scanning to the same result. Two mechanisms, one behaviour.
+#
+# A survivor is not a coverage gap until the mutant is shown to differ AT THE
+# LINE (`probes-need-a-control-arm.md`), and this one could not: the branch was
+# dead code carrying a comment that claimed it was load-bearing — the exact
+# "comment defending the choice" shape `kb-review` §4a names. The branch was
+# deleted and the invariant documented on `_DELIMITER_STOP` instead. This arm
+# now mutates the mechanism that actually runs.
+[[arm]]
+id = "herestring-via-delimiter-stop"
+test = "test_a_herestring_consumes_nothing"
+file = "python/src/kb_setup/check_first.py"
+old = '''_DELIMITER_STOP = frozenset(" \t;&|<>()'\"")'''
+new = '''_DELIMITER_STOP = frozenset(" \t;&|()'\"")'''
+
+# --- the NEGATIVE direction: bodies must still be stripped -------------------
+
+# Without this arm the suite could be satisfied by deleting `strip_heredoc_bodies`
+# outright — every "the guard still sees X" test would pass and the function's
+# whole purpose would be gone. This mutation makes the stripper a no-op and the
+# body tests must go red.
+[[arm]]
+id = "bodies-not-stripped"
+test = "test_a_body_under_an_awkward_delimiter_is_still_hidden"
+file = "python/src/kb_setup/check_first.py"
+old = '''    if "<<" not in command:
+        return command'''
+new = '''    return command
+    if "<<" not in command:
+        return command'''
+
+# An unreadable delimiter must not swallow the remainder. Returning early here
+# restores the third route to the same blinding failure.
+[[arm]]
+id = "unreadable-delimiter-swallows-rest"
+test = "test_an_unreadable_delimiter_does_not_swallow_the_rest"
+file = "python/src/kb_setup/check_first.py"
+old = '''            # An unreadable delimiter opens no body we can close. Keep scanning
+            # rather than swallowing the rest of the command.
+            i = j
+            continue'''
+new = '''            return "UNREADABLE-DELIMITER-NEVER-MATCHED", quote'''
