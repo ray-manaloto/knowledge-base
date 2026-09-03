@@ -1,20 +1,31 @@
-# Revert arms for the heredoc-tokeniser fix (§0b).
+# Revert arms for the heredoc-tokeniser fix (§0b), through two review rounds.
 #
-# Each row REVERTS one property of the fix to the behaviour that shipped before
-# it, and the row's named test must go RED. A fix whose own test still passes
-# without it is decoration (`probes-need-a-control-arm.md` rule 2).
+# Each row REVERTS one property of the fix and the row's named test must go RED.
+# A fix whose own test still passes without it is decoration
+# (`probes-need-a-control-arm.md` rule 2).
 #
-# THIS SUITE IS ALL-NEW, WHICH IS EXACTLY WHY IT NEEDS ARMING. Every test in
+# THIS SUITE IS ALL-NEW, WHICH IS WHY IT NEEDS ARMING. Every test in
 # `tests/test_heredoc_tokeniser.py` was written alongside the fix, by the person
-# who wrote the fix, in the same sitting. That is the shape `kb-review` §4a calls
-# the least-reviewed code in the diff, and a mutation sweep over PRODUCTION code
-# is structurally blind to a test that asserts nothing. Reverting is the only
-# cheap probe for it.
+# who wrote the fix. That is the shape `kb-review` §4a calls the least-reviewed
+# code in the diff, and a mutation sweep over PRODUCTION code is structurally
+# blind to a test that asserts nothing. Reverting is the only cheap probe for it.
 #
-# THE MUTATIONS ARE THE REAL OLD CODE, not convenient no-ops. `absent-quote-state`
-# and `narrow-delimiter` between them reconstruct the two halves of the regex
-# that shipped — `<<-?\s*['"]?(\w+)['"]?` — so a survivor here would mean the
-# suite cannot see the defect it was written for.
+# WHAT THIS SPEC HAS ALREADY CAUGHT, none of it reachable by reading:
+#
+#   - an explicit `<<<` branch that was INERT (`<` was already in
+#     `_DELIMITER_STOP`), carrying a comment claiming it was load-bearing;
+#   - a test that COULD NOT FAIL, because it used a `ruff` gate and
+#     `check_first`'s `_HAND_GATE_FALLBACK` matches raw text without consulting
+#     the tokeniser at all;
+#   - `<<$VAR` genuinely uncovered;
+#   - three round-1 anchors silently moved by a refactor, caught by `--dry-run`.
+#
+# TWO ARMS WERE REVERSED IN ROUND 2, and that is the most useful entry here. They
+# defended REFUSALS — of a trailing backslash, and of a `$` in a delimiter — that
+# read as the safe choice and were wrong. Refusing a delimiter that is REAL
+# leaves its body exposed, and a body is attacker-shaped text: one containing
+# `<<NEVER` blinds the guard by the other route. Both were settled by running the
+# shape in real bash, which is the only thing that could have settled them.
 
 suites = [
   "tests/test_heredoc_tokeniser.py",
@@ -32,9 +43,8 @@ new = '''_DELIMITER_STOP = frozenset(" \t;&|<>()'\"")  # inert control edit'''
 
 # --- defect 2: the opener matched inside quotes ------------------------------
 
-# Deleting the branch that OPENS a quote is the realistic break: it is one line,
-# it is the line a refactor would drop, and it restores the regex's exact
-# blindness — `<<` becomes a redirection everywhere, including inside a string.
+# Deleting the branch that OPENS a quote restores the regex's exact blindness:
+# `<<` becomes a redirection everywhere, including inside a string.
 [[arm]]
 id = "absent-quote-state"
 test = "test_a_quoted_redirection_operator_opens_no_heredoc"
@@ -47,8 +57,8 @@ new = '''        if False:
             i += 1
             continue'''
 
-# The quote state must SURVIVE a newline. Resetting it per line is the shape a
-# regex forces and the shape a careless loop reintroduces.
+# Quote state must SURVIVE a newline. Resetting per line is the shape a regex
+# forces and the shape a careless loop reintroduces.
 [[arm]]
 id = "quote-not-carried-across-lines"
 test = "test_a_quote_left_open_carries_to_the_next_line"
@@ -56,9 +66,9 @@ file = "python/src/kb_setup/check_first.py"
 old = "        pending = _scan_line(line, stack)"
 new = "        pending = _scan_line(line, [None])"
 
-# --- defect 1: `\w+` truncated the delimiter ---------------------------------
+# --- defect 1: the delimiter capture stopped at the first non-word character --
 
-# Adding `-` and `.` to the stop set reproduces `\w+`'s truncation for an
+# Adding `-` and `.` to the stop set reproduces the old `\w+` truncation for an
 # UNQUOTED delimiter exactly.
 [[arm]]
 id = "narrow-delimiter"
@@ -68,36 +78,19 @@ old = '''_DELIMITER_STOP = frozenset(" \t;&|<>()'\"")'''
 new = '''_DELIMITER_STOP = frozenset(" \t;&|<>()'\"-.+")'''
 
 # The QUOTED path bypasses `_DELIMITER_STOP` entirely, so the arm above cannot
-# reach it — a separate mutation is required, or `<<'END-MSG'` would be covered
-# by nothing. This is the "prove the mutant differs AT THE LINE" check from
-# `probes-need-a-control-arm.md`: two arms because there are two code paths, not
-# because two look thorough.
+# reach it. Two arms because there are two code paths, not because two look
+# thorough.
 [[arm]]
 id = "quoted-delimiter-truncated"
 test = "test_a_command_after_an_awkward_delimiter_is_still_seen"
 file = "python/src/kb_setup/check_first.py"
-old = "        return None if end == -1 else (line[i + 1 : end] or None)"
+old = "        return (line[i + 1 : end] or None), end + 1"
 new = '''        import re as _re
 
         _m = _re.match(r"\w+", line[i + 1 : end])
-        return None if end == -1 or _m is None else _m.group(0)'''
+        return (None if _m is None else _m.group(0)), end + 1'''
 
-# --- `<<<` is a herestring, not a heredoc ------------------------------------
-
-# THIS ARM REPLACES ONE THAT SURVIVED, and the survivor is the finding.
-#
-# The first version mutated an explicit `if line.startswith("<<<", i): i += 3`
-# branch in `_scan_line` to `if False:`. It SURVIVED — no test failed — because
-# the branch was INERT: `<` is in `_DELIMITER_STOP`, so `_read_delimiter` already
-# stopped on the third `<`, returned None, and the unreadable-delimiter path
-# resumed scanning to the same result. Two mechanisms, one behaviour.
-#
-# A survivor is not a coverage gap until the mutant is shown to differ AT THE
-# LINE (`probes-need-a-control-arm.md`), and this one could not: the branch was
-# dead code carrying a comment that claimed it was load-bearing — the exact
-# "comment defending the choice" shape `kb-review` §4a names. The branch was
-# deleted and the invariant documented on `_DELIMITER_STOP` instead. This arm
-# now mutates the mechanism that actually runs.
+# `<<<` is a herestring; `<` being in `_DELIMITER_STOP` is what makes it safe.
 [[arm]]
 id = "herestring-via-delimiter-stop"
 test = "test_a_herestring_consumes_nothing"
@@ -107,10 +100,9 @@ new = '''_DELIMITER_STOP = frozenset(" \t;&|()'\"")'''
 
 # --- the NEGATIVE direction: bodies must still be stripped -------------------
 
-# Without this arm the suite could be satisfied by deleting `strip_heredoc_bodies`
-# outright — every "the guard still sees X" test would pass and the function's
-# whole purpose would be gone. This mutation makes the stripper a no-op and the
-# body tests must go red.
+# Without this the suite could be satisfied by deleting `strip_heredoc_bodies`
+# outright: every "the guard still sees X" test would pass and the function's
+# whole purpose would be gone.
 [[arm]]
 id = "bodies-not-stripped"
 test = "test_a_body_under_an_awkward_delimiter_is_still_hidden"
@@ -121,33 +113,22 @@ new = '''    return command
     if "<<" not in command:
         return command'''
 
-# An unreadable delimiter must not swallow the remainder. Returning early here
-# restores the third route to the same blinding failure.
+# An unreadable delimiter must not swallow the remainder.
 [[arm]]
 id = "unreadable-delimiter-swallows-rest"
 test = "test_an_unreadable_delimiter_does_not_swallow_the_rest"
 file = "python/src/kb_setup/check_first.py"
-old = '''    if delimiter is None:
-        return j'''
-new = '''    if delimiter is None:
-        found.append("UNREADABLE-DELIMITER-NEVER-MATCHED")
-        return j'''
+old = '''    if delimiter is not None:
+        found.append(delimiter)'''
+new = '''    found.append(delimiter or "UNREADABLE-DELIMITER-NEVER-MATCHED")'''
 
-# ============================================================================
-# ROUND 2 — the four P1s the cold lane found in the first version of this fix.
-# ============================================================================
-#
-# Two were REGRESSIONS against the regex being replaced: the OLD code denied
-# `cat <<$'END-MSG' … END-MSG` and `cat <<\` + `EOF`, and the new scanner did
-# not. Measured by reconstructing the old stripper and running both.
-#
-# All four blind the guard. None was reachable by reading the scanner; every one
-# came from a lane instructed to CONSTRUCT the shell shape and run it through
-# `check_hook_call`.
+# --- round 1's four P1s ------------------------------------------------------
 
-# `$'…'` is ANSI-C quoting: the `$` is syntax, not delimiter. Stepping over it is
-# one line, and without it `_read_delimiter` returns `$` — a delimiter no closing
-# line can equal.
+# ANSI-C quoting IS applied to a delimiter word (checked against bash). Without
+# the step-over the delimiter is misread and the BODY is not stripped — which is
+# why the arm's test is a BODY case. Its first version used a "guard still sees
+# the following command" case and SURVIVED as an inert mutant, because the
+# guard stayed un-blinded either way.
 [[arm]]
 id = "ansi-c-quoting-not-stepped-over"
 test = "test_the_whole_guard_chain_sees_past_a_heredoc"
@@ -157,30 +138,17 @@ old = '''    if line[i] == "$" and i + 1 < n and line[i + 1] in "'\"":
 new = '''    if False:
         i += 1'''
 
-# A trailing backslash CONTINUES the line. Recording `\` as the delimiter is the
-# regression; refusing it is the fix.
+# ROUND 2 REVERSED THIS ONE. It used to mutate a REFUSAL of the trailing
+# backslash; refusing was itself the defect, because bash JOINS the continued
+# line and the heredoc is real. The arm now removes the JOIN.
 [[arm]]
-id = "trailing-backslash-taken-as-delimiter"
+id = "continuation-not-joined"
 test = "test_the_whole_guard_chain_sees_past_a_heredoc"
 file = "python/src/kb_setup/check_first.py"
-old = '''            if i + 1 >= n:
-                return None  # continuation, not a delimiter'''
-new = '''            if i + 1 >= n:
-                out.append(line[i])
-                break'''
+old = "        while _is_continued(line) and i + 1 < total:"
+new = "        while False and i + 1 < total:"
 
-# `$VAR` as a delimiter is resolvable only by bash. Accepting it invents one.
-[[arm]]
-id = "expansion-accepted-as-delimiter"
-test = "test_the_whole_guard_chain_sees_past_a_heredoc"
-file = "python/src/kb_setup/check_first.py"
-old = '''    if not delimiter or "$" in delimiter:
-        return None'''
-new = '''    if not delimiter:
-        return None'''
-
-# `$(` inside double quotes opens a FRESH quoting context. Without the push, the
-# inner `"` reads as closing the outer string and a quoted `<<EOF` becomes real.
+# `$(` inside double quotes opens a FRESH quoting context.
 [[arm]]
 id = "command-substitution-not-nested"
 test = "test_the_whole_guard_chain_sees_past_a_heredoc"
@@ -198,3 +166,29 @@ test = "test_the_whole_guard_chain_sees_past_a_heredoc"
 file = "python/src/kb_setup/check_first.py"
 old = "        pending = _scan_line(line, stack)"
 new = "        pending = _scan_line(line, stack)[:1]"
+
+# --- round 2's four findings, against round 1's own fixes --------------------
+#
+# NO ARM for the deleted `$`-in-delimiter refusal. Bash performs no expansion on
+# a delimiter word, so the refusal was defending a bug; an arm for deleted code
+# would be decoration. The neighbouring genuinely load-bearing case is the
+# ANSI-C step-over, armed above.
+
+# `<<'A'` is a 3-character token yielding a 1-character delimiter. Resuming at
+# `start + len(delimiter)` lands ON the closing quote, opening quote state there
+# and hiding every later opener on the line.
+[[arm]]
+id = "resume-uses-delimiter-length-not-token-end"
+test = "test_the_whole_guard_chain_sees_past_a_heredoc"
+file = "python/src/kb_setup/check_first.py"
+old = "    return max(end, j)"
+new = "    return j + (len(delimiter) if delimiter else 0)"
+
+# Popping on the first `)` ends the substitution frame early when an ordinary
+# subshell is nested inside it, restoring the outer quote context.
+[[arm]]
+id = "nested-parens-not-counted"
+test = "test_the_whole_guard_chain_sees_past_a_heredoc"
+file = "python/src/kb_setup/check_first.py"
+old = '''        if ch == "(":'''
+new = '''        if line.startswith("$(", i):'''

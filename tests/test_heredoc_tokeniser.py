@@ -315,9 +315,49 @@ HOOK_CASES: list[tuple[str, str, bool]] = [
         "cat <<\\\nEOF\nbody\nEOF\ncodex exec -",
         True,
     ),
-    # `<<$VAR` is a delimiter only bash can resolve, so `_read_delimiter` refuses
-    # it. Nothing covered that until an arm removed the refusal and survived.
-    ("expansion-delimiter-then-lane", "cat <<$VAR\nbody\nEOF\ncodex exec -", True),
+    # `<<$VAR` — THIS CASE ASSERTED THE WRONG ANSWER UNTIL ROUND 2, and the fix
+    # was to learn what bash does rather than to guess. **Bash performs NO
+    # expansion on a heredoc delimiter word**: `<<$VAR` closes on a LITERAL
+    # `$VAR`. Verified by running it — the `EOF` line printed as body output and
+    # the `$VAR` line terminated the heredoc.
+    #
+    # So `codex exec -` on the line after `EOF` is still INSIDE the body, and
+    # denying it would be a false report. The original expectation (True) came
+    # from a refusal that treated `$` as unresolvable; the refusal was removed
+    # and the expectation corrected with it.
+    ("expansion-delimiter-body-is-not-closed-by-eof", "cat <<$VAR\nbody\nEOF\ncodex exec -", False),
+    ("expansion-delimiter-closes-on-literal", "cat <<$VAR\nbody\n$VAR\ncodex exec -", True),
+    # A backslash-continued opener is a REAL heredoc whose delimiter sits on the
+    # next line, so its body must be stripped like any other. Refusing the
+    # delimiter left the body exposed — the same blinding by the other route,
+    # since a body may contain `<<NEVER`.
+    ("backslash-continuation-body-stays-hidden", "cat <<\\\nEOF\ncodex exec -\nEOF", False),
+    (
+        "backslash-continuation-body-with-fake-opener",
+        "cat <<\\\nEOF\n<<NEVER\nEOF\ncodex exec -",
+        True,
+    ),
+    # `$(` nested inside an ordinary subshell: popping on the FIRST `)` ended the
+    # substitution frame early and restored the outer quote context, so a quoted
+    # `<<EOF` read as a real opener.
+    (
+        "nested-subshell-inside-substitution",
+        'x="$( (printf x); printf "%s" "<<EOF")"\ncodex exec -',
+        True,
+    ),
+    # A quoted FIRST delimiter is a 3-character token yielding a 1-character
+    # delimiter. Resuming at `start + len(delimiter)` landed on the closing
+    # quote, opened quote state there, and hid the second opener entirely.
+    (
+        "quoted-first-delimiter-second-still-queued",
+        "cat <<'A' <<B\nbodyA\nA\nbodyB\nB\ncodex exec -",
+        True,
+    ),
+    (
+        "quoted-first-delimiter-both-bodies-hidden",
+        "cat <<'A' <<B\ncodex exec -\nA\ncodex exec -\nB",
+        False,
+    ),
     (
         "nested-command-substitution-then-gate",
         'x="$(printf "%s" "<<EOF")"\nuv run ruff check foo.py',

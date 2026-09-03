@@ -139,55 +139,71 @@ _HAND_GATE_FALLBACK = re.compile(
 _DELIMITER_STOP = frozenset(" \t;&|<>()'\"")
 
 
-def _read_delimiter(line: str, i: int) -> str | None:
+def _read_delimiter(line: str, i: int) -> tuple[str | None, int]:
     r"""Read the heredoc delimiter starting at ``i``, or ``None`` to refuse one.
 
     Quoted (`<<'END-MSG'`, `<<"END-MSG"`, and the ANSI-C / locale forms
     `<<$'END-MSG'` and `<<$"END-MSG"`) reads to the closing quote; unquoted reads
     to the first character that cannot be part of a word.
 
-    **REFUSING IS THE SAFE ANSWER, and every refusal below is deliberate.** A
-    delimiter this function invents is one no later line can match, so the
-    heredoc never closes and every command after it is discarded as body — the
-    guard goes silent. Returning ``None`` instead makes `_scan_line` keep
-    scanning, which at worst reads a body line as code and reports a command
-    that was only ever text. A false report is answerable; a silent guard is not.
+    Returns ``(delimiter, index just past the delimiter TOKEN)``. The second
+    element is the position in the SOURCE, not ``start + len(delimiter)``:
+    `<<'A'` yields a one-character delimiter from a three-character token, and
+    resuming inside it left the scanner on the closing quote — which then opened
+    quote state and hid the `<<B` in `cat <<'A' <<B`.
 
-    Three refusals, all found by a cold lane running the shapes rather than
-    reading them, and two of them REGRESSIONS this function introduced against
-    the regex it replaced:
+    **REFUSING IS NOT AUTOMATICALLY THE SAFE ANSWER, and two refusals that read
+    that way were WRONG.** The first version of this function refused a trailing
+    backslash and any delimiter containing `$`, reasoning that an invented
+    delimiter never closes and silences the guard. True, but refusing a delimiter
+    that IS real leaves its body exposed instead — and a body is attacker-shaped
+    text: one containing `<<NEVER` opens a heredoc nothing closes, blinding the
+    guard by the other route, while one containing `codex exec -` produces a
+    false denial. Both refusals were removed after checking real bash:
 
-    - a trailing backslash CONTINUES the line, so the delimiter is not on it.
-      `cat <<\\` + `EOF` recorded `\\` and swallowed the rest.
-    - `$` outside the `$'…'` / `$"…"` forms means expansion, whose result we
-      cannot know. `<<$VAR` is a delimiter only bash can resolve.
-    - an unterminated quote has no closing quote to read to.
+    - `cat <<\\` + `EOF` — bash JOINS the continued line and the delimiter is
+      `EOF`. Handled in :func:`strip_heredoc_bodies` by joining first.
+    - `<<$VAR` — **bash performs NO expansion on the delimiter word**; it closes
+      on a literal `$VAR`. Verified by running it: the `EOF` line printed as
+      body and the `$VAR` line terminated the heredoc. So `$` is an ordinary
+      delimiter character.
+
+    One refusal remains and is genuinely a refusal: an unterminated quote has no
+    closing quote to read to, so there is no delimiter to have.
     """
     n = len(line)
     if i >= n:
-        return None
-    # `$'…'` (ANSI-C) and `$"…"` (locale): the `$` is quoting syntax, not part
-    # of the delimiter. Stepping over it is what makes `<<$'END-MSG'` close.
+        return None, i
+    # `$'…'` (ANSI-C) and `$"…"` (locale) quoting IS applied to the delimiter
+    # word — checked against bash, where `<<$'END-MSG'` closes on `END-MSG`. The
+    # `$` is quoting syntax here, unlike the `$VAR` case above.
     if line[i] == "$" and i + 1 < n and line[i + 1] in "'\"":
         i += 1
     if line[i] in "'\"":
         quote = line[i]
         end = line.find(quote, i + 1)
-        return None if end == -1 else (line[i + 1 : end] or None)
+        if end == -1:
+            return None, n
+        return (line[i + 1 : end] or None), end + 1
     out: list[str] = []
     while i < n and line[i] not in _DELIMITER_STOP:
-        if line[i] == "\\":
-            if i + 1 >= n:
-                return None  # continuation, not a delimiter
+        if line[i] == "\\" and i + 1 < n:
             out.append(line[i + 1])
             i += 2
             continue
         out.append(line[i])
         i += 1
-    delimiter = "".join(out)
-    if not delimiter or "$" in delimiter:
-        return None
-    return delimiter
+    return ("".join(out) or None), i
+
+
+def _is_continued(line: str) -> bool:
+    r"""Whether ``line``'s newline is escaped, so the command continues below.
+
+    An ODD number of trailing backslashes escapes the newline; an even number is
+    escaped backslashes followed by a real line end. `printf 'a\\\\'` ends the
+    command, `cat <<\\` does not.
+    """
+    return (len(line) - len(line.rstrip("\\"))) % 2 == 1
 
 
 def _delimiter_start(line: str, i: int) -> int:
@@ -262,9 +278,16 @@ def _scan_line(line: str, stack: list[str | None]) -> list[str]:
         if ch == "\\":
             i += 2
             continue
-        if line.startswith("$(", i):
+        if ch == "(":
+            # EVERY unquoted `(` pushes, not just the one in `$(`. An ordinary
+            # nested subshell closes with a `)` too, and popping the
+            # substitution frame on the FIRST `)` ended the frame early: in
+            # `x="$( (printf x); printf "%s" "<<EOF")"` the inner `)` restored
+            # the outer double quote's context, the quoted `<<EOF` read as a
+            # real opener, and the guard went blind. Counting depth is what
+            # makes the pairing right.
             stack.append(None)
-            i += 2
+            i += 1
             continue
         if ch == ")" and len(stack) > 1:
             stack.pop()
@@ -287,16 +310,20 @@ def _consume_opener(line: str, i: int, found: list[str]) -> int:
     Split out of :func:`_scan_line` to keep that loop under the complexity limit
     once multiple openers per line had to be queued.
 
-    Resumes AFTER the operator either way. An unreadable delimiter (see
-    :func:`_read_delimiter`'s refusals) opens no body we can close, so scanning
-    continues rather than swallowing the rest of the command.
+    Resumes past the delimiter TOKEN, which is what `_read_delimiter` returns —
+    not past the delimiter's own length. `<<'A'` yields `A` from three source
+    characters, and `j + len("A")` left the scanner sitting on the closing
+    quote: it opened quote state there and never saw the `<<B` in
+    `cat <<'A' <<B`, so B's legitimate body was retained and falsely denied.
+
+    An unreadable delimiter opens no body we can close, so scanning continues
+    from the same place rather than swallowing the rest of the command.
     """
     j = _delimiter_start(line, i)
-    delimiter = _read_delimiter(line, j)
-    if delimiter is None:
-        return j
-    found.append(delimiter)
-    return j + len(delimiter)
+    delimiter, end = _read_delimiter(line, j)
+    if delimiter is not None:
+        found.append(delimiter)
+    return max(end, j)
 
 
 def strip_heredoc_bodies(command: str) -> str:
@@ -347,16 +374,30 @@ def strip_heredoc_bodies(command: str) -> str:
     """
     if "<<" not in command:
         return command
+    lines = command.splitlines()
     out: list[str] = []
     pending: list[str] = []
     stack: list[str | None] = [None]
-    for line in command.splitlines():
+    i, total = 0, len(lines)
+    while i < total:
         if pending:
-            if line.strip() == pending[0]:
+            if lines[i].strip() == pending[0]:
                 pending.pop(0)
+            i += 1
             continue
+        # A trailing backslash CONTINUES the command line, so the delimiter may
+        # be on the NEXT physical line: `cat <<\` + `EOF` opens a heredoc whose
+        # delimiter is `EOF`, confirmed against real bash. Joining happens only
+        # on lines being SCANNED — never inside a body, where a trailing
+        # backslash is ordinary text and joining would merge the closing
+        # delimiter line into the body and blind the guard.
+        line = lines[i]
+        while _is_continued(line) and i + 1 < total:
+            i += 1
+            line = line[:-1] + lines[i]
         out.append(line)
         pending = _scan_line(line, stack)
+        i += 1
     return "\n".join(out)
 
 
