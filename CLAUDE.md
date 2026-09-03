@@ -11,11 +11,11 @@ parsing; every edge tagged EXTRACTED/INFERRED; no vector store).
 
 ## Invariants (do NOT violate)
 
-1. **graphify is PROJECT-SCOPED, never global.** Install only with
-   `graphify install --project`. Never bare `graphify install` (mutates
-   `~/.claude`), never `graphify extract --global` / `graphify global add`
-   (shared mutable machine state → non-reproducible, collides across hosts).
-   The graph lives in this repo's `graphify-out/`.
+1. **graphify is PROJECT-SCOPED, never global.** Never run `graphify install`
+   by hand — the hook denies it even with `--project`; use
+   `mise run kb-skill-refresh`. Never `graphify extract --global` /
+   `graphify global add` (shared mutable machine state → non-reproducible,
+   collides across hosts). The graph lives in this repo's `graphify-out/`.
 2. **This repo edits only PROJECT settings.** It never touches `~/.claude` or
    any global/system/user config.
 3. **Inputs are reproducible.** Every source is committed — either the content
@@ -64,11 +64,12 @@ Two hard mandates (Ray, 2026-07-22, machine-enforced):
    / `_merge_docs.py` / graphify-bundled-python call and prints the task to use. See
    `.claude/skills/kb-curator` for the full workflow.
 2. **Corpus LLM work runs on `claude-cli` or `openai-cli`, chosen by an EXPLICIT
-   `--backend`** (Ray, 2026-08-25); a key-detected backend is forbidden. A global
-   `GEMINI_API_KEY` (a mise secret) exists, so it is a *forbidden* key: `kb_setup.graphify_env.clean_env()`
-   strips every key trigger (Gemini/Google/OpenAI/Kimi/DeepSeek/Azure/**Bedrock via
-   `AWS_REGION`**/Ollama) from every graphify subprocess. The two CLI backends are
-   explicit-only by graphify's own `detect_backend()`, not by the cleaner.
+   `--backend`** (Ray, 2026-08-25) — with one known gap: `ANTHROPIC_API_KEY` is a
+   deliberate, test-locked exception letting `claude-cli` auto-select via
+   `detect_backend()`'s priority tuple instead (`do-not.md` #4; #685/#686).
+   Every OTHER key-detected backend stays forbidden: a global `GEMINI_API_KEY`
+   (a mise secret) exists, so `clean_env()` strips every non-Claude key
+   trigger (Gemini/Google/OpenAI/Kimi/DeepSeek/Azure/**Bedrock via `AWS_REGION`**/Ollama).
 
 Concretely:
 
@@ -78,8 +79,7 @@ Concretely:
 - **Prose (docs/URLs/blogs)**: `mise run kb-add -- <url>` fetches to `./raw`; semantic
   extraction is the **Claude host agent** (a Workflow fan-out of `general-purpose`
   subagents that read each raw file → `{nodes,edges}` → one combined chunk in
-  `sources/extractions/`), then `mise run kb-merge -- <chunk>`. Key-detected
-  backends (Gemini/OpenAI-key/Ollama/…) are stripped.
+  `sources/extractions/`), then `mise run kb-merge -- <chunk>`.
 - **Video**: `mise run kb-add -- <yt-url>` then `mise run kb-transcribe -- raw/<yt>.m4a` (local faster-whisper — no key, no LLM), then host-agent extract the transcript.
 - **Label** after every merge: `mise run kb-label` — deterministic hub labels (no LLM, Gemini-free); LLM-named communities via claude-cli remain untested (#2076).
 
@@ -87,7 +87,7 @@ Concretely:
 
 ```bash
 mise install && mise deps                     # tools + locked Python runtime (Graphify SDK/CLI)
-graphify install --project                    # project-scoped skill + graphify-out/
+mise run kb-skill-refresh                     # install + repair project-scoped skill + graphify-out/
 mise run kb-build                             # reproduce graph.json from committed inputs (no LLM)
 mise run kb-query -- "what does this corpus cover?"
 mise run kb-serve                             # read-only MCP server for other agents
@@ -166,7 +166,7 @@ mise run kb-currency          # the full loop; writes docs/currency/
 | `sources/*.manifest` | github-repo pins (url+SHA); the clone `sources/<name>/` is gitignored, re-fetched on build. |
 | `sources/media/` | Vendored non-refetchable sources (video transcripts, docs, PDFs) — committed. |
 | `sources/extractions/*.json` | Committed host-agent doc/media extraction chunks (not free to regenerate). |
-| `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (**528 MB measured 2026-09-02**, the fifth re-measure — this figure goes stale; far past git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). `graph-prose.json` is derived from THAT (by every task that writes `graph.json` — `kb-build`/`kb-merge`/`kb-label` — or `kb-prose` alone): the same graph minus every `_origin=ast` node, which is what `kb-query --prose` reads. Committed: **`memory/`** (authored work-memory) — the ONE committed subdirectory since the semantic-corpus layer's own tracked evidence tree (`graphify-semantic-corpus-chunks/`, #317) was removed with the rest of that layer, 2026-08-24 (`docs/archive/README.md`). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
+| `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (**528 MB measured 2026-09-02**, the fifth re-measure — this figure goes stale; far past git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). `graph-prose.json` is derived from THAT (by every task that writes `graph.json` — `kb-build`/`kb-merge`/`kb-label` — or `kb-prose` alone): the same graph minus every `_origin=ast` node, which is what `kb-query --prose` reads. Committed: **`memory/`** (authored work-memory) and **`graphify-semantic-slice/`** (retained provider evidence, 5 files, #317) — the two committed subdirectories. A separate, now-removed evidence tree (`graphify-semantic-corpus-chunks/`) went with the rest of the semantic-corpus layer, 2026-08-24 (`docs/archive/README.md`). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
 | `python/` | `kb_setup` (build/update/artifacts/manifest/chunks/env — thin helpers, zero-bash-logic) + `kb_setup.currency`, the tool-currency engine dotfiles also depends on. |
 | `currency.toml` | Per-tool currency config (`[tool.<name>]`): pin, extras, source manifest, build stamp, tracked issues. |
 | `docs/currency/` | Committed run log: `README.md` (one row per run) + `runs/<date>-<tool>.md` (detail, only when a run found something). |
