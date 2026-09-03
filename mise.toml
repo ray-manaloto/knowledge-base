@@ -1191,6 +1191,16 @@ description = "Aggregate work-memory outcomes into reflections/LESSONS.md + the 
 # reflections/ + overlay are gitignored (regenerable); run each session.
 run = "graphify reflect --graph {{config_root}}/graphify-out/graph.json"
 
+[tasks.kb-recall]
+description = 'Rank work-memory against a question: mise run kb-recall -- "<question>" [--top N] [--outcome useful|corrected|all] [--since YYYY-MM-DD] [--json]'
+# graphify ships save-result + reflect and NO recall verb (knowledge-base#540):
+# 364 memory files nothing could read back except by filename. kb_setup.recall
+# reuses graphify.reflect's frontmatter parser and kb_setup.lexical's BM25 math
+# (a fresh Document/Index, not lexical.build_index() — that function's field
+# scope is locked to graph nodes) to rank the store, best first, three exit
+# states apart: hits / looked-and-found-nothing / did-not-look.
+run = "uv run kb-setup recall"
+
 # --- second brain (routing seam; see dotfiles docs/specs/second-brain-design.md) ---
 # The brain/ vault is its OWN graph (separate from the aggregate — a vault note never
 # connects to code structurally, measured). Keys stripped so update stays the FREE

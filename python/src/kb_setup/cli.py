@@ -465,6 +465,10 @@ def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
         from kb_setup import remember
 
         return remember.main(repo_root, rest)
+    if cmd == "recall":
+        from kb_setup import recall
+
+        return recall.main(repo_root, rest)
     if cmd == "goal-check":
         from kb_setup import goal
 
