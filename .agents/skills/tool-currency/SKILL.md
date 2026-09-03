@@ -74,8 +74,16 @@ consider adopting".
 
 ### 4. Apply, only if the verdict authorized it
 
-An auto-apply is a **patch** bump whose six gates passed. The engine does the
-edits; you branch and ship.
+An auto-apply is **any** bump whose six gates passed. The engine does the edits;
+you branch and ship.
+
+**It read "a **patch** bump" until 2026-09-03.** Ray removed that restriction —
+*"we always want to be on the latest version"*. The gate measured digit position
+rather than risk: codex `0.152.1 → 0.153.1` blocked while mise
+`2026.9.0 → 2026.9.1` passed, purely because calver puts a release in the patch
+slot. It also had no way to be cleared, unlike the tracked-issue gate. The
+release notes are still read — gates 2 and 3 require a readable release and no
+breaking/removal/deprecation marker.
 
 1. Branch first — never commit to `main` (dotfiles
    `.claude/rules/do-not.md` #9; the same rule applies here).
