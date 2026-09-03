@@ -297,6 +297,7 @@ def check_hook_call(raw: str) -> Result[str | None]:
             _graphify_redirect,
             _check_first,
             _stage_explicitly,
+            _destructive_git,
             _inplace_edit,
             _codex_lane,
             _absent_binary,
@@ -405,6 +406,29 @@ def _inplace_edit(tool_input: dict) -> str | None:
         from kb_setup import inplace_edit
 
         return inplace_edit.decide(command)
+    except Exception:
+        return None
+
+
+def _destructive_git(tool_input: dict) -> str | None:
+    """Deny a git command that discards UNCOMMITTED work. Never raises.
+
+    Placed directly after `_stage_explicitly`, its nearest relative — both are
+    about what a git command does to state you have not saved, and a reader
+    looking for one will find the other.
+
+    UNLIKE every other guard in this chain it is STATEFUL: it asks git whether
+    the tree is dirty, because these commands are ordinary and useful on a clean
+    one. It fails OPEN when git cannot be asked, which is the same contract the
+    rest of the chain keeps — see `_secret_guard`'s note.
+    """
+    command = tool_input.get("command", "")
+    if not isinstance(command, str):
+        return None
+    try:
+        from kb_setup import destructive_git
+
+        return destructive_git.decide(command)
     except Exception:
         return None
 
