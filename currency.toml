@@ -1933,6 +1933,7 @@ manifest = "sources/codex.manifest"
 # did not mention antigravity at all. Both halves wrong, and the figure reached
 # Ray's own directive text before anyone re-derived it.
 mise_key = "antigravity-cli"
+expected = "1.1.25"
 binary = "agy"
 github = "google-antigravity/antigravity-cli"
 # The HOUSE form (`^v?(\d+\.\d+\.\d+)`, as at `[tool.hk]` and `[tool.fnox]`),
@@ -1957,10 +1958,19 @@ version_pattern = '^v?(\d+\.\d+\.\d+)$'
 # version is this". `binary` above is what makes this row honest; a
 # path-derived check here would be decoration.
 #
-# `manifest` is deliberately absent for now: there is no
-# `sources/antigravity-cli.manifest`, and declaring one before the source is
-# pinned would report DRIFT against a file that does not exist — the same false-
-# DRIFT shape `[tool.codex]` above documents at length. Add both together.
+# THAT ROW STAYED DECORATION UNTIL `expected` WAS ADDED (2026-09-03, cold
+# review of 575fb5be). `self_managed` is `bool(self.expected)`
+# (`config.py:326`) — with no `expected`, `check_sync` never reaches
+# `_check_self_managed` (which is what actually runs `agy --version`) and
+# instead falls through to the mise-managed branch, which compares the
+# `mise.toml` pin against this `manifest` — two hand-edited files agreeing
+# with each other, never the binary. Live control arm at the time: `agy`
+# reported 1.1.25 from inside a `1.1.23/` install dir, `mise.toml` pinned
+# 1.1.23, the manifest pinned 1.1.20 — `mise run kb-currency-check` reported
+# drift for `claude-code` and `mise` (both of which declare `expected`) and
+# said nothing about `antigravity-cli`. `expected` (declared above, beside
+# `mise_key`) moves this row onto the code path that actually asks the binary.
+manifest = "sources/antigravity-cli.manifest"
 
 [tool.agnix]
 # The agent-documentation validator. Ray, 2026-08-19: "make a critical/currency
