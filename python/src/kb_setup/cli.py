@@ -91,6 +91,8 @@ def _print_usage() -> int:
         "remember --question Q [--answer A|--answer-file F] "
         "[--outcome useful|dead_end|corrected] "
         "[--correction C|--correction-file F] [--nodes N...] | remember --audit | "
+        "recall <question> [--top N] [--outcome useful|dead_end|corrected|all] "
+        "[--since YYYY-MM-DD] [--json] [--memory-dir PATH] | "
         "goal-check <path|--text ...> | "
         "goal-outcome <pair> --result R [--turns N] [--note ...] | "
         "cc | cc-doctor | eval [--live] [--slow] | "
