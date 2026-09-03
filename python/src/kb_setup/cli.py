@@ -490,6 +490,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import edit_check
 
         return edit_check.run(repo_root)
+    if cmd == "codex":
+        from kb_setup import codex_run
+
+        return codex_run.run(rest)
     if cmd == "detect-census":
         from kb_setup import graph
 

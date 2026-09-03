@@ -298,6 +298,7 @@ def check_hook_call(raw: str) -> Result[str | None]:
             _check_first,
             _stage_explicitly,
             _inplace_edit,
+            _codex_lane,
             _absent_binary,
         ):
             reason = guard(tool_input)
@@ -404,6 +405,28 @@ def _inplace_edit(tool_input: dict) -> str | None:
         from kb_setup import inplace_edit
 
         return inplace_edit.decide(command)
+    except Exception:
+        return None
+
+
+def _codex_lane(tool_input: dict) -> str | None:
+    """Deny a raw `codex exec`/`codex review`; redirect to `mise run kb-codex`.
+
+    Placed after `_inplace_edit` and before `_absent_binary`. Behind
+    `_inplace_edit` because that guard names a concrete correctness hole in the
+    edit you are making, which is narrower advice than "route this through a
+    task". Ahead of `_absent_binary` for the reason that one already documents:
+    it makes the weakest claim of the set, being only about the host.
+
+    Never raises — see `_secret_guard`'s note on failing open.
+    """
+    command = tool_input.get("command", "")
+    if not isinstance(command, str):
+        return None
+    try:
+        from kb_setup import codex_lane
+
+        return codex_lane.decide(command)
     except Exception:
         return None
 
