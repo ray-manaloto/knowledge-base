@@ -401,6 +401,86 @@ def strip_heredoc_bodies(command: str) -> str:
     return "\n".join(out)
 
 
+#: The shell operators this tokeniser recognises. A module constant rather than
+#: an argument read back off the lexer, because :func:`is_operator` has to
+#: classify a token AFTER the lexer that produced it is gone.
+PUNCTUATION_CHARS = "();<>|&\n"
+
+
+def is_operator(token: str) -> bool:
+    """True when this token is a shell operator rather than a word.
+
+    ``punctuation_chars`` makes shlex emit operators as tokens of their own,
+    each made up entirely of shell punctuation — and it groups a run, so ``>>``
+    arrives as one token rather than two.
+    """
+    return bool(token) and all(char in PUNCTUATION_CHARS for char in token)
+
+
+def tokenise(command: str) -> list[str] | None:
+    """Every token INCLUDING the operators, or None when unparsable.
+
+    PUBLIC, and the reason is a defect this repo would otherwise have shipped
+    twice. :func:`segments` splits on operators and DISCARDS them, so
+    ``cat > .claude/rules/x.md`` comes back as ``[["cat"], [".claude/rules/x.md"]]``
+    — the redirect TARGET survives, the fact that it was a redirect does not. A
+    guard asking "what does this command write?" cannot answer it from
+    `segments` alone, and the obvious workaround is a second tokeniser, which is
+    exactly what the `segments`/`command_word` docstrings below argue against.
+
+    So the split is: this function tokenises, `segments` is implemented on top
+    of it, and a guard that needs operator identity calls this one. One
+    tokeniser, now three guards.
+    """
+    lexer = shlex.shlex(
+        strip_heredoc_bodies(command), posix=True, punctuation_chars=PUNCTUATION_CHARS
+    )
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    try:
+        return list(lexer)
+    except ValueError:
+        return None
+
+
+def tokenise_marked(command: str) -> list[tuple[str, bool]] | None:
+    """Each token paired with whether it is a REAL operator, not a quoted one.
+
+    🔴 WHY THIS IS NOT `is_operator(tokenise(...))`. Under `posix=True` shlex
+    strips quotes, so `grep '>' CLAUDE.md` yields the tokens
+    ``['grep', '>', 'CLAUDE.md']`` — byte-identical to the redirect
+    `grep > CLAUDE.md`. Value alone cannot tell a quoted literal from an
+    operator, and a guard reading redirects off :func:`tokenise` therefore denies
+    an ordinary `grep`. Found by the cold lane on `d3437a7059e1`, P1, reproduced
+    before it was believed.
+
+    The second lexer is the same input under `posix=False`, where a quoted token
+    keeps its quotes (`"'>'"`) and so fails :func:`is_operator`. The two runs are
+    zipped positionally; if their lengths ever disagree the alignment is not
+    trustworthy and this returns None, which every caller treats as "fail open".
+
+    :func:`segments` deliberately does NOT use this. It has always split on a
+    quoted operator too, its callers were hardened against that behaviour over
+    several review rounds, and changing it here would be an unrequested
+    behavioural change to a shared module rather than a fix to this one.
+    """
+    values = tokenise(command)
+    if values is None:
+        return None
+    lexer = shlex.shlex(
+        strip_heredoc_bodies(command), posix=False, punctuation_chars=PUNCTUATION_CHARS
+    )
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    try:
+        quoted = list(lexer)
+    except ValueError:
+        return None
+    if len(quoted) != len(values):
+        return None
+    return [(v, is_operator(v) and is_operator(q)) for v, q in zip(values, quoted, strict=True)]
+
+
 def segments(command: str) -> list[list[str]] | None:
     """Tokenise the command and split it at shell operators, None if unparsable.
 
@@ -421,19 +501,13 @@ def segments(command: str) -> list[list[str]] | None:
     and hands `_segment_is_a_gate` its second line as a command. (Round 2
     finding 1; the round-1 fix introduced it.)
     """
-    lexer = shlex.shlex(strip_heredoc_bodies(command), posix=True, punctuation_chars="();<>|&\n")
-    lexer.whitespace = " \t\r"
-    lexer.whitespace_split = True
-    try:
-        tokens = list(lexer)
-    except ValueError:
+    tokens = tokenise(command)
+    if tokens is None:
         return None
 
     split: list[list[str]] = [[]]
     for token in tokens:
-        # punctuation_chars=True emits operators as tokens of their own, made
-        # up entirely of shell punctuation.
-        if token and all(char in lexer.punctuation_chars for char in token):
+        if is_operator(token):
             split.append([])
         else:
             split[-1].append(token)

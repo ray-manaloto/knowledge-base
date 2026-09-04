@@ -1,0 +1,358 @@
+# Mutation arms for `kb_setup.instruction_shell_write` + `md_budget.agents_root`
+# (#711, and the AGENTS.md half Ray ruled in the same round).
+#
+# WHAT THESE DO NOT COVER, said first because it is the more important half.
+#
+# These arms measure my TESTS. They cannot see whether `.claude/settings.json`
+# routes a Bash call into the guard at all — and on the sibling change (#698)
+# that was the ACTUAL defect: 55 green unit tests beside a hook that fired on
+# nothing, because an `Edit(<glob>)` `if` rule does not match a `Write` call. A
+# clean sweep here says the suite can go red. It says nothing about the settings
+# file beside it.
+#
+# THE LIVE ARMS, run by hand against the SHIPPED config on 2026-09-04, both
+# directions, and the reason this spec is not the only evidence:
+#
+#   echo "probe" > .claude/rules/zz-live-arm-probe.md
+#     -> DENIED. `ls` afterwards: "No such file or directory" — it never
+#        reached disk, so the deny is a real refusal and not a late warning.
+#
+#   uv run python -c "open('.claude/rules/zz-python-probe.md','w').write('x'*10)"
+#     -> DENIED. This is the EXACT command shape #711 was filed about, the one
+#        that previously wrote 401 lines into `.claude/rules/` and landed.
+#
+#   echo "control" > <scratchpad>/control-arm.md
+#     -> ALLOWED, rc=0, file written. A guard that can only deny is not a
+#        guard, and without this row the two above are satisfied by a hook that
+#        refuses every redirect in the session.
+#
+# ── the control: a no-op comment that MUST survive ─────────────────────────
+
+suites = ["tests/test_instruction_shell_write.py", "tests/test_md_budget.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    marked = tokenise_marked(command)'''
+new = '''    marked = tokenise_marked(command)  # control'''
+
+# ── S1: stop seeing redirects — the shape the whole ticket is about ────────
+[[arm]]
+id = "S1"
+test = "test_a_shell_write_to_an_instruction_file_is_denied"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''            if value in _WRITE_REDIRECTS:
+                awaiting_target = True
+                continue'''
+new = '''            if False:
+                awaiting_target = True
+                continue'''
+
+# ── S2: treat `<` as a write too ───────────────────────────────────────────
+#
+# The OVER-CORRECTION direction, which is the one a guard like this usually gets
+# wrong. `wc -l < CLAUDE.md` reads a file and must stay silent; widening the set
+# to every redirect operator is the natural sloppy version of S1's fix.
+[[arm]]
+id = "S2"
+test = "test_a_read_redirect_is_not_a_write"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''_WRITE_REDIRECTS = frozenset({">", ">>", ">|", "&>", "&>>"})'''
+new = '''_WRITE_REDIRECTS = frozenset({">", ">>", ">|", "&>", "&>>", "<"})'''
+
+# ── S3: drop the write-intent condition on `python -c` ─────────────────────
+#
+# Arms the FALSE-POSITIVE direction specifically. With only the path-literal
+# condition, `python -c "print(open('CLAUDE.md').read())"` — an ordinary read
+# probe — is denied. Every measured defect in this repo's guard family has come
+# from that direction rather than from evasion, so it gets its own row.
+[[arm]]
+id = "S3"
+test = "test_a_python_c_that_only_reads_is_silent"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    if not _WRITE_INTENT.search(program):
+        return []'''
+new = '''    if False:
+        return []'''
+
+# ── S4: fail CLOSED on an unparsable command ───────────────────────────────
+#
+# Inverts `hook_guard`'s convention. This is exactly the kind of inversion a
+# later reader "corrects" back — and doing so would deny every Bash call whose
+# quoting shlex cannot parse, inside a hook that runs on all of them.
+[[arm]]
+id = "S4"
+test = "test_an_unparsable_command_fails_open"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    if marked is None:
+        return []  # unparsable, or two lexers disagreed — fail open'''
+new = '''    if marked is None:
+        return ["CLAUDE.md"]'''
+
+# ── S5: render "allow" instead of staying silent ───────────────────────────
+#
+# Armed on the ABSENCE of a key. Returning `permissionDecision: "allow"` would
+# ALSO skip the user's permission prompt — a regression that looks like success
+# in every other assertion, which is why it needs an arm rather than a comment.
+[[arm]]
+id = "S5"
+test = "test_an_allow_renders_nothing_at_all"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    if not verdict.deny:
+        return None'''
+new = '''    if not verdict.deny:
+        return json.dumps({"hookSpecificOutput": {"permissionDecision": "allow"}})'''
+
+# ── S6: let `uv run python -c` read as a command named `uv` ────────────────
+#
+# The realistic regression, not a nonsense edit: this is what the guard did
+# BEFORE `_unwrap_runner` existed, and the probe table caught it. `uv run
+# python` is how python is actually invoked in this repo, so without the unwrap
+# the single most likely bypass shape here is invisible.
+[[arm]]
+id = "S6"
+test = "test_a_python_c_that_writes_is_denied"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    words = _unwrap_runner(command_word(words))'''
+new = '''    words = command_word(words)'''
+
+# ── S7 IS GONE. TWO MUTATIONS, BOTH INERT, AND THAT IS THE FINDING ─────────
+#
+# S7 tried to arm `_unwrap_runner`'s BOUNDED scan — the property that an
+# argument cannot be promoted into the command position, which
+# `check_first._segment_is_a_gate` shipped as a real defect once
+# (`uv run pytest -k ruff` denied for a tool it does not cover). Twice:
+#
+#   v1  replace the bounded flag-scan with `words.index("run")`.
+#       SURVIVED. Probed over six shapes — `uv pip install run`,
+#       `uv --directory run run python`, `uv run`, … — the two implementations
+#       differed on **0**, because the trailing `or words` fallback collapses
+#       the only case that could diverge. A behaviour-preserving edit.
+#
+#   v2  replace it with a forward scan for the first python-ish token, which is
+#       the historical defect's exact shape. SURVIVED TOO — and this one DOES
+#       change the unwrap: `uv run pytest -k python` unwraps to `['python']`
+#       instead of `['pytest', '-k', 'python']`. But the DENY DECISION is
+#       unchanged on all six shapes, because `_python_c_targets` then requires
+#       `-c`, a `.md` path literal AND a write indicator, and a promoted bare
+#       `python` satisfies none of them.
+#
+# 🔴 SO THE PROPERTY IS NOT LOAD-BEARING HERE, and that is worth more than a
+# green row would have been. The false-positive protection on this path is the
+# CONJUNCTION inside `_python_c_targets`, not the unwrap — and S3, which removes
+# one term of that conjunction, DIED. The arm that matters was already present;
+# S7 was arming a line whose effect is masked downstream.
+#
+# `_unwrap_runner` keeps the bounded scan anyway. Unlike the dead branch A5
+# found, this one is reachable and correct — it is simply masked today, and it
+# becomes load-bearing the moment `_PYTHON` handling grows a shape that needs
+# fewer conditions. Deleting it would trade a correct line for a green sweep.
+#
+# The rule this pair illustrates, twice in one spec: a SURVIVOR IS NOT A GAP
+# until the mutant is shown to change observable behaviour at the line. Taking
+# either survival at face value would have added a test for a defect that
+# cannot occur, and the test would have passed forever while proving nothing.
+
+# ── T1: `tokenise` stops keeping the operators ─────────────────────────────
+#
+# The defect that made this guard need a `check_first` change at all: `segments`
+# discards operator tokens, so a redirect target arrives indistinguishable from
+# a bare command word. Filtering them out of `tokenise` restores exactly that
+# blindness while `segments` — and every existing check_first test — stays green.
+[[arm]]
+id = "T1"
+test = "test_a_shell_write_to_an_instruction_file_is_denied"
+file = "python/src/kb_setup/check_first.py"
+old = '''        return list(lexer)'''
+new = '''        return [t for t in lexer if not is_operator(t)]'''
+
+# ── A1: AGENTS.md goes back to matching no class ───────────────────────────
+[[arm]]
+id = "A1"
+test = "test_an_agents_md_gets_its_own_class"
+file = "python/src/kb_setup/md_budget.py"
+old = '''    if _AGENTS_RE.search(path):'''
+new = '''    if False:'''
+
+# ── A2: fold agents bytes into the EAGER total ─────────────────────────────
+#
+# The one-line change Ray explicitly rejected. It makes the printed
+# "eager context ~N bytes every session" figure overstate by counting bytes
+# Claude never loads — a load-bearing number quietly becoming wrong, which no
+# test would catch unless one is pointed at it.
+[[arm]]
+id = "A2"
+test = "test_agents_root_is_not_counted_as_eager_context"
+file = "python/src/kb_setup/md_budget.py"
+old = '''EAGER_CLASSES = frozenset({"eager_root", "rule_unscoped"})'''
+new = '''EAGER_CLASSES = frozenset({"eager_root", "rule_unscoped", "agents_root"})'''
+
+# ── A3: drop the closure dedup — the CROSS-REPO regression ─────────────────
+#
+# dotfiles runs this same function over a tree where every AGENTS.md HAS a
+# CLAUDE.md stub importing it. Without this skip its bytes are charged twice,
+# once inside the stub's closure and once standalone, and the violation names
+# the wrong path. That repo pins this package by SHA, so the damage arrives
+# whenever the pin advances — not here, where nothing would look wrong.
+[[arm]]
+id = "A3"
+test = "test_an_imported_agents_md_is_not_budgeted_twice"
+file = "python/src/kb_setup/md_budget.py"
+old = '''        if cls == "agents_root" and rel in imported:'''
+new = '''        if False:'''
+
+# ── A4: make the dedup unconditional ───────────────────────────────────────
+#
+# The control arm for A3, and it is the arm that matters most: without it, A3
+# is satisfied by an implementation that never budgets an AGENTS.md at all —
+# i.e. by the exact behaviour this change exists to remove, passing its own
+# test while doing it.
+[[arm]]
+id = "A4"
+test = "test_the_import_dedup_is_about_being_imported_not_about_the_filename"
+file = "python/src/kb_setup/md_budget.py"
+old = '''        if cls == "agents_root" and rel in imported:'''
+new = '''        if cls == "agents_root":'''
+
+# ── A5 IS GONE, AND THE LINE IT ARMED IS GONE WITH IT ──────────────────────
+#
+# A5 mutated away `_closure_members`' self-exclusion — `if member == path:
+# continue` — on the reasoning that a CLAUDE.md is a member of its own closure
+# and must still be budgeted as the stub. It SURVIVED.
+#
+# The survival was correct and the line was dead. Measured over a tree of two
+# stub/AGENTS.md pairs: the only paths the exclusion ever dropped were
+# `CLAUDE.md` and `docs/CLAUDE.md`, and NEITHER classifies as `agents_root` —
+# the only class the `imported` set is ever consulted for. An entry point cannot
+# demote itself, so the branch could never fire.
+#
+# So the fix was not a new test. It was DELETING the branch: a defensive line
+# nothing can reach is a line no arm can protect, and leaving it would have left
+# an unarmed conditional in a function whose whole job is a cross-repo
+# correctness invariant. `probes-need-a-control-arm.md` rule 9 — "unreachable by
+# construction is a CLAIM, and it needs an arm like any other." This one got its
+# arm, and the arm is why the line is gone.
+
+# ── THE COLD-REVIEW FIXES, ARMED ON THEIR OWN (kb-review step 4a) ──────────
+#
+# The cold lane on `d3437a7059e1` returned FOUR P1s and six P2s, and every one
+# reproduced when I ran it before believing it. A fix written under that much
+# pressure, by whoever already got the area wrong once, is the least-reviewed
+# code in the diff — so each fix gets a row, and each row mutates the fix back
+# toward the DEFECT rather than toward nonsense.
+
+# F1 — P1: a quoted `>` read as a redirect operator.
+#
+# The realistic regression is going back to reading operator identity off token
+# VALUES, which is what `is_operator(tokenise(...))` does and what every reader
+# will reach for first, because it is shorter and looks equivalent.
+[[arm]]
+id = "F1"
+test = "test_a_quoted_redirect_character_is_not_a_redirect"
+file = "python/src/kb_setup/check_first.py"
+old = '''    return [(v, is_operator(v) and is_operator(q)) for v, q in zip(values, quoted, strict=True)]'''
+new = '''    return [(v, is_operator(v)) for v, q in zip(values, quoted, strict=True)]'''
+
+# F2 — P1: `cd` before the write.
+#
+# Mutating the cd-tracking away restores the exact bypass: one token in front of
+# an ordinary redirect and the target no longer classifies.
+[[arm]]
+id = "F2"
+test = "test_a_cd_before_the_write_is_followed"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''            cwd = _next_cwd(cwd, command_word(current))'''
+new = '''            cwd = cwd'''
+
+# F3 — the OVER-CORRECTION mirror of F2, which is the direction a fix like this
+# usually breaks. Resolving every relative target against the repo root is the
+# lazy version of "follow the cd", and it wrongly denies a write that lands
+# outside the repository. `guarding-one-direction` is a recurring failure here.
+[[arm]]
+id = "F3"
+test = "test_a_cd_out_of_the_repo_is_followed_too"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    if target.startswith(("/", "~")):
+        return target
+    return posixpath.normpath(posixpath.join(cwd, target)) if cwd else target'''
+new = '''    return target'''
+
+# F4 — P2: a sed SCRIPT file reported as a write target.
+#
+# `-f` names a file sed READS. Dropping the value-flag handling is how the
+# false positive comes back, and it is the natural simplification.
+[[arm]]
+id = "F4"
+test = "test_a_sed_script_file_is_not_a_write_target"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''        return _operands(words, _SCRIPT_VALUE_FLAGS)'''
+new = '''        return _operands(words)'''
+
+# F5 — P2: GNU `--in-place=SUFFIX`. The defect was an equality check where a
+# prefix check was needed, so the mutation restores equality.
+[[arm]]
+id = "F5"
+test = "test_gnu_in_place_with_a_suffix_is_recognised"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''        if flag.startswith(_IN_PLACE_LONG):'''
+new = '''        if flag == _IN_PLACE_LONG:'''
+
+# F6 — P2: the write pattern matching PROSE inside a `python -c`.
+#
+# Dropping the required opening paren is exactly the original bug: a printed
+# string that merely names the method reads as a call.
+[[arm]]
+id = "F6"
+test = "test_a_python_c_that_merely_mentions_a_write_method_is_silent"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''_WRITE_INTENT = re.compile(r"""open\([^)]*['"][wax]|write_text\(|writelines\(|\.write\(""")'''
+new = '''_WRITE_INTENT = re.compile(r"""open\([^)]*['"][wax]|write_text|writelines|\.write\(""")'''
+
+# F7 — P2 (found while fixing P1b, not by the lane): a `~` path joined to the
+# repo root lands inside it and classifies as a nested entry point.
+[[arm]]
+id = "F7"
+test = "test_a_home_relative_path_is_not_this_repos_business"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''        if raw.startswith("~"):'''
+new = '''        if False:'''
+
+# F8 — P2: `main()` judging a payload from another tool as shell.
+[[arm]]
+id = "F8"
+test = "test_main_ignores_a_payload_from_another_tool"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    tool = payload.get("tool_name")
+    if tool is not None and tool != "Bash":
+        return 0'''
+new = '''    tool = payload.get("tool_name")
+    if False:
+        return 0'''
+
+# F9 — P1: the AGENTS.md dedup walking NESTED closures, which promoted an
+# imported AGENTS.md from a 200-line ceiling to a 400-line one.
+[[arm]]
+id = "F9"
+test = "test_a_nested_stub_does_not_relax_the_agents_budget"
+file = "python/src/kb_setup/md_budget.py"
+old = '''        if classify(rel, exclude=exclude) != "eager_root":'''
+new = '''        if classify(rel, exclude=exclude) not in ("eager_root", "nested"):'''
+
+# ── NOT ARMED, and stated so a clean score is not misread ──────────────────
+#
+# The lane's P2 on `agents_bytes` being labelled "per lane run" was a PROSE
+# defect — codex loads the root AGENTS.md plus the CWD's ancestors, not every
+# one in the tree, so summing them and calling it a per-run figure overstated.
+# No mutation can catch a wrong sentence. It is fixed by rewording the output
+# and by printing the file COUNT beside the total so the difference is visible.
+#
+# The same is true of the two overclaims in the denial reason ("only a heredoc
+# carries its content"; "`md_size_budget` still fails the commit"). Both were
+# wrong as written, both are prose, both are now corrected — and neither is
+# armable, which is exactly why they survived a full green sweep the first time.
+#
+# The lane's P3 — `except A, B:` without parentheses — is DECLINED, not missed.
+# It is PEP 758, valid on the Python this repo pins (>=3.14), and it is house
+# style enforced mechanically: `ruff format` REWRITES the parenthesised form
+# into it, so "fixing" it would be reverted by the next `mise run fmt`.

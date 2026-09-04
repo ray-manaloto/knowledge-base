@@ -115,16 +115,33 @@ DEFAULT_EXCLUDED_PREFIXES = (
 # Docs: "maximum depth of four hops".
 _MAX_IMPORT_DEPTH = 4
 
-# Only CLAUDE.md is an ENTRY POINT: "Claude Code reads CLAUDE.md, not
+# Only CLAUDE.md is an ENTRY POINT for CLAUDE: "Claude Code reads CLAUDE.md, not
 # AGENTS.md. If your repository already uses AGENTS.md ... create a CLAUDE.md
-# that imports it." So an AGENTS.md reaches context ONLY through its stub's
-# @import, and is budgeted as a member of that closure — never standalone.
-# Budgeting it twice would both double-count the eager total and blame the
-# wrong file. This repo's AGENTS.md is a tracked SIBLING of CLAUDE.md (codex's
-# minimum, not an @import stub), so no budget counts it here; dotfiles
-# separately guarantees every AGENTS.md has its stub (`claude_agents_md_pairs`),
-# which is what makes the closure-only treatment safe there: none is orphaned.
+# that imports it." So an AGENTS.md that HAS a stub reaches Claude's context only
+# through that stub's @import, and is budgeted as a member of that closure.
+#
+# Until 2026-09-04 that was the whole story and the conclusion drawn from it was
+# "so nothing budgets an AGENTS.md standalone". That left a real hole: an
+# AGENTS.md with NO stub importing it is in no closure, matches no class, and is
+# therefore bounded by nothing at all — while still being read in full by every
+# codex lane, which does not use CLAUDE.md as its entry point. This repo's own
+# AGENTS.md was exactly that file: a tracked SIBLING of CLAUDE.md (codex's
+# minimum, not an @import stub), 51 lines, with no ceiling over it.
+#
+# `agents_root` closes that, and the double-counting the old comment warned
+# about is now prevented MECHANICALLY rather than by leaving the file unbudgeted:
+# :func:`check` computes every entry closure's membership first and skips an
+# `agents_root` file that is already inside one. That distinction matters beyond
+# this repo — dotfiles runs this same function over a tree where
+# `claude_agents_md_pairs` guarantees every AGENTS.md HAS a stub, so there every
+# one of them stays closure-counted exactly as before and `agents_root` matches
+# nothing. Same code, opposite outcome, because the rule is now about the tree
+# rather than about the filename.
 _ENTRY_RE = re.compile(r"(^|/)CLAUDE\.md$")
+# The orphan case above. Deliberately the same shape as `_ENTRY_RE`: a nested
+# AGENTS.md with no importer is unbounded for exactly the same reason a root one
+# is, and codex reads the tree, not a stub chain.
+_AGENTS_RE = re.compile(r"(^|/)AGENTS\.md$")
 _RULE_RE = re.compile(r"^\.claude/rules/.*\.md$")
 # BOTH skill trees. `.agents/skills/` is the tracked near-copy the non-Claude
 # lanes read, and until 2026-08-17 it matched no budget class at all — so a copy
@@ -182,10 +199,28 @@ BUDGETS: dict[str, Budget] = {
         DEFERRED_BYTE_BACKSTOP,
         "loads only on invocation/relevance — documented 500-line guideline",
     ),
+    "agents_root": Budget(
+        DOCUMENTED_LINE_TARGET,
+        EAGER_BYTE_BACKSTOP,
+        "read in full by every codex lane run, and imported by no CLAUDE.md — "
+        "so nothing else bounds it",
+    ),
 }
 
 # The classes whose bytes are spent at launch, every session.
+#
+# `agents_root` is deliberately NOT here, and that is the whole reason it is a
+# class of its own rather than an alias for `eager_root`. `report.eager_bytes` is
+# printed every run as "eager context ~N bytes every session", and it is a claim
+# about what CLAUDE loads at launch. An orphan AGENTS.md is never in that — it is
+# read by codex, on a different loader, on a different schedule. Folding it in
+# would have been a one-line change that quietly made a load-bearing number
+# overstate; :attr:`Report.agents_bytes` carries it instead, and is printed
+# beside the eager figure rather than inside it.
 EAGER_CLASSES = frozenset({"eager_root", "rule_unscoped"})
+
+# The classes whose bytes a NON-Claude lane pays. Separate pot, same discipline.
+AGENTS_CLASSES = frozenset({"agents_root"})
 
 
 @dataclass
@@ -202,6 +237,13 @@ class Report:
 
     violations: list[Violation] = field(default_factory=list)
     eager_bytes: int = 0
+    #: Bytes in the `agents_root` class — read by a codex lane, never by Claude
+    #: at launch. Kept apart from :attr:`eager_bytes` on purpose; see
+    #: :data:`EAGER_CLASSES`.
+    agents_bytes: int = 0
+    #: How many files those bytes came from. Printed beside the total because
+    #: codex loads the root AGENTS.md plus the CWD's ancestors, not all of them.
+    agents_counted: int = 0
     counted: int = 0
 
 
@@ -288,14 +330,20 @@ def classify(path: str, *, exclude: tuple[str, ...] = DEFAULT_EXCLUDED_PREFIXES)
         return "skill"
     if _RULE_RE.match(path):
         return "rule_unscoped"  # refined by frontmatter at read time
+    if _AGENTS_RE.search(path):
+        # PROVISIONAL. `check` demotes this to None when some entry closure
+        # already imports the file, because that closure has already paid for
+        # its bytes. `classify` takes a path and nothing else, so it cannot
+        # answer "is anything importing this?" — that question needs the whole
+        # tree, and answering it here from a filename would be a guess.
+        return "agents_root"
     if not _ENTRY_RE.search(path):
         return None
     # The root CLAUDE.md and .claude/CLAUDE.md are "loaded in full at launch";
     # every other directory's stub is lazy ("included when Claude reads files
-    # in those subdirectories").
-    if "/" not in path or path.startswith(".claude/"):
-        return "eager_root"
-    return "nested"
+    # in those subdirectories"). One expression rather than two returns, because
+    # `agents_root` took this function to ruff's PLR0911 ceiling.
+    return "eager_root" if "/" not in path or path.startswith(".claude/") else "nested"
 
 
 @dataclass(frozen=True)
@@ -429,6 +477,55 @@ def _resolve_class(rel: str, raw: str, exclude: tuple[str, ...]) -> str | None:
     return cls
 
 
+def _closure_members(
+    root: Path, rels: list[str], exclude: tuple[str, ...], overlay: Overlay
+) -> set[str]:
+    """Every path pulled in by some entry point's ``@import`` chain.
+
+    The entry classes are the two whose size is measured as a CLOSURE
+    (:func:`_size_of`), so a member's bytes are already counted against the
+    importing stub. Anything in this set must not ALSO be budgeted standalone,
+    or one file is charged twice and the violation names the wrong path.
+
+    This exists for `agents_root` and is written as a general set rather than an
+    ``AGENTS.md`` special case, because the double-count is a property of being
+    imported — not of the filename.
+
+    🔴 ONLY ``eager_root`` CLOSURES DEDUPLICATE, and the first version also
+    walked ``nested`` ones. That was a real hole, found by the cold lane on
+    `d3437a7059e1` (P1): `nested`'s ceiling is 400 lines against `agents_root`'s
+    200, so an AGENTS.md imported by a *nested* stub was silently promoted to the
+    looser budget — a 300-line file passing with zero violations. Narrowing to
+    eager closures also preserves the cross-repo invariant this function exists
+    for: dotfiles' AGENTS.md files are imported by the ROOT stub, which is
+    `eager_root`, so they still deduplicate exactly as before.
+
+    🔴 IT DOES NOT EXCLUDE AN ENTRY FROM ITS OWN CLOSURE, and the first version
+    did. That looked obviously right — a CLAUDE.md is a member of its own closure
+    and must still be budgeted as the stub — but the branch was DEAD, and the
+    arms sweep is what said so: the mutation removing it killed no test. Measured
+    rather than reasoned: over a tree of two stub/AGENTS.md pairs, the only paths
+    the exclusion ever dropped were ``CLAUDE.md`` and ``docs/CLAUDE.md``, and
+    NEITHER classifies as ``agents_root`` — the only class this set is ever
+    consulted for. An entry point therefore cannot demote itself, and a defensive
+    branch nothing can reach is a line no arm can protect.
+    ``probes-need-a-control-arm.md`` rule 9.
+    """
+    members: set[str] = set()
+    for rel in rels:
+        path = root / rel
+        if classify(rel, exclude=exclude) != "eager_root":
+            continue
+        if not overlay.exists(path):
+            continue
+        for member in resolve_imports(path, root, overlay=overlay):
+            try:
+                members.add(member.relative_to(root).as_posix())
+            except ValueError:
+                continue  # an @import that escaped the tree; not ours to budget
+    return members
+
+
 def _description_violation(rel: str, raw: str) -> Violation | None:
     """Catch the one HARD truncation: an over-long SKILL.md description."""
     desc = skill_description(raw)
@@ -483,14 +580,23 @@ def check(
     # An override for an already-tracked path must not be walked twice; one for
     # an untracked path is appended so a created file is still budgeted.
     extra = [rel for rel in overlay.content if rel not in set(tracked)]
+    walk = [*tracked, *extra]
+    # Computed BEFORE the loop, over the same list the loop walks, so a created
+    # file's imports count too. See `_closure_members` for why this is not an
+    # AGENTS.md special case.
+    imported = _closure_members(root, walk, exclude, overlay)
 
-    for rel in [*tracked, *extra]:
+    for rel in walk:
         path = root / rel
         if classify(rel, exclude=exclude) is None or not overlay.exists(path):
             continue
         raw = overlay.read(path)
         cls = _resolve_class(rel, raw, exclude)
         if cls is None:
+            continue
+        if cls == "agents_root" and rel in imported:
+            # Some CLAUDE.md imports it, so its bytes are already inside that
+            # stub's closure. Skipping here is what keeps the total honest.
             continue
 
         if cls == "skill" and (v := _description_violation(rel, raw)):
@@ -502,6 +608,9 @@ def check(
         report.counted += 1
         if cls in EAGER_CLASSES:
             report.eager_bytes += bytes_
+        elif cls in AGENTS_CLASSES:
+            report.agents_bytes += bytes_
+            report.agents_counted += 1
 
         if lines > budget.max_lines:
             report.violations.append(
@@ -587,9 +696,28 @@ def md_budget_main(root: Path) -> int:
         sys.stderr.write(f"{v.path}: {v.message}\n")
     # The number that actually matters, surfaced every run: bytes paid at
     # launch in EVERY session, regardless of what the task touches.
+    #
+    # The agents figure is APPENDED rather than added in. Two loaders, two
+    # schedules, two numbers — summing them would produce a single total that is
+    # true of no one. It is omitted entirely when the class matched nothing, so
+    # a repo where every AGENTS.md has its stub (dotfiles) reads exactly as it
+    # did before this class existed.
+    # 🔴 NOT "per lane run". This sums EVERY orphan AGENTS.md in the tree, and
+    # codex's own pinned instructions load only the root file plus the CWD's
+    # ancestors (`sources/codex/codex-rs/protocol/src/prompts/base_instructions/
+    # default.md:27`), so a per-run reading would overstate on any repo with more
+    # than one. The honest claim is the total held under this budget — which is
+    # what the number is — and the file count is printed with it so the
+    # difference is visible rather than assumed. Cold lane P2 on `d3437a7059e1`.
+    agents = (
+        f"; {report.agents_counted} unimported AGENTS.md ~{report.agents_bytes} bytes "
+        f"(~{report.agents_bytes // 4} tokens) total, read by codex not by Claude"
+        if report.agents_bytes
+        else ""
+    )
     sys.stdout.write(
         f"md-budget: {report.counted} instruction files checked; "
         f"eager context ~{report.eager_bytes} bytes "
-        f"(~{report.eager_bytes // 4} tokens) every session\n"
+        f"(~{report.eager_bytes // 4} tokens) every session{agents}\n"
     )
     return exit_code(result)

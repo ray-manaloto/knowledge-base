@@ -147,6 +147,20 @@ proven three-armed). A duplicate adds noise.
 a command position only, and only for `.py`/`.pyi`. Those belong at the **Bash**
 surface, not Edit/Write — closing them here would be the wrong tenant.
 
+🔴 **UPDATE 2026-09-04 — that Bash tenant now exists, and this section's "NOT
+fully closed" is now a narrower claim than it reads.** `kb_setup.instruction_shell_write`
+(#711, Ray's ruling) denies a `>`/`>>` redirect, a `tee`, an in-place `sed`/`perl`
+and a writing `python -c` whose target classifies as an instruction file — by
+SHAPE, not by budget, because only a heredoc carries its content in the command.
+Verified live against the shipped config, both directions: an
+`echo … > .claude/rules/…` was refused and the file never reached disk, while the
+same redirect to a non-instruction path succeeded.
+
+What is STILL open, and is the current list: `find … -exec sed -i`, `xargs sed -i`,
+`sh -c`, `eval`, `$(…)`, and a `python -c` that builds its path from variables.
+The tenancy ruling above is unchanged and is what made a separate module the
+right answer rather than a second responsibility inside the budget guard.
+
 `Write` has not been probed for whether it delivers LSP feedback the way `Edit`
 does. Probe it before assuming; if it does not, a narrow Write-only
 `PostToolUse` tenant is justified and nothing else is.
