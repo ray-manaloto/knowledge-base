@@ -61,9 +61,11 @@
     color: var(--ink-soft);
   }
   .choice.pick { background: var(--pick-bg); color: var(--ink); font-weight: 500; }
+  /* The letters are how the reader answers, so they are functional text, not
+     ornament: --rule (the border tint) put them at 1.32:1 on white. */
   .choice .mark {
     font-family: "IBM Plex Mono", monospace; font-size: 11px;
-    color: var(--rule); flex: none; width: 1.1em;
+    color: var(--ink-soft); flex: none; width: 1.1em;
   }
   .choice.pick .mark { color: var(--pick); }
 

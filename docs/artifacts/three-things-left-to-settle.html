@@ -63,7 +63,9 @@
   .opts { display: flex; flex-direction: column; gap: 3px; }
   .opt { font-size: 13.5px; padding: 3px 8px; color: var(--soft); display: flex; gap: 8px; }
   .opt.pick { background: var(--key-bg); color: var(--ink); font-weight: 600; }
-  .opt .m { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--rule); width: 1em; flex: none; }
+  /* Functional text — the reader answers by letter — so it takes a readable
+     token, not the border tint, which measured 1.39:1 on white. */
+  .opt .m { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--soft); width: 1em; flex: none; }
   .opt.pick .m { color: var(--key); }
 
   .ask { background: var(--key); color: #fff; padding: 12px 16px; }
