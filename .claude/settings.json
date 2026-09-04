@@ -40,6 +40,94 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Edit(CLAUDE.md)",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Write(CLAUDE.md)",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Edit(.claude/rules/**)",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Write(.claude/rules/**)",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Edit(.claude/skills/**)",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Write(.claude/skills/**)",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Edit(.agents/skills/**)",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Write(.agents/skills/**)",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard",
+            "timeout": 60
+          }
+        ]
       }
     ],
     "SessionStart": [

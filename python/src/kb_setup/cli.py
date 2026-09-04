@@ -63,7 +63,7 @@ def _print_usage() -> int:
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | "
-        "telemetry-prune | serve | env-refresh [--sentinel] | "
+        "telemetry-prune | serve | env-refresh [--sentinel] | instruction-edit-guard | "
         "merge <chunk> | label | "
         "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
         "brain [record|reflect|audit] | distill | session-reflect [--sessions N] | "
@@ -219,6 +219,14 @@ def _run(argv: list[str] | None = None) -> int:
         # A bare arm, on `funnel`'s precedent: it neither reads nor writes the
         # graph, and its whole job is one write to a path only a hook knows.
         return env_refresh.main(rest)
+    if cmd == "instruction-edit-guard":
+        from kb_setup import instruction_edit_guard
+
+        # Its sibling guards live in `hook_guard`; this one deliberately does
+        # not (#700 decision 3). `hook_guard`'s whole interface is a
+        # shell-tokenised command from Bash/Grep — it returns Ok(None) for any
+        # other tool — and an Edit payload has none of that.
+        return instruction_edit_guard.main(repo_root)
     if cmd == "serve":
         from kb_setup import mcp_serve
 

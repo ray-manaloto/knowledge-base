@@ -1,0 +1,183 @@
+# Mutation arms for `kb_setup.instruction_edit_guard` + `md_budget.Overlay` (#698).
+#
+# `docs/design/edit-write-hook-surface.md` says this tenant OWES a spec proving
+# both directions — Edit and Write, matching and non-matching paths. This is it.
+#
+# WHAT THESE DO NOT COVER, said first because it is the more important half.
+# These arms measure my TESTS. They cannot see whether the HOOK IS WIRED, and on
+# this change that was the actual defect: the first wiring used `Edit(<glob>)`
+# for all four path classes, every unit test was green, and the hook fired on
+# nothing. That was found by attempting a real over-budget write and watching the
+# file reach disk. A clean sweep here says the suite can go red; it says nothing
+# about the settings.json beside it.
+#
+# The live arms, for the record, run by hand against the SHIPPED config:
+#   over-budget Write  -> DENIED, file never created
+#   within-budget Write -> ALLOWED, headroom delivered via additionalContext
+# A check that can only deny is not a check, which is why the second one exists.
+#
+# G1/G2 are the two exits that cost something when wrong. G1 is the deny; G2 is
+# the headroom, and it is armed on the ABSENCE of `permissionDecision` because
+# returning "allow" would additionally skip the user's permission prompt — a
+# regression that would look like success in every other assertion.
+#
+# G3 arms the SILENT exit, which is the one that keeps the guard usable. A guard
+# that denies what it does not understand blocks routinely, and a guard that
+# blocks routinely gets switched off. Note the direction: the mutation makes the
+# guard MORE aggressive, and the test must catch that too.
+#
+# G4 arms fail-CLOSED, which INVERTS `hook_guard`'s fail-open convention. That
+# inversion is exactly the kind of thing a later reader "corrects" back, so it
+# gets an arm rather than only a comment.
+#
+# O1/O2 are the two holes the #700 design record found by reading `md_budget.py`,
+# and each is armed at the line that closes it. O1: a `Write` CREATING a new
+# instruction file is untracked and not yet on disk, so the old walk skipped it
+# twice over. O2: `closure_size` re-reads every @import member, so overriding
+# only the top-level read left the closure counting stale bytes.
+#
+# O3 is the regression arm in the other direction: the no-override path must not
+# widen the walk. Without it, every arm above could pass while ordinary
+# `mise run lint` silently changed meaning.
+#
+# 🔴 O3's FIRST VERSION WAS A BROKEN PROBE, and `kb-arms` is what said so. It
+# forced `overrides={"CLAUDE.md": ""}` on every `check()` call against a test
+# comparing `check(root)` with `check(root, overrides={})` — but the mutation hit
+# BOTH sides equally, so those two still agreed while other tests went red. The
+# runner reported `PROBE BROKEN - red suite did not name the test`, which is the
+# whole reason `test` is required on every non-control arm.
+#
+# The test underneath it was the deeper problem: `overrides or {}` makes empty
+# and absent the SAME branch, so it could never fail. Both were replaced — the
+# arm now breaks `exists()`, and the test asserts a tracked-but-DELETED file is
+# still skipped, which is what the no-override path can genuinely get wrong.
+
+suites = ["tests/test_instruction_edit_guard.py", "tests/test_md_budget.py"]
+
+# ── the control: a no-op comment that MUST survive ─────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''    candidate = _matched(root, tool, payload)'''
+new = '''    candidate = _matched(root, tool, payload)  # control'''
+
+# ── G1: stop denying an over-budget edit ───────────────────────────────────
+[[arm]]
+id = "G1"
+test = "test_an_over_budget_write_is_denied"
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''    mine = [v for v in report.violations if v.path == rel]'''
+new = '''    mine = []'''
+
+# ── G2: return "allow", which would ALSO skip the user's permission prompt ──
+[[arm]]
+id = "G2"
+test = "test_a_valid_edit_gets_headroom_and_no_permission_decision"
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''        out["additionalContext"] = verdict.reason'''
+new = '''        out["permissionDecision"] = "allow"'''
+
+# ── G3: deny anything not understood, instead of staying silent ────────────
+[[arm]]
+id = "G3"
+test = "test_a_non_instruction_file_is_silent"
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''    candidate = _matched(root, tool, payload)
+    if candidate is None:
+        return SILENT'''
+new = '''    candidate = _matched(root, tool, payload)
+    if candidate is None:
+        return Verdict(deny=True, reason="not understood")'''
+
+# ── G4: fail OPEN on an unprojectable payload (hook_guard's convention) ─────
+[[arm]]
+id = "G4"
+test = "test_an_unprojectable_edit_on_a_matched_file_is_denied"
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''    proposed = project(tool, payload, path)
+    if proposed is None:'''
+new = '''    proposed = project(tool, payload, path)
+    if False:'''
+
+# ── O1: hole 1 — stop injecting an untracked override into the walk ────────
+[[arm]]
+id = "O1"
+test = "test_a_write_creating_a_new_rule_is_budgeted"
+file = "python/src/kb_setup/md_budget.py"
+old = '''    extra = [rel for rel in overlay.content if rel not in set(tracked)]'''
+new = '''    extra = []'''
+
+# ── O2: hole 2 — let the closure re-read from disk behind the overlay ──────
+[[arm]]
+id = "O2"
+test = "test_an_override_reaches_the_import_closure"
+file = "python/src/kb_setup/md_budget.py"
+old = '''        raw = over.read(f)'''
+new = '''        raw = f.read_text(errors="replace")'''
+
+# ── O3: the no-override path must not change ───────────────────────────────
+[[arm]]
+id = "O3"
+test = "test_a_tracked_file_deleted_from_disk_is_still_skipped"
+file = "python/src/kb_setup/md_budget.py"
+old = '''        if rel is not None and rel in self.content:
+            return True
+        return path.is_file()'''
+new = '''        if rel is not None and rel in self.content:
+            return True
+        return True'''
+
+# ── the cold-review fixes, armed on their own (kb-review step 4a) ──────────
+#
+# Added after the cold lane on 3047b2989777 returned P1 (the Bash bypass, which
+# is prose-only and unarmable from here), P2 (a docstring saying "declined" for
+# behaviour that DENIES) and P3 (the Edit projection not mirroring the real
+# tool's uniqueness precondition).
+#
+# F1 arms P3's fix in the direction that MATTERS. The realistic regression is
+# reverting to the old first-occurrence replacement, which silently judges a
+# write that could never reach disk — so the mutation is exactly the old line,
+# not a nonsense edit.
+#
+# F2 arms P3's fix in the OVER-CORRECTION direction, which is the one a fix like
+# this usually breaks: uniqueness must not bleed into the `replace_all` path,
+# where an ambiguous match is the whole point. `guarding-one-direction` is a
+# recurring failure here, so both directions get a row.
+#
+# F3 arms P2. The bug was PROSE, and no mutation can catch prose — so what this
+# arms is the test that now pins the behaviour the prose got wrong. Without a
+# test, the docstring was free to drift again the moment someone "fixed" the code
+# to match the words.
+#
+# NOT ARMED, and it is the worst finding: P1, the Bash-tool bypass. It is a
+# statement about which MATCHER the settings file registers, and no mutation of
+# this module can reach it. It is closed by prose in the docstring and by an
+# issue, not by code — and saying so here is the point, because a full arms
+# sweep beside an unarmed P1 is exactly how a clean score gets misread as a
+# clean change.
+
+[[arm]]
+id = "F1"
+test = "test_an_ambiguous_match_without_replace_all_is_unprojectable"
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''    if old and current.count(old) != 1:
+        return None'''
+new = '''    if old and old not in current:
+        return None'''
+
+[[arm]]
+id = "F2"
+test = "test_replace_all_still_accepts_an_ambiguous_match"
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''    if payload.get("replace_all") is True:
+        return current.replace(old, new) if old in current else None'''
+new = '''    if payload.get("replace_all") is True:
+        return current.replace(old, new) if current.count(old) == 1 else None'''
+
+[[arm]]
+id = "F3"
+test = "test_notebook_edit_on_an_instruction_path_denies"
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''EDIT_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})'''
+new = '''EDIT_TOOLS = frozenset({"Edit", "Write"})'''

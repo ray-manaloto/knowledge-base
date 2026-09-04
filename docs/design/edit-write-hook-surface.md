@@ -71,9 +71,35 @@ Filtering goes in the harness via `if`, not only in python, because a bare
 matcher spawns a ~0.25 s process on **every** edit in the repo for a policy that
 concerns a small minority of them. `if` holds **exactly one** permission rule
 (`hooks.md:432`) — no `&&`, `||` or list — so each path class needs its own
-handler. One `Edit(<glob>)` rule covers `Edit`, `Write` and `NotebookEdit`
-(`tools-reference.md:85,368`). Python stays authoritative; `if` is cheap dispatch
-only, since the docs call the filter best-effort (`hooks.md:448`).
+handler. Python stays authoritative; `if` is cheap dispatch only, since the docs
+call the filter best-effort (`hooks.md:448`).
+
+🔴 **CORRECTED 2026-09-04 while building #698.** This paragraph claimed *"one
+`Edit(<glob>)` rule covers `Edit`, `Write` and `NotebookEdit`
+(`tools-reference.md:85,368`)"*, reasoning from `permissions.md:316` — *"Use
+`Edit(docs/**)` in place of `Write(docs/**)`"*. **A hook `if` filter matches on
+the ACTUAL TOOL NAME, so that is wrong**, and the wiring built from it fired on
+nothing while every unit test stayed green.
+
+Measured by attempting a real over-budget write and watching whether the file
+reached disk, one variable at a time:
+
+| `if` rule | tool call | fires? |
+|---|---|---|
+| *(none)* | `Write` | yes |
+| `Edit(.claude/rules/**)` | `Write` | **NO** |
+| `Write(.claude/rules/**)` | `Write` | yes |
+| `Edit(.claude/rules/**)` | `Edit` | yes |
+
+`permissions.md:316` is about the PERMISSION SYSTEM; `hooks.md:427`'s "uses the
+same syntax as permission rules" means the same *syntax*, not the same
+tool-name resolution. So the shipped wiring is **`{Edit, Write}` × 4 path
+classes = 8 handlers**. `NotebookEdit` is deliberately not among them: it writes
+`.ipynb`, not instruction markdown.
+
+The reusable half is not the flag — it is that **unit tests prove the module and
+only a live write proves the WIRING.** Same "written is not running" shape as
+the codex hook-trust finding, arriving on the Claude side.
 
 ### 3. Module — separate, not inside `hook_guard`
 
