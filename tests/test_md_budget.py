@@ -82,13 +82,24 @@ def test_no_budget_reuses_the_misattributed_12000() -> None:
 
 
 def test_only_claude_md_is_an_entry_point() -> None:
-    """Only CLAUDE.md is read: "Claude Code reads CLAUDE.md, not AGENTS.md".
+    """Only CLAUDE.md is CLAUDE's entry point, so no AGENTS.md is eager or nested.
 
-    AGENTS.md reaches context ONLY via its stub's @import, so budgeting it
-    standalone would double-count the eager total and blame the wrong file.
+    "Claude Code reads CLAUDE.md, not AGENTS.md."
+
+    🔴 THIS TEST ASSERTED `classify("AGENTS.md") is None` UNTIL 2026-09-04, and
+    the reason given was that an AGENTS.md reaches context only via its stub's
+    @import, so budgeting it standalone would double-count. Both halves of that
+    were true and the conclusion still left a hole: an AGENTS.md with NO stub is
+    in no closure, matched no class, and was bounded by nothing — while codex
+    read it in full on every lane run.
+
+    So `agents_root` now classifies it, and the double-counting the old reason
+    worried about is prevented by `check` skipping any AGENTS.md an entry closure
+    already imports (see `test_an_imported_agents_md_is_not_budgeted_twice`).
+    The entry-point claim itself is unchanged and is what this test still pins.
     """
-    assert md_budget.classify("AGENTS.md") is None
-    assert md_budget.classify("tests/AGENTS.md") is None
+    assert md_budget.classify("AGENTS.md") not in ("eager_root", "nested")
+    assert md_budget.classify("tests/AGENTS.md") not in ("eager_root", "nested")
     assert md_budget.classify("CLAUDE.md") == "eager_root"
     assert md_budget.classify("tests/CLAUDE.md") == "nested"
 
@@ -465,3 +476,89 @@ def test_md_budget_a_populated_tree_still_reports_ok(tmp_path: Path) -> None:
     assert isinstance(result, Ok)
     assert result.value.counted > 0
     assert result.rc is Rc.OK
+
+
+# --- `agents_root`: the orphan AGENTS.md (#698 follow-up, Ray 2026-09-04) -----
+
+
+def test_an_agents_md_gets_its_own_class() -> None:
+    """An AGENTS.md gets a class of its own.
+
+    It used to classify as None, so NOTHING bounded it — not the hk gate, and not
+    the #698 Edit/Write guard, which gates on `classify(rel) is None`.
+    """
+    assert md_budget.classify("AGENTS.md") == "agents_root"
+    assert md_budget.classify("docs/AGENTS.md") == "agents_root"
+
+
+def test_agents_root_is_not_counted_as_eager_context() -> None:
+    """The whole reason it is a class of its own rather than an alias.
+
+    `report.eager_bytes` is printed every run as a claim about what CLAUDE loads
+    at launch. An orphan AGENTS.md is read by codex, on a different loader —
+    folding it in would be one line that quietly made that number overstate.
+    """
+    assert "agents_root" not in md_budget.EAGER_CLASSES
+    assert "agents_root" in md_budget.AGENTS_CLASSES
+
+
+def test_an_orphan_agents_md_is_budgeted_and_kept_out_of_the_eager_total(
+    tmp_path: Path,
+) -> None:
+    root = _git_repo(tmp_path)
+    _commit(root, "CLAUDE.md", "# root\n")
+    _commit(root, "AGENTS.md", "# agents\nbody\n")
+
+    report = md_budget.check(root)
+
+    assert report.agents_bytes > 0
+    assert report.eager_bytes > 0
+    # Two pots, never one total: summing them would produce a figure that is
+    # true of neither loader.
+    assert report.agents_bytes != report.eager_bytes
+
+
+def test_an_imported_agents_md_is_not_budgeted_twice(tmp_path: Path) -> None:
+    """🔴 THE CROSS-REPO CASE, and the reason this is not a filename rule.
+
+    dotfiles runs this same function over a tree where `claude_agents_md_pairs`
+    guarantees every AGENTS.md HAS a CLAUDE.md stub importing it. There its bytes
+    are already inside that stub's closure, so counting it standalone as well
+    would charge one file twice and put the violation on the wrong path — which
+    is exactly what the comment this class replaced warned about.
+    """
+    root = _git_repo(tmp_path)
+    _commit(root, "CLAUDE.md", "@AGENTS.md\n")
+    _commit(root, "AGENTS.md", "# agents\nbody\n")
+
+    report = md_budget.check(root)
+
+    assert report.agents_bytes == 0
+
+
+def test_the_import_dedup_is_about_being_imported_not_about_the_filename(
+    tmp_path: Path,
+) -> None:
+    """CONTROL ARM for the test above: remove the @import and it IS budgeted.
+
+    Without this, the dedup assertion is satisfied by an implementation that
+    never budgets an AGENTS.md at all — i.e. by the old behaviour this change
+    exists to remove, passing its own test while doing it.
+    """
+    root = _git_repo(tmp_path)
+    _commit(root, "CLAUDE.md", "no import here\n")
+    _commit(root, "AGENTS.md", "# agents\nbody\n")
+
+    report = md_budget.check(root)
+
+    assert report.agents_bytes > 0
+
+
+def test_an_over_long_agents_md_is_a_violation(tmp_path: Path) -> None:
+    root = _git_repo(tmp_path)
+    _commit(root, "CLAUDE.md", "# root\n")
+    _commit(root, "AGENTS.md", "\n".join(f"line {i}" for i in range(300)))
+
+    report = md_budget.check(root)
+
+    assert any(v.path == "AGENTS.md" for v in report.violations)

@@ -1714,3 +1714,20 @@ description = "PreToolUse: deny an Edit/Write that would put an instruction file
 # Reads the hook payload on stdin, so it is never run by hand.
 run = "uv run kb-setup instruction-edit-guard"
 timeout = "60s"
+
+[tasks.kb-instruction-shell-write]
+description = "PreToolUse: deny a SHELL write to a budgeted instruction file"
+# #711, Ray's ruling 2026-09-04. The cold lane on `3047b2989777` rated it P1 that
+# #698's eight handlers all match `Edit|Write`, so the whole Bash surface reached
+# the same files unchecked — and the session harness tells agents to prefer
+# sed/heredocs for edits, which made the uncovered door the DEFAULT one.
+#
+# It denies by SHAPE, not by budget. Of the six bypass shapes only a heredoc
+# carries its content in the command; the rest write bytes that do not exist
+# until the command runs. So a size check here could cover a sixth of the
+# surface while reading as if it covered all of it — the remedy points at the
+# Edit/Write tools, where #698 does the real check over the real content.
+#
+# Reads the hook payload on stdin, so it is never run by hand.
+run = "uv run kb-setup instruction-shell-write"
+timeout = "60s"

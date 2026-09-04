@@ -1,0 +1,231 @@
+# Mutation arms for `kb_setup.instruction_shell_write` + `md_budget.agents_root`
+# (#711, and the AGENTS.md half Ray ruled in the same round).
+#
+# WHAT THESE DO NOT COVER, said first because it is the more important half.
+#
+# These arms measure my TESTS. They cannot see whether `.claude/settings.json`
+# routes a Bash call into the guard at all — and on the sibling change (#698)
+# that was the ACTUAL defect: 55 green unit tests beside a hook that fired on
+# nothing, because an `Edit(<glob>)` `if` rule does not match a `Write` call. A
+# clean sweep here says the suite can go red. It says nothing about the settings
+# file beside it.
+#
+# THE LIVE ARMS, run by hand against the SHIPPED config on 2026-09-04, both
+# directions, and the reason this spec is not the only evidence:
+#
+#   echo "probe" > .claude/rules/zz-live-arm-probe.md
+#     -> DENIED. `ls` afterwards: "No such file or directory" — it never
+#        reached disk, so the deny is a real refusal and not a late warning.
+#
+#   uv run python -c "open('.claude/rules/zz-python-probe.md','w').write('x'*10)"
+#     -> DENIED. This is the EXACT command shape #711 was filed about, the one
+#        that previously wrote 401 lines into `.claude/rules/` and landed.
+#
+#   echo "control" > <scratchpad>/control-arm.md
+#     -> ALLOWED, rc=0, file written. A guard that can only deny is not a
+#        guard, and without this row the two above are satisfied by a hook that
+#        refuses every redirect in the session.
+#
+# ── the control: a no-op comment that MUST survive ─────────────────────────
+
+suites = ["tests/test_instruction_shell_write.py", "tests/test_md_budget.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    tokens = tokenise(command)'''
+new = '''    tokens = tokenise(command)  # control'''
+
+# ── S1: stop seeing redirects — the shape the whole ticket is about ────────
+[[arm]]
+id = "S1"
+test = "test_a_shell_write_to_an_instruction_file_is_denied"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''        if token in _WRITE_REDIRECTS and not is_operator(tokens[index + 1]):'''
+new = '''        if False:'''
+
+# ── S2: treat `<` as a write too ───────────────────────────────────────────
+#
+# The OVER-CORRECTION direction, which is the one a guard like this usually gets
+# wrong. `wc -l < CLAUDE.md` reads a file and must stay silent; widening the set
+# to every redirect operator is the natural sloppy version of S1's fix.
+[[arm]]
+id = "S2"
+test = "test_a_read_redirect_is_not_a_write"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''_WRITE_REDIRECTS = frozenset({">", ">>"})'''
+new = '''_WRITE_REDIRECTS = frozenset({">", ">>", "<"})'''
+
+# ── S3: drop the write-intent condition on `python -c` ─────────────────────
+#
+# Arms the FALSE-POSITIVE direction specifically. With only the path-literal
+# condition, `python -c "print(open('CLAUDE.md').read())"` — an ordinary read
+# probe — is denied. Every measured defect in this repo's guard family has come
+# from that direction rather than from evasion, so it gets its own row.
+[[arm]]
+id = "S3"
+test = "test_a_python_c_that_only_reads_is_silent"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    if not _WRITE_INTENT.search(program):
+        return []'''
+new = '''    if False:
+        return []'''
+
+# ── S4: fail CLOSED on an unparsable command ───────────────────────────────
+#
+# Inverts `hook_guard`'s convention. This is exactly the kind of inversion a
+# later reader "corrects" back — and doing so would deny every Bash call whose
+# quoting shlex cannot parse, inside a hook that runs on all of them.
+[[arm]]
+id = "S4"
+test = "test_an_unparsable_command_fails_open"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    if tokens is None:
+        return []  # unparsable — fail open, see the module docstring'''
+new = '''    if tokens is None:
+        return ["CLAUDE.md"]'''
+
+# ── S5: render "allow" instead of staying silent ───────────────────────────
+#
+# Armed on the ABSENCE of a key. Returning `permissionDecision: "allow"` would
+# ALSO skip the user's permission prompt — a regression that looks like success
+# in every other assertion, which is why it needs an arm rather than a comment.
+[[arm]]
+id = "S5"
+test = "test_an_allow_renders_nothing_at_all"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    if not verdict.deny:
+        return None'''
+new = '''    if not verdict.deny:
+        return json.dumps({"hookSpecificOutput": {"permissionDecision": "allow"}})'''
+
+# ── S6: let `uv run python -c` read as a command named `uv` ────────────────
+#
+# The realistic regression, not a nonsense edit: this is what the guard did
+# BEFORE `_unwrap_runner` existed, and the probe table caught it. `uv run
+# python` is how python is actually invoked in this repo, so without the unwrap
+# the single most likely bypass shape here is invisible.
+[[arm]]
+id = "S6"
+test = "test_a_python_c_that_writes_is_denied"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''        words = _unwrap_runner(command_word(raw))'''
+new = '''        words = command_word(raw)'''
+
+# ── S7 IS GONE. TWO MUTATIONS, BOTH INERT, AND THAT IS THE FINDING ─────────
+#
+# S7 tried to arm `_unwrap_runner`'s BOUNDED scan — the property that an
+# argument cannot be promoted into the command position, which
+# `check_first._segment_is_a_gate` shipped as a real defect once
+# (`uv run pytest -k ruff` denied for a tool it does not cover). Twice:
+#
+#   v1  replace the bounded flag-scan with `words.index("run")`.
+#       SURVIVED. Probed over six shapes — `uv pip install run`,
+#       `uv --directory run run python`, `uv run`, … — the two implementations
+#       differed on **0**, because the trailing `or words` fallback collapses
+#       the only case that could diverge. A behaviour-preserving edit.
+#
+#   v2  replace it with a forward scan for the first python-ish token, which is
+#       the historical defect's exact shape. SURVIVED TOO — and this one DOES
+#       change the unwrap: `uv run pytest -k python` unwraps to `['python']`
+#       instead of `['pytest', '-k', 'python']`. But the DENY DECISION is
+#       unchanged on all six shapes, because `_python_c_targets` then requires
+#       `-c`, a `.md` path literal AND a write indicator, and a promoted bare
+#       `python` satisfies none of them.
+#
+# 🔴 SO THE PROPERTY IS NOT LOAD-BEARING HERE, and that is worth more than a
+# green row would have been. The false-positive protection on this path is the
+# CONJUNCTION inside `_python_c_targets`, not the unwrap — and S3, which removes
+# one term of that conjunction, DIED. The arm that matters was already present;
+# S7 was arming a line whose effect is masked downstream.
+#
+# `_unwrap_runner` keeps the bounded scan anyway. Unlike the dead branch A5
+# found, this one is reachable and correct — it is simply masked today, and it
+# becomes load-bearing the moment `_PYTHON` handling grows a shape that needs
+# fewer conditions. Deleting it would trade a correct line for a green sweep.
+#
+# The rule this pair illustrates, twice in one spec: a SURVIVOR IS NOT A GAP
+# until the mutant is shown to change observable behaviour at the line. Taking
+# either survival at face value would have added a test for a defect that
+# cannot occur, and the test would have passed forever while proving nothing.
+
+# ── T1: `tokenise` stops keeping the operators ─────────────────────────────
+#
+# The defect that made this guard need a `check_first` change at all: `segments`
+# discards operator tokens, so a redirect target arrives indistinguishable from
+# a bare command word. Filtering them out of `tokenise` restores exactly that
+# blindness while `segments` — and every existing check_first test — stays green.
+[[arm]]
+id = "T1"
+test = "test_a_shell_write_to_an_instruction_file_is_denied"
+file = "python/src/kb_setup/check_first.py"
+old = '''        return list(lexer)'''
+new = '''        return [t for t in lexer if not is_operator(t)]'''
+
+# ── A1: AGENTS.md goes back to matching no class ───────────────────────────
+[[arm]]
+id = "A1"
+test = "test_an_agents_md_gets_its_own_class"
+file = "python/src/kb_setup/md_budget.py"
+old = '''    if _AGENTS_RE.search(path):'''
+new = '''    if False:'''
+
+# ── A2: fold agents bytes into the EAGER total ─────────────────────────────
+#
+# The one-line change Ray explicitly rejected. It makes the printed
+# "eager context ~N bytes every session" figure overstate by counting bytes
+# Claude never loads — a load-bearing number quietly becoming wrong, which no
+# test would catch unless one is pointed at it.
+[[arm]]
+id = "A2"
+test = "test_agents_root_is_not_counted_as_eager_context"
+file = "python/src/kb_setup/md_budget.py"
+old = '''EAGER_CLASSES = frozenset({"eager_root", "rule_unscoped"})'''
+new = '''EAGER_CLASSES = frozenset({"eager_root", "rule_unscoped", "agents_root"})'''
+
+# ── A3: drop the closure dedup — the CROSS-REPO regression ─────────────────
+#
+# dotfiles runs this same function over a tree where every AGENTS.md HAS a
+# CLAUDE.md stub importing it. Without this skip its bytes are charged twice,
+# once inside the stub's closure and once standalone, and the violation names
+# the wrong path. That repo pins this package by SHA, so the damage arrives
+# whenever the pin advances — not here, where nothing would look wrong.
+[[arm]]
+id = "A3"
+test = "test_an_imported_agents_md_is_not_budgeted_twice"
+file = "python/src/kb_setup/md_budget.py"
+old = '''        if cls == "agents_root" and rel in imported:'''
+new = '''        if False:'''
+
+# ── A4: make the dedup unconditional ───────────────────────────────────────
+#
+# The control arm for A3, and it is the arm that matters most: without it, A3
+# is satisfied by an implementation that never budgets an AGENTS.md at all —
+# i.e. by the exact behaviour this change exists to remove, passing its own
+# test while doing it.
+[[arm]]
+id = "A4"
+test = "test_the_import_dedup_is_about_being_imported_not_about_the_filename"
+file = "python/src/kb_setup/md_budget.py"
+old = '''        if cls == "agents_root" and rel in imported:'''
+new = '''        if cls == "agents_root":'''
+
+# ── A5 IS GONE, AND THE LINE IT ARMED IS GONE WITH IT ──────────────────────
+#
+# A5 mutated away `_closure_members`' self-exclusion — `if member == path:
+# continue` — on the reasoning that a CLAUDE.md is a member of its own closure
+# and must still be budgeted as the stub. It SURVIVED.
+#
+# The survival was correct and the line was dead. Measured over a tree of two
+# stub/AGENTS.md pairs: the only paths the exclusion ever dropped were
+# `CLAUDE.md` and `docs/CLAUDE.md`, and NEITHER classifies as `agents_root` —
+# the only class the `imported` set is ever consulted for. An entry point cannot
+# demote itself, so the branch could never fire.
+#
+# So the fix was not a new test. It was DELETING the branch: a defensive line
+# nothing can reach is a line no arm can protect, and leaving it would have left
+# an unarmed conditional in a function whose whole job is a cross-repo
+# correctness invariant. `probes-need-a-control-arm.md` rule 9 — "unreachable by
+# construction is a CLAIM, and it needs an arm like any other." This one got its
+# arm, and the arm is why the line is gone.

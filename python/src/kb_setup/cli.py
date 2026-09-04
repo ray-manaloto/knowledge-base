@@ -64,6 +64,7 @@ def _print_usage() -> int:
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | "
         "telemetry-prune | serve | env-refresh [--sentinel] | instruction-edit-guard | "
+        "instruction-shell-write | "
         "merge <chunk> | label | "
         "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
         "brain [record|reflect|audit] | distill | session-reflect [--sessions N] | "
@@ -227,6 +228,15 @@ def _run(argv: list[str] | None = None) -> int:
         # shell-tokenised command from Bash/Grep — it returns Ok(None) for any
         # other tool — and an Edit payload has none of that.
         return instruction_edit_guard.main(repo_root)
+    if cmd == "instruction-shell-write":
+        from kb_setup import instruction_shell_write
+
+        # The Bash half of the same tenant (#711). Separate from the four
+        # stateless Bash guards in `hook_guard` on purpose: those redirect a
+        # command to a better command, while this one refuses a SURFACE and
+        # points at a different TOOL. Folding it in would have put md_budget's
+        # classification inside the redirect table, where nothing else needs it.
+        return instruction_shell_write.main(repo_root)
     if cmd == "serve":
         from kb_setup import mcp_serve
 

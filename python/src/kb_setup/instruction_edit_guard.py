@@ -106,13 +106,21 @@ decision 5 rules that the Bash surface is a **different tenant** — its sibling
 guard. Cold review P1 on ``3047b2989777`` was right that the admission existed
 for the sibling and had not been carried here.
 
-Two things follow, and the second is the uncomfortable one:
+🔴 **THAT TENANT NOW EXISTS: `kb_setup.instruction_shell_write` (#711, Ray's
+ruling 2026-09-04).** The shapes listed above are no longer merely admitted —
+a `>`/`>>` redirect, a `tee`, an in-place `sed`/`perl` and a writing
+`python -c` are DENIED at a `Bash` matcher, by SHAPE, with the remedy pointing
+back at these two tools. So this paragraph's "completely invisible to it" is
+still true of THIS module and is no longer true of the repo.
 
-* the hk ``md_size_budget`` step remains the **authority**; this guard is a
-  faster, earlier signal and never the last line;
-* the gap is **live, not theoretical** — this repo's own conventions push agents
-  toward Bash for file work, so the bypass is on the path of least resistance
-  rather than off it. Tracked separately rather than papered over.
+Two things still follow, and the second is the uncomfortable one:
+
+* the hk ``md_size_budget`` step remains the **authority**; both guards are
+  faster, earlier signals and neither is the last line;
+* the gap is **narrowed, not closed** — ``find … -exec sed -i``, ``xargs``,
+  ``sh -c``, ``eval`` and ``$(…)`` still reach these files, and this repo's own
+  conventions push agents toward Bash for file work. The sibling module's own
+  SCOPE block is the current list; do not read this one as covering it.
 
 What it declines to judge, and why that is not a failure
 ========================================================
