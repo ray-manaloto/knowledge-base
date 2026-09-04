@@ -1,8 +1,17 @@
 # Archiving the planning-with-files plan
 
 Loaded on demand by `clear-prep` step 7. Split out of `SKILL.md` on
-2026-09-03 (#697), which was at exactly its 500-line ceiling; every detail
-below is unchanged. Do this ONLY after the user answers *"/clear now"*.
+2026-09-03 (#697), which was at exactly its 500-line ceiling. Do this ONLY
+after the user answers *"/clear now"*.
+
+**One line is NOT a verbatim move**, flagged by the cold review of `00d0b078`:
+the `PWF=` assignment below was rewritten from a `:-` default carrying a literal
+plugin-cache path to the `:?` required-variable form. Two reasons, and neither is
+cosmetic. agnix exempts a `SKILL.md` from its hard-coded-path rule but NOT a
+`references/*.md` sidecar — measured three-armed — so that literal fails
+`mise run lint` here while it passed there. And it pinned a plugin VERSION in
+prose, which goes stale silently. `session-resume/SKILL.md` still carries the
+literal path if you need it. Everything else below is verbatim.
 
 **On *"/clear now"* — and only then — ARCHIVE the plan, but only if it is DONE:**
 

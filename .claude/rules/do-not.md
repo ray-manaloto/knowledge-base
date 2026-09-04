@@ -30,7 +30,7 @@ The authoritative list of things agents (and humans) must not do in this repo.
      writes THERE: genuinely shared state, banned for this entry's own reason.
 
    ⚠️ **`watch` was in this list and never belonged to it** (narrowed
-   2026-08-01, evidence in `docs/invariant-provenance.md` § entry 2 — do not
+   2026-08-01, evidence in `docs/invariant-provenance.md` § entry 2a — do not
    re-add it). It is still the wrong tool: `watch` refreshes only that path's
    scoped sub-graph, so it cannot update the **aggregate** graph. Use
    **`mise run kb-watch`** (`kb_setup.graph.refresh_self`), which re-extracts

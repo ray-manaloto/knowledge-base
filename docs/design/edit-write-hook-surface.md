@@ -40,11 +40,11 @@ Two contract details decide the shape, both read from
 
 - 🔴 **`permissionDecisionReason` reaches Claude only on `"deny"`.** For
   `"allow"` and `"ask"` it is *"shown to the user but not Claude"*
-  (`hooks.md:1746`). So headroom on a valid edit MUST travel in
+  (`hooks.md:1745`). So headroom on a valid edit MUST travel in
   `additionalContext`, never the reason.
 - 🔴 **`additionalContext` IS supported on `PreToolUse`** (`hooks.md:1747`, with
-  the JSON example at `:1768`) — even though the decision-control summary table
-  at `:1013` lists only `permissionDecision`/`permissionDecisionReason`. That
+  the JSON example at `:1766`) — even though the decision-control summary table
+  at `:1007` lists only `permissionDecision`/`permissionDecisionReason`. That
   table gives key fields *for the decision*, not the event's full field set. A
   design read off the summary alone splits this across two events and is wrong.
 
@@ -70,10 +70,10 @@ Do not name `NotebookEdit`: it writes `.ipynb`, not instruction markdown.
 Filtering goes in the harness via `if`, not only in python, because a bare
 matcher spawns a ~0.25 s process on **every** edit in the repo for a policy that
 concerns a small minority of them. `if` holds **exactly one** permission rule
-(`hooks.md:427`) — no `&&`, `||` or list — so each path class needs its own
+(`hooks.md:432`) — no `&&`, `||` or list — so each path class needs its own
 handler. One `Edit(<glob>)` rule covers `Edit`, `Write` and `NotebookEdit`
 (`tools-reference.md:85,368`). Python stays authoritative; `if` is cheap dispatch
-only, since the docs call the filter best-effort (`hooks.md:431`).
+only, since the docs call the filter best-effort (`hooks.md:448`).
 
 ### 3. Module — separate, not inside `hook_guard`
 
@@ -98,7 +98,7 @@ call. That reasoning does **not** carry here. A silent internal failure defeats
 exactly the policy the hook advertises, and the blast radius is one instruction
 file rather than all shell access.
 
-🔴 **The timeout path fails OPEN and cannot be leaned on.** `hooks.md:846`,
+🔴 **The timeout path fails OPEN and cannot be leaned on.** `hooks.md:845`,
 verbatim: *"A timed-out `command`, `http`, or `mcp_tool` hook doesn't block the
 tool call. The call continues through the normal permission flow, so don't count
 on a stalled hook to act as a gate."* Only an Agent SDK callback hook blocks on
@@ -128,15 +128,45 @@ does. Probe it before assuming; if it does not, a narrow Write-only
 ### 6. Ordering — #697 before any denial
 
 Five instruction files sat at **exactly** 100% of their line budget when this was
-decided (re-derived twice, independently, on 2026-09-03; #697's prose said seven,
-its own table said five). A deny shipped against that state makes every edit to
+decided — `CLAUDE.md` (200/200), `.claude/rules/do-not.md` (200/200),
+`.claude/rules/probes-need-a-control-arm.md` (200/200), and
+`.claude/skills/clear-prep/SKILL.md` (500/500) in BOTH the `.claude/` and
+`.agents/` trees. Re-derived twice independently on 2026-09-03; issue 697's prose
+said seven, its own table said five, and five is right.
+
+**How to re-derive it.** `md_budget.Report` exposes only an aggregate count, so
+the per-file breakdown needs the classifier directly — the cold review of
+`00d0b078` correctly labelled this claim `unverified` for want of exactly this
+recipe:
+
+```python
+from pathlib import Path
+from kb_setup import md_budget as m
+root = Path(".")
+for rel in m.tracked_files(root):
+    f = root / rel
+    if m.classify(rel) is None or not f.is_file():
+        continue
+    raw = f.read_text(errors="replace")
+    cls = m._resolve_class(rel, raw, m.DEFAULT_EXCLUDED_PREFIXES)
+    if cls is None:
+        continue
+    lines, _bytes, _unit = m._size_of(cls, f, raw, root)
+    cap = m.BUDGETS[cls].max_lines
+    print(f"{lines / cap:6.1%} {lines:>4}/{cap:<4} {rel}")
+``` A deny shipped against that state makes every edit to
 `CLAUDE.md` or `do-not.md` a trim-first operation, and **a guard that blocks
 routinely gets switched off — a switched-off guard is worse than none.**
 
-# 697 was landed first, in the same round as this record. Post-trim the tightest
+Issue 697 was landed first, in the same round as this record. Post-trim the
+tightest files are `.claude/rules/long-running-command-hangs.md` (198/200) and
+`.claude/rules/mise-tasks-only.md` (194/200) — same recipe as above — so the
+ordering constraint is relieved but not eliminated.
 
-files are 198/200 and 194/200, so the ordering constraint is relieved but not
-eliminated.
+(That paragraph opened with a bare `#697` until the cold review of `00d0b078`:
+`mise run fmt` rewrote it to `# 697` at line start, making it an **H1** and
+orphaning the rest of the sentence. `kb-review`'s own SKILL.md records the same
+hazard. Never start a line with `#` followed by digits.)
 
 ## What this record does NOT do
 
@@ -187,3 +217,4 @@ atomically).
 
 - [ray-manaloto/knowledge-base](https://github.com/ray-manaloto/knowledge-base) — issues #671, #697, #698, #699, #700.
 - [anthropics/claude-code](https://github.com/anthropics/claude-code) — via the pinned docs clone `sources/claude-code-docs/`, for `hooks.md` and `tools-reference.md`.
+```

@@ -32,7 +32,7 @@ outright regardless of any env var.
 The denial generalises to every platform subcommand: `graphify antigravity
 install` and `graphify codex install --project` are both denied.
 
-## Entry 2 — why `watch` was removed from the ban list
+## Entry 2a — why `watch` was removed from the ban list
 
 Narrowed 2026-08-01. The banned spelling `graphify --watch` **is not a real
 invocation**: `--watch` occurs **0** times in the currently-pinned **0.9.53**
@@ -49,7 +49,7 @@ here, but for a different reason, and that reason is stated in the rule: it
 refreshes only that path's scoped sub-graph and cannot update the aggregate
 graph. Use `mise run kb-watch`.
 
-## Entry 2 — `hook install`, in full
+## Entry 2b — `hook install`, in full
 
 `graphify.hooks.install()` (`hooks.py:754-763`) resolves the nearest git repo and
 calls `_hooks_dir(root)`, which asks `git rev-parse --git-path hooks` and honours
