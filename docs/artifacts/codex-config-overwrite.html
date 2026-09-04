@@ -1,0 +1,184 @@
+<title>The Codex Config Overwrite</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --ground:   #F2F4F6;
+    --surface:  #FFFFFF;
+    --ink:      #16202B;
+    --ink-soft: #5A6674;
+    --rule:     #D7DDE4;
+    --loss:     #9A4B18;
+    --loss-bg:  #FBEFE6;
+    --keep:     #1F5D4C;
+    --keep-bg:  #E7F1ED;
+    --sans: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.45;
+    padding: 30px 20px 40px;
+  }
+
+  .sheet {
+    max-width: 760px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 30px 34px 28px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--loss);
+    margin: 0 0 8px;
+  }
+
+  h1 {
+    font-size: 27px;
+    font-weight: 700;
+    letter-spacing: -0.021em;
+    line-height: 1.14;
+    text-wrap: balance;
+    margin: 0 0 22px;
+  }
+
+  dl { margin: 0; display: grid; grid-template-columns: 92px 1fr; gap: 11px 18px; }
+
+  dt {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding-top: 3px;
+  }
+
+  dd { margin: 0; font-size: 15.5px; }
+  dd b { font-weight: 700; }
+  .gone { color: var(--loss); font-weight: 700; }
+
+  figure {
+    margin: 24px 0 22px;
+    padding: 18px 16px 12px;
+    background: var(--ground);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow-x: auto;
+  }
+
+  figcaption {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-top: 10px;
+    text-align: center;
+  }
+
+  svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+
+  .ask {
+    margin: 0;
+    padding: 14px 16px;
+    background: var(--loss-bg);
+    border-left: 3px solid var(--loss);
+    font-size: 15.5px;
+  }
+
+  .ask b { display: block; font-size: 12px; font-family: var(--mono); letter-spacing: 0.1em;
+           text-transform: uppercase; color: var(--loss); margin-bottom: 4px; }
+
+  .safe { color: var(--keep); font-weight: 700; }
+
+  .corr {
+    margin: 18px 0 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+
+  .corr b { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+            text-transform: uppercase; color: var(--ink); margin-bottom: 4px; }
+</style>
+
+<main class="sheet">
+  <p class="eyebrow">Corrected 2026-09-04 · first answer was wrong</p>
+  <h1>ChatGPT copied your Claude Code setup over your Codex settings file</h1>
+
+  <dl>
+    <dt>What</dt>
+    <dd>Your Codex settings file went from <b>144 lines to 27</b> at 3:29 AM.</dd>
+
+    <dt>Who</dt>
+    <dd>The <b>ChatGPT desktop app</b>. It has a setting that copies your Claude Code setup across, and it is switched on.</dd>
+
+    <dt>Lost</dt>
+    <dd><span class="gone">Every note you wrote in it</span> — and the block that lets Codex reach our knowledge graph.</dd>
+
+    <dt>Why</dt>
+    <dd>A copy replaces. It brought <em>its</em> version of the file and put nothing of yours back.</dd>
+
+    <dt>Recurs</dt>
+    <dd><span class="gone">Yes.</span> "Keep imports in sync" is on, so it will happen again.</dd>
+
+    <dt>Safe</dt>
+    <dd><span class="safe">Nothing was saved.</span> The file is back and the pull request is clean.</dd>
+  </dl>
+
+  <figure>
+    <svg viewBox="0 0 640 156" role="img"
+         aria-label="A 144-line file with notes goes into the ChatGPT import and comes out as a 27-line file holding copied Claude Code settings; the notes have no path through.">
+      <!-- before -->
+      <rect x="6" y="20" width="150" height="116" rx="2" fill="#FFFFFF" stroke="#16202B" stroke-width="1.4"/>
+      <text x="81" y="12" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#5A6674" text-anchor="middle">what you wrote</text>
+      <text x="20" y="42" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#9A4B18"># why this pin</text>
+      <text x="20" y="58" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#9A4B18"># why two names</text>
+      <text x="20" y="80" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#16202B">[agents]</text>
+      <text x="20" y="96" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#16202B">[mcp_servers.kb]</text>
+      <text x="20" y="124" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#5A6674">144 lines</text>
+
+      <!-- generator -->
+      <rect x="222" y="52" width="120" height="52" rx="2" fill="#16202B"/>
+      <text x="282" y="76" font-family="Instrument Sans, sans-serif" font-size="12.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">ChatGPT import</text>
+      <text x="282" y="92" font-family="JetBrains Mono, monospace" font-size="9.5" fill="#A9B4C0" text-anchor="middle">copies Claude Code</text>
+
+      <!-- arrows: settings pass through, notes stop -->
+      <path d="M158 88 H216" stroke="#16202B" stroke-width="1.4" fill="none"/>
+      <path d="M210 84 l7 4 -7 4" fill="#16202B"/>
+      <path d="M158 50 H200" stroke="#9A4B18" stroke-width="1.4" fill="none" stroke-dasharray="4 3"/>
+      <line x1="203" y1="44" x2="215" y2="56" stroke="#9A4B18" stroke-width="1.8"/>
+      <line x1="215" y1="44" x2="203" y2="56" stroke="#9A4B18" stroke-width="1.8"/>
+      <text x="209" y="34" font-family="Instrument Sans, sans-serif" font-size="10.5" font-weight="700" fill="#9A4B18" text-anchor="middle">no path</text>
+
+      <path d="M344 78 H400" stroke="#16202B" stroke-width="1.4" fill="none"/>
+      <path d="M394 74 l7 4 -7 4" fill="#16202B"/>
+
+      <!-- after -->
+      <rect x="406" y="34" width="150" height="88" rx="2" fill="#FFFFFF" stroke="#9A4B18" stroke-width="1.4"/>
+      <text x="481" y="26" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#5A6674" text-anchor="middle">what it wrote back</text>
+      <text x="420" y="58" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#16202B">[agents]</text>
+      <text x="420" y="76" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#16202B">your Claude settings</text>
+      <text x="420" y="110" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#9A4B18">27 lines</text>
+    </svg>
+    <figcaption>The six settings it added are a word-for-word copy of this project’s Claude Code file. That is how we know.</figcaption>
+  </figure>
+
+  <p class="ask">
+    <b>What I need from you</b>
+    One decision: turn that sync off (or narrow what it copies), or leave it on and let me add a
+    check that shouts whenever this file loses its notes again.
+  </p>
+  <p class="corr">
+    <b>Corrected</b>
+    The first version of this page blamed a helper tool inside a plugin. That was wrong.
+    It was named because it was the only thing on the machine that <em>could</em> have written those
+    settings — which is not the same as showing that it <em>did</em>.
+  </p>
+</main>
