@@ -63,7 +63,7 @@ def _print_usage() -> int:
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | "
-        "telemetry-prune | serve | "
+        "telemetry-prune | serve | env-refresh [--sentinel] | "
         "merge <chunk> | label | "
         "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
         "brain [record|reflect|audit] | distill | session-reflect [--sessions N] | "
@@ -213,6 +213,12 @@ def _run(argv: list[str] | None = None) -> int:
         return manifest_audit.main(repo_root, rest)
     if cmd in {"insights", "graph-size", "telemetry-prune"}:
         return _dispatch_graph_hygiene(repo_root, cmd, rest)
+    if cmd == "env-refresh":
+        from kb_setup import env_refresh
+
+        # A bare arm, on `funnel`'s precedent: it neither reads nor writes the
+        # graph, and its whole job is one write to a path only a hook knows.
+        return env_refresh.main(rest)
     if cmd == "serve":
         from kb_setup import mcp_serve
 

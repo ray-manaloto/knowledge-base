@@ -1,0 +1,128 @@
+# Mutation arms for `kb_setup.env_refresh` (#702).
+#
+# The live three-arm probe that settled the DESIGN is a different thing from
+# these, and confusing the two is the mistake worth naming up front. That probe
+# measured the world: does a PATH written to `CLAUDE_ENV_FILE` beat the shell
+# snapshot's final `export PATH`? It did. These arms measure only my TESTS —
+# whether the suite I wrote alongside the module can actually go red. A clean
+# sweep here says nothing about whether the design is correct.
+#
+# What each arm is for:
+#
+# A1 is the one that matters most, because it is the module's whole thesis. An
+# absent `CLAUDE_ENV_FILE` must return NOT_RUN, never OK. Returning OK is the
+# #702 failure mode restated in code — a hook that writes nothing reporting
+# success is indistinguishable from one that works, and that is precisely the
+# condition the issue exists to stop being invisible.
+#
+# A2 arms idempotence realistically. The realistic break is DELETING the marker
+# check, not renaming the marker: a CwdChanged trigger fires on every `cd`, so
+# without that guard PATH grows one duplicate entry per fire, unbounded, for the
+# life of the session.
+#
+# A3 arms the refusal to guess. Returning a hardcoded fallback path when mise
+# cannot answer is the tempting "helpful" edit, and it fails silently — a PATH
+# entry that resolves nothing looks exactly like a working hook.
+#
+# A4 arms LINE ORDER, which is the detail a reader reverses. `export
+# PATH="X:$PATH"` PREPENDS, so the LAST line written wins the head. Swapping the
+# two emissions puts the sentinel at position 1 and the shims dir at 2 — still
+# "working" by every other assertion in the suite, and wrong.
+#
+# A5 arms the no-trailing-newline append. The env file is SOURCED, so gluing our
+# first line onto an unterminated one is a syntax error in a preamble that runs
+# before every Bash command — a break that takes the whole tool down, not one
+# feature.
+#
+# WHAT IS NOT ARMED, and cannot be from here: that `FileChanged` works. It did
+# not fire in this round's live test and the module docstring says so; no unit
+# mutation can reach that. Nor is a real mid-session version bump armed — the
+# shim is a symlink to the mise binary, so it tracks by construction, but
+# "by construction" is a claim and this file is not where it gets its arm.
+
+suites = ["tests/test_env_refresh.py"]
+
+# ── the control: a no-op comment that MUST survive ─────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/env_refresh.py"
+old = '''    target = env.get(ENV_FILE_VAR)'''
+new = '''    target = env.get(ENV_FILE_VAR)  # control'''
+
+# ── A1: an absent env file must NOT be reported as success ─────────────────
+[[arm]]
+id = "A1"
+test = "test_absent_env_file_is_not_run_never_ok"
+file = "python/src/kb_setup/env_refresh.py"
+old = '''        return Rc.NOT_RUN
+    shims = shims_dir(run=run)'''
+new = '''        return Rc.OK
+    shims = shims_dir(run=run)'''
+
+# ── A2: delete the idempotence guard (the realistic break, not a rename) ───
+[[arm]]
+id = "A2"
+test = "test_writes_shims_entry_and_is_idempotent"
+file = "python/src/kb_setup/env_refresh.py"
+old = '''    if MARKER in existing:'''
+new = '''    if False:'''
+
+# ── A3: guess a path instead of refusing when mise cannot answer ───────────
+[[arm]]
+id = "A3"
+test = "test_refuses_to_guess_when_mise_cannot_answer"
+file = "python/src/kb_setup/env_refresh.py"
+old = '''    shims = shims_dir(run=run)
+    if shims is None:'''
+new = '''    shims = shims_dir(run=run) or Path("/usr/local/bin")
+    if shims is None:'''
+
+# ── A4: reverse the emission order, so the sentinel wins the head ──────────
+[[arm]]
+id = "A4"
+test = "test_sentinel_lands_behind_the_shims_entry"
+file = "python/src/kb_setup/env_refresh.py"
+old = '''        out.append(f'export PATH="{SENTINEL_DIR}:$PATH"')
+    out.append(f'export PATH="{shims}:$PATH"')'''
+new = '''        out.append(f'export PATH="{shims}:$PATH"')
+    out.append(f'export PATH="{SENTINEL_DIR}:$PATH"')'''
+
+# ── A5: drop the newline guard, gluing our line onto an unterminated one ───
+[[arm]]
+id = "A5"
+test = "test_append_to_a_file_with_no_trailing_newline"
+file = "python/src/kb_setup/env_refresh.py"
+old = '''    prefix = "" if existing.endswith("\n") or not existing else "\n"'''
+new = '''    prefix = ""'''
+
+# ── the cold-review fixes, armed on their own (kb-review step 4a) ──────────
+#
+# Added after the cold lane on b5404f11 returned P2 (no exception handling on
+# the write path) and P3 (a tautological test). The skill's rule is that the fix
+# closing a finding is the least-reviewed code in the diff, so each fix gets an
+# arm of its own rather than riding on the arms written before it existed.
+#
+# F1 breaks the P2 fix REALISTICALLY: not by deleting the try, but by catching
+# the wrong exception type. That is the mistake someone actually makes, and it
+# leaves the structure looking correct — a `try:` with an `except` beside it,
+# which is exactly what a reading pass checks for.
+#
+# F2 breaks the P3 fix at the argv. The replacement test's whole claim is that
+# the default path reaches `subprocess.run` WITH the arguments the module says
+# it sends; dropping `--json` is the realistic regression and is invisible to
+# every other test in the file, all of which stub the runner.
+
+[[arm]]
+id = "F1"
+test = "test_unwritable_target_is_not_run_not_a_traceback"
+file = "python/src/kb_setup/env_refresh.py"
+old = '''    except OSError as exc:'''
+new = '''    except ValueError as exc:'''
+
+[[arm]]
+id = "F2"
+test = "test_default_run_actually_invokes_subprocess_run"
+file = "python/src/kb_setup/env_refresh.py"
+old = '''            ["mise", "doctor", "--json"],'''
+new = '''            ["mise", "doctor"],'''

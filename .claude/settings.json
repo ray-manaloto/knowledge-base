@@ -57,6 +57,16 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "startup|resume|clear|compact|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-env-refresh",
+            "timeout": 60
+          }
+        ]
       }
     ],
     "SessionEnd": [

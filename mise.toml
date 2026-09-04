@@ -1672,3 +1672,26 @@ description = "Extract EVERY buildable source once, past every failure: which so
 run = "uv run kb-setup extract-census"
 # Bound: extracts every source cold, so it is the most expensive read-only task here.
 timeout = "180m"
+
+[tasks.kb-env-refresh]
+description = "Put mise's shim dir at the head of PATH in CLAUDE_ENV_FILE (unfreezes the Bash tool)"
+# #702. Every Bash tool call is a fresh `zsh -c` re-sourcing
+# `~/.claude/shell-snapshots/snapshot-zsh-<id>.sh`, whose FINAL line is a literal
+# `export PATH='...'` captured once at session start. A `mise use` mid-session
+# therefore cannot reach the Bash tool at all: measured on #702's session,
+# `codex --version` said 0.152.0 while `mise exec -- codex --version` said
+# 0.153.1 under a 0.153.1 pin.
+#
+# The remedy is one line into `CLAUDE_ENV_FILE`, which Claude Code runs as a
+# script preamble before each Bash command. A mise SHIM is a symlink to the
+# `mise` binary itself, never to a version-named path, so that one line stays
+# correct across every future bump -- no regeneration, no PATH growth, and no
+# environment VALUES copied into a file.
+#
+# Wired to SessionStart, not FileChanged: with a version-independent shim there
+# is nothing for a file change to react to. `CLAUDE_ENV_FILE` is exposed only to
+# SessionStart/Setup/CwdChanged/FileChanged (hooks.md:1219); on any other event
+# the task exits 127, never 0, because a hook that never asked the question is
+# not a pass.
+run = "uv run kb-setup env-refresh"
+timeout = "60s"
