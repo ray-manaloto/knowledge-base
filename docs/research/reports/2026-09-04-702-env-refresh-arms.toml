@@ -95,3 +95,34 @@ test = "test_append_to_a_file_with_no_trailing_newline"
 file = "python/src/kb_setup/env_refresh.py"
 old = '''    prefix = "" if existing.endswith("\n") or not existing else "\n"'''
 new = '''    prefix = ""'''
+
+# ── the cold-review fixes, armed on their own (kb-review step 4a) ──────────
+#
+# Added after the cold lane on b5404f11 returned P2 (no exception handling on
+# the write path) and P3 (a tautological test). The skill's rule is that the fix
+# closing a finding is the least-reviewed code in the diff, so each fix gets an
+# arm of its own rather than riding on the arms written before it existed.
+#
+# F1 breaks the P2 fix REALISTICALLY: not by deleting the try, but by catching
+# the wrong exception type. That is the mistake someone actually makes, and it
+# leaves the structure looking correct — a `try:` with an `except` beside it,
+# which is exactly what a reading pass checks for.
+#
+# F2 breaks the P3 fix at the argv. The replacement test's whole claim is that
+# the default path reaches `subprocess.run` WITH the arguments the module says
+# it sends; dropping `--json` is the realistic regression and is invisible to
+# every other test in the file, all of which stub the runner.
+
+[[arm]]
+id = "F1"
+test = "test_unwritable_target_is_not_run_not_a_traceback"
+file = "python/src/kb_setup/env_refresh.py"
+old = '''    except OSError as exc:'''
+new = '''    except ValueError as exc:'''
+
+[[arm]]
+id = "F2"
+test = "test_default_run_actually_invokes_subprocess_run"
+file = "python/src/kb_setup/env_refresh.py"
+old = '''            ["mise", "doctor", "--json"],'''
+new = '''            ["mise", "doctor"],'''

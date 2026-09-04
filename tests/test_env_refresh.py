@@ -13,12 +13,16 @@ the one detail a reader gets backwards.
 from __future__ import annotations
 
 import json
-import subprocess
-from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from kb_setup import env_refresh
 from kb_setup.result import Rc
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import pytest
 
 
 class _Proc:
@@ -141,6 +145,50 @@ def test_main_reads_the_passed_env_not_the_process(tmp_path: Path) -> None:
     assert target.exists()
 
 
-def test_real_subprocess_default_is_wired() -> None:
-    """`run=None` must reach `subprocess.run`, not a stub left behind."""
-    assert env_refresh.subprocess.run is subprocess.run
+def test_default_run_actually_invokes_subprocess_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`run=None` must REACH `subprocess.run`, not merely be importable beside it.
+
+    Cold review P3 on b5404f11: the previous version of this test asserted
+    `env_refresh.subprocess.run is subprocess.run`, which is true by virtue of
+    the plain `import subprocess` at the top of the module and stays true no
+    matter what the default path does. It could not fail. This one substitutes
+    the real function and asserts the default branch called it, with the argv
+    the module claims to send.
+    """
+    seen: list[list[str]] = []
+
+    def spy(args: list[str], **_kwargs: object) -> _Proc:
+        seen.append(args)
+        return _Proc(json.dumps({"dirs": {"shims": "/spy/shims"}}))
+
+    monkeypatch.setattr(env_refresh.subprocess, "run", spy)
+    assert env_refresh.shims_dir() == Path("/spy/shims")
+    assert seen == [["mise", "doctor", "--json"]]
+
+
+def test_unwritable_target_is_not_run_not_a_traceback(tmp_path: Path) -> None:
+    """Cold review P2 on b5404f11: an unwritable target must not raise.
+
+    `shims_dir` already caught `OSError`; the write path did not, so a missing
+    parent directory took the hook down with a raw traceback at exit 1 instead
+    of the module's own `Rc` vocabulary.
+    """
+    missing_parent = tmp_path / "no-such-dir" / "env.sh"
+    rc = env_refresh.apply({env_refresh.ENV_FILE_VAR: str(missing_parent)}, run=_mise_ok())
+    assert rc == Rc.NOT_RUN
+    assert not missing_parent.exists()
+
+
+def test_read_only_target_is_not_run(tmp_path: Path) -> None:
+    """The other half of P2: the file exists and cannot be appended to."""
+    target = tmp_path / "env.sh"
+    target.write_text('export A="1"\n', encoding="utf-8")
+    target.chmod(0o444)
+    try:
+        rc = env_refresh.apply({env_refresh.ENV_FILE_VAR: str(target)}, run=_mise_ok())
+    finally:
+        target.chmod(0o644)
+    assert rc == Rc.NOT_RUN
+    assert env_refresh.MARKER not in target.read_text(encoding="utf-8")

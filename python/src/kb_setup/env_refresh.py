@@ -55,8 +55,13 @@ resolves nothing looks exactly like a hook that worked.
 The arm that bought this, and what it measured
 ==============================================
 
-That a ``PATH`` written to ``CLAUDE_ENV_FILE`` actually OVERRIDES snapshot line
-1825 was inferred, never measured, and the whole recommendation rested on it.
+That a ``PATH`` written to ``CLAUDE_ENV_FILE`` actually OVERRIDES the snapshot's
+final ``export PATH`` was inferred, never measured, and the whole recommendation
+rested on it. (#702 puts that line at 1825 of 1825. Re-derived here on a
+DIFFERENT session's snapshot rather than carried over: 1825 lines, the last
+beginning ``export PATH='``, and exactly one line in the file matching
+``^export PATH=`` — so the count is a coincidence of a stable environment, and
+the load-bearing fact is *last line, sole assignment*, not the number.)
 Armed three ways on 2026-09-04, reading the result in a LATER Bash call:
 
 * marker :data:`SENTINEL_VAR` absent -> the hook never ran -> conclude nothing;
@@ -217,17 +222,30 @@ def apply(env: dict[str, str], *, sentinel: bool = False, run: _Runner | None = 
         )
         return Rc.NOT_RUN
     path = Path(target)
-    existing = path.read_text(encoding="utf-8") if path.exists() else ""
-    if MARKER in existing:
-        events.say(
-            "env-refresh.already",
-            f"{path} already carries the shims entry — nothing appended.",
+    try:
+        existing = path.read_text(encoding="utf-8") if path.exists() else ""
+        if MARKER in existing:
+            events.say(
+                "env-refresh.already",
+                f"{path} already carries the shims entry — nothing appended.",
+            )
+            return Rc.OK
+        body = "\n".join(lines_for(shims, sentinel=sentinel)) + "\n"
+        prefix = "" if existing.endswith("\n") or not existing else "\n"
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(prefix + body)
+    except OSError as exc:
+        # Cold review P2 on b5404f11: `shims_dir` above catches OSError and this
+        # path did not, so an unwritable target — a missing parent directory, a
+        # read-only file — left the hook dying on a raw traceback at exit 1.
+        # `Rc.NOT_RUN` is the honest code for it, and it is the same code the
+        # unset-variable arm returns for the same reason: nothing was written,
+        # so nothing may report success.
+        events.fail(
+            "env-refresh.unwritable",
+            f"could not write {path}: {exc}. Nothing written; this is NOT a pass.",
         )
-        return Rc.OK
-    body = "\n".join(lines_for(shims, sentinel=sentinel)) + "\n"
-    prefix = "" if existing.endswith("\n") or not existing else "\n"
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(prefix + body)
+        return Rc.NOT_RUN
     events.say(
         "env-refresh.wrote",
         f"appended mise shims ({shims}) to the head of PATH in {path}"
