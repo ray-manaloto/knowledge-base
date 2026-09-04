@@ -34,16 +34,20 @@ suites = ["tests/test_instruction_shell_write.py", "tests/test_md_budget.py"]
 id = "C0"
 control = true
 file = "python/src/kb_setup/instruction_shell_write.py"
-old = '''    tokens = tokenise(command)'''
-new = '''    tokens = tokenise(command)  # control'''
+old = '''    marked = tokenise_marked(command)'''
+new = '''    marked = tokenise_marked(command)  # control'''
 
 # ── S1: stop seeing redirects — the shape the whole ticket is about ────────
 [[arm]]
 id = "S1"
 test = "test_a_shell_write_to_an_instruction_file_is_denied"
 file = "python/src/kb_setup/instruction_shell_write.py"
-old = '''        if token in _WRITE_REDIRECTS and not is_operator(tokens[index + 1]):'''
-new = '''        if False:'''
+old = '''            if value in _WRITE_REDIRECTS:
+                awaiting_target = True
+                continue'''
+new = '''            if False:
+                awaiting_target = True
+                continue'''
 
 # ── S2: treat `<` as a write too ───────────────────────────────────────────
 #
@@ -54,8 +58,8 @@ new = '''        if False:'''
 id = "S2"
 test = "test_a_read_redirect_is_not_a_write"
 file = "python/src/kb_setup/instruction_shell_write.py"
-old = '''_WRITE_REDIRECTS = frozenset({">", ">>"})'''
-new = '''_WRITE_REDIRECTS = frozenset({">", ">>", "<"})'''
+old = '''_WRITE_REDIRECTS = frozenset({">", ">>", ">|", "&>", "&>>"})'''
+new = '''_WRITE_REDIRECTS = frozenset({">", ">>", ">|", "&>", "&>>", "<"})'''
 
 # ── S3: drop the write-intent condition on `python -c` ─────────────────────
 #
@@ -81,9 +85,9 @@ new = '''    if False:
 id = "S4"
 test = "test_an_unparsable_command_fails_open"
 file = "python/src/kb_setup/instruction_shell_write.py"
-old = '''    if tokens is None:
-        return []  # unparsable — fail open, see the module docstring'''
-new = '''    if tokens is None:
+old = '''    if marked is None:
+        return []  # unparsable, or two lexers disagreed — fail open'''
+new = '''    if marked is None:
         return ["CLAUDE.md"]'''
 
 # ── S5: render "allow" instead of staying silent ───────────────────────────
@@ -110,8 +114,8 @@ new = '''    if not verdict.deny:
 id = "S6"
 test = "test_a_python_c_that_writes_is_denied"
 file = "python/src/kb_setup/instruction_shell_write.py"
-old = '''        words = _unwrap_runner(command_word(raw))'''
-new = '''        words = command_word(raw)'''
+old = '''    words = _unwrap_runner(command_word(words))'''
+new = '''    words = command_word(words)'''
 
 # ── S7 IS GONE. TWO MUTATIONS, BOTH INERT, AND THAT IS THE FINDING ─────────
 #
@@ -229,3 +233,126 @@ new = '''        if cls == "agents_root":'''
 # correctness invariant. `probes-need-a-control-arm.md` rule 9 — "unreachable by
 # construction is a CLAIM, and it needs an arm like any other." This one got its
 # arm, and the arm is why the line is gone.
+
+# ── THE COLD-REVIEW FIXES, ARMED ON THEIR OWN (kb-review step 4a) ──────────
+#
+# The cold lane on `d3437a7059e1` returned FOUR P1s and six P2s, and every one
+# reproduced when I ran it before believing it. A fix written under that much
+# pressure, by whoever already got the area wrong once, is the least-reviewed
+# code in the diff — so each fix gets a row, and each row mutates the fix back
+# toward the DEFECT rather than toward nonsense.
+
+# F1 — P1: a quoted `>` read as a redirect operator.
+#
+# The realistic regression is going back to reading operator identity off token
+# VALUES, which is what `is_operator(tokenise(...))` does and what every reader
+# will reach for first, because it is shorter and looks equivalent.
+[[arm]]
+id = "F1"
+test = "test_a_quoted_redirect_character_is_not_a_redirect"
+file = "python/src/kb_setup/check_first.py"
+old = '''    return [(v, is_operator(v) and is_operator(q)) for v, q in zip(values, quoted, strict=True)]'''
+new = '''    return [(v, is_operator(v)) for v, q in zip(values, quoted, strict=True)]'''
+
+# F2 — P1: `cd` before the write.
+#
+# Mutating the cd-tracking away restores the exact bypass: one token in front of
+# an ordinary redirect and the target no longer classifies.
+[[arm]]
+id = "F2"
+test = "test_a_cd_before_the_write_is_followed"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''            cwd = _next_cwd(cwd, command_word(current))'''
+new = '''            cwd = cwd'''
+
+# F3 — the OVER-CORRECTION mirror of F2, which is the direction a fix like this
+# usually breaks. Resolving every relative target against the repo root is the
+# lazy version of "follow the cd", and it wrongly denies a write that lands
+# outside the repository. `guarding-one-direction` is a recurring failure here.
+[[arm]]
+id = "F3"
+test = "test_a_cd_out_of_the_repo_is_followed_too"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    if target.startswith(("/", "~")):
+        return target
+    return posixpath.normpath(posixpath.join(cwd, target)) if cwd else target'''
+new = '''    return target'''
+
+# F4 — P2: a sed SCRIPT file reported as a write target.
+#
+# `-f` names a file sed READS. Dropping the value-flag handling is how the
+# false positive comes back, and it is the natural simplification.
+[[arm]]
+id = "F4"
+test = "test_a_sed_script_file_is_not_a_write_target"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''        return _operands(words, _SCRIPT_VALUE_FLAGS)'''
+new = '''        return _operands(words)'''
+
+# F5 — P2: GNU `--in-place=SUFFIX`. The defect was an equality check where a
+# prefix check was needed, so the mutation restores equality.
+[[arm]]
+id = "F5"
+test = "test_gnu_in_place_with_a_suffix_is_recognised"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''        if flag.startswith(_IN_PLACE_LONG):'''
+new = '''        if flag == _IN_PLACE_LONG:'''
+
+# F6 — P2: the write pattern matching PROSE inside a `python -c`.
+#
+# Dropping the required opening paren is exactly the original bug: a printed
+# string that merely names the method reads as a call.
+[[arm]]
+id = "F6"
+test = "test_a_python_c_that_merely_mentions_a_write_method_is_silent"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''_WRITE_INTENT = re.compile(r"""open\([^)]*['"][wax]|write_text\(|writelines\(|\.write\(""")'''
+new = '''_WRITE_INTENT = re.compile(r"""open\([^)]*['"][wax]|write_text|writelines|\.write\(""")'''
+
+# F7 — P2 (found while fixing P1b, not by the lane): a `~` path joined to the
+# repo root lands inside it and classifies as a nested entry point.
+[[arm]]
+id = "F7"
+test = "test_a_home_relative_path_is_not_this_repos_business"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''        if raw.startswith("~"):'''
+new = '''        if False:'''
+
+# F8 — P2: `main()` judging a payload from another tool as shell.
+[[arm]]
+id = "F8"
+test = "test_main_ignores_a_payload_from_another_tool"
+file = "python/src/kb_setup/instruction_shell_write.py"
+old = '''    tool = payload.get("tool_name")
+    if tool is not None and tool != "Bash":
+        return 0'''
+new = '''    tool = payload.get("tool_name")
+    if False:
+        return 0'''
+
+# F9 — P1: the AGENTS.md dedup walking NESTED closures, which promoted an
+# imported AGENTS.md from a 200-line ceiling to a 400-line one.
+[[arm]]
+id = "F9"
+test = "test_a_nested_stub_does_not_relax_the_agents_budget"
+file = "python/src/kb_setup/md_budget.py"
+old = '''        if classify(rel, exclude=exclude) != "eager_root":'''
+new = '''        if classify(rel, exclude=exclude) not in ("eager_root", "nested"):'''
+
+# ── NOT ARMED, and stated so a clean score is not misread ──────────────────
+#
+# The lane's P2 on `agents_bytes` being labelled "per lane run" was a PROSE
+# defect — codex loads the root AGENTS.md plus the CWD's ancestors, not every
+# one in the tree, so summing them and calling it a per-run figure overstated.
+# No mutation can catch a wrong sentence. It is fixed by rewording the output
+# and by printing the file COUNT beside the total so the difference is visible.
+#
+# The same is true of the two overclaims in the denial reason ("only a heredoc
+# carries its content"; "`md_size_budget` still fails the commit"). Both were
+# wrong as written, both are prose, both are now corrected — and neither is
+# armable, which is exactly why they survived a full green sweep the first time.
+#
+# The lane's P3 — `except A, B:` without parentheses — is DECLINED, not missed.
+# It is PEP 758, valid on the Python this repo pins (>=3.14), and it is house
+# style enforced mechanically: `ruff format` REWRITES the parenthesised form
+# into it, so "fixing" it would be reverted by the next `mise run fmt`.

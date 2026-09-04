@@ -443,6 +443,44 @@ def tokenise(command: str) -> list[str] | None:
         return None
 
 
+def tokenise_marked(command: str) -> list[tuple[str, bool]] | None:
+    """Each token paired with whether it is a REAL operator, not a quoted one.
+
+    🔴 WHY THIS IS NOT `is_operator(tokenise(...))`. Under `posix=True` shlex
+    strips quotes, so `grep '>' CLAUDE.md` yields the tokens
+    ``['grep', '>', 'CLAUDE.md']`` — byte-identical to the redirect
+    `grep > CLAUDE.md`. Value alone cannot tell a quoted literal from an
+    operator, and a guard reading redirects off :func:`tokenise` therefore denies
+    an ordinary `grep`. Found by the cold lane on `d3437a7059e1`, P1, reproduced
+    before it was believed.
+
+    The second lexer is the same input under `posix=False`, where a quoted token
+    keeps its quotes (`"'>'"`) and so fails :func:`is_operator`. The two runs are
+    zipped positionally; if their lengths ever disagree the alignment is not
+    trustworthy and this returns None, which every caller treats as "fail open".
+
+    :func:`segments` deliberately does NOT use this. It has always split on a
+    quoted operator too, its callers were hardened against that behaviour over
+    several review rounds, and changing it here would be an unrequested
+    behavioural change to a shared module rather than a fix to this one.
+    """
+    values = tokenise(command)
+    if values is None:
+        return None
+    lexer = shlex.shlex(
+        strip_heredoc_bodies(command), posix=False, punctuation_chars=PUNCTUATION_CHARS
+    )
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    try:
+        quoted = list(lexer)
+    except ValueError:
+        return None
+    if len(quoted) != len(values):
+        return None
+    return [(v, is_operator(v) and is_operator(q)) for v, q in zip(values, quoted, strict=True)]
+
+
 def segments(command: str) -> list[list[str]] | None:
     """Tokenise the command and split it at shell operators, None if unparsable.
 

@@ -206,3 +206,99 @@ def test_main_is_silent_and_zero_on_anything_unexpected(
     """
     assert guard.main(_repo(tmp_path), payload) == 0
     assert capsys.readouterr().out == ""
+
+
+# --- cold-review regressions on d3437a7059e1 ---------------------------------
+#
+# Every one of these was a finding the lane REPRODUCED by running the module,
+# not by reading it. They are kept as named tests rather than folded into the
+# parametrized lists above so a future failure says which defect came back.
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["grep '>' CLAUDE.md", 'echo ">" CLAUDE.md', "awk '>' CLAUDE.md"],
+)
+def test_a_quoted_redirect_character_is_not_a_redirect(tmp_path: Path, command: str) -> None:
+    """P1: posix shlex strips quotes, so `'>'` and `>` are the same token.
+
+    Reading redirects off token VALUES therefore denied an ordinary `grep`.
+    `check_first.tokenise_marked` re-lexes with quoting preserved so the two can
+    be told apart.
+    """
+    assert not guard.evaluate(_repo(tmp_path), command).deny
+
+
+@pytest.mark.parametrize("op", ["&>", "&>>", ">|"])
+def test_the_other_writing_redirects_are_denied(tmp_path: Path, op: str) -> None:
+    """P1: `&>`, `&>>` and `>|` are real writes and were reaching disk."""
+    assert guard.evaluate(_repo(tmp_path), f"cat {op} CLAUDE.md").deny
+
+
+def test_a_cd_before_the_write_is_followed(tmp_path: Path) -> None:
+    """P1: one token was the whole bypass — `cd` into the directory first."""
+    assert guard.evaluate(_repo(tmp_path), "cd .claude/rules && cat > a.md").deny
+
+
+def test_a_cd_out_of_the_repo_is_followed_too(tmp_path: Path) -> None:
+    """CONTROL ARM for the test above, and the inverse defect it also fixed.
+
+    Without this, the cd-tracking is satisfied by an implementation that treats
+    every relative path as repo-rooted — which is the ORIGINAL bug, and it
+    wrongly denied a write that lands outside the repository entirely.
+    """
+    assert not guard.evaluate(_repo(tmp_path), "cd /tmp && cat > CLAUDE.md").deny
+
+
+def test_a_sed_script_file_is_not_a_write_target(tmp_path: Path) -> None:
+    """P2: `-f` names the SCRIPT, which sed READS."""
+    assert not guard.evaluate(_repo(tmp_path), "sed -i -f CLAUDE.md target.txt").deny
+
+
+def test_gnu_in_place_with_a_suffix_is_recognised(tmp_path: Path) -> None:
+    """P2: `--in-place=.bak` is one token, so an equality check missed it."""
+    assert guard.evaluate(_repo(tmp_path), "sed --in-place=.bak 's/a/b/' CLAUDE.md").deny
+
+
+def test_a_python_c_that_merely_mentions_a_write_method_is_silent(tmp_path: Path) -> None:
+    """P2: the write pattern matched prose. Every alternative now needs a paren."""
+    command = "python -c \"print('write_text CLAUDE.md')\""
+    assert not guard.evaluate(_repo(tmp_path), command).deny
+
+
+def test_a_home_relative_path_is_not_this_repos_business(tmp_path: Path) -> None:
+    """A `~`-rooted path is $HOME, not this repository.
+
+    Found while fixing P1b: `root / "~/CLAUDE.md"` lands INSIDE the root and
+    classifies as a nested entry point, so the guard denied a write to the
+    user's own config — which `do-not.md` #11 puts outside this repo's remit.
+    """
+    assert not guard.evaluate(_repo(tmp_path), "cat > ~/CLAUDE.md").deny
+
+
+def test_main_ignores_a_payload_from_another_tool(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """P2: the matcher is `Bash`, but the module must not depend on that alone.
+
+    🔴 THE FIRST VERSION OF THIS TEST ASSERTED ONLY `main(...) == 0` AND COULD
+    NOT FAIL — `main` returns 0 unconditionally, by design, because a hook that
+    exits non-zero on its own confusion breaks every Bash call. Arm F8 caught it:
+    disabling the tool check killed no test. The observable that actually
+    distinguishes the two behaviours is whether anything is PRINTED.
+    """
+    payload = json.dumps({"tool_name": "Edit", "tool_input": {"command": "cat > CLAUDE.md"}})
+    assert guard.main(_repo(tmp_path), payload) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_main_still_denies_when_the_tool_name_is_bash(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """CONTROL ARM for the tool-name check above.
+
+    Without it, that test is satisfied by a guard that ignores every payload.
+    """
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "cat > CLAUDE.md"}})
+    assert guard.main(_repo(tmp_path), payload) == 0
+    assert "deny" in capsys.readouterr().out

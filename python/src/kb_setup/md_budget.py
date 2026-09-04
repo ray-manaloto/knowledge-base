@@ -241,6 +241,9 @@ class Report:
     #: at launch. Kept apart from :attr:`eager_bytes` on purpose; see
     #: :data:`EAGER_CLASSES`.
     agents_bytes: int = 0
+    #: How many files those bytes came from. Printed beside the total because
+    #: codex loads the root AGENTS.md plus the CWD's ancestors, not all of them.
+    agents_counted: int = 0
     counted: int = 0
 
 
@@ -488,6 +491,15 @@ def _closure_members(
     ``AGENTS.md`` special case, because the double-count is a property of being
     imported — not of the filename.
 
+    🔴 ONLY ``eager_root`` CLOSURES DEDUPLICATE, and the first version also
+    walked ``nested`` ones. That was a real hole, found by the cold lane on
+    `d3437a7059e1` (P1): `nested`'s ceiling is 400 lines against `agents_root`'s
+    200, so an AGENTS.md imported by a *nested* stub was silently promoted to the
+    looser budget — a 300-line file passing with zero violations. Narrowing to
+    eager closures also preserves the cross-repo invariant this function exists
+    for: dotfiles' AGENTS.md files are imported by the ROOT stub, which is
+    `eager_root`, so they still deduplicate exactly as before.
+
     🔴 IT DOES NOT EXCLUDE AN ENTRY FROM ITS OWN CLOSURE, and the first version
     did. That looked obviously right — a CLAUDE.md is a member of its own closure
     and must still be budgeted as the stub — but the branch was DEAD, and the
@@ -502,7 +514,7 @@ def _closure_members(
     members: set[str] = set()
     for rel in rels:
         path = root / rel
-        if classify(rel, exclude=exclude) not in ("eager_root", "nested"):
+        if classify(rel, exclude=exclude) != "eager_root":
             continue
         if not overlay.exists(path):
             continue
@@ -598,6 +610,7 @@ def check(
             report.eager_bytes += bytes_
         elif cls in AGENTS_CLASSES:
             report.agents_bytes += bytes_
+            report.agents_counted += 1
 
         if lines > budget.max_lines:
             report.violations.append(
@@ -689,9 +702,16 @@ def md_budget_main(root: Path) -> int:
     # true of no one. It is omitted entirely when the class matched nothing, so
     # a repo where every AGENTS.md has its stub (dotfiles) reads exactly as it
     # did before this class existed.
+    # 🔴 NOT "per lane run". This sums EVERY orphan AGENTS.md in the tree, and
+    # codex's own pinned instructions load only the root file plus the CWD's
+    # ancestors (`sources/codex/codex-rs/protocol/src/prompts/base_instructions/
+    # default.md:27`), so a per-run reading would overstate on any repo with more
+    # than one. The honest claim is the total held under this budget — which is
+    # what the number is — and the file count is printed with it so the
+    # difference is visible rather than assumed. Cold lane P2 on `d3437a7059e1`.
     agents = (
-        f"; codex-lane context ~{report.agents_bytes} bytes "
-        f"(~{report.agents_bytes // 4} tokens) per lane run"
+        f"; {report.agents_counted} unimported AGENTS.md ~{report.agents_bytes} bytes "
+        f"(~{report.agents_bytes // 4} tokens) total, read by codex not by Claude"
         if report.agents_bytes
         else ""
     )

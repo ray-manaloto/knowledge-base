@@ -562,3 +562,22 @@ def test_an_over_long_agents_md_is_a_violation(tmp_path: Path) -> None:
     report = md_budget.check(root)
 
     assert any(v.path == "AGENTS.md" for v in report.violations)
+
+
+def test_a_nested_stub_does_not_relax_the_agents_budget(tmp_path: Path) -> None:
+    """Cold review P1 on `d3437a7059e1`: the dedup walked NESTED closures too.
+
+    `nested`'s ceiling is 400 lines against `agents_root`'s 200, so an AGENTS.md
+    imported by a nested stub was silently promoted to the looser budget and a
+    300-line file passed with zero violations. Only `eager_root` closures
+    deduplicate now — which is also what preserves the dotfiles invariant, since
+    its AGENTS.md files are imported by the ROOT stub.
+    """
+    root = _git_repo(tmp_path)
+    _commit(root, "CLAUDE.md", "# root\n")
+    _commit(root, "docs/CLAUDE.md", "@AGENTS.md\n")
+    _commit(root, "docs/AGENTS.md", "\n".join(f"line {i}" for i in range(300)))
+
+    report = md_budget.check(root)
+
+    assert any(v.path == "docs/AGENTS.md" for v in report.violations)

@@ -15,11 +15,13 @@ was measured, not inferred: `uv run python -c` wrote 401 lines into
 denied.
 
 🔴 IT DENIES BY SHAPE, AND DELIBERATELY DOES NOT BUDGET. Ray ruled this on
-2026-09-04 after the alternative was put to him. The reason is that of the six
-bypass shapes, exactly ONE carries its content in the command: a heredoc.
-`tee f.md < big.md`, `sed -i`, `perl -pi`, a `python -c` and `find … -exec` all
-write bytes that do not exist until the command runs, so a budget check could
-only ever cover a sixth of the surface while reading as if it covered the
+2026-09-04 after the alternative was put to him. The reason is that most of the
+bypass shapes do not carry their content: `tee f.md < big.md`, `sed -i`,
+`perl -pi` and `find … -exec` all write bytes that do not exist until the command
+runs. A heredoc does carry its content, and so does a `python -c` — but reading
+the latter means evaluating a program, which is not something a PreToolUse guard
+gets to do. So a budget check here would cover the shapes that are easiest to
+measure rather than the ones that matter, while reading as if it covered the
 surface. Refusing the shape and pointing at the `Edit`/`Write` tools — where
 #698's real budget check already lives, over the real proposed content — is one
 rule with no favoured shape.
@@ -30,12 +32,17 @@ command re-parsed a second way to recover its content.
 
 🔴 SCOPE, stated so silence does not imply coverage. This guard sees:
 
-  - a `>` / `>>` redirect whose target classifies as an instruction file;
+  - a `>`, `>>`, `>|`, `&>` or `&>>` redirect whose target classifies as an
+    instruction file — a numeric prefix (`2> f`) included, since shlex emits the
+    digit as a separate token;
   - `tee` at a command position with such a file among its operands;
-  - `sed` / `perl` at a command position with an in-place flag and such a file
-    among its operands;
+  - `sed` / `perl` at a command position with an in-place flag (`-i`,
+    `--in-place`, `--in-place=SUFFIX`) and such a file among its operands, with
+    `-f`/`-e` script arguments excluded because sed READS those;
   - `python -c` / `python3 -c` whose code contains BOTH an instruction path
-    literal AND a write indicator.
+    literal AND a write CALL;
+  - any of the above after a `cd`, whose effect on the working directory is
+    tracked across the command.
 
 It does NOT see, and these are not denied:
 
@@ -47,11 +54,22 @@ It does NOT see, and these are not denied:
     every guard in this family has (`mise-tasks-only.md` § the guard is a
     redirect, not a sandbox).
   - a `python -c` that names no path literal, e.g. one building the path from
-    variables.
+    variables — and, in the other direction, it CAN still fire on a path inside
+    a printed string, because it text-matches a program it does not parse.
+  - a `cd` whose argument is itself computed, or a `pushd`/subshell.
 
-The FALLBACK IS UNCHANGED AND NOT A REGRESSION: hk's `md_size_budget` step still
-sweeps every tracked instruction file and still fails the commit. What this buys
-is an earlier signal on the surface #698 does not reach.
+🔴 EVERY ITEM IN BOTH LISTS ABOVE WAS RUN, not reasoned about. Five of them are
+there because the cold lane on `d3437a7059e1` ran them first and this module got
+them wrong: a quoted `'>'` denied an ordinary `grep`; `&>`/`&>>`/`>|` were absent
+from the redirect set; one `cd` in front of a redirect bypassed the guard
+completely; a sed `-f` SCRIPT was reported as a write; and `--in-place=SUFFIX`
+was missed by an equality check.
+
+THE FALLBACK, stated more carefully than it was at first: hk's `md_size_budget`
+step still sweeps every tracked instruction file — but it fails a commit only
+when a file is actually OVER budget, so a bypass that stays within budget is
+reported by nothing. What this guard buys is an earlier signal on the surface
+#698 does not reach, not a second budget check.
 
 🔴 IT FAILS OPEN, matching `hook_guard`'s convention rather than
 `instruction_edit_guard`'s. The inversion is deliberate and is the opposite
@@ -72,18 +90,28 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from kb_setup import md_budget
-from kb_setup.check_first import command_word, is_operator, tokenise
+from kb_setup.check_first import command_word, tokenise_marked
 
-#: Redirect operators that TRUNCATE or APPEND. `<` is a read and never a write.
-_WRITE_REDIRECTS = frozenset({">", ">>"})
+#: Redirect operators that WRITE. `<` is a read and never a write; `>|` is
+#: bash's noclobber override, `&>`/`&>>` redirect both streams. All three of
+#: those were missing until the cold lane on `d3437a7059e1` ran them (P1) —
+#: `cat &> CLAUDE.md` is a real write and was reaching disk unremarked.
+#: A numeric prefix needs no entry: shlex emits `2> f` as `2`, `>`, `f`.
+_WRITE_REDIRECTS = frozenset({">", ">>", ">|", "&>", "&>>"})
 
 #: Commands that write a file named on their own command line.
 _TEE = frozenset({"tee"})
 _IN_PLACE_TOOLS = frozenset({"sed", "perl"})
 _PYTHON = frozenset({"python", "python3"})
 
-#: `sed -i` (BSD form takes a suffix argument), `perl -pi`, `--in-place`.
-_IN_PLACE_FLAGS = frozenset({"--in-place"})
+#: `--in-place`, or `--in-place=SUFFIX` (GNU's single-token form, which an
+#: equality check misses — cold lane P2).
+_IN_PLACE_LONG = "--in-place"
+
+#: Flags of `sed`/`perl` whose VALUE is a script or a script file, not a target.
+#: Without this, `sed -i -f CLAUDE.md target.txt` reports CLAUDE.md as written
+#: when it is being READ as the script (cold lane P2).
+_SCRIPT_VALUE_FLAGS = frozenset({"-f", "-e", "--file", "--expression"})
 
 #: A path literal inside a `python -c` program. Deliberately narrow: it must end
 #: in `.md`, because that is the only extension any budget class matches, so a
@@ -94,7 +122,13 @@ _PATH_LITERAL = re.compile(r"[\w./-]+\.md")
 #: hold — a `python -c` that merely READS CLAUDE.md is a legitimate probe and
 #: denying it would be exactly the false-positive direction every measured
 #: defect in this guard family has come from.
-_WRITE_INTENT = re.compile(r"""open\([^)]*['"][wax]|write_text|writelines|\.write\(""")
+#:
+#: Every alternative requires the OPENING PAREN of a real call. Without it,
+#: `print("write_text CLAUDE.md")` — prose that merely mentions the method —
+#: was denied (cold lane P2). It is still a text match over a program this guard
+#: does not parse, so a path inside a printed string can still trip it; see the
+#: module SCOPE block.
+_WRITE_INTENT = re.compile(r"""open\([^)]*['"][wax]|write_text\(|writelines\(|\.write\(""")
 
 
 @dataclass(frozen=True)
@@ -116,36 +150,33 @@ def _has_in_place_flag(tokens: list[str]) -> bool:
     reason.
     """
     # Named `flag`, not `token`: ruff's S105 reads a variable called `token`
-    # compared against a literal as a hardcoded credential, and a suppression
-    # is not available here (`do-not.md` #9).
+    # compared against a literal as a hardcoded credential, and a suppression is
+    # not available here (`do-not.md` #9).
     for flag in tokens:
         if flag == "--":
             return False
-        if flag in _IN_PLACE_FLAGS:
+        if flag.startswith(_IN_PLACE_LONG):
             return True
         if flag.startswith("-") and not flag.startswith("--") and "i" in flag[1:]:
             return True
     return False
 
 
-def _redirect_targets(tokens: list[str]) -> list[str]:
-    """Every token that follows a truncating or appending redirect."""
-    found = []
-    for index, token in enumerate(tokens[:-1]):
-        if token in _WRITE_REDIRECTS and not is_operator(tokens[index + 1]):
-            found.append(tokens[index + 1])
-    return found
-
-
-def _operands(words: list[str]) -> list[str]:
-    """The non-flag words after the command, `--` honoured."""
+def _operands(words: list[str], value_flags: frozenset[str] = frozenset()) -> list[str]:
+    """The non-flag words after the command, `--` and value-taking flags honoured."""
     out = []
     seen_separator = False
+    skip_next = False
     for word in words[1:]:
+        if skip_next:
+            skip_next = False
+            continue
         if word == "--" and not seen_separator:
             seen_separator = True
             continue
         if not seen_separator and word.startswith("-"):
+            if word in value_flags:
+                skip_next = True
             continue
         out.append(word)
     return out
@@ -163,7 +194,9 @@ def _unwrap_runner(words: list[str]) -> list[str]:
     The scan for `run` is bounded to the flags before it and stops at the first
     non-flag word, so `uv run pytest -k run` cannot have its `-k` argument
     promoted into the command position. That promotion is precisely the round-1
-    defect recorded in `_segment_is_a_gate`; it is not repeated here.
+    defect recorded in `_segment_is_a_gate`; it is not repeated here. NOTE that
+    the arms sweep showed this boundedness is currently MASKED downstream — see
+    the S7 entry in `docs/research/reports/2026-09-04-711-shell-write-guard-arms.toml`.
     """
     if not words or posixpath.basename(words[0]) != "uv":
         return words
@@ -188,43 +221,89 @@ def _python_c_targets(words: list[str]) -> list[str]:
     return _PATH_LITERAL.findall(program)
 
 
+def _next_cwd(cwd: str, words: list[str]) -> str:
+    """Apply a `cd` to the running working directory.
+
+    🔴 WITHOUT THIS THE GUARD IS BYPASSED BY ONE TOKEN. `cd .claude/rules &&
+    cat > x.md` writes a rule file, and resolving `x.md` against the repo root
+    classifies it as nothing at all. Cold lane P1, reproduced before believed.
+    The inverse mattered too: a relative write after `cd /tmp` was being resolved
+    back INTO the repo and wrongly denied.
+
+    A bare `cd` goes to $HOME. It is represented as an absolute path so that
+    everything after it resolves outside the repository and falls silent, which
+    is the correct answer rather than a guess.
+    """
+    if not words or posixpath.basename(words[0]) != "cd":
+        return cwd
+    operands = _operands(words)
+    target = operands[0] if operands else "~"
+    if target.startswith(("/", "~")):
+        return target
+    return posixpath.normpath(posixpath.join(cwd, target))
+
+
+def _resolve(cwd: str, target: str) -> str:
+    """Where `target` lands, given the command's running cwd."""
+    if target.startswith(("/", "~")):
+        return target
+    return posixpath.normpath(posixpath.join(cwd, target)) if cwd else target
+
+
+def _segment_targets(words: list[str]) -> list[str]:
+    """Files this ONE command writes by naming them as arguments."""
+    words = _unwrap_runner(command_word(words))
+    if not words:
+        return []
+    tool = posixpath.basename(words[0])
+    if tool in _TEE:
+        return _operands(words)
+    if tool in _IN_PLACE_TOOLS and _has_in_place_flag(words[1:]):
+        # The first bare operand of `sed -i 's/a/b/' f.md` is the SCRIPT.
+        # Classification discards it — a sed expression does not resolve to a
+        # budgeted path — so no arity special case is needed, only the
+        # value-taking flags above, whose arguments genuinely are filenames.
+        return _operands(words, _SCRIPT_VALUE_FLAGS)
+    if tool in _PYTHON:
+        return _python_c_targets(words)
+    return []
+
+
 def written_paths(command: str) -> list[str]:
     """Every path this command appears to WRITE. Never raises.
 
-    Returns raw strings as written on the command line; :func:`evaluate` is what
-    resolves and classifies them. Keeping the two apart is what lets the shapes
-    be tested without a repository.
+    Returns paths as they land relative to the command's own working directory;
+    :func:`evaluate` resolves and classifies them. Keeping the two apart is what
+    lets the shapes be tested without a repository.
     """
-    tokens = tokenise(command)
-    if tokens is None:
-        return []  # unparsable — fail open, see the module docstring
+    marked = tokenise_marked(command)
+    if marked is None:
+        return []  # unparsable, or two lexers disagreed — fail open
 
-    found = _redirect_targets(tokens)
+    found: list[str] = []
+    cwd = ""
+    current: list[str] = []
+    awaiting_target = False
 
-    segment: list[str] = []
-    segments = [segment]
-    for token in tokens:
-        if is_operator(token):
-            segment = []
-            segments.append(segment)
-        else:
-            segment.append(token)
-
-    for raw in segments:
-        words = _unwrap_runner(command_word(raw))
-        if not words:
+    for value, is_op in marked:
+        if is_op:
+            if value in _WRITE_REDIRECTS:
+                awaiting_target = True
+                continue
+            # Any other operator ends the command: settle it, and let a `cd`
+            # in it move the working directory for everything that follows.
+            found.extend(_resolve(cwd, t) for t in _segment_targets(current))
+            cwd = _next_cwd(cwd, command_word(current))
+            current = []
+            awaiting_target = False
             continue
-        tool = posixpath.basename(words[0])
-        if tool in _TEE:
-            found.extend(_operands(words))
-        elif tool in _IN_PLACE_TOOLS and _has_in_place_flag(words[1:]):
-            # The first operand of `sed -i 's/a/b/' f.md` is the SCRIPT, not a
-            # file. Classification discards it — a sed expression does not
-            # resolve to a budgeted path — so no special case is needed here,
-            # and adding one would be a second place to get the arity wrong.
-            found.extend(_operands(words))
-        elif tool in _PYTHON:
-            found.extend(_python_c_targets(words))
+        if awaiting_target:
+            found.append(_resolve(cwd, value))
+            awaiting_target = False
+            continue
+        current.append(value)
+
+    found.extend(_resolve(cwd, t) for t in _segment_targets(current))
     return found
 
 
@@ -239,15 +318,16 @@ _REMEDY = (
     "prefer sed/heredocs for edits makes that the default path rather than an "
     "unusual one.\n"
     "\n"
-    "This is a deny by SHAPE, not a budget check: of the shell shapes that can "
-    "write these files, only a heredoc carries its content in the command, so a "
-    "size check here could cover one shape while reading as if it covered all "
-    "of them.\n"
+    "This is a deny by SHAPE, not a budget check. Most shapes that write these "
+    "files carry no content in the command at all (`tee f < g`, `sed -i`, "
+    "`perl -pi`), so a size check here would cover whichever shapes are easiest "
+    "to measure while reading as if it covered all of them.\n"
     "\n"
     "SCOPE, stated so silence does not imply coverage: `find ... -exec sed -i`, "
-    "`xargs sed -i`, `sh -c`, `eval` and `$(...)` are NOT denied. hk's "
-    "`md_size_budget` step remains the backstop for every one of them and still "
-    "fails the commit. Ray's ruling 2026-09-04; enforced by "
+    "`xargs sed -i`, `sh -c`, `eval` and `$(...)` are NOT denied. For those, hk's "
+    "`md_size_budget` step is the remaining check — note that it fails a commit "
+    "only when the file is actually OVER budget, so a bypass that stays within "
+    "budget is not reported anywhere. Ray's ruling 2026-09-04; enforced by "
     "kb_setup.instruction_shell_write."
 )
 
@@ -256,6 +336,12 @@ def evaluate(root: Path, command: str) -> Verdict:
     """Decide on one Bash command. Never raises."""
     hits = []
     for raw in written_paths(command):
+        if raw.startswith("~"):
+            # $HOME, not this repository. `Path(root) / "~/CLAUDE.md"` lands
+            # INSIDE the root and classifies as a nested entry point, so without
+            # this a write to the user's own config would be denied here — and
+            # `do-not.md` #11 says user config is not this repo's to police.
+            continue
         try:
             rel = (root / raw).resolve().relative_to(root.resolve()).as_posix()
         except ValueError, OSError:
@@ -296,6 +382,14 @@ def main(root: Path, stdin_text: str | None = None) -> int:
     except ValueError, TypeError:
         return 0
     if not isinstance(payload, dict):
+        return 0
+    # Checked here rather than relying on the matcher. `.claude/settings.json`
+    # registers this on `Bash` alone, so today the check is redundant — but the
+    # module is importable and the settings file is edited by hand, and a
+    # payload from another tool that happens to carry a `command` field would
+    # otherwise be judged as shell. Cold lane P2 on `d3437a7059e1`.
+    tool = payload.get("tool_name")
+    if tool is not None and tool != "Bash":
         return 0
     tool_input = payload.get("tool_input")
     command = tool_input.get("command") if isinstance(tool_input, dict) else None
