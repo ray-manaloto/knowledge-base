@@ -1,0 +1,128 @@
+<title>Three Things Left to Settle</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  :root {
+    --ground:  #ECEFF3;
+    --card:    #FFFFFF;
+    --ink:     #131820;
+    --soft:    #5A6472;
+    --rule:    #D6DBE3;
+    --key:     #26357A;
+    --key-bg:  #E4E8F6;
+    --warn:    #8C3A26;
+    --warn-bg: #F6E6E1;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 15px; line-height: 1.45;
+    padding: 24px 20px 28px;
+  }
+  .page { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+
+  h1 {
+    font-family: "Archivo", Helvetica, Arial, sans-serif;
+    font-weight: 700; font-size: 27px; line-height: 1.1; margin: 0;
+    letter-spacing: -0.015em; text-wrap: balance;
+  }
+  .lede { color: var(--soft); font-size: 13.5px; margin: 2px 0 0; }
+
+  .block { background: var(--card); border: 1px solid var(--rule); padding: 13px 16px 14px; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--key);
+  }
+  h2 {
+    font-family: "Archivo", Helvetica, sans-serif;
+    font-weight: 600; font-size: 17px; margin: 4px 0 6px; text-wrap: balance;
+  }
+  .block > p { margin: 0 0 8px; font-size: 14px; }
+  .block > p.tight { margin-bottom: 6px; }
+  .soft { color: var(--soft); }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 9px; }
+  @media (max-width: 620px) { .split { grid-template-columns: 1fr; } }
+  .split div { padding: 8px 10px; font-size: 13px; }
+  .can  { background: var(--key-bg); }
+  .cant { background: var(--warn-bg); }
+  .split h3 {
+    font-family: "Archivo", sans-serif; font-size: 11.5px; margin: 0 0 4px;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .can h3  { color: var(--key); }
+  .cant h3 { color: var(--warn); }
+  .split code {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px;
+    display: block; line-height: 1.6;
+  }
+
+  .opts { display: flex; flex-direction: column; gap: 3px; }
+  .opt { font-size: 13.5px; padding: 3px 8px; color: var(--soft); display: flex; gap: 8px; }
+  .opt.pick { background: var(--key-bg); color: var(--ink); font-weight: 600; }
+  .opt .m { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--rule); width: 1em; flex: none; }
+  .opt.pick .m { color: var(--key); }
+
+  .ask { background: var(--key); color: #fff; padding: 12px 16px; }
+  .ask p { margin: 0; font-size: 14.5px; }
+
+  footer { color: var(--soft); font-size: 11.5px; margin: 0; }
+</style>
+
+<div class="page">
+  <div>
+    <h1>Three things left to settle</h1>
+    <p class="lede">You've chosen what to do. These are the how-big and what-first questions underneath. Blue = what I'd do.</p>
+  </div>
+
+  <div class="block">
+    <span class="eyebrow">The shell guard</span>
+    <h2>For most shell writes I can see <em>that</em> a file is being written, but not <em>what</em> goes into it</h2>
+    <div class="split">
+      <div class="can">
+        <h3>Content is right there</h3>
+        <code>cat &gt; rules/x.md &lt;&lt;EOF … EOF</code>
+      </div>
+      <div class="cant">
+        <h3>Content is unknowable until it runs</h3>
+        <code>tee x.md &lt; big.md<br>sed -i / perl -pi<br>python -c "…write…"<br>find … -exec sed -i</code>
+      </div>
+    </div>
+    <div class="opts">
+      <div class="opt pick"><span class="m">A</span><span>Refuse the shape. Any shell write to a protected file is turned back with "use the Edit tool" — where the real size check already lives. One rule, no half-coverage.</span></div>
+      <div class="opt"><span class="m">B</span><span>Measure where I can, refuse only what's too big; let the other five shapes through untouched.</span></div>
+      <div class="opt"><span class="m">C</span><span>Measure where I can, and warn without blocking on the rest.</span></div>
+    </div>
+  </div>
+
+  <div class="block">
+    <span class="eyebrow">The size limit for AGENTS.md</span>
+    <h2>Giving it a limit is easy; the trap is which pot the bytes get counted in</h2>
+    <p class="tight soft">Every session I print one number — "this much instruction text is loaded at launch." Claude never loads AGENTS.md. Codex does, every run. Put it in the wrong pot and that number becomes a lie.</p>
+    <div class="opts">
+      <div class="opt pick"><span class="m">A</span><span>Its own pot — same 200-line limit, counted separately, launch figure stays honest.</span></div>
+      <div class="opt"><span class="m">B</span><span>Reuse the existing launch pot. One line of code, and the launch number starts overstating.</span></div>
+      <div class="opt"><span class="m">C</span><span>Its own pot, but a looser 400-line limit.</span></div>
+    </div>
+  </div>
+
+  <div class="block">
+    <span class="eyebrow">What comes first</span>
+    <h2>Three small jobs are now queued in front of the thing your plan file calls the only priority</h2>
+    <p class="tight soft">The plan file still says setup work outranks everything. A separate tracker says the next source-ingestion ticket is ready and has been skipped eight sessions running. These three jobs are perhaps half a session together.</p>
+    <div class="opts">
+      <div class="opt pick"><span class="m">A</span><span>Finish these three first — they're small, and they close today's round properly.</span></div>
+      <div class="opt"><span class="m">B</span><span>Setup work first; these three wait.</span></div>
+      <div class="opt"><span class="m">C</span><span>The skipped ingestion ticket first — eight sessions is long enough.</span></div>
+    </div>
+  </div>
+
+  <div class="ask">
+    <p>Pick <strong>one letter per block</strong>, and there's a free-text box at the end for anything I didn't think to ask.</p>
+  </div>
+
+  <footer>Sizes, line counts and the six shell shapes were all measured today. Paths, issue numbers and code references stay in the terminal reply.</footer>
+</div>

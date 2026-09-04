@@ -1,0 +1,143 @@
+<title>Four Loops Left Open</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  :root {
+    --ground:   #F2F3F5;
+    --card:     #FFFFFF;
+    --ink:      #16191F;
+    --ink-soft: #565D69;
+    --rule:     #DDE0E6;
+    --open:     #9A5B12;
+    --open-bg:  #F7EDDC;
+    --pick:     #1D5E58;
+    --pick-bg:  #E1EFEC;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    padding: 26px 22px 30px;
+  }
+
+  .page { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  h1 {
+    font-family: "Newsreader", Georgia, serif;
+    font-weight: 600; font-size: 30px; line-height: 1.1; margin: 0;
+    text-wrap: balance; letter-spacing: -0.01em;
+  }
+  .standfirst { color: var(--ink-soft); font-size: 14px; margin: 0; }
+
+  .row {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--open);
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 0 24px;
+    padding: 13px 16px 14px;
+  }
+  @media (max-width: 660px) { .row { grid-template-columns: 1fr; gap: 10px; } }
+
+  .chip {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 11px; font-weight: 500;
+    color: var(--open); background: var(--open-bg);
+    padding: 1px 6px; border-radius: 2px;
+    letter-spacing: 0.02em;
+  }
+  .what { font-weight: 700; font-size: 16px; margin: 5px 0 4px; text-wrap: balance; }
+  .cost { color: var(--ink-soft); font-size: 13.5px; margin: 0; }
+  .cost b { color: var(--ink); font-weight: 500; }
+
+  .choices { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+  .choice {
+    display: flex; align-items: baseline; gap: 8px;
+    font-size: 13.5px; padding: 3px 7px; border-radius: 3px;
+    color: var(--ink-soft);
+  }
+  .choice.pick { background: var(--pick-bg); color: var(--ink); font-weight: 500; }
+  .choice .mark {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    color: var(--rule); flex: none; width: 1.1em;
+  }
+  .choice.pick .mark { color: var(--pick); }
+
+  .ask {
+    background: var(--pick-bg); border: 1px solid #C2DAD5;
+    padding: 12px 16px; display: flex; align-items: baseline; gap: 10px;
+  }
+  .ask .arrow { color: var(--pick); font-weight: 700; }
+  .ask p { margin: 0; font-size: 14.5px; }
+  .ask b { color: var(--pick); }
+
+  footer { color: var(--ink-soft); font-size: 12px; margin: 0; }
+</style>
+
+<div class="page">
+  <header>
+    <h1>Four loops left open</h1>
+    <p class="standfirst">Green highlight = what I'd do</p>
+  </header>
+
+  <div class="row">
+    <div>
+      <span class="chip">#710</span>
+      <p class="what">Another app quietly rewrote your codex settings</p>
+      <p class="cost"><b>If nothing changes:</b> it happens again on its own schedule, and the part it deletes is what lets codex reach your knowledge graph. You never see it go.</p>
+    </div>
+    <div class="choices">
+      <div class="choice"><span class="mark">A</span><span>Turn the syncing off at the source</span></div>
+      <div class="choice"><span class="mark">B</span><span>Add a check that fails the moment the block goes missing</span></div>
+      <div class="choice pick"><span class="mark">C</span><span>Both — off at the source, and a check in case it comes back on</span></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <span class="chip">#711</span>
+      <p class="what">The guard I just shipped watches two doors out of three</p>
+      <p class="cost"><b>If nothing changes:</b> a shell command can still write any instruction file unchecked — and the door it skips is the one I'm told to prefer. The commit gate still catches it later.</p>
+    </div>
+    <div class="choices">
+      <div class="choice pick"><span class="mark">A</span><span>Watch the shell door too, for the plain shapes</span></div>
+      <div class="choice"><span class="mark">B</span><span>Widen the older shell guard instead</span></div>
+      <div class="choice"><span class="mark">C</span><span>Leave it — say so, rely on the commit gate</span></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <span class="chip">page</span>
+      <p class="what">A page I published has no source saved anywhere</p>
+      <p class="cost"><b>If nothing changes:</b> the link keeps working, but the day it needs correcting there is nothing to edit — and it already carries one correction.</p>
+    </div>
+    <div class="choices">
+      <div class="choice pick"><span class="mark">A</span><span>Save the source into the repo, on its own branch</span></div>
+      <div class="choice"><span class="mark">B</span><span>Take the page down instead</span></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <span class="chip">AGENTS.md</span>
+      <p class="what">One instruction file has no size limit at all</p>
+      <p class="cost"><b>If nothing changes:</b> nothing today — but it is the file codex reads every single run, and it is the only one that can grow with nothing objecting.</p>
+    </div>
+    <div class="choices">
+      <div class="choice pick"><span class="mark">A</span><span>Give it a limit now, while it is small</span></div>
+      <div class="choice"><span class="mark">B</span><span>Leave it, keep the note</span></div>
+    </div>
+  </div>
+
+  <div class="ask">
+    <span class="arrow">&rarr;</span>
+    <p>Pick <b>one letter per row</b>. Nothing else is needed from you — I'll work out the order myself once I know the four answers.</p>
+  </div>
+
+  <footer>Everything here was measured today. Evidence, file paths and issue links stay in the terminal reply.</footer>
+</div>
