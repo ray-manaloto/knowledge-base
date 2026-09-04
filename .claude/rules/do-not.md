@@ -2,65 +2,40 @@
 
 The authoritative list of things agents (and humans) must not do in this repo.
 
-1. **Do NOT run `graphify install` by hand — not even with `--project`.**
-   `hook_guard.decide()` keys only on the SUBCOMMAND, never on flags
-   (`hook_guard.py:141-147`), so `--project` is not a carve-out: both
-   `graphify install --project` and bare `graphify install` are DENIED.
-   Control-armed this round: `hg.decide("graphify install --project")` →
-   denied, `hg.decide("mise run kb-build")` → `None`. **Use
-   `mise run kb-skill-refresh`** instead — it runs the same installer, then
-   repairs what the installer regresses (`.claude/settings.json`'s hook
-   paths/timeouts, a stripped trailing newline — #133) and restores the local
-   skill addenda the installer wipes. See `mise-tasks-only.md`.
+1. **Do NOT run `graphify install` by hand — not even with `--project`, and not
+   any platform subcommand** (`graphify antigravity install`, `graphify codex
+   install`). `hook_guard.decide()` keys only on the SUBCOMMAND, never on flags
+   (`hook_guard.py:141-147`), so `--project` is not a carve-out. Control-armed:
+   `hg.decide("graphify install --project")` → denied, `hg.decide("mise run
+   kb-build")` → `None`. **Use `mise run kb-skill-refresh`** — it runs the same
+   installer, then repairs what the installer regresses (`.claude/settings.json`
+   hook paths/timeouts, a stripped trailing newline — #133) and restores the
+   local skill addenda the installer wipes. See `mise-tasks-only.md`.
 
-   Bare `graphify install` (no `--project`) still additionally **mutates
-   `~/.claude`**: at the pinned 0.9.53, `dispatch_install_cli` resolves
-   exactly **one** platform — the CLI arg, or `claude` by default
-   (`install.py:2066-2121`) — and `_copy_skill_file` writes ONE destination
-   plus ONE `.graphify_version` stamp (`install.py:172-239`); there is no
-   loop spraying stamps into every installed platform, an earlier version of
-   this entry said there was and was wrong. Default (`claude`) write is
-   ~84 KB total: `skill.md` (~41 KB) + its `references/` sidecar (~43 KB,
-   `:187-190`), plus it **appends a `# graphify` H1 to `~/.claude/CLAUDE.md`**
-   (creating it if absent). `CLAUDE_CONFIG_DIR` is irrelevant either way,
-   since `--project` is denied outright regardless of any env var.
-
-   **The denial generalises to every platform subcommand, not just
-   `install`.** `graphify antigravity install` and `graphify codex install
-   --project` are BOTH denied too. The old advice to run those "in a
-   throwaway directory outside this repo" works only for a **human** typing
-   directly in a terminal — the hook watches this session's Bash tool, not
-   the target directory.
+   Bare `graphify install` additionally **mutates `~/.claude`** (~84 KB, plus a
+   `# graphify` H1 appended to `~/.claude/CLAUDE.md`). The old advice to run a
+   platform subcommand "in a throwaway directory outside this repo" works only
+   for a **human** typing in a terminal — the hook watches this session's Bash
+   tool, not the target directory. Detail + one corrected claim:
+   `docs/invariant-provenance.md` § entry 1.
 
 2. **Do NOT run `graphify hook install`, `graphify extract --global`, or
    `graphify global add`.** All three are hand-run graphify, already forbidden
    by entry 3 — but their REASONS differ:
    - `extract --global` / `global add` — genuinely shared, non-reproducible,
      collides across hosts. The graph lives in this repo's `graphify-out/`.
-   - `hook install` — **MISFILED here, but only PARTIALLY.** `graphify.hooks.install()`
-     (`hooks.py:754-763`) resolves the nearest git repo and calls
-     `_hooks_dir(root)`, which asks `git rev-parse --git-path hooks` and
-     honours `core.hooksPath` (`hooks.py:491-532`): on an ordinary repo it
-     writes to **that repo's own `.git/hooks`**, never `~/`. But when
-     `core.hooksPath` names an absolute external directory (e.g.
-     `~/.githooks`, as Husky sets), `install()` writes THERE instead —
-     genuinely shared state in that one configuration, banned for entry-2's
-     own reason rather than entry-3's.
+   - `hook install` — writes to the repo's own `.git/hooks` on an ordinary
+     repo, so it is MISFILED here — **except** when `core.hooksPath` names an
+     absolute external directory (e.g. `~/.githooks`, as Husky sets), where it
+     writes THERE: genuinely shared state, banned for this entry's own reason.
 
-   **`watch` was in this list and never belonged to it** (narrowed 2026-08-01).
-   The banned spelling `graphify --watch` is not a real invocation — `--watch`
-   occurs **0** times in the currently-pinned **0.9.53** `cli.py`
-   (re-verified this round; was cited against 0.9.31), against a control of
-   **9** for `--force`. The real form is the subcommand `graphify watch
-   <path>`, and its effect is repo-local (`<path>/graphify-out/`, never `~/`)
-   — this entry's stated rationale never described it.
-
-   It is still the wrong tool here, for a better reason: `watch` refreshes
-   only that path's scoped sub-graph with no post-rebuild hook, so it cannot
-   update the **aggregate** `graphify-out/graph.json`. Use
+   ⚠️ **`watch` was in this list and never belonged to it** (narrowed
+   2026-08-01, evidence in `docs/invariant-provenance.md` § entry 2 — do not
+   re-add it). It is still the wrong tool: `watch` refreshes only that path's
+   scoped sub-graph, so it cannot update the **aggregate** graph. Use
    **`mise run kb-watch`** (`kb_setup.graph.refresh_self`), which re-extracts
-   `python/` + `tests/`, merges into the aggregate, re-derives the prose
-   graph, and restamps. Running `watch` by hand also still fails rule 3.
+   `python/` + `tests/`, merges, re-derives the prose graph, and restamps.
+   Running `watch` by hand also still fails rule 3.
 
 3. **Do NOT run graphify by hand at all — drive it through a `kb-*` mise task.**
    Enforced by `kb_setup.hook_guard`, a PreToolUse deny — **best-effort, not
@@ -73,37 +48,30 @@ The authoritative list of things agents (and humans) must not do in this repo.
    since the allowlist is a deliberate exception list. See `mise-tasks-only.md`.
 
 4. **Do NOT let any NON-ANTHROPIC key-detected LLM backend touch the corpus —
-   `ANTHROPIC_API_KEY` is the one deliberate, test-locked exception.** The
-   headline used to say "any key-detected backend"; that is WRONG (#685).
+   `ANTHROPIC_API_KEY` is the one deliberate, test-locked exception** (#685; the
+   headline said "any key-detected backend" until 2026-09-03 and was wrong).
    `ANTHROPIC_API_KEY`/`ANTHROPIC_BASE_URL` are intentionally KEPT
-   (`kb_setup/graphify_env.py:21-24`), and `detect_backend`'s own priority
-   tuple puts `"claude"` third (`llm.py:3547`) — so it genuinely IS
-   key-detected and genuinely IS allowed to auto-select. `[[ -v
-   ANTHROPIC_API_KEY ]]` is ABSENT on this host, so the gap is latent and
-   host-conditional, not a live leak — but live on any host that exports it.
+   (`graphify_env.py:21-24`) and `detect_backend`'s priority tuple puts
+   `"claude"` third (`llm.py:3547`), so it IS key-detected and IS allowed to
+   auto-select. That var is ABSENT on this host — the gap is latent and
+   host-conditional, not a live leak, but live on any host exporting it.
 
    Two graphify agents are sanctioned — `claude-cli` and `openai-cli` (Ray,
    2026-08-25, `docs/direction/2026-08-25-ray-directives.md` §2; both
    subscription-billed, both `--backend`-explicit only). Every OTHER
-   key-detected backend stays forbidden: `clean_env()` strips every
-   non-Claude key trigger (Gemini/Google/OpenAI/Kimi/DeepSeek/Azure/
-   **Bedrock via `AWS_REGION`**/Ollama) — `_STRIP_BACKEND_ENV`
-   (`graphify_env.py:32+`). `detect_backend()` (`llm.py:3535`) never
-   auto-selects `claude-cli`/`openai-cli` by name. Keep the `OPENAI_API_KEY`
-   strip — without it the openai-cli route can fall through to the METERED
-   API (`llm.py:2017-2022`). `extra` overrides in `clean_env({...})` apply
-   AFTER the strips (`test_graphify_env.py::test_extra_still_wins`) — do not
-   hand a stripped key back in through `extra`.
+   key-detected backend stays forbidden: `clean_env()` strips every non-Claude
+   trigger (Gemini/Google/OpenAI/Kimi/DeepSeek/Azure/**Bedrock via
+   `AWS_REGION`**/Ollama) — `_STRIP_BACKEND_ENV` (`graphify_env.py:32+`). Keep
+   the `OPENAI_API_KEY` strip — without it the openai-cli route falls through to
+   the METERED API (`llm.py:2017-2022`). `extra` overrides apply AFTER the
+   strips (`test_graphify_env.py::test_extra_still_wins`) — do not hand a
+   stripped key back in through `extra`.
 
-   🔴 **The compensating control this module cites is GONE.** The comment at
+   🔴 **The compensating control this module cites is GONE.**
    `graphify_env.py:25-31` cites `graphify_semantic_slice.scrub_route_overrides`
-   as removing the two Anthropic vars from this process's own environ before
-   corpus entry points run. That module does not exist (removed with the
-   2026-08-24 layer removal). No executable definition or call site survives
-   anywhere in `python/` — `git grep -n scrub_route_overrides -- python/`
-   finds only this same comment (a repo-wide grep also hits many `docs/`
-   reports, frozen provenance of the removed layer, not live references).
-   Filed as #686; do not assume this control runs.
+   as scrubbing the two Anthropic vars before corpus entry points run. That
+   module does not exist (removed 2026-08-24); no definition or call site
+   survives in `python/`. Filed as #686 — do not assume this control runs.
 
 5. **Do NOT commit `graphify-out/` beyond `memory/` and
    `graphify-semantic-slice/`.** Everything else is DERIVED and rebuilt by

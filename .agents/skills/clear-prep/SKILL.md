@@ -424,31 +424,14 @@ bounded, never *never*). Re-asking next turn is the nagging this skill must not
 become; a deferral that never expires is the worse failure, leaving a session
 writing its handoff at the end of the window instead of the start.
 
-**On *"/clear now"* — and only then — ARCHIVE the plan, but only if it is DONE:**
-
-```bash
-PWF="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/cache/planning-with-files/planning-with-files/3.12.0}"
-sh "$PWF/scripts/check-complete.sh"   # phases still in_progress? then DO NOT archive
-mkdir -p .planning/.archive && mv .planning/<id> .planning/.archive/<id>
-grep -qx '<id>' .planning/.active_plan 2>/dev/null && rm .planning/.active_plan
-```
-
-**Archiving an UNFINISHED plan destroys the thing the plugin exists for** — its
-`SessionStart` hook (matcher `startup|resume|clear|compact`) restores a live plan
-after exactly the `/clear` you are preparing, and in gated mode the Stop hook is
-still counting its phases. So check first — an incomplete plan is normal and stays.
-The `.active_plan` guard matters: one global pointer a parallel `PLAN_ID` may hold.
-
-Two details are load-bearing. Nothing creates `.archive/`, so without `mkdir -p`
-the first archive fails and an `&&` chain silently leaves the plan selected. And
-the leading dot matters because `resolve-plan-dir.sh` falls back to the newest
-`.planning/<dir>/` by mtime while **skipping hidden dirs** (`.*) continue ;;`).
-
-**Find the plan before you move it** — `resolve-plan-dir.sh` honours `PLAN_ID`
-and `PWF_PLAN_ROOT`, and legacy mode keeps `task_plan.md` at the repo ROOT with
-no `.planning/` at all. Archive rather than delete; `.planning/` is gitignored,
-so none of it is corpus. After the answer, never before the ask. Then stop: next
-is the user's `/clear`, then `/session-resume`.
+**On *"/clear now"* — and only then — ARCHIVE the plan, but only if it is DONE.**
+`check-complete.sh` first: **archiving an UNFINISHED plan destroys the thing the
+plugin exists for**, since its `SessionStart` hook restores a live plan after
+exactly the `/clear` you are preparing. An incomplete plan is normal and stays.
+Full procedure, with the four details that each silently break it:
+**`references/plan-archive.md`**. Archive rather than delete; `.planning/` is
+gitignored, so none of it is corpus. After the answer, never before the ask.
+Then stop: next is the user's `/clear`, then `/session-resume`.
 
 ## Keeping this skill honest over time
 
