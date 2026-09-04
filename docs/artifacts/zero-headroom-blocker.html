@@ -1,0 +1,98 @@
+<title>The Zero-Headroom Blocker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  :root{
+    --ground:#F7F8FA; --panel:#FFFFFF; --ink:#161A1F; --muted:#5B6672;
+    --line:#DCE1E7; --accent:#0B5D8A; --warn:#A6431F; --ok:#2E6B4F;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Source Sans 3",system-ui,-apple-system,sans-serif;
+    font-size:16px; line-height:1.5;
+    display:flex; justify-content:center; padding:28px 20px 40px;
+  }
+  main{width:100%; max-width:640px; display:flex; flex-direction:column; gap:18px}
+  h1{
+    font-family:Archivo,system-ui,sans-serif; font-weight:700;
+    font-size:29px; line-height:1.15; margin:0; text-wrap:balance;
+    letter-spacing:-.015em;
+  }
+  .sub{margin:0; color:var(--muted); font-size:15.5px}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:20px 22px; display:flex; flex-direction:column; gap:13px;
+  }
+  .row{display:grid; grid-template-columns:74px 1fr; gap:14px; align-items:baseline}
+  .k{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11.5px;
+    font-weight:500; letter-spacing:.09em; text-transform:uppercase; color:var(--muted);
+  }
+  .v{margin:0; font-size:16px}
+  .v b{font-weight:600}
+  .stop{color:var(--warn); font-weight:600}
+  figure{margin:0; overflow-x:auto}
+  figcaption{
+    margin-top:7px; color:var(--muted); font-size:13px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  .ask{
+    background:var(--panel); border:1px solid var(--line);
+    border-left:4px solid var(--accent); border-radius:10px; padding:17px 20px;
+  }
+  .ask p{margin:0; font-size:16px}
+  .ask .lab{
+    display:block; font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11.5px; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--accent); margin-bottom:6px; font-weight:500;
+  }
+</style>
+
+<main>
+  <div>
+    <h1>Five files are already full.</h1>
+    <p class="sub">A guard that blocks over-long edits would block your next edit to <b>CLAUDE.md</b>.</p>
+  </div>
+
+  <section class="card">
+    <div class="row"><span class="k">Plan</span>
+      <p class="v">Warn me at the moment I edit an instruction file, instead of failing a gate minutes later.</p></div>
+    <div class="row"><span class="k">Snag</span>
+      <p class="v"><span class="stop">Five of those files have zero room left.</span> The guard would refuse the very next edit to four of them.</p></div>
+    <div class="row"><span class="k">Fix</span>
+      <p class="v">Trim those five first. Then the guard only speaks up when something is genuinely wrong.</p></div>
+    <div class="row"><span class="k">Risk</span>
+      <p class="v">A guard that blocks constantly gets switched off — and a switched-off guard is worse than none.</p></div>
+  </section>
+
+  <figure>
+    <svg viewBox="0 0 620 74" width="620" height="74" role="img"
+         aria-label="Trim the five full files first, then build the guard; the written decision can land now either way.">
+      <g font-family="Source Sans 3, sans-serif" font-size="14">
+        <rect x="1" y="15" width="176" height="44" rx="7" fill="#FFFFFF" stroke="#A6431F" stroke-width="1.6"/>
+        <text x="89" y="34" text-anchor="middle" fill="#A6431F" font-weight="600">Make room</text>
+        <text x="89" y="50" text-anchor="middle" fill="#5B6672" font-size="12.5">trim the 5 full files</text>
+
+        <path d="M182 37 H214" stroke="#5B6672" stroke-width="1.6"/>
+        <path d="M214 37 l-8 -4.5 v9 z" fill="#5B6672"/>
+
+        <rect x="220" y="15" width="176" height="44" rx="7" fill="#FFFFFF" stroke="#DCE1E7" stroke-width="1.6"/>
+        <text x="308" y="34" text-anchor="middle" fill="#161A1F" font-weight="600">Build the guard</text>
+        <text x="308" y="50" text-anchor="middle" fill="#5B6672" font-size="12.5">warns, and can refuse</text>
+
+        <path d="M401 37 H433" stroke="#5B6672" stroke-width="1.6"/>
+        <path d="M433 37 l-8 -4.5 v9 z" fill="#5B6672"/>
+
+        <rect x="439" y="15" width="180" height="44" rx="7" fill="#FFFFFF" stroke="#2E6B4F" stroke-width="1.6"/>
+        <text x="529" y="34" text-anchor="middle" fill="#2E6B4F" font-weight="600">Write it down</text>
+        <text x="529" y="50" text-anchor="middle" fill="#5B6672" font-size="12.5">can land any time</text>
+      </g>
+    </svg>
+    <figcaption>Order matters between the first two. The third is independent.</figcaption>
+  </figure>
+
+  <div class="ask">
+    <span class="lab">What I need from you</span>
+    <p>Pick the order. I recommend <b>make room first</b> — it is the only one that changes what the other two cost.</p>
+  </div>
+</main>

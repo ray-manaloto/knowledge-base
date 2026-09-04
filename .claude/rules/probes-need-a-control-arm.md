@@ -127,25 +127,18 @@ its issue tracker is the thing most likely to be quoted at you.
 6. **An INHERITED number is not a measurement — re-derive it or label it.** A
    figure that arrives from a handoff or a prior session's table has *no
    control arm attached*. Repeating it converts someone else's unverified note
-   into your finding.
-
-   A session inherited a 5-row model bake-off table and reported it as "same
-   corpus, same flags, so it is comparable". Only the corpus was ever constant:
-   graphify records **no backend or model in any artifact**, the semantic cache
-   key is model-blind, and every arm was n=1. The whole comparison had to be
-   discarded — after a claim from it had already been reported as a finding.
-   Before repeating an inherited number, either re-derive it and say so, or
+   into your finding. Before repeating one, either re-derive it and say so, or
    mark it explicitly as unverified. And when a number *ranks* things, ask what
    the **noise floor** is: a difference smaller than same-input variance is not
    a difference.
+
    **A number can be invalidated by the very commit that writes it.** Ask what
    would move a figure before you commit it, and if the answer is "this change",
-   state the durable fact instead — the delta, the ratio, the mechanism. One
-   branch shipped two: "45 tasks listed vs 41 declared" in a commit that ADDED a
-   task, and "82 files in `docs/`" in a commit that added a doc. Both were
-   correctly measured, both were wrong on arrival, and neither was noticed
-   until a reviewer re-ran the count. This is the inherited-number failure with
-   a shorter fuse: the author *did* measure, so it reads as verified forever.
+   state the durable fact instead — the delta, the ratio, the mechanism. This is
+   the inherited-number failure with a shorter fuse: the author *did* measure, so
+   it reads as verified forever. Two worked failures — the discarded model
+   bake-off and the two self-invalidating counts — are in
+   `docs/probe-failures.md` § inherited numbers.
 7. **Cross-check a surprise before you report it.** A second route to the same
    fact costs seconds and settles which side is broken. Disagreement is a
    finding, not noise — and the finding is usually your probe.
@@ -159,21 +152,14 @@ its issue tracker is the thing most likely to be quoted at you.
    other.** To say it, *construct the reaching case and watch it be rejected*.
    If you can construct it, it is reachable and you have just found your
    fixture; if you genuinely cannot after trying, the claim is earned.
-
-   Deriving unreachability from a chain of true premises is not evidence. A
-   guard here was documented as dead because: a `file:line` token ends in
-   `:<digits>`, so its extension contains a `:`; every allowlisted extension is
-   short and alphanumeric; therefore none is one edit away. Every premise true,
-   conclusion false — it never asked whether an allowlisted extension ends in a
-   **digit**. `mp3` does, so `foo.mp:3` repaired to `foo.mp3` and the guard was
-   live all along.
+   Deriving unreachability from a chain of true premises is not evidence — a
+   guard here was documented as dead on four true premises and was live all
+   along (`docs/probe-failures.md` § unreachable by construction).
 
    **A PREDICTED survival is the most dangerous arm you can run.** That one was
    labelled `EXPECTED NO-OP` in the harness, so two runs *confirmed the
-   prediction* instead of testing it — and it had only survived because the
-   test's fixtures could not exhibit the harm (rule 3's bound, wearing a
-   different hat). Treat a survival you predicted as owing MORE evidence than a
-   surprising one, not less.
+   prediction* instead of testing it. Treat a survival you predicted as owing
+   MORE evidence than a surprising one, not less.
 
    **And an arm can keep PASSING while measuring something its id does not
    name** — a later fix can close the direction it probed, leaving it green

@@ -115,49 +115,19 @@ mise run kb-currency-check    # step 1: offline ~10ms, silent when clean; + pin-
 mise run kb-currency          # the full loop; writes docs/currency/
 ```
 
-- **Step 1 is the new part.** Bumps were already covered (Renovate,
-  `mise outdated --bump`); what nothing checked was whether the binary a shell
-  actually reaches matches the pin, and whether the *installed* version built
-  `graphify-out/`. It caught a live defect on day one: `MISE_ENV_CACHE=1` had a
-  stale `pipx-graphifyy/0.9.23/bin` on PATH ahead of the mise shims.
-- **graphify stamps no version into its own output** — `export.to_json()` writes
-  only `built_at_commit` — so `kb-build` writes `graphify-out/.currency-stamp.json`
-  recording the version that ACTUALLY RAN (never the pin, which would launder
-  drift). A rebuild that bypasses `kb-build` is detected via a **content
-  fingerprint** (`size:mtime_ns`) and reports *version unknown*, never a false
-  green. It deliberately does NOT key off `built_at_commit`: that is the git HEAD,
-  so every rebuild at one commit writes the same value — and rebuilding repeatedly
-  at one commit is the normal rhythm, which made the old check almost never able
-  to fire while claiming it could.
-- **`extra_probes` checks the install, not the config.** Two files agreeing that
-  `extras = ["all"]` says nothing about whether the extra delivered anything, so
-  the config also names packages that must be present. It is author-chosen on
-  purpose: `graspologic`/`leidenalg`/`igraph` auto-skip by PEP 508 marker on
-  Python 3.14 (the accepted Louvain fallback), so demanding every extra would
-  report drift that is not drift. **`backend_probes` is its sibling**: not "did an
-  extra deliver a package" but "did a declared BACKEND survive the upgrade" —
-  `openai-cli` is a patch our FORK carries, and losing it lets extraction fall back
-  to the METERED OpenAI API while every version number still agrees.
-- **Step 5 can never live in a hook.** A hook is a shell command; only the model
-  can call `AskUserQuestion`. The SessionStart hook therefore runs step 1 only and
-  is **silent unless something drifted** — always exiting 0, because a session must
-  not be blocked over a version pin. Two things it does NOT stay silent about: a
-  missing `currency.toml` (silence is this design's "clean", so an absent config
-  must announce that step 1 did not run) and an unknown `--tool` (exit 2).
-- **An unambiguous bump may apply itself** — six gates: versions readable and
-  moving forward · readable GitHub release · no breaking marker · extras unchanged
-  · no tracked issue moved · step 1 green. **Fails closed.** PyPI is the
-  installable truth; GitHub the narrative. Gate 1 was "patch-level" until Ray
-  removed it 2026-09-03 — it measured digits, not risk; a MAJOR now applies.
-- **"Could not check" is never rendered as green.** Three distinct states, kept
-  distinct because collapsing them is how every defect in this engine's review
-  happened: DRIFT (checked, disagrees) · SKIP (not applicable here) · OK. A run of
-  nothing-but-SKIPs reports *not verifiable here*, never "in sync"; an unreachable
-  upstream reports *latest UNKNOWN*, never "current"; a tracked issue whose lookup
-  failed blocks gate 5 rather than passing it; and a binary that is simply not
-  installed on a host where it *should* be is DRIFT, not SKIP.
-- **`mise run kb-currency` always exits 0** and can never serve as a CI gate — an
-  out-of-date tool is a signal, not a failure. Read the report, not the rc.
+**The design facts live in `.claude/rules/tool-currency-and-native-first.md`** —
+always exits 0 · "could not check" is never green · graphify stamps no version,
+so `kb-build` writes `.currency-stamp.json` · a bump may self-apply and fails
+closed · step 5 cannot live in a hook. Two that are NOT in that rule:
+
+- **`extra_probes` checks the install, not the config**, and **`backend_probes`
+  is its sharper sibling**: `openai-cli` is a patch our FORK carries, and losing
+  it lets extraction fall back to the METERED OpenAI API while every version
+  number still agrees.
+- **Gate 1 was "patch-level" until Ray removed it 2026-09-03** — it measured
+  digits, not risk. A MAJOR now self-applies if the other five gates pass.
+
+Retired rationale: `docs/currency/design-notes.md`.
 
 ## Layout
 
