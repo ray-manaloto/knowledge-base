@@ -127,3 +127,57 @@ old = '''        if rel is not None and rel in self.content:
 new = '''        if rel is not None and rel in self.content:
             return True
         return True'''
+
+# ── the cold-review fixes, armed on their own (kb-review step 4a) ──────────
+#
+# Added after the cold lane on 3047b2989777 returned P1 (the Bash bypass, which
+# is prose-only and unarmable from here), P2 (a docstring saying "declined" for
+# behaviour that DENIES) and P3 (the Edit projection not mirroring the real
+# tool's uniqueness precondition).
+#
+# F1 arms P3's fix in the direction that MATTERS. The realistic regression is
+# reverting to the old first-occurrence replacement, which silently judges a
+# write that could never reach disk — so the mutation is exactly the old line,
+# not a nonsense edit.
+#
+# F2 arms P3's fix in the OVER-CORRECTION direction, which is the one a fix like
+# this usually breaks: uniqueness must not bleed into the `replace_all` path,
+# where an ambiguous match is the whole point. `guarding-one-direction` is a
+# recurring failure here, so both directions get a row.
+#
+# F3 arms P2. The bug was PROSE, and no mutation can catch prose — so what this
+# arms is the test that now pins the behaviour the prose got wrong. Without a
+# test, the docstring was free to drift again the moment someone "fixed" the code
+# to match the words.
+#
+# NOT ARMED, and it is the worst finding: P1, the Bash-tool bypass. It is a
+# statement about which MATCHER the settings file registers, and no mutation of
+# this module can reach it. It is closed by prose in the docstring and by an
+# issue, not by code — and saying so here is the point, because a full arms
+# sweep beside an unarmed P1 is exactly how a clean score gets misread as a
+# clean change.
+
+[[arm]]
+id = "F1"
+test = "test_an_ambiguous_match_without_replace_all_is_unprojectable"
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''    if old and current.count(old) != 1:
+        return None'''
+new = '''    if old and old not in current:
+        return None'''
+
+[[arm]]
+id = "F2"
+test = "test_replace_all_still_accepts_an_ambiguous_match"
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''    if payload.get("replace_all") is True:
+        return current.replace(old, new) if old in current else None'''
+new = '''    if payload.get("replace_all") is True:
+        return current.replace(old, new) if current.count(old) == 1 else None'''
+
+[[arm]]
+id = "F3"
+test = "test_notebook_edit_on_an_instruction_path_denies"
+file = "python/src/kb_setup/instruction_edit_guard.py"
+old = '''EDIT_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})'''
+new = '''EDIT_TOOLS = frozenset({"Edit", "Write"})'''

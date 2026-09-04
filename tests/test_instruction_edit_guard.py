@@ -256,14 +256,75 @@ def test_project_returns_none_rather_than_the_current_content(tmp_path: Path) ->
 # --- projection details ------------------------------------------------------
 
 
-def test_replace_all_false_replaces_only_the_first(tmp_path: Path) -> None:
+def test_a_unique_match_projects_the_replacement(tmp_path: Path) -> None:
+    root = _repo(tmp_path, {"CLAUDE.md": "a\nz\n"})
+    got = guard.project(
+        "Edit",
+        {"old_string": "a", "new_string": "b"},
+        root / "CLAUDE.md",
+    )
+    assert got == "b\nz\n"
+
+
+def test_an_ambiguous_match_without_replace_all_is_unprojectable(tmp_path: Path) -> None:
+    """Cold review P3 on 3047b2989777: mirror the real Edit tool's preconditions.
+
+    The Edit tool requires `old_string` to be present AND unique unless
+    `replace_all` is set. Projecting a first-occurrence replacement here models a
+    write that can never reach disk, so the guard would be judging a hypothetical.
+    """
     root = _repo(tmp_path, {"CLAUDE.md": "a\na\n"})
     got = guard.project(
         "Edit",
         {"old_string": "a", "new_string": "b"},
         root / "CLAUDE.md",
     )
-    assert got == "b\na\n"
+    assert got is None
+
+
+def test_replace_all_still_accepts_an_ambiguous_match(tmp_path: Path) -> None:
+    """The uniqueness rule must NOT bleed into the replace_all path."""
+    root = _repo(tmp_path, {"CLAUDE.md": "a\na\n"})
+    got = guard.project(
+        "Edit",
+        {"old_string": "a", "new_string": "b", "replace_all": True},
+        root / "CLAUDE.md",
+    )
+    assert got == "b\nb\n"
+
+
+def test_replace_all_with_no_match_is_unprojectable(tmp_path: Path) -> None:
+    root = _repo(tmp_path, {"CLAUDE.md": "a\n"})
+    got = guard.project(
+        "Edit",
+        {"old_string": "NOPE", "new_string": "b", "replace_all": True},
+        root / "CLAUDE.md",
+    )
+    assert got is None
+
+
+def test_notebook_edit_on_an_instruction_path_denies(tmp_path: Path) -> None:
+    """Cold review P2 on 3047b2989777: the docstring said "declined", it DENIES.
+
+    Deny is correct — an unmodelled payload against a budgeted file has an
+    unknown post-edit size — but nothing asserted it, so the prose was free to
+    drift from the behaviour. It had.
+    """
+    root = _repo(tmp_path, {"CLAUDE.md": "hi\n"})
+    v = guard.evaluate(
+        root, "NotebookEdit", {"file_path": str(root / "CLAUDE.md"), "new_source": "x"}
+    )
+    assert v.deny
+    assert "could not be projected" in v.reason
+
+
+def test_notebook_edit_on_a_notebook_is_silent(tmp_path: Path) -> None:
+    """The ordinary case: an .ipynb is not an instruction file, so no opinion."""
+    root = _repo(tmp_path, {"CLAUDE.md": "hi\n"})
+    v = guard.evaluate(
+        root, "NotebookEdit", {"file_path": str(root / "nb.ipynb"), "new_source": "x"}
+    )
+    assert v.silent
 
 
 def test_replace_all_true_replaces_every_occurrence(tmp_path: Path) -> None:

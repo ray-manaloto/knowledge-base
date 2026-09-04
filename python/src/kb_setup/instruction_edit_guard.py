@@ -89,6 +89,31 @@ denied.
 on a stalled hook to act as a gate."* Fail-closed is implemented here or it does
 not exist.
 
+🔴 SCOPE, stated so silence does not imply coverage
+===================================================
+
+**This guard sees the ``Edit`` and ``Write`` TOOLS ONLY. A Bash-tool write to an
+instruction file is completely invisible to it** — a heredoc (``cat >
+.claude/rules/x.md <<'EOF'``), ``tee``, ``sed -i``, ``perl -pi``, a ``python -c``
+that writes a file, ``find … -exec``, ``xargs``. None of them reaches a matcher
+of ``Edit|Write``.
+
+This is not an oversight, but the previous version of this docstring never said
+so, which made it one in effect. ``docs/design/edit-write-hook-surface.md``
+decision 5 rules that the Bash surface is a **different tenant** — its sibling
+``inplace_edit.py:96-100`` already lists the same blind spots under its own
+"SCOPE" heading, and closing them here would put shell parsing inside a budget
+guard. Cold review P1 on ``3047b2989777`` was right that the admission existed
+for the sibling and had not been carried here.
+
+Two things follow, and the second is the uncomfortable one:
+
+* the hk ``md_size_budget`` step remains the **authority**; this guard is a
+  faster, earlier signal and never the last line;
+* the gap is **live, not theoretical** — this repo's own conventions push agents
+  toward Bash for file work, so the bypass is on the path of least resistance
+  rather than off it. Tracked separately rather than papered over.
+
 What it declines to judge, and why that is not a failure
 ========================================================
 
@@ -113,11 +138,25 @@ from kb_setup.result import Rc
 EDIT_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})
 """Tools whose payload this module knows how to project.
 
-``NotebookEdit`` is listed because one ``Edit(<glob>)`` permission rule covers
-all three (``tools-reference.md:85,368``), so it can reach a handler filtered by
-``if``. It is not in the settings MATCHER — it writes ``.ipynb``, which is not
-instruction markdown — and its payload shape is not modelled, so it lands in
-:func:`project` returning ``None`` and is declined rather than guessed at.
+``NotebookEdit`` is listed so that a payload naming an instruction file reaches
+a DECISION rather than slipping past as an unknown tool. It is not in the
+settings matcher — it writes ``.ipynb``, which is not instruction markdown — and
+its payload shape is not modelled, so :func:`project` returns ``None`` and the
+candidate is **DENIED**, fail-closed.
+
+That last word is a correction (cold review P2 on ``3047b2989777``). This
+docstring previously said such a payload was *"declined rather than guessed at"*,
+which reads as the silent exit and is the opposite of what runs. Measured:
+
+.. code-block:: text
+
+    {"tool_name":"NotebookEdit","tool_input":{"file_path":".claude/rules/do-not.md",...}}
+    -> permissionDecision: "deny"
+
+Deny is the correct behaviour — an unmodelled payload against a budgeted file has
+an unknown post-edit size, and this guard fails closed on a matched candidate.
+Only the prose was wrong, which is the more dangerous half: a reader trusting it
+would have "fixed" the code to match.
 
 ``MultiEdit`` is deliberately absent: **0** occurrences in the pinned docs. That
 tool no longer exists.
@@ -151,12 +190,15 @@ def _project_edit(payload: dict[str, object], path: Path) -> str | None:
         current = path.read_text(errors="replace") if path.is_file() else ""
     except OSError:
         return None
-    if old and old not in current:
-        # The Edit tool would fail on this too. Declining beats projecting a
-        # replacement that will never happen and denying on its imagined size.
-        return None
     if payload.get("replace_all") is True:
-        return current.replace(old, new)
+        return current.replace(old, new) if old in current else None
+    # Mirror the real Edit tool's preconditions, or this projects a write that
+    # can never reach disk. It requires `old_string` to be present AND unique
+    # unless `replace_all` is set, so both a miss and an ambiguous match are
+    # "cannot model" -> deny, not a guessed first-occurrence replacement.
+    # (Cold review P3 on `3047b2989777`: only the miss was handled.)
+    if old and current.count(old) != 1:
+        return None
     return current.replace(old, new, 1)
 
 
