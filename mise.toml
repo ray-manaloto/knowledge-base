@@ -1695,3 +1695,22 @@ description = "Put mise's shim dir at the head of PATH in CLAUDE_ENV_FILE (unfre
 # not a pass.
 run = "uv run kb-setup env-refresh"
 timeout = "60s"
+
+[tasks.kb-instruction-edit-guard]
+description = "PreToolUse: deny an Edit/Write that would put an instruction file over budget"
+# #698, built to the decisions in `docs/design/edit-write-hook-surface.md` (#700).
+#
+# ONE handler does both jobs, because a PreToolUse payload carries enough to
+# compute the post-edit size before the write happens: over budget -> a `deny`
+# whose reason Claude reads; within budget -> the projected headroom in
+# `additionalContext`, with NO `permissionDecision` key (returning "allow" would
+# also skip the user's permission prompt, which nobody asked for).
+#
+# It re-runs the WHOLE `md_budget` sweep with an `overrides` map rather than
+# checking one file. A second per-file implementation would be free to disagree
+# with the hk gate, and the entire value here is that the hook and the gate
+# cannot drift.
+#
+# Reads the hook payload on stdin, so it is never run by hand.
+run = "uv run kb-setup instruction-edit-guard"
+timeout = "60s"

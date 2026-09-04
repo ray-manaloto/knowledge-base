@@ -298,7 +298,63 @@ def classify(path: str, *, exclude: tuple[str, ...] = DEFAULT_EXCLUDED_PREFIXES)
     return "nested"
 
 
-def resolve_imports(entry: Path, root: Path, depth: int = 0) -> list[Path]:
+@dataclass(frozen=True)
+class Overlay:
+    """A proposed-content view of the tree: overrides first, disk second.
+
+    #698 needs to budget an edit BEFORE it happens, and the sweep must see the
+    proposed bytes everywhere it would otherwise read disk. One object threaded
+    through `check` -> `_size_of` -> `closure_size` -> `resolve_imports` is what
+    makes that true; overriding only the top-level `read_text` was the second of
+    the two holes the #700 design record found, because `closure_size` re-reads
+    every `@import`ed member itself and would have counted stale bytes.
+
+    `content` is keyed by repo-relative POSIX path — the same spelling
+    `tracked_files` returns and `classify` expects — while the lookups take
+    `Path`, because that is what the import walker carries.
+
+    :data:`EMPTY` is the no-override case and is the default everywhere, so a
+    plain sweep behaves exactly as it did before this class existed.
+    """
+
+    root: Path
+    content: dict[str, str]
+
+    def rel(self, path: Path) -> str | None:
+        """``path`` as a repo-relative POSIX string, or ``None`` if outside."""
+        try:
+            return path.resolve().relative_to(self.root.resolve()).as_posix()
+        except ValueError, OSError:
+            return None
+
+    def exists(self, path: Path) -> bool:
+        """True when the overlay supplies ``path``, or it is a real file.
+
+        The override arm is the FIRST of the two holes: a `Write` creating a new
+        instruction file is untracked AND absent from disk, so `check`'s
+        `not path.is_file()` skip made it invisible twice over — the guard would
+        have waved through the one edit that can add a whole file to the budget.
+        """
+        rel = self.rel(path)
+        if rel is not None and rel in self.content:
+            return True
+        return path.is_file()
+
+    def read(self, path: Path) -> str:
+        """The proposed bytes for ``path``, falling back to disk."""
+        rel = self.rel(path)
+        if rel is not None and rel in self.content:
+            return self.content[rel]
+        return path.read_text(errors="replace")
+
+
+EMPTY = Overlay(Path(), {})
+"""The no-override overlay. Every read falls through to disk."""
+
+
+def resolve_imports(
+    entry: Path, root: Path, depth: int = 0, overlay: Overlay | None = None
+) -> list[Path]:
     """Return the transitive @import closure of ``entry``, including itself.
 
     Imports "are expanded and loaded into context at launch alongside the
@@ -306,10 +362,11 @@ def resolve_imports(entry: Path, root: Path, depth: int = 0) -> list[Path]:
     unit that costs context. Budgeting per file would let any file evade its
     ceiling by splitting, which the docs explicitly call a non-reduction.
     """
-    if depth > _MAX_IMPORT_DEPTH or not entry.is_file():
+    over = overlay if overlay is not None else EMPTY
+    if depth > _MAX_IMPORT_DEPTH or not over.exists(entry):
         return []
     out = [entry]
-    raw = injected_text(entry.read_text(errors="replace"))
+    raw = injected_text(over.read(entry))
     # Fenced blocks are skipped by the real import parser; mirror that.
     raw = re.sub(r"```.*?```", "", raw, flags=re.DOTALL)
     for m in _IMPORT_RE.finditer(raw):
@@ -322,11 +379,13 @@ def resolve_imports(entry: Path, root: Path, depth: int = 0) -> list[Path]:
         except ValueError:
             continue  # outside the repo
         if nxt not in out:
-            out.extend(p for p in resolve_imports(nxt, root, depth + 1) if p not in out)
+            out.extend(p for p in resolve_imports(nxt, root, depth + 1, over) if p not in out)
     return out
 
 
-def closure_size(entry: Path, root: Path) -> tuple[int, int, list[Path]]:
+def closure_size(
+    entry: Path, root: Path, overlay: Overlay | None = None
+) -> tuple[int, int, list[Path]]:
     """Measure the (lines, bytes) of an entry's whole import closure.
 
     An import directive is REPLACED by the imported content, so the directive's
@@ -334,10 +393,11 @@ def closure_size(entry: Path, root: Path) -> tuple[int, int, list[Path]]:
     one `@AGENTS.md` line + AGENTS.md's 200) reads as 201 and a file sitting
     legitimately at the documented limit fails for a reason unrelated to size.
     """
-    files = resolve_imports(entry, root)
+    over = overlay if overlay is not None else EMPTY
+    files = resolve_imports(entry, root, 0, over)
     lines = bytes_ = 0
     for f in files:
-        raw = f.read_text(errors="replace")
+        raw = over.read(f)
         text = injected_text(raw)
         fenced = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
         directives = len(_IMPORT_RE.findall(fenced))
@@ -382,10 +442,12 @@ def _description_violation(rel: str, raw: str) -> Violation | None:
     )
 
 
-def _size_of(cls: str, path: Path, raw: str, root: Path) -> tuple[int, int, str]:
+def _size_of(
+    cls: str, path: Path, raw: str, root: Path, overlay: Overlay | None = None
+) -> tuple[int, int, str]:
     """Return (lines, bytes, unit) for one file, by class."""
     if cls in ("eager_root", "nested"):
-        lines, bytes_, files = closure_size(path, root)
+        lines, bytes_, files = closure_size(path, root, overlay)
         # Name the closure, not just the stub: a 1-line CLAUDE.md that imports
         # a 12KB AGENTS.md must not report "CLAUDE.md is too big".
         members = ", ".join(f.relative_to(root).as_posix() for f in files if f != path)
@@ -396,15 +458,37 @@ def _size_of(cls: str, path: Path, raw: str, root: Path) -> tuple[int, int, str]
     return lines, bytes_, "file"
 
 
-def check(root: Path, *, exclude: tuple[str, ...] = DEFAULT_EXCLUDED_PREFIXES) -> Report:
-    """Budget every tracked instruction file by its load class."""
-    report = Report()
+def check(
+    root: Path,
+    *,
+    exclude: tuple[str, ...] = DEFAULT_EXCLUDED_PREFIXES,
+    overrides: dict[str, str] | None = None,
+) -> Report:
+    """Budget every tracked instruction file by its load class.
 
-    for rel in tracked_files(root):
+    ``overrides`` maps a repo-relative POSIX path to the content it is ABOUT to
+    have, so #698 can ask "would this edit breach a budget?" before the write
+    lands. It is the same sweep either way — deliberately, because a second
+    per-file checker would be free to disagree with the gate, and the whole
+    point is that the hook and the gate cannot drift.
+
+    An overridden path that git does not track is walked anyway. That is the
+    `Write`-creates-a-new-file case, and without it the guard would be blind to
+    the single edit that can add an entire file to the eager budget.
+    """
+    report = Report()
+    overlay = Overlay(root, dict(overrides or {}))
+
+    tracked = tracked_files(root)
+    # An override for an already-tracked path must not be walked twice; one for
+    # an untracked path is appended so a created file is still budgeted.
+    extra = [rel for rel in overlay.content if rel not in set(tracked)]
+
+    for rel in [*tracked, *extra]:
         path = root / rel
-        if classify(rel, exclude=exclude) is None or not path.is_file():
+        if classify(rel, exclude=exclude) is None or not overlay.exists(path):
             continue
-        raw = path.read_text(errors="replace")
+        raw = overlay.read(path)
         cls = _resolve_class(rel, raw, exclude)
         if cls is None:
             continue
@@ -413,7 +497,7 @@ def check(root: Path, *, exclude: tuple[str, ...] = DEFAULT_EXCLUDED_PREFIXES) -
             report.violations.append(v)
 
         budget = BUDGETS[cls]
-        lines, bytes_, unit = _size_of(cls, path, raw, root)
+        lines, bytes_, unit = _size_of(cls, path, raw, root, overlay)
 
         report.counted += 1
         if cls in EAGER_CLASSES:
