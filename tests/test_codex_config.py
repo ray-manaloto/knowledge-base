@@ -96,7 +96,14 @@ def test_untracked_file_is_unknown_not_clean(tmp_path: Path) -> None:
     """No committed copy means the question cannot be answered — never CLEAN."""
     report = codex_config.status(tmp_path, run=_runner({"ls-files": _proc(1)}))
     assert report.verdict is Verdict.UNKNOWN
-    assert "not tracked" in report.detail
+    assert "untracked" in report.detail
+    # The detail must not assert WHICH of the two worlds this is. `ls-files
+    # --error-unmatch` exits non-zero both for a repository that does not track
+    # the file and for a directory that is no repository at all, and this probe
+    # cannot separate them — so the wording names both. Pinned because the old
+    # message said "in this repository", which the cold review of de258a00
+    # (P3) caught being false in the second case.
+    assert "not a git repository" in report.detail
 
 
 def test_git_missing_is_unknown(tmp_path: Path) -> None:

@@ -157,6 +157,20 @@ def _run(
             cwd=repo_root,
             timeout=30,
         )
+    # PEP 758 syntax, and the FORMATTER's own output — not a missing pair of
+    # parentheses. Python 3.14 re-allows an unparenthesized `except` tuple
+    # (`requires-python = ">=3.14"`, running 3.14.7), and `ruff format` at
+    # `target-version = "py314"` normalizes TO this form.
+    #
+    # Armed both directions rather than argued: `except (OSError, ...)` here was
+    # rewritten back to this line by `mise run fmt`, which reported
+    # `1 file reformatted`; and this form passes `format --check` at rc=0. Adding
+    # parens is not a fix that can be kept — the next `fmt` removes them.
+    #
+    # Recorded because it reads like the Python-2 `except Type, name:` footgun
+    # and was filed as such by the cold review of de258a00 (P2, non-blocking).
+    # Nothing flags it because it is what the formatter wants; the note is the
+    # only thing that stops the finding recurring.
     except OSError, subprocess.SubprocessError:
         return None
 
@@ -178,11 +192,21 @@ def status(repo_root: Path, run: _Runner | None = None) -> Report:
     if tracked is None:
         return Report(Verdict.UNKNOWN, "git could not be run at all")
     if tracked.returncode != 0:
-        # Not tracked: there is no committed copy to compare against, so the
-        # question this module asks cannot be answered here. Never CLEAN.
+        # Not reported as tracked: there is no committed copy to compare
+        # against, so the question this module asks cannot be answered here.
+        # Never CLEAN.
+        #
+        # The wording states only what `ls-files --error-unmatch` actually
+        # settles. It exits non-zero for TWO different worlds — a repository
+        # that does not track the file, and a directory that is no repository at
+        # all — and this probe cannot tell them apart without another git call.
+        # Saying "in this repository" asserted the first and was wrong in the
+        # second (cold review of de258a00, P3), which is the shape a check owes
+        # a reader: declare what it cannot see rather than pick a side.
         return Report(
             Verdict.UNKNOWN,
-            f"{WATCHED} is not tracked in this repository, so there is no "
+            f"git does not report {WATCHED} as tracked here — either it is "
+            "untracked, or this is not a git repository — so there is no "
             "committed copy to compare against",
         )
 
