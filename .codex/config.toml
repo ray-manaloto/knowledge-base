@@ -126,6 +126,24 @@ default_subagent_reasoning_effort = "high"
 [mcp_servers.kb]
 command = "uv"
 args = ["run", "kb-setup", "serve"]
+# REGISTERED IS NOT REACHABLE — this line is what makes the server usable from a
+# headless lane (#668, 2026-09-08). `mise run kb-codex` runs at approval policy
+# `never`, and under that policy every MCP tool call is denied OUTRIGHT before
+# the server is ever contacted: `mcp_tool_call.rs:1535` returns
+# `"MCP tool call requires approval, but approval policy is never"`. Live-armed —
+# a lane asked for `kb`'s graph_stats replied `KB-UNREACHABLE ... approval policy
+# is never`, which reads exactly like a broken server and is not one.
+#
+# `approve` is the one mode that short-circuits that check:
+# `codex-mcp/src/mcp/mod.rs:95-97` returns auto-approved BEFORE the policy test,
+# so it holds under `never` specifically. Read from the pinned source at
+# rust-v0.153.4, per Ray's directive 4 — a CLI's error strings are secondary
+# artifacts, the argument definitions are primary and we have them.
+#
+# Safe here because `kb` is READ-ONLY by construction: `kb-setup serve` exposes
+# graph reads and nothing that writes. Do NOT copy this line to a server that
+# can mutate anything.
+default_tools_approval_mode = "approve"
 
 # `update_plan` became OPT-IN in codex 0.152.0 (PR #41744, "Make the update_plan
 # tool opt-in", merged 2026-08-31T00:55:03Z — verified via `gh api`, before the
