@@ -1,0 +1,145 @@
+<title>The Eleven Names</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper:   #F5F7F8;
+    --card:    #FFFFFF;
+    --ink:     #12171C;
+    --muted:   #5B6672;
+    --rule:    #D9E0E5;
+    --blocked: #A3342A;
+    --open:    #1D6647;
+    --slate:   #2C4A66;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 16px;
+    line-height: 1.45;
+    margin: 0;
+    padding: 26px 20px 30px;
+  }
+  main { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+  .eyebrow {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 6px;
+  }
+  h1 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 30px; font-weight: 700; line-height: 1.12;
+    margin: 0; text-wrap: balance;
+  }
+  .sub { margin: 8px 0 0; color: var(--muted); font-size: 15px; }
+
+  figure { margin: 0; background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 14px 10px; overflow-x: auto; }
+  figure svg { max-width: 100%; height: auto; display: block; }
+  figcaption {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4;
+  }
+
+  dl { margin: 0; display: grid; grid-template-columns: 108px 1fr; gap: 11px 16px; align-items: baseline; }
+  dt {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  dd { margin: 0; }
+  dd b { font-weight: 600; }
+  code {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 13px; font-variant-numeric: tabular-nums;
+  }
+  .no { color: var(--blocked); font-weight: 600; }
+  .yes { color: var(--open); font-weight: 600; }
+
+  .ask {
+    border-left: 3px solid var(--slate);
+    padding: 2px 0 2px 14px;
+  }
+  .ask p { margin: 0; }
+  .ask .lead { font-family: "Archivo", system-ui, sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--slate); margin-bottom: 3px; }
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">Door 3 &middot; now open</p>
+    <h1>The lane could reach the graph. It just wasn&rsquo;t allowed to carry one setting in.</h1>
+    <p class="sub">Both sides now answer <code>359,146</code>. Nothing is blocked.</p>
+  </header>
+
+  <figure>
+    <svg viewBox="0 0 720 186" role="img" aria-label="Codex hands a new program only eleven named settings; the setting that raises the graph size limit is not one of them, so it bounced. Naming it explicitly lets it through.">
+      <defs>
+        <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,0 10,5 0,10" fill="#2C4A66"/>
+        </marker>
+        <marker id="tipRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,0 10,5 0,10" fill="#A3342A"/>
+        </marker>
+        <marker id="tipGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,0 10,5 0,10" fill="#1D6647"/>
+        </marker>
+      </defs>
+
+      <!-- left: your settings -->
+      <rect x="8" y="26" width="176" height="92" rx="5" fill="#FFFFFF" stroke="#D9E0E5"/>
+      <text x="96" y="46" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="#12171C">Your settings</text>
+      <text x="96" y="66" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#5B6672">PATH  HOME  TERM …</text>
+      <text x="96" y="86" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#A3342A">GRAPHIFY_MAX_GRAPH_BYTES</text>
+      <text x="96" y="104" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10.5" fill="#5B6672">&ldquo;files up to 1&nbsp;GB are fine&rdquo;</text>
+
+      <!-- the gate -->
+      <line x1="322" y1="14" x2="322" y2="152" stroke="#2C4A66" stroke-width="2"/>
+      <rect x="314" y="52" width="16" height="30" fill="#F5F7F8" stroke="#2C4A66" stroke-width="2"/>
+      <text x="322" y="168" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11.5" font-weight="700" fill="#2C4A66">the gate: 11 names only</text>
+
+      <!-- allowed through -->
+      <line x1="188" y1="62" x2="308" y2="62" stroke="#2C4A66" stroke-width="1.6" marker-end="url(#tip)"/>
+      <text x="248" y="54" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10.5" fill="#2C4A66">on the list</text>
+
+      <!-- bounced -->
+      <path d="M188 92 L296 92" stroke="#A3342A" stroke-width="1.6" stroke-dasharray="5 4"/>
+      <path d="M296 92 L262 112" stroke="#A3342A" stroke-width="1.6" marker-end="url(#tipRed)"/>
+      <text x="238" y="128" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10.5" fill="#A3342A">not on the list &mdash; dropped</text>
+
+      <!-- right: the reader -->
+      <rect x="470" y="26" width="242" height="92" rx="5" fill="#FFFFFF" stroke="#D9E0E5"/>
+      <text x="591" y="46" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="#12171C">The graph reader</text>
+      <text x="591" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" fill="#5B6672">never heard the setting, so it used</text>
+      <text x="591" y="83" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" fill="#A3342A">its own limit: files up to 512&nbsp;MB</text>
+      <text x="591" y="103" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#A3342A">our file: 528&nbsp;MB &rarr; refused</text>
+
+      <line x1="336" y1="62" x2="462" y2="62" stroke="#2C4A66" stroke-width="1.6" marker-end="url(#tip)"/>
+
+      <!-- the fix -->
+      <path d="M188 148 L462 148" stroke="#1D6647" stroke-width="1.8" marker-end="url(#tipGreen)"/>
+      <rect x="252" y="136" width="196" height="24" rx="4" fill="#F5F7F8" stroke="#1D6647"/>
+      <text x="350" y="152" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" font-weight="700" fill="#1D6647">the fix: name it, and it goes through</text>
+    </svg>
+    <figcaption>Codex starts helper programs with a short list of settings &mdash; eleven names, fixed. Everything else you set is dropped at the door, silently.</figcaption>
+  </figure>
+
+  <dl>
+    <dt>Cause</dt>
+    <dd>Our &ldquo;big files are fine&rdquo; setting was <b>never on that list</b>, so the reader fell back to its own smaller limit and refused a file <b>16&nbsp;MB</b> over it.</dd>
+
+    <dt>Why hidden</dt>
+    <dd>The real reason was printed where nobody could see it. What came back was just <span class="no">&ldquo;could not load&rdquo;</span> &mdash; so three sessions guessed at timeouts.</dd>
+
+    <dt>Then what</dt>
+    <dd>Fixing that uncovered a <b>second</b> wall: a 30&#8209;second wait. Loading takes 21&nbsp;seconds warm, which is already too close. Raised to 120.</dd>
+
+    <dt>Proof</dt>
+    <dd class="yes">Codex asked and got 359,146. Claude asked and got 359,146. Same graph, both sides.</dd>
+  </dl>
+
+  <div class="ask">
+    <p class="lead">What I need from you</p>
+    <p>Nothing for door 3 &mdash; it&rsquo;s done and committed. But something rewrote your codex settings file mid-session and deleted 145 lines of notes. I have the details and one question.</p>
+  </div>
+</main>
