@@ -289,8 +289,19 @@ _EXPECTED_METADATA_ONLY = (
     graphify_health.ExpectedMetadataOnly(
         source_name="codex-docs",
         relative_path="pyproject.toml",
-        content_sha256="ca9fd4efd37b34a3e91618291b20399d864a0f125cf45b3569cbd44a3a40223c",
-        pinned_commit="cdc06dbff609d9dd221ebd0c94b727eddd8e722c",
+        # RE-APPROVED at codex-docs 3b1ef69d (2026-09-08). The approval is keyed
+        # to BOTH values, so advancing the manifest correctly invalidated it and
+        # `kb-manifest-audit` blocked the ship — the gate working, not noise.
+        #
+        # The premise was re-verified rather than the numbers re-typed:
+        # `grep -c '^\[project\]' sources/codex-docs/pyproject.toml` -> **0**,
+        # and the file's only tables are `[tool.ruff]`, `[tool.ruff.lint]`,
+        # `[tool.coverage.run]`, `[tool.coverage.report]`. So the zero-node
+        # result is still correct for the recorded reason. The file did change
+        # upstream — it gained the two `.lint`/`.report` tables the comment above
+        # predates — which is exactly why the SHA is part of the key.
+        content_sha256="3ee45be83e41d61eb7d77dedf9e4c2c499ee080ef1b3aac96ee739e302b8192f",
+        pinned_commit="3b1ef69d01c53b1de818703e73a6235df2248277",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
     graphify_health.ExpectedMetadataOnly(
