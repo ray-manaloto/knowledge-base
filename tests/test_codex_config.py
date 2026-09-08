@@ -163,6 +163,43 @@ def test_changed_names_the_recovery_command(capsys: pytest.CaptureFixture[str]) 
     assert "#710" in out
 
 
+def test_changed_warns_that_a_restore_re_arms_the_next_rewrite(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The recovery must not read as the end of it.
+
+    The importer writes only when a value or a server NAME is absent
+    (`external-agent-migration/src/service.rs:590-595`, `:633-635`), and `HEAD`
+    deliberately omits `[mcp_servers.graphify]` — so restoring the committed
+    copy re-creates the exact gap the next import fills, comments and all.
+
+    This is armed because it is the half that was WRONG when shipped: the first
+    version of this message printed the stash command as the remedy, so the
+    tripwire's own advice armed the next rewrite. Nothing failed when the
+    message was corrected, which is how the gap was found — the render had
+    assertions for the command and the issue number, and none for the guidance.
+    """
+    codex_config.render(Report(Verdict.CHANGED, "differs from the committed copy", 162, 32))
+    out = _drain(capsys)
+    assert "RE-ARMS" in out
+    assert "MISSING" in out
+    # The durable fix lives outside this repo, so the message has to name it.
+    assert "Automatic sync" in out
+
+
+def test_changed_does_not_claim_a_schedule(capsys: pytest.CaptureFixture[str]) -> None:
+    """No time-of-day claim, because the one that was here got falsified.
+
+    The message asserted "~03:29", true of the 2026-09-05 and 09-06 events and
+    refuted by a fourth at 22:21:10Z. Three points within two seconds of one
+    clock minute is exactly what makes a fixed-timer claim persuasive enough to
+    write down; this pins that it is not written down again.
+    """
+    codex_config.render(Report(Verdict.CHANGED, "differs from the committed copy", 162, 32))
+    out = _drain(capsys)
+    assert "03:29" not in out
+
+
 def test_unknown_says_it_is_not_a_pass(capsys: pytest.CaptureFixture[str]) -> None:
     """'Could not check' must never render as green."""
     codex_config.render(Report(Verdict.UNKNOWN, "git could not be run at all"))

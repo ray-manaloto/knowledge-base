@@ -11,16 +11,27 @@ The defect
 ==========
 
 ChatGPT desktop's "Import from another AI app" sync rewrites this repo's
-`.codex/config.toml` at ~03:29 CDT, destroying every hand-written comment. Three
-occurrences are on record, all within two seconds of the same clock minute:
+`.codex/config.toml`, destroying every hand-written comment.
+
+**NOT on a daily 03:29 schedule — that claim died on its fourth data point.**
+Three occurrences landed within two seconds of the same clock minute, which is
+what made a fixed timer so persuasive; the fourth, measured in-session, was at
+**22:21:10Z (17:21 local)**. A schedule this repo neither owns nor observes is
+not a fact it should assert, so the render no longer states a time.
 
 ===========  ===========  ===============  ===================================
-morning      size         ``[mcp_servers]``  provenance
+event        size         ``[mcp_servers]``  provenance
 ===========  ===========  ===============  ===================================
 2026-09-04   144 -> 27    **removed**      issue #710, not re-measured here
 2026-09-05   144 -> 30    kb kept, graphify **added**  issue #710, not re-measured here
 2026-09-06   144 -> 30    kb kept, graphify **added**  measured 2026-09-08 in-session
+2026-09-08   162 -> 32    kb kept, graphify **added**  measured in-session, 22:21:10Z
 ===========  ===========  ===============  ===================================
+
+The fourth row is the one with the app's own receipt beside it: the Import
+history read "10 imported", itemised ``Settings 1``, ``MCP servers 1``,
+``Sessions 8`` — two separate writing categories, which is what refuted
+"unticking Settings is enough".
 
 Why this checks the DIFF and not named markers
 ==============================================
@@ -139,6 +150,26 @@ def recovery_command(now: datetime | None = None) -> str:
     step. This is the command that was run by hand on 2026-09-08 and on the two
     prior occurrences — printing it is the whole difference between a report the
     reader can act on and one they have to re-derive.
+
+    🔴 IT PRESERVES EVIDENCE; IT DOES NOT STOP THE REWRITE, AND ON ITS OWN IT
+    INVITES THE NEXT ONE. Read from the importer's own source at
+    `sources/codex/codex-rs/external-agent-migration/`: a category writes only
+    when the merge finds something ABSENT — `import_config` needs a missing
+    value (`service.rs:590-595`), `import_mcp_server_config` a missing server
+    NAME (`:633-635`). `HEAD` deliberately carries no `[mcp_servers.graphify]`,
+    so every restore re-creates precisely the gap the next import fills, and the
+    whole-file `toml::to_string_pretty` + `fs::write`
+    (`config_values.rs:77-80`) takes the comments with it again.
+
+    So the caller is told both halves. The durable fixes are outside this
+    repository — untick the writing categories, or turn Automatic sync off —
+    with an in-repo alternative that is NOT implemented here: `MigrationScope::
+    repository` returns `None` if `.codex/config.toml` (or five sibling paths)
+    is a symlink (`scope.rs:57-71`), which opts this repo out of those branches.
+
+    The message also no longer claims a time. It said "~03:29", true of the
+    2026-09-05 and 09-06 events, and falsified on 2026-09-08 by one at 22:21Z.
+    A schedule this repo does not own is not a fact this repo should assert.
     """
     stamp = (now or datetime.now(tz=UTC)).strftime("%Y-%m-%d %H:%M:%SZ")
     return f'git stash push -m "EVIDENCE #710 recurrence {stamp}" -- {WATCHED}'
@@ -263,9 +294,15 @@ def render(report: Report) -> None:
     events.warn(
         "codex-config.changed",
         f"[codex-config] {WATCHED} {report.detail}{size}. If you did not edit it, "
-        f"this is #710 — the ChatGPT desktop import sync rewrites it at ~03:29 and "
-        f"destroys every comment. Preserve the evidence and restore the good file:\n"
-        f"  {recovery_command()}",
+        f"this is #710 — ChatGPT desktop's import sync rewrites this file whole and "
+        f"destroys every comment. Preserve the evidence:\n"
+        f"  {recovery_command()}\n"
+        f"  A RESTORE ALONE RE-ARMS THE NEXT REWRITE. The importer writes only "
+        f"when something looks MISSING, so putting back a copy that omits what it "
+        f"added re-creates the condition it fills. Durable fix: untick the writing "
+        f"categories (Settings, MCP servers, Agents, Hooks) or turn Automatic sync "
+        f"off in ChatGPT desktop — see docs/research/reports/"
+        f"2026-09-08-chatgpt-import-tracker.md.",
         path=str(WATCHED),
         committed_lines=report.committed_lines,
         worktree_lines=report.worktree_lines,
