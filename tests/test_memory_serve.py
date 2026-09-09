@@ -262,3 +262,35 @@ def test_a_real_tools_call_returns_ranked_json(tmp_path: Path) -> None:
         assert payload["hits"][0]["path"] == "target.md", payload
     finally:
         mcp_probe._shutdown(proc)
+
+
+# --- cold-review round 1: the P2 on `question: null` ----------------------
+
+
+def test_an_explicit_null_question_is_refused_like_an_absent_one() -> None:
+    """Cold P2: `dict.get`'s default covers an ABSENT key, never an explicit null.
+
+    `str(args.get("question", ""))` returned the literal `"None"` for
+    `{"question": null}` and searched for it — live-verified as 60 matches in
+    the 382-record store, in a response a caller cannot tell apart from a real
+    answer. Both neighbours refuse correctly, which is what made it invisible:
+    an omitted key and an empty string each produce `a question is required`.
+    """
+    assert memory_serve.recall_argv({"question": None}) == ["", "--json"]
+
+
+def test_a_null_question_reaches_the_same_refusal_as_an_empty_one(tmp_path: Path) -> None:
+    """The end of that path, not just the translation — with both controls.
+
+    Asserting only on `recall_argv` would leave the fix one layer short of what
+    a client actually sees.
+    """
+    _memory(tmp_path, "x", question="something", answer="an answer")
+    null_text, null_error = memory_serve.run_recall_tool({"question": None}, tmp_path)
+    absent_text, absent_error = memory_serve.run_recall_tool({}, tmp_path)
+    empty_text, empty_error = memory_serve.run_recall_tool({"question": ""}, tmp_path)
+    assert (null_error, absent_error, empty_error) == (True, True, True)
+    assert "a question is required" in null_text
+    assert null_text == absent_text == empty_text, (
+        "an explicit null must be indistinguishable from an absent or empty question"
+    )

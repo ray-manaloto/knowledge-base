@@ -112,7 +112,16 @@ def recall_argv(arguments: dict[str, Any] | None) -> list[str]:
     because a tool result is machine-read.
     """
     args = dict(arguments or {})
-    argv = [str(args.get("question", "")), "--json"]
+    # An explicit JSON `null` is NOT the same as an absent key, and `dict.get`'s
+    # default only covers the absent case — so `str(args.get("question", ""))`
+    # produced the literal string `"None"` and searched for it. Cold-review P2,
+    # live-verified: `{"question": null}` returned a normal-looking ranked set
+    # (60 matches in the 382-record store) that a caller cannot tell apart from a
+    # real answer, while an omitted key and an empty string both correctly refuse
+    # with `a question is required`. The optional flags below already guarded
+    # `is not None`; this field did not, and it is the only required one.
+    question = args.get("question")
+    argv = ["" if question is None else str(question), "--json"]
     for flag in ("top", "outcome", "since"):
         if args.get(flag) is not None:
             argv += [f"--{flag}", str(args[flag])]
