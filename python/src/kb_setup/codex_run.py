@@ -132,7 +132,7 @@ def _toml_str(value: str) -> str:
     return f'"{escaped}"'
 
 
-def _terminate_group(proc: subprocess.Popen[str]) -> None:
+def _terminate_group(proc: subprocess.Popen[str], *, own_group: bool) -> None:
     """End the lane's whole process GROUP, TERM then KILL.
 
     The group, not the PID, because codex spawns child tool-call workers that
@@ -140,20 +140,34 @@ def _terminate_group(proc: subprocess.Popen[str]) -> None:
     `fable-orchestrator`'s own watchdog records as *kill the group, never just
     the PID*.
 
-    🔴 **The group is only ours to kill when we CREATED it.** `_spawn` passes
-    `start_new_session` exactly when a timeout is set, so the two are coupled;
-    if that coupling ever breaks, `os.getpgid(proc.pid)` returns the CALLER's
-    group and `killpg` would take down this process, its mise task and its
-    shell. The comparison below is the arm on that — same group as ours ⇒ signal
-    the child alone. It is cheap, and the failure it prevents is not.
+    🔴 **The group is only ours to kill when we CREATED it**, so `own_group` is
+    passed in by the caller rather than inferred. `_spawn` sets
+    `start_new_session` exactly when a timeout is set, and the two must stay
+    coupled: signalling a group we did not create would take down this process,
+    its mise task and its shell.
+
+    🔴 **THE PGID IS `proc.pid`, AND IT IS NOT LOOKED UP.** This function used to
+    start with `os.getpgid(proc.pid)` and treat a `ProcessLookupError` as "already
+    reaped, nothing to do". On macOS that error also fires for a **zombie** —
+    measured: a child that has exited but not been waited on returns `pgid == pid`
+    while alive and `ProcessLookupError` the moment it exits, before any `wait()`.
+    So the leader exiting first (exactly the case a watchdog exists for) made this
+    function return having signalled NOTHING, leaving the rest of the group alive
+    and the caller blocked on a pipe those survivors still held.
+
+    No lookup is needed: `start_new_session=True` makes the child its own session
+    and group leader, so its pgid IS its pid, by definition and while it is a
+    zombie too.
     """
-    try:
-        pgid = os.getpgid(proc.pid)
-    except ProcessLookupError, PermissionError:  # already reaped
-        return
-    own_group = pgid != os.getpgid(0)
+    pgid = proc.pid
 
     def _signal(sig: int) -> None:
+        # A reaped process frees its PID for reuse, and `pgid` is that PID — so
+        # once `wait()` has returned, signalling could reach a stranger. The
+        # watchdog can fire in exactly that window, between `wait()` returning
+        # and `cancel()` landing.
+        if proc.returncode is not None:
+            return
         with contextlib.suppress(ProcessLookupError, PermissionError):
             if own_group:
                 os.killpg(pgid, sig)
@@ -161,19 +175,56 @@ def _terminate_group(proc: subprocess.Popen[str]) -> None:
                 proc.send_signal(sig)
 
     _signal(signal.SIGTERM)
-    # Poll rather than sleep the grace out: the moment the child is reaped we
-    # stop, so SIGKILL can never reach a PID the OS has since handed to someone
-    # else. `poll()` is non-blocking and safe from this thread.
+    # Poll rather than sleep the grace out, so SIGKILL can never reach a PID the
+    # OS has since handed to someone else.
+    #
+    # 🔴 **WAIT ON THE GROUP, NOT THE LEADER.** This loop returned as soon as
+    # `proc.poll()` went non-None — i.e. the moment codex itself exited — which
+    # skipped the SIGKILL entirely while a descendant that ignored SIGTERM was
+    # still running and still holding stdout. Measured by the cold lane: with
+    # `timeout=0.3` and a tee, a TERM-ignoring descendant kept the call blocked
+    # past six seconds, while the TERM-responsive control returned 124 in 0.31s.
+    # A leader-only check turns the hard bound this whole function exists to
+    # provide back into an unbounded wait.
     deadline = time.monotonic() + _KILL_GRACE
     while time.monotonic() < deadline:
-        if proc.poll() is not None:
+        if _group_gone(pgid, own_group=own_group, proc=proc):
             return
         time.sleep(0.1)
     _signal(signal.SIGKILL)
 
 
+def _group_gone(pgid: int, *, own_group: bool, proc: subprocess.Popen[str]) -> bool:
+    """Has every process in the lane's group exited — not merely its leader?
+
+    `killpg(pgid, 0)` sends no signal and raises `ProcessLookupError` only when
+    the group has no members left, which is the question `proc.poll()` cannot
+    answer: poll speaks for one PID.
+
+    When the group is NOT ours it is the caller's own, which always has members
+    (us), so asking about it would never terminate and would end in a SIGKILL to
+    this process. There the leader IS the whole lane, so poll is both correct and
+    the only safe probe.
+    """
+    if not own_group:
+        return proc.poll() is not None
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        # A member survives that we may not signal; treat it as still present
+        # rather than reporting a clean exit we did not observe.
+        return False
+    return False
+
+
 def _tee(stream: IO[str], path: Path) -> None:
-    """Copy the lane's stdout to `path` AND to ours, line by line.
+    """Copy the lane's output to `path` AND to ours, line by line.
+
+    The stream handed in carries stdout AND stderr merged (see `_spawn`), because
+    codex puts incremental progress on stderr and only the final message on
+    stdout. "The lane's output" therefore means both, deliberately.
 
     Line-buffered rather than captured-then-written because an Astra review runs
     for tens of minutes: a caller polling a background run needs to see progress,
@@ -213,14 +264,14 @@ def _spawn(
     A new session also means Ctrl-C no longer reaches the child, which is why it
     is not the default: an interactive lane should stay interruptible.
 
-    `prompt` (stdin) and `tee` (stdout) never co-occur — `exec` takes its prompt
+    `prompt` (stdin) and `tee` (the merged output stream) never co-occur — `exec` takes its prompt
     on stdin and writes its own `-o` file, while `review` takes its instructions
     through `-c developer_instructions=` and has no `-o` to write. Feeding a pipe
     while draining another needs a select loop nothing here calls for, so the
     combination raises rather than deadlocking on a caller's first large prompt.
     """
     if prompt is not None and tee is not None:
-        raise ValueError("_spawn cannot write stdin and tee stdout in one call")
+        raise ValueError("_spawn cannot write stdin and tee the output stream in one call")
 
     # argv is built by this module from validated flags and never goes through a
     # shell, so nothing here interpolates caller text into a command line.
@@ -229,6 +280,23 @@ def _spawn(
         argv,
         stdin=subprocess.PIPE if prompt is not None else None,
         stdout=subprocess.PIPE if tee is not None else None,
+        # 🔴 **THE PROGRESS IS ON STDERR, so the tee must take both streams.**
+        # codex's human renderer sends every agent message through `eprintln!`
+        # (`exec/src/event_processor_with_human_output.rs:99-105`) and only
+        # prints the FINAL message to stdout, at shutdown (`:399-408`). A
+        # stdout-only tee therefore writes nothing at all until the run ends —
+        # which made this module's own promise of incremental evidence false,
+        # and a lane killed at its bound left an EMPTY report.
+        #
+        # Observed before it was understood: during a 1143s review the tee file
+        # sat at 0 bytes while the run's combined output passed 500 KB. The
+        # per-line flush was working; there was simply nothing on stdout to
+        # flush.
+        #
+        # The cost is real and accepted: hook warnings and MCP errors now land
+        # in the report too. A noisy report that exists beats a clean one that
+        # is empty exactly when the lane died early.
+        stderr=subprocess.STDOUT if tee is not None else None,
         text=True,
         env=os.environ.copy(),
         start_new_session=bounded,
@@ -238,7 +306,7 @@ def _spawn(
 
     def _fire() -> None:
         timed_out.set()
-        _terminate_group(proc)
+        _terminate_group(proc, own_group=bounded)
 
     watchdog = threading.Timer(timeout, _fire) if timeout is not None else None
     if watchdog is not None:
@@ -248,9 +316,26 @@ def _spawn(
         if tee is not None and proc.stdout is not None:
             _tee(proc.stdout, tee)
         if prompt is not None and proc.stdin is not None:
-            proc.stdin.write(prompt)
-            proc.stdin.close()
+            # A child that exited before reading the prompt leaves us writing to
+            # a closed pipe. That is the CHILD's story to tell, not an error of
+            # ours: raising here replaced its real exit code with a wrapper
+            # traceback (rc 1), and on a timeout it also swallowed the 124 and
+            # the SUBSET warning. Measured against a 1 MB prompt and an
+            # early-exiting child: this wrapper returned 1 where the
+            # `subprocess.run` it replaced returned the child's own 7.
+            with contextlib.suppress(BrokenPipeError):
+                proc.stdin.write(prompt)
+                proc.stdin.close()
         rc = proc.wait()
+    except BaseException:
+        # The child is already running, so an exception here (a `_tee` that
+        # cannot open its destination is the real case) must not leave it
+        # orphaned. Kill and REAP before the `finally` cancels its watchdog —
+        # cancelling first would remove the only thing that would ever have
+        # bounded it.
+        _terminate_group(proc, own_group=bounded)
+        proc.wait()
+        raise
     finally:
         if watchdog is not None:
             watchdog.cancel()
@@ -414,7 +499,7 @@ def _run_review(args: argparse.Namespace) -> int:
 
     `--output` is honoured HERE rather than as an argv flag, because `codex
     review` has none — see `_review_argv` for the source citation. So this path
-    tees the lane's stdout to the file itself, and that is a real difference from
+    tees the lane's output to the file itself, and that is a real difference from
     `exec` mode worth stating: `-o` is codex's own `--output-last-message` and
     holds only the final message, while this holds everything the lane printed.
     For a review report that is the better artifact, but it is not the same
@@ -529,7 +614,8 @@ def run(argv: list[str] | None = None) -> int:
         "--output",
         default=None,
         help="persist the lane's output to this file. exec: codex's own `-o` "
-        "last-message file. --review: this task tees stdout, since `codex review` "
+        "last-message file. --review: this task tees the lane's merged stdout+stderr, "
+        "since `codex review` "
         "has no -o (#678)",
     )
     parser.add_argument(

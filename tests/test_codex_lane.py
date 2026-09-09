@@ -470,7 +470,7 @@ def test_terminate_group_signals_a_child_that_shares_our_own_group() -> None:
     """
     proc = subprocess.Popen(["sleep", "30"], text=True)
     try:
-        codex_run._terminate_group(proc)
+        codex_run._terminate_group(proc, own_group=False)
         assert proc.wait(timeout=10) != 0  # died by signal, not by finishing
     finally:
         if proc.poll() is None:  # pragma: no cover — only on a failed arm
@@ -577,3 +577,93 @@ def test_review_never_forwards_approval_policy() -> None:
     the reviewer ran.
     """
     assert "approval_policy" not in _review(sandbox="read-only", model="gpt-6-astra")
+
+
+# ---------------------------------------------------------------------------
+# Round-1 cold-review fixes. Each of these fails on the pre-fix code.
+# ---------------------------------------------------------------------------
+
+
+def test_the_bound_holds_when_a_descendant_ignores_sigterm(tmp_path: Path) -> None:
+    """P1: the watchdog must wait on the GROUP, not on codex alone.
+
+    The leader exits on SIGTERM immediately; the descendant traps it and keeps
+    stdout open. A leader-only check returned before ever sending SIGKILL, so the
+    tee blocked on a pipe nothing would close and the "hard bound" was unbounded.
+    """
+    target = tmp_path / "out.md"
+    started = time.monotonic()
+    rc = codex_run._spawn(
+        ["sh", "-c", "sh -c 'trap \"\" TERM; sleep 30' & exec sleep 0.2"],
+        timeout=0.3,
+        tee=target,
+    )
+    elapsed = time.monotonic() - started
+    assert rc == 124
+    # _KILL_GRACE is 5s, so a correct run ends by ~5.5s; the pre-fix code hung
+    # until the descendant's own 30s sleep expired.
+    assert elapsed < 15.0, f"the group outlived its bound; took {elapsed:.1f}s"
+
+
+def test_the_tee_captures_stderr_where_codex_puts_its_progress(tmp_path: Path) -> None:
+    """P2: agent messages go to stderr; stdout gets only the final message.
+
+    `exec/src/event_processor_with_human_output.rs:99-105` uses `eprintln!` for
+    every agent message and `:399-408` prints the final one to stdout at
+    shutdown. A stdout-only tee wrote an empty file for the entire run.
+    """
+    target = tmp_path / "out.md"
+    rc = codex_run._spawn(["sh", "-c", "echo progress-line >&2; echo final-line"], tee=target)
+    assert rc == 0
+    captured = target.read_text(encoding="utf-8")
+    assert "progress-line" in captured, "stderr progress never reached the report"
+    assert "final-line" in captured
+
+
+def test_a_child_that_exits_before_reading_the_prompt_keeps_its_rc() -> None:
+    """P2: a closed stdin is the CHILD's story, not a wrapper traceback.
+
+    Writing a large prompt to an early-exiting child raised BrokenPipeError and
+    replaced the child's exit code with rc 1.
+    """
+    big = "x" * (1024 * 1024)
+    assert codex_run._spawn(["sh", "-c", "exit 7"], prompt=big) == 7
+
+
+def test_a_timeout_during_a_blocked_stdin_write_still_reports_124() -> None:
+    """P2, the same defect's worse half: the SUBSET warning was swallowed too."""
+    big = "x" * (1024 * 1024)
+    rc = codex_run._spawn(["sh", "-c", "exec sleep 30"], prompt=big, timeout=0.5)
+    assert rc == 124
+
+
+def test_an_unopenable_output_path_does_not_orphan_the_child(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P2: `_tee` raising must not leave a child whose watchdog was cancelled.
+
+    `/dev/null/x.md` cannot be created — `mkdir(parents=True)` over `/dev/null`
+    raises `FileExistsError`, since it exists and is not a directory. The child
+    is already running at that point, so the error path has to kill and reap it
+    before the `finally` cancels the only thing that would have bounded it.
+
+    The spy is the whole test. Asserting only that the OSError propagates would
+    pass with the cleanup deleted — the same empty-arm shape that let A7 survive
+    its first anchor. What must be true is that something terminated the child
+    AND that it was reaped.
+    """
+    seen: dict[str, object] = {}
+    real = codex_run._terminate_group
+
+    def _spy(proc: subprocess.Popen[str], *, own_group: bool) -> None:
+        seen["proc"] = proc
+        real(proc, own_group=own_group)
+
+    monkeypatch.setattr(codex_run, "_terminate_group", _spy)
+    with pytest.raises(OSError, match="File exists"):
+        codex_run._spawn(["sh", "-c", "exec sleep 30"], timeout=0.3, tee=Path("/dev/null/x.md"))
+
+    child = seen.get("proc")
+    assert child is not None, "the child was left running; nothing terminated it"
+    assert isinstance(child, subprocess.Popen)
+    assert child.returncode is not None, "the child was terminated but never reaped"

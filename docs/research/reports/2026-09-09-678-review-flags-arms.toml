@@ -150,3 +150,69 @@ old = '''    if spec.sandbox:
         argv += ["-c", f"sandbox_mode={_toml_str(spec.sandbox)}"]'''
 new = '''    if False:
         argv += ["-c", f"sandbox_mode={_toml_str(spec.sandbox)}"]'''
+
+# ---------------------------------------------------------------------------
+# ROUND-1 COLD-REVIEW FIXES (A10-A14). Every mutation below restores the EXACT
+# pre-fix expression, so each arm is simultaneously kb-review §4a's "revert the
+# fix and watch its own test go red" and a mutation arm on the fix. That is
+# deliberate: a synthetic mutation would prove less than the real prior code.
+# ---------------------------------------------------------------------------
+
+# A10 - the watchdog waits on the LEADER again. The bound silently stops being a
+# bound the moment codex exits before a descendant that is still holding the
+# pipe; nothing sends SIGKILL and the caller blocks until the descendant chooses
+# to leave.
+[[arm]]
+id = "A10"
+test = "test_the_bound_holds_when_a_descendant_ignores_sigterm"
+file = "python/src/kb_setup/codex_run.py"
+old = '''        if _group_gone(pgid, own_group=own_group, proc=proc):'''
+new = '''        if proc.poll() is not None:'''
+
+# A11 - THE ROOT CAUSE UNDER A10, and a separate arm because it fails earlier.
+# Deriving the pgid from the leader at kill time: on macOS `getpgid` raises
+# ProcessLookupError for a ZOMBIE, so `_terminate_group` returned having
+# signalled nothing at all. The pre-fix code caught that and returned; here the
+# raise escapes into the timer thread, which kills the watchdog just as dead.
+[[arm]]
+id = "A11"
+test = "test_the_bound_holds_when_a_descendant_ignores_sigterm"
+file = "python/src/kb_setup/codex_run.py"
+old = '''    pgid = proc.pid'''
+new = '''    pgid = os.getpgid(proc.pid)'''
+
+# A12 - stdout-only capture. codex puts agent messages on stderr
+# (`event_processor_with_human_output.rs:99-105`) and only the final message on
+# stdout at shutdown (`:399-408`), so this writes an EMPTY report for the whole
+# run and a lane killed at its bound leaves nothing.
+[[arm]]
+id = "A12"
+test = "test_the_tee_captures_stderr_where_codex_puts_its_progress"
+file = "python/src/kb_setup/codex_run.py"
+old = '''        stderr=subprocess.STDOUT if tee is not None else None,'''
+new = '''        stderr=None,'''
+
+# A13 - the prompt write raises BrokenPipeError instead of letting the child
+# speak. Replaces the lane's real exit code with a wrapper traceback, and on a
+# timeout swallows the 124 and the SUBSET warning with it.
+[[arm]]
+id = "A13"
+test = "test_a_child_that_exits_before_reading_the_prompt_keeps_its_rc"
+file = "python/src/kb_setup/codex_run.py"
+old = '''            with contextlib.suppress(BrokenPipeError):
+                proc.stdin.write(prompt)
+                proc.stdin.close()'''
+new = '''            proc.stdin.write(prompt)
+            proc.stdin.close()'''
+
+# A14 - the error path cancels the watchdog without cleaning up the child, so an
+# unopenable --output orphans a running lane with nothing left to bound it. Note
+# the test spies on `_terminate_group` rather than only asserting the OSError:
+# asserting the raise alone SURVIVES this mutation, which is the A7 lesson
+# applied before the fact rather than after.
+[[arm]]
+id = "A14"
+test = "test_an_unopenable_output_path_does_not_orphan_the_child"
+file = "python/src/kb_setup/codex_run.py"
+old = '''    except BaseException:'''
+new = '''    except SystemExit:'''

@@ -183,12 +183,27 @@ tree protected evidence. An after-only `git status` cannot see an edit made
 *inside* a path that was already modified — it looked dirty before and it looks
 dirty after. Capture both, and diff them:
 
+🔴 **Porcelain STATUS is not enough — snapshot CONTENT.** A path that was already
+`M` stays `M` after a second edit, so a status-only comparison prints
+`TREE UNCHANGED` over changed bytes: it misses exactly the case the paragraph
+above promises to catch, because an already-dirty file is the likeliest thing a
+lane touches. Fingerprint the content:
+
 ```bash
-git status --porcelain > /tmp/astra-tree-before.txt
-git stash list > /tmp/astra-stash-before.txt
+git status --porcelain > /tmp/astra-status-before.txt
+git stash list      > /tmp/astra-stash-before.txt
+git diff HEAD       | shasum -a 256 > /tmp/astra-worktree-before.txt   # tracked edits
+git diff --cached   | shasum -a 256 >> /tmp/astra-worktree-before.txt  # staged edits
 # ... run the lane ...
-git status --porcelain | diff /tmp/astra-tree-before.txt - && echo "TREE UNCHANGED"
+git status --porcelain | diff /tmp/astra-status-before.txt - \
+  && git stash list    | diff /tmp/astra-stash-before.txt - \
+  && { git diff HEAD | shasum -a 256; git diff --cached | shasum -a 256; } \
+       | diff /tmp/astra-worktree-before.txt - \
+  && echo "TREE UNCHANGED"
 ```
+
+The stash list is compared too, because "restoring" a tree by stashing the lane's
+edits leaves the status clean and the evidence hidden rather than gone.
 
 Report any difference rather than repairing it: this repo has a recorded
 incident of a review lane mutating a tracked file, and the remedy is to say so,
