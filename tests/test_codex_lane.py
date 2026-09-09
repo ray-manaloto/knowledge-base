@@ -8,8 +8,12 @@ evasion, and a guard that refuses the procedure it protects is worse than none.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
+import os
+import shlex
+import signal
 import subprocess
 import sys
 import threading
@@ -667,3 +671,60 @@ def test_an_unopenable_output_path_does_not_orphan_the_child(
     assert child is not None, "the child was left running; nothing terminated it"
     assert isinstance(child, subprocess.Popen)
     assert child.returncode is not None, "the child was terminated but never reaped"
+
+
+def test_the_bound_kills_the_group_on_a_non_tee_run(tmp_path: Path) -> None:
+    """P1, round 2: the non-tee path returned before the group was cleaned up.
+
+    Without a tee the main thread sits in `proc.wait()`, which returns the moment
+    the LEADER dies — so the watchdog was still inside its grace period when
+    `_spawn` returned, and a `returncode` guard then suppressed the SIGKILL it
+    was about to send. Measured by the cold lane: rc 124 in 0.60s with a
+    TERM-ignoring descendant still running past the five-second grace.
+
+    TWO THINGS ABOUT THIS FIXTURE, both learned by getting them wrong:
+
+    1. **The leader must OUTLIVE the bound**, or the watchdog never fires and the
+       run simply succeeds. A first version slept 0.2s and asserted rc 124
+       against a clean rc 0.
+    2. **The descendant must ignore SIGTERM in the process that SLEEPS.**
+       `sh -c 'trap "" TERM; sleep 30'` does not: `sh` ignores TERM but runs
+       `sleep` as a child, and `killpg` reaches that child directly, which has
+       default disposition and dies. Both round-2 arms SURVIVED against that
+       fixture — it was never testing what its name claimed. A python child that
+       installs `SIG_IGN` on itself before sleeping is TERM-proof for real, so
+       only the SIGKILL at the end of the grace can end it.
+
+    Asserting rc alone proves nothing: rc was already 124 while the leak was live.
+    The assertion is on the descendant.
+    """
+    pidfile = tmp_path / "descendant.pid"
+    inner = (
+        "import os, signal, time;"
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN);"
+        f"open({str(pidfile)!r}, 'w').write(str(os.getpid()));"
+        "time.sleep(30)"
+    )
+    spawn_descendant = f"{shlex.quote(sys.executable)} -c {shlex.quote(inner)}"
+    started = time.monotonic()
+    rc = codex_run._spawn(["sh", "-c", f"{spawn_descendant} & exec sleep 30"], timeout=0.5)
+    elapsed = time.monotonic() - started
+
+    assert rc == 124
+    pid = int(pidfile.read_text(encoding="utf-8").strip())
+    # `_spawn` must not return until the watchdog has finished escalating, so by
+    # here the group is killed. The short poll absorbs only the zombie window
+    # before init reaps it; an unkilled descendant sleeps 30s and never clears.
+    deadline = time.monotonic() + 3.0
+    alive = True
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            alive = False
+            break
+        time.sleep(0.05)
+    if alive:  # pragma: no cover — only on a failed arm
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(pid, signal.SIGKILL)
+        pytest.fail(f"descendant {pid} survived the bound; _spawn returned after {elapsed:.2f}s")

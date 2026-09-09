@@ -162,12 +162,25 @@ def _terminate_group(proc: subprocess.Popen[str], *, own_group: bool) -> None:
     pgid = proc.pid
 
     def _signal(sig: int) -> None:
-        # A reaped process frees its PID for reuse, and `pgid` is that PID — so
-        # once `wait()` has returned, signalling could reach a stranger. The
-        # watchdog can fire in exactly that window, between `wait()` returning
-        # and `cancel()` landing.
-        if proc.returncode is not None:
-            return
+        # 🔴 **NO `returncode` GUARD HERE, AND THAT IS THE FIX.** One stood here
+        # to stop a signal reaching a recycled PID. It also stopped the SIGKILL:
+        # on a NON-tee run the main thread is already inside `proc.wait()`, so
+        # the leader is reaped during the grace period, and the guard then made
+        # the escalation a no-op — rc 124 came back in 0.6s while a TERM-ignoring
+        # descendant ran on past the grace. The guard suppressed exactly the
+        # signal the grace period exists to deliver.
+        #
+        # It was never needed, in either direction:
+        #
+        # - `killpg`: POSIX does not reuse a process-group ID while the group
+        #   still has members, and `pgid` is only signalled while it does. An
+        #   empty group raises `ProcessLookupError`, suppressed below.
+        # - `send_signal`: CPython ALREADY does this check, for this exact
+        #   reason — `self.poll()` then `if self.returncode is not None: return`,
+        #   citing bpo-38630's recycled-PID race, and it suppresses
+        #   `ProcessLookupError` itself per bpo-40550.
+        #
+        # So the guard bought nothing and cost the bound.
         with contextlib.suppress(ProcessLookupError, PermissionError):
             if own_group:
                 os.killpg(pgid, sig)
@@ -339,6 +352,18 @@ def _spawn(
     finally:
         if watchdog is not None:
             watchdog.cancel()
+            # 🔴 **JOIN, or the bound ends before the cleanup does.** `cancel()`
+            # only un-schedules a timer that has not fired; one already inside
+            # `_terminate_group` keeps running while `_spawn` returns. On a
+            # non-tee run nothing else waits for it — `proc.wait()` returns as
+            # soon as the LEADER dies — so the caller resumed with the group's
+            # SIGKILL still pending, which is the same "bound that is not a
+            # bound" this watchdog exists to prevent, one layer up.
+            #
+            # The join is bounded by `_KILL_GRACE`, because that is the longest
+            # `_terminate_group` can run. A timer that never fired joins
+            # instantly, so the ordinary path pays nothing.
+            watchdog.join()
 
     if timed_out.is_set():
         print(

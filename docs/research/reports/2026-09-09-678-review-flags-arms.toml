@@ -216,3 +216,38 @@ test = "test_an_unopenable_output_path_does_not_orphan_the_child"
 file = "python/src/kb_setup/codex_run.py"
 old = '''    except BaseException:'''
 new = '''    except SystemExit:'''
+
+# ---------------------------------------------------------------------------
+# ROUND-2 COLD-REVIEW FIXES (A15-A16). Both restore the exact pre-fix code, so
+# each is the §4a revert-check and the arm at once. They target the NON-tee
+# path, which A10/A11 never exercised: with a tee, the main thread blocks in
+# `_tee` until the pipe closes, which hid both defects.
+# ---------------------------------------------------------------------------
+
+# A15 - the `returncode` guard comes back. It was added in round 1 to stop a
+# signal reaching a recycled PID, and it suppressed the SIGKILL instead: on a
+# non-tee run `proc.wait()` reaps the leader DURING the grace period, so the
+# guard fires exactly when the escalation is due. It was never needed - killpg
+# cannot hit a recycled pgid while the group has members, and CPython's own
+# `send_signal` already performs this check (bpo-38630).
+[[arm]]
+id = "A15"
+test = "test_the_bound_kills_the_group_on_a_non_tee_run"
+file = "python/src/kb_setup/codex_run.py"
+old = '''        with contextlib.suppress(ProcessLookupError, PermissionError):
+            if own_group:'''
+new = '''        if proc.returncode is not None:
+            return
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            if own_group:'''
+
+# A16 - the watchdog is cancelled but never joined. `cancel()` only unschedules
+# a timer that has not fired; one already inside `_terminate_group` keeps running
+# while `_spawn` returns, so the caller resumes with the group's SIGKILL still
+# pending. Nothing else waits for it on the non-tee path.
+[[arm]]
+id = "A16"
+test = "test_the_bound_kills_the_group_on_a_non_tee_run"
+file = "python/src/kb_setup/codex_run.py"
+old = '''            watchdog.join()'''
+new = '''            pass'''

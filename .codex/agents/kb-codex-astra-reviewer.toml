@@ -189,21 +189,43 @@ dirty after. Capture both, and diff them:
 above promises to catch, because an already-dirty file is the likeliest thing a
 lane touches. Fingerprint the content:
 
+**And an ALREADY-UNTRACKED file needs its own fingerprint.** A non-ignored file
+that git has never seen is `??` before the lane and `??` after, and it appears in
+neither `git diff HEAD` nor `git diff --cached` — so status and both diff hashes
+are identical while its bytes changed. Hash the untracked contents as a third
+term. Define the snapshot once and take it twice:
+
 ```bash
-git status --porcelain > /tmp/astra-status-before.txt
-git stash list      > /tmp/astra-stash-before.txt
-git diff HEAD       | shasum -a 256 > /tmp/astra-worktree-before.txt   # tracked edits
-git diff --cached   | shasum -a 256 >> /tmp/astra-worktree-before.txt  # staged edits
+astra_fingerprint() {                       # status + stash + tracked + untracked
+  git status --porcelain
+  git stash list
+  git diff HEAD     | shasum -a 256
+  git diff --cached | shasum -a 256
+  git ls-files --others --exclude-standard -z \
+    | xargs -0 -r shasum -a 256             # contents, not just names
+}
+
+astra_fingerprint > /tmp/astra-tree-before.txt
 # ... run the lane ...
-git status --porcelain | diff /tmp/astra-status-before.txt - \
-  && git stash list    | diff /tmp/astra-stash-before.txt - \
-  && { git diff HEAD | shasum -a 256; git diff --cached | shasum -a 256; } \
-       | diff /tmp/astra-worktree-before.txt - \
-  && echo "TREE UNCHANGED"
+astra_fingerprint | diff /tmp/astra-tree-before.txt - && echo "TREE UNCHANGED"
 ```
 
-The stash list is compared too, because "restoring" a tree by stashing the lane's
-edits leaves the status clean and the evidence hidden rather than gone.
+`--exclude-standard` keeps `.gitignore`d paths out, so `graphify-out/` and
+`.agent/` churn does not drown the signal; `-z`/`-0` survive spaces in paths.
+The stash list is in there because "restoring" a tree by stashing the lane's
+edits leaves the status clean and hides the evidence rather than removing it.
+
+**Two things this snippet needs from you**, both found by running it rather than
+reading it: keep the snapshot file **outside the worktree** (`/tmp`, as above) —
+written inside, it becomes an untracked file the second snapshot hashes, so
+every comparison differs; and run it **from the repo root**, since
+`ls-files --others` prints repo-relative paths that `shasum` resolves against
+your cwd. Silently, both of them.
+
+Five arms on a scratch repo, 2026-09-09: nothing changed → `TREE UNCHANGED`;
+a pre-existing untracked file edited → detected; a second edit to an
+already-modified tracked file → detected; edits hidden with `git stash` →
+detected; `.gitignore`d churn → correctly ignored.
 
 Report any difference rather than repairing it: this repo has a recorded
 incident of a review lane mutating a tracked file, and the remedy is to say so,
