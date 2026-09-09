@@ -1,6 +1,6 @@
 ---
 name: kb-session-reflect
-description: "Self-reflect on a finished round: what did it do BY HAND that a mise task already owns, which standing directives it violated and at what rate, which probes could not have answered, and which sequential calls want one wrapper. Use this at the end of any session — it is a step of /clear-prep — and whenever the user asks what went wrong this session, what should be automated, whether a step should become a skill or task, or asks for a retrospective, post-mortem or self-assessment of the round. Also use it before proposing any new automation, so the proposal rests on measured transcript evidence rather than recollection."
+description: "Self-reflect on a finished round: what did it do BY HAND that a mise task already owns, which standing directives it violated and at what rate, which probes could not have answered, and which sequential calls want one wrapper. Use this at the START of a session to read the previous round's kept report (/session-resume runs it), and whenever the user asks what went wrong this session, what should be automated, whether a step should become a skill or task, or asks for a retrospective, post-mortem or self-assessment of the round. Also use it before proposing any new automation, so the proposal rests on measured transcript evidence rather than recollection."
 ---
 
 # Session reflect — what this round did by hand
@@ -19,9 +19,22 @@ deterministically, for free, every time.
 ## Run it
 
 ```bash
-mise run kb-session-reflect              # this round
+mise run kb-session-reflect -- --last         # the PREVIOUS round's kept report
+mise run kb-session-reflect                   # this round, right now
 mise run kb-session-reflect -- --sessions 5   # is it a habit, not a slip?
 ```
+
+**`--last` is the one you usually want, and `/session-resume` runs it for you.**
+Every run keeps its report at `.agent/kb/reflect/<session>.md`, and the
+SessionEnd hook runs one every session — so the previous round's reflection is
+already on disk when this one starts. That is deliberate scheduling: this was a
+`/clear-prep` step for five rounds and was dropped in **all five**, every time
+for want of context budget at the end of a session (#717). Reading it at the
+START costs nothing and has a whole session to act on.
+
+**"no kept reflection yet" is not "a clean round."** `--last` says so in words
+rather than printing nothing — `.agent/` dies with a fresh clone, and nothing
+was kept at all before #717.
 
 Default is **one** session, because a round is a session. Widening it answers a
 different question and a per-session count read as a per-round count overstates
@@ -67,9 +80,13 @@ format is parsed in a single place.
 
 They ask different questions, and the difference is measurable rather than
 stylistic. `kb-distill` is a **frequency miner**: it groups ad-hoc scripts across
-50 sessions by import signature, answering *was a program written twice?* This
-asks *what did this round do by hand?* — which frequency mining structurally
-cannot see, because a step done once has no frequency to mine.
+50 sessions by the repo SURFACE each one touches, answering *was a program
+written twice?* This asks *what did this round do by hand?* — which frequency
+mining structurally cannot see, because a step done once has no frequency to
+mine. Nor can it see a habit spanning two surfaces: the grouping puts those in
+two rows on purpose (`import_signature` was measured and rejected as the default
+— 153 of 785 scripts landed in one `json` bucket), so read adjacent rows for a
+shared SHAPE before believing they are two leads.
 
 The gap has a number on it. distill's largest group is **149 hand-written
 mutation harnesses across 21 sessions**, every one a fresh scratchpad, while

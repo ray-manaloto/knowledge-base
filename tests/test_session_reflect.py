@@ -10,7 +10,9 @@ must-NOT-fire case makes that visible as a defect rather than as thoroughness.
 from __future__ import annotations
 
 import json
+import os
 import re
+import time
 from pathlib import Path
 
 from kb_setup import session_reflect as sr
@@ -710,3 +712,91 @@ def test_the_shown_excerpts_are_capped_and_say_how_many_were_withheld(tmp_path) 
     assert len(shown) == sr.EXCERPTS_PER_RULE
     assert all("pytest" in line for line in shown)
     assert lines[-1].strip().startswith(f"… {8 - sr.EXCERPTS_PER_RULE} more")
+
+
+# --- #717: the report is KEPT for the next session, not discarded ----------
+
+
+def test_quiet_keeps_the_report_instead_of_discarding_it(tmp_path, monkeypatch, capsys):
+    """The #717 defect, armed AT THE LEVEL THE MUTATION HAPPENS.
+
+    SessionEnd already ran a FULL reflection every session and `--quiet` printed
+    two counts and dropped it — the expensive part paid for, at the one moment
+    no reader is left. The realistic break is deleting the `persist` CALL from
+    `reflect_main` while every count in the summary line stays right.
+
+    So this drives `reflect_main`, not `persist`. A test calling `persist`
+    directly would survive that exact deletion — this file's own header records
+    the PR #220 lesson it would be repeating: 15 of 15 tests called the library
+    while the CLI dispatch was already broken.
+    """
+    path = _transcript(tmp_path, "uv run pytest t.py 2>&1 | tail -1", name="sessA")
+    monkeypatch.setattr(sr.brain, "project_transcripts", lambda *_a, **_k: [path])
+
+    assert sr.reflect_main(tmp_path, ["--quiet"]) == 0
+
+    kept = tmp_path / sr.REFLECT_DIR / "sessA.md"
+    assert kept.is_file(), "--quiet computed the full report and threw it away again"
+    assert "piped-rc" in kept.read_text(encoding="utf-8")
+    assert "kept at" in capsys.readouterr().out
+
+
+def test_persist_refuses_to_name_a_report_that_describes_no_session(tmp_path):
+    """No session ⇒ no filename that means anything. Returning None beats inventing one.
+
+    A timestamped file with no session in it cannot be told apart from one whose
+    session simply was not recorded, and `/session-resume` would then read it as
+    the previous round's findings.
+    """
+    assert sr.persist(tmp_path, sr.Report()) is None
+
+
+def test_newest_report_is_by_mtime_not_by_name(tmp_path):
+    """Filenames are session ids and carry no order, so name-sorting is wrong.
+
+    The control arm is the name order: `zzz` sorts last alphabetically and is
+    written FIRST here, so a name-sorted implementation returns it and this test
+    goes red.
+    """
+    directory = tmp_path / sr.REFLECT_DIR
+    directory.mkdir(parents=True)
+    old = directory / "zzz.md"
+    old.write_text("older", encoding="utf-8")
+    time.sleep(0.01)
+    new = directory / "aaa.md"
+    new.write_text("newer", encoding="utf-8")
+    os.utime(old, (1, 1))
+
+    assert sr.newest_report(tmp_path) == new
+
+
+def test_newest_report_is_none_when_nothing_has_been_kept(tmp_path):
+    """The negative arm — and `_print_last` must say so in WORDS, not print nothing."""
+    assert sr.newest_report(tmp_path) is None
+
+
+def test_last_says_none_rather_than_printing_nothing(tmp_path, capsys):
+    """An empty stdout reads as 'the last session had no findings'. It does not.
+
+    `probes-need-a-control-arm.md` rule 4: a command that never asked must not
+    look like one that asked and found nothing — especially here, where the
+    reader is a skill that would otherwise report a clean round.
+    """
+    assert sr.reflect_main(tmp_path, ["--last"]) == 0
+    out = capsys.readouterr().out
+    assert "no kept reflection yet" in out
+    assert "NOT" in out
+
+
+def test_last_prints_the_kept_report(tmp_path, capsys):
+    """The POSITIVE arm for `--last`, which `/session-resume` runs."""
+    directory = tmp_path / sr.REFLECT_DIR
+    directory.mkdir(parents=True)
+    (directory / "prev.md").write_text(
+        "## Standing-directive violations\n- `x` x3\n", encoding="utf-8"
+    )
+
+    assert sr.reflect_main(tmp_path, ["--last"]) == 0
+    out = capsys.readouterr().out
+    assert "prev.md" in out
+    assert "`x` x3" in out

@@ -185,7 +185,6 @@ mise run kb-reflect                       # aggregate -> reflections/LESSONS.md
 mise run kb-remember -- --audit           # any correction still missing its lesson?
 mise run kb-goal-outcome -- <pair> --result <r> [--turns N]   # if a /goal ran
 mise run kb-distill                       # did this round hand-write a tool twice?
-mise run kb-session-reflect               # what did it do by hand that a task owns?
 ```
 
 `kb-remember` is what makes the corpus compound: a lesson that lives only in a
@@ -204,12 +203,19 @@ shape written more than once. Read its output as **leads**: it always exits 0 an
 gates nothing, and **nothing to propose is the common, correct result** — which
 is what makes a non-empty report worth reading.
 
-**`kb-session-reflect` is the fourth, and asks what distill cannot.** distill is
-a FREQUENCY miner, grouping scripts by import signature: *was a program written
-twice?* A step done by hand ONCE has no frequency to mine and is invisible to it
-— a directive violated at a rate, a probe that answered without asking, adjacent
-tasks wanting one wrapper. Both read the same transcripts through one reader
-(`distill.tool_uses`) and both are advisory. Read
+**`kb-session-reflect` is the fourth, and it is NOT a step here any more (#717).**
+It asks what distill cannot — distill is a FREQUENCY miner, grouping scripts by
+the repo SURFACE each touches (*was a program written twice?*), so a step done by
+hand ONCE is invisible to it, as is a habit SPANNING surfaces, which the grouping
+splits across rows by design. Both read the same transcripts through one reader
+(`distill.tool_uses`) and both are advisory.
+
+It was a step here for five rounds and was **dropped in all five**, every time
+for the same stated reason: no context budget left at the point clear-prep runs.
+That is a scheduling defect, not an oversight — a step always reached when the
+budget is gone is a step scheduled wrong. It now runs at **SessionEnd** (it
+always did) and **keeps** its report, and `/session-resume` reads it at the START
+of the next session on full budget. Nothing to run here. Read
 `.claude/skills/kb-session-reflect/SKILL.md` when a lead looks worth a
 `skill -> task -> module` triple; it carries the rule for which layer it earns.
 

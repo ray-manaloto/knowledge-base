@@ -68,7 +68,7 @@ def _print_usage() -> int:
         "instruction-shell-write | "
         "merge <chunk> | label | "
         "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
-        "brain [record|reflect|audit] | distill | session-reflect [--sessions N] | "
+        "brain [record|reflect|audit] | distill | session-reflect [--sessions N|--last] |"
         "arms <spec.toml> [--dry-run] | "
         "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
         "graph-counts [--by-source] [name...] | "

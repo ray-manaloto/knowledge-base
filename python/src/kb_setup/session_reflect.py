@@ -2,20 +2,21 @@
 """End-of-session self-reflection: what did this round do BY HAND that is code?
 
 `kb_setup.distill` answers one question — *was a program written twice?* — by
-grouping ad-hoc scripts across sessions on their import signature. It is a
-frequency miner, and frequency mining structurally cannot see the work this
-module looks for:
+grouping ad-hoc scripts across sessions on the repo SURFACE each one touches
+(`distill.surface_signature`; `import_signature` was measured and REJECTED as the
+default, 153 of 785 scripts in one `json` bucket). It is a frequency miner, and
+frequency mining structurally cannot see the work this module looks for:
 
 - a step done by hand **once**, in one session, that a `kb-*` task already owns;
 - a directive violated at a *rate* rather than a yes/no;
 - a probe that answered without ever asking;
 - a run of tasks, skills or library calls that wants a single wrapper.
 
-None of those repeat across sessions in a way an import signature groups, and
+None of those repeat across sessions in a way a surface signature groups, and
 the first is the expensive one: `kb-arms` exists precisely so nobody hand-writes
 a mutation harness, and distill still reports **149 hand-written harnesses across
 21 sessions** because each one is a fresh scratchpad rather than a recurring
-import shape.
+shape on one surface.
 
 So this module reads the same transcripts and asks the complementary question:
 **what did this session do by hand that already has a home?**
@@ -48,7 +49,7 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from kb_setup import brain
+from kb_setup import atomic, brain
 from kb_setup.distill import tool_uses
 
 DEFAULT_SESSION_LIMIT = 1
@@ -807,25 +808,103 @@ def render(report: Report) -> str:
     return "\n".join(out)
 
 
+#: Where a rendered reflection is kept for the NEXT session to read.
+#: Gitignored with the rest of `.agent/`, and that is right: it describes one
+#: machine's sessions and nothing tracked cites it.
+REFLECT_DIR = Path(".agent/kb/reflect")
+
+
+def persist(root: Path, report: Report) -> Path | None:
+    """Write the rendered report beside the session it describes; return the path.
+
+    THE DEFECT THIS CLOSES (#717). The SessionEnd hook already runs a FULL
+    reflection every session — `.claude/settings.json`, `kb-session-reflect --
+    --quiet` — and `--quiet` then printed two counts and dropped the report on
+    the floor. Every expensive part was already paid for; what was missing was a
+    reader, and at SessionEnd there is none left. So the report is kept, and
+    `/session-resume` reads it at the START of the next session, where there is a
+    whole session's budget to act on it.
+
+    Why not the fix the ticket proposed (render it on `kb-context`'s
+    over-threshold branch): `kb-context` is itself only ever run late. Measured
+    2026-09-08 over 21 days of transcripts, filtered to real Bash invocations
+    rather than prose mentions: **30 invocations across 18 sessions, median first
+    invocation around ordinal 300**, and exactly one session called it before
+    ordinal 100. Attaching the report there moves which command prints it, not
+    when it is read.
+
+    NAMED AFTER THE SESSION, and it REFUSES rather than inventing a name: a
+    report whose `sessions` is empty describes nothing, and a timestamped file
+    with no session in it is indistinguishable from one whose session was simply
+    not recorded. Returns `None` in that case, which the caller reports.
+    """
+    if not report.sessions:
+        return None
+    target = root / REFLECT_DIR / f"{report.sessions[0]}.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    atomic.write_text(target, render(report))
+    return target
+
+
+def newest_report(root: Path) -> Path | None:
+    """The most recently written persisted reflection, or None if there is none.
+
+    Newest by mtime rather than by name: the filename is a session id, which
+    carries no order. At the start of a session this is the PREVIOUS session's
+    reflection, which is exactly the one worth reading.
+    """
+    directory = root / REFLECT_DIR
+    if not directory.is_dir():
+        return None
+    found = sorted(directory.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return found[0] if found else None
+
+
 def reflect_main(root: Path, args: Sequence[str] = ()) -> int:
     """`kb-setup session-reflect` — always 0; this reports, it never gates."""
-    limit = DEFAULT_SESSION_LIMIT
     rest = list(args)
+    if "--last" in rest:
+        return _print_last(root)
+    limit = DEFAULT_SESSION_LIMIT
     if "--sessions" in rest:
         index = rest.index("--sessions")
         if index + 1 < len(rest) and rest[index + 1].isdigit():
             limit = int(rest[index + 1])
     report = reflect(root, limit=limit)
+    kept = persist(root, report)
     if "--quiet" in rest:
         # SessionEnd shares a 1.5 s budget across hooks and its output competes
         # with the audit's. One line naming the counts is enough to decide
-        # whether to run the task properly; the full report is one command away.
+        # whether to run the task properly — and the report itself is now KEPT
+        # rather than discarded, so "one command away" is no longer the only way
+        # back to it.
         findings = len(report.owned) + len(report.violations) + len(report.unarmed)
         wrappable = len(report.repeats) + len(report.runs)
+        where = kept.relative_to(root) if kept else "NOT KEPT (no session recorded)"
         print(
-            f"session-reflect: {findings} finding(s), {wrappable} wrapper lead(s) "
-            f"— `mise run kb-session-reflect` for the report"
+            f"session-reflect: {findings} finding(s), {wrappable} wrapper lead(s) — kept at {where}"
         )
         return 0
     print(render(report))
+    return 0
+
+
+def _print_last(root: Path) -> int:
+    """`--last`: the previous session's kept reflection, for `/session-resume`.
+
+    Says "none" in words rather than printing nothing. An empty stdout here is
+    indistinguishable from a command that failed to look, which is the failure
+    `probes-need-a-control-arm.md` rule 4 is about — and this one is read by a
+    skill that would otherwise report "no findings".
+    """
+    found = newest_report(root)
+    if found is None:
+        print(
+            "session-reflect: no kept reflection yet — none has been written since "
+            "this was added, or `.agent/` was cleaned. This is NOT 'the last "
+            "session had no findings'."
+        )
+        return 0
+    print(f"# kept reflection: {found.relative_to(root)}\n")
+    print(found.read_text(encoding="utf-8"))
     return 0
