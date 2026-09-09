@@ -53,6 +53,25 @@ is codegraph's, and it is independent of tokens: a tool's mere presence steers
 the model into picking it when it should not (`sources/codegraph/src/mcp/tools.ts`
 :813, which pares its own default set to a single tool for exactly this reason).
 
+🔴 THE ALLOWLIST IS ADVERTISE-ONLY. IT IS NOT ACCESS CONTROL. A tool removed
+from `tools/list` still EXECUTES when a client calls it by name, because
+`_FILTERED` covers only the two *list* methods and `tools/call` is never
+intercepted at all — it is forwarded to graphify's own handler untouched.
+
+Measured live, 2026-09-09, with `KB_MCP_TOOLS="query_graph,get_node"`:
+`tools/list` advertised **2** tools and `graph_stats` was not among them, while
+`tools/call graph_stats` in the same session returned
+`Nodes: 359146 / Edges: 807085`. Control arm: with no allowlist the same probe
+advertises **10** and returns the identical payload, so the filter is observably
+doing something and the 2-vs-10 difference is real — it is just a difference in
+what is ADVERTISED.
+
+This is defensible for the purpose above (context cost, and not steering the
+model toward a tool it should not pick). It is written here because the startup
+banner says `narrowed to N`, which reads like a capability boundary, and the
+first person to reach for `KB_MCP_TOOLS` as a safety mechanism will be wrong in
+a way nothing else in this file would tell them.
+
 FILTERING IS BY REQUEST ID, NOT BY GUESSING. A JSON-RPC response carries an `id`
 and no method, so the proxy records the method of every client request it
 forwards and rewrites only the responses whose id it is still waiting on. A
