@@ -46,11 +46,6 @@
 # last. Remove each entry in the commit that closes it.
 #
 [[ticket]]
-issue = 727
-title = "V0 — kb-recall-work: search project, branches/worktrees, issues, plans before designing"
-blockers = []
-
-[[ticket]]
 issue = 728
 title = "V1 — rebase the graphify fork onto the newest release; refresh both skill trees + stamps; kb-fork-rebase"
 blockers = [727]
