@@ -1,0 +1,155 @@
+# Mutation arms for `kb-memory`, U-R9's transport half (#681, Phase U/#672).
+#
+# WHAT IS ACTUALLY AT RISK HERE, and it is not the ranking. `kb_setup.recall` was
+# already proven from the CLI (#684, and #687's three defects fixed in #720). The
+# new risk is TRANSPORT: a server that is configured, registered, and completely
+# silent. This repo has been bitten by that exact shape twice —
+#
+#   * #105: `mise run kb-serve` served NOTHING for months. It exited rc=0 with
+#     empty stderr because mise read the task's stdio BY LINE instead of
+#     connecting it, so the server hit EOF on its first read. The clean exit is
+#     why nothing caught it.
+#   * #668: REGISTERED IS NOT REACHABLE. A correctly-configured server was denied
+#     before it was ever contacted, and the error read exactly like a broken
+#     server.
+#
+# So the arms that matter are the LIVE ones. A unit test on the object
+# `build_server` returns proves it is shaped correctly and can never prove a
+# client can reach it — which is precisely the gap both incidents fell through.
+#
+# A2 IS THE LOAD-BEARING ARM. It deletes the `on_call_tool` wiring while leaving
+# `on_list_tools` intact, which is the realistic regression: the server still
+# advertises `recall`, still handshakes, still passes every unit test, and
+# answers nothing. Only a real `tools/call` over a pipe disagrees.
+
+suites = ["tests/test_memory_serve.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/memory_serve.py"
+old = '''    args = dict(arguments or {})'''
+new = '''    args = dict(arguments or {})  # control'''
+
+# A1 — the tool disappears from `tools/list`. The realistic break is not
+# renaming the constant (a reader would notice) but returning the wrong list, so
+# this empties it: the server still starts and still handshakes.
+[[arm]]
+id = "A1"
+test = "test_kb_memory_server_advertises_recall"
+file = "python/src/kb_setup/memory_serve.py"
+old = '''        return types.ListToolsResult(tools=[tool])'''
+new = '''        return types.ListToolsResult(tools=[])'''
+
+# A2 — ADVERTISED BUT UNANSWERABLE, the #105/#668 shape. `tools/list` is
+# untouched, so the handshake test (A1's test) still passes and every unit test
+# still passes; only the end-to-end call fails. If this arm ever SURVIVES, the
+# live call test has stopped being live.
+[[arm]]
+id = "A2"
+test = "test_a_real_tools_call_returns_ranked_json"
+file = "python/src/kb_setup/memory_serve.py"
+old = '''        if params.name != RECALL_TOOL:'''
+new = '''        if params.name == RECALL_TOOL or True:'''
+
+# A3 — the argv translation drops `--json`, so the tool returns the human
+# rendering and the caller cannot parse it. A tool result is machine-read; this
+# is the difference between a tool and a paragraph.
+#
+# ⚠️ RE-ANCHORED. This arm first named `test_a_real_tools_call_returns_ranked_json`
+# and `kb-arms` refused it: `PROBE BROKEN - red suite did not name the test`. The
+# suite DID go red, so a laxer harness would have scored it green — but the
+# failure was the unit test on `recall_argv`, which trips first. The arm was
+# measuring something its id did not name, which is the exact class the guard
+# exists for. The end-to-end JSON parse is already armed by A2; this one belongs
+# to the translation it actually breaks.
+#
+# ⚠️ AND THEN RE-ANCHORED A SECOND TIME, for a different reason: the round-2 P2
+# fix below rewrote the exact line this anchored on, so `kb-arms` reported
+# `PROBE BROKEN - pattern not found`. That is TWICE in one session that a fix
+# silently invalidated an existing arm — the harness caught both, and nothing
+# else would have. `mise run kb-arms -- <spec> --dry-run` after any edit to armed
+# code is the cheap version of this lesson; it re-checks every pattern for free.
+[[arm]]
+id = "A3"
+test = "test_recall_argv_passes_json_and_the_question"
+file = "python/src/kb_setup/memory_serve.py"
+old = '''    argv = ["" if question is None else str(question), "--json"]'''
+new = '''    argv = ["" if question is None else str(question)]'''
+
+# A4 — an explicit null for an optional is forwarded rather than dropped, so
+# `--top None` reaches `check_recall` and refuses the whole call. Turns "the
+# caller left this out" into "the caller got it wrong", which an MCP client
+# sending explicit nulls would hit on its first request.
+[[arm]]
+id = "A4"
+test = "test_recall_argv_omits_a_flag_whose_value_is_none"
+file = "python/src/kb_setup/memory_serve.py"
+old = '''        if args.get(flag) is not None:'''
+new = '''        if flag in args:'''
+
+# A5 — an empty store is reported as an ERROR rather than as an answer. This is
+# the "never asked" / "answered no" collapse of `probes-need-a-control-arm.md`
+# rule 4, arriving at the transport: a caller would read a bare store as a
+# malformed question and stop asking.
+[[arm]]
+id = "A5"
+test = "test_an_empty_store_is_not_flagged_as_an_error"
+file = "python/src/kb_setup/memory_serve.py"
+old = '''        return (f"nothing searched (rc={rc}): {result.message}", rc != Rc.NOT_RUN)'''
+new = '''        return (f"nothing searched (rc={rc}): {result.message}", True)'''
+
+# A6 — the refusal path stops carrying its exit code. A tool that says only "it
+# went wrong" cannot tell a caller whether to fix the question or stop asking.
+[[arm]]
+id = "A6"
+test = "test_run_recall_tool_reports_a_bad_request_as_text_not_an_exception"
+file = "python/src/kb_setup/memory_serve.py"
+old = '''        return (f"refused (rc={exit_code(validated)}): {validated.message}", True)'''
+new = '''        return (f"refused: {validated.message}", True)'''
+
+# A7 — the default store silently moves. The realistic break: someone "tidies"
+# the path and `kb-memory` then serves a different corpus than `mise run
+# kb-recall` reports, with both looking healthy.
+[[arm]]
+id = "A7"
+test = "test_memory_dir_defaults_to_the_committed_store"
+file = "python/src/kb_setup/memory_serve.py"
+old = '''    return repo_root / "graphify-out" / "memory"'''
+new = '''    return repo_root / "graphify-out" / "memories"'''
+
+# --- round 2: the cold lane's P2 ------------------------------------------
+#
+# `str(args.get("question", ""))` — `dict.get`'s default covers an ABSENT key and
+# never an explicit JSON `null`, so `{"question": null}` searched for the literal
+# string "None". Live-verified by the lane and reproduced here: 60 matches in the
+# 382-record store, in a response shaped identically to a real answer. Both
+# neighbours refuse correctly (an omitted key and an empty string each give
+# `a question is required`), which is exactly what made it invisible — the field
+# sits one line above three optional flags that DO guard `is not None`.
+#
+# Worth naming as a class: this is the same shape as #687's `unparsable` finding
+# — a value that is right for the common case and silently wrong for the one the
+# caller cannot distinguish. Both were found by RUNNING the surface, not reading.
+
+# A8 — the P2 itself, replayed exactly.
+[[arm]]
+id = "A8"
+test = "test_an_explicit_null_question_is_refused_like_an_absent_one"
+file = "python/src/kb_setup/memory_serve.py"
+old = '''    question = args.get("question")
+    argv = ["" if question is None else str(question), "--json"]'''
+new = '''    argv = [str(args.get("question", "")), "--json"]'''
+
+# A9 — the same regression, measured one layer further out. A8 asserts on the
+# translation; this asserts on what a CLIENT sees, which is where the defect was
+# actually observed. Without it the fix is armed only at the seam it was written
+# at — the failure mode this repo has recorded as "a test written at the library
+# level survives a CLI-level mutation".
+[[arm]]
+id = "A9"
+test = "test_a_null_question_reaches_the_same_refusal_as_an_empty_one"
+file = "python/src/kb_setup/memory_serve.py"
+old = '''    question = args.get("question")
+    argv = ["" if question is None else str(question), "--json"]'''
+new = '''    argv = [str(args.get("question", "")), "--json"]'''

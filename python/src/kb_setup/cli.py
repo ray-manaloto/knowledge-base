@@ -63,7 +63,8 @@ def _print_usage() -> int:
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | "
-        "telemetry-prune | serve | env-refresh [--sentinel] | codex-config-check | "
+        "telemetry-prune | serve | serve-memory | env-refresh [--sentinel] | "
+        "codex-config-check | "
         "instruction-edit-guard | "
         "instruction-shell-write | "
         "merge <chunk> | label | "
@@ -253,6 +254,15 @@ def _run(argv: list[str] | None = None) -> int:
         # `execvpe` that the code stopped doing; the cold lane found the two
         # disagreeing.
         return mcp_serve.serve(repo_root, rest)
+    if cmd == "serve-memory":
+        from kb_setup import memory_serve
+
+        # A THIRD server, not a tool bolted onto `serve`. `mcp_serve` proxies
+        # graphify's own binary and can only ever NARROW its tool list — probed
+        # live on #681, three arms, an invented allowlist name yields 0 tools
+        # rather than a new one. So the work-memory surface needs its own
+        # process; #681 ruled that over a fork patch and an always-on relay.
+        return memory_serve.serve(repo_root, rest)
     if cmd == "artifacts":
         from kb_setup import artifacts, graphify_health
 

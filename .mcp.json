@@ -9,6 +9,11 @@
       "command": "uv",
       "args": ["run", "kb-setup", "serve"]
     },
+    "kb-memory": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "kb-setup", "serve-memory"]
+    },
     "repowise": {
       "type": "http",
       "url": "https://api.repowise.dev/mcp/ray-manaloto/knowledge-base",
