@@ -1,0 +1,126 @@
+# Mutation arms for the Astra round-1 fixes on kb_setup.recall_work (#727).
+#
+# Nine findings, every one demonstrated by the lane with an executed arm rather
+# than a reading, and every fix is the least-reviewed code in the diff. Each arm
+# below REVERTS one fix — not a synthetic corruption, the literal pre-fix shape —
+# so a survivor means the test written beside that fix cannot see the defect it
+# was written for.
+#
+# The two P1s are the ones that decide branch deletions:
+#   A1  a merged PR is evidence about its head COMMIT, never about a name
+#   A2  a local and a remote tip that differ are two rows, never one
+# and A10/A11 arm the two guards that sit beside them (base-branch filter,
+# unknown-worktrees => never merged). A3-A9 are the seven P2s in review order.
+
+suites = ["tests/test_recall_work.py"]
+
+[[arm]]
+id = "A0"
+control = true
+file = "python/src/kb_setup/recall_work.py"
+old = '''#: Pending branches shown on stdout; the report carries the rest.'''
+new = '''#: Pending branches shown on stdout; the report carries the rest. (control)'''
+
+# A1 — P1: match the merged PR by NAME only (the pre-fix behaviour).
+[[arm]]
+id = "A1"
+test = "test_a_branch_reused_after_its_pr_merged_reads_live_not_merged"
+file = "python/src/kb_setup/recall_work.py"
+old = '''        for head in self.by_name.get(name, []):
+            if head.oid == tip:
+                return head'''
+new = '''        for head in self.by_name.get(name, []):
+            if True:
+                return head'''
+
+# A2 — P1: collapse a divergent local/remote pair into one `both` row.
+[[arm]]
+id = "A2"
+test = "test_divergent_local_and_remote_tips_are_two_rows_judged_separately"
+file = "python/src/kb_setup/recall_work.py"
+old = '''        if here is not None and there is not None and here[0] == there[0]:'''
+new = '''        if here is not None and there is not None:'''
+
+# A3 — P2: search plans in the root checkout only.
+[[arm]]
+id = "A3"
+test = "test_plans_are_searched_in_every_checkout_not_only_the_root"
+file = "python/src/kb_setup/recall_work.py"
+old = '''    for ctx in repos:
+        for pattern in PLAN_GLOBS:'''
+new = '''    for ctx in repos[:1]:
+        for pattern in PLAN_GLOBS:'''
+
+# A4 — P2: a failed worktree listing reads as "no worktrees".
+[[arm]]
+id = "A4"
+test = "test_a_failed_worktree_listing_blocks_every_merged_verdict"
+file = "python/src/kb_setup/recall_work.py"
+old = '''    rc, out, _ = _git(top, runner, "worktree", "list", "--porcelain")
+    if rc != 0:
+        return None'''
+new = '''    rc, out, _ = _git(top, runner, "worktree", "list", "--porcelain")
+    if rc != 0:
+        return []'''
+
+# A5 — P2: trust a GitHub search that says incomplete_results.
+[[arm]]
+id = "A5"
+test = "test_an_incomplete_github_search_is_could_not_ask_never_a_count"
+file = "python/src/kb_setup/recall_work.py"
+old = '''    if data.get("incomplete_results"):
+        return None, _INCOMPLETE'''
+new = '''    if False:
+        return None, _INCOMPLETE'''
+
+# A6 — P2: count every tracked file as examined, including the excluded ones.
+[[arm]]
+id = "A6"
+test = "test_the_topic_is_found_by_every_offline_probe_with_its_denominator"
+file = "python/src/kb_setup/recall_work.py"
+old = '''    rc, out, _ = _git(ctx.path, runner, "ls-files", "-z", "--", ".", *excludes)'''
+new = '''    rc, out, _ = _git(ctx.path, runner, "ls-files", "-z")'''
+
+# A7 — P2: drop kb-recall's not-indexed count.
+[[arm]]
+id = "A7"
+test = "test_the_memory_probe_reports_files_the_store_could_not_index"
+file = "python/src/kb_setup/recall_work.py"
+old = '''    if report.unparsable:'''
+new = '''    if False:'''
+
+# A8 — P2: saturation from distinct names instead of raw rows.
+[[arm]]
+id = "A8"
+test = "test_a_full_merged_pr_page_is_reported_even_when_every_head_repeats"
+file = "python/src/kb_setup/recall_work.py"
+old = '''        return self.rows >= _MERGED_PR_LIMIT'''
+new = '''        return len(self.by_name) >= _MERGED_PR_LIMIT'''
+
+# A9 — P2: accept a topic the output contract forbids.
+[[arm]]
+id = "A9"
+test = "test_an_oversized_topic_is_refused_before_any_search"
+file = "python/src/kb_setup/recall_work.py"
+old = '''    if len(options.topic) > _MAX_TOPIC:'''
+new = '''    if False:'''
+
+# A10 — the guard beside A1: a PR merged into some OTHER branch counts as merged.
+[[arm]]
+id = "A10"
+test = "test_a_pr_merged_into_another_branch_is_not_merged_into_the_base"
+file = "python/src/kb_setup/recall_work.py"
+old = '''        if not isinstance(row, dict) or row.get("baseRefName") != ctx.base_branch:'''
+new = '''        if not isinstance(row, dict):'''
+
+# A11 — the guard beside A4: judge branches as if the worktrees were known.
+[[arm]]
+id = "A11"
+test = "test_a_failed_worktree_listing_blocks_every_merged_verdict"
+file = "python/src/kb_setup/recall_work.py"
+old = '''    if ctx.worktrees is None:
+        # What is checked out is unknown, so nothing here may read `merged`.
+        return Verdict.unverified'''
+new = '''    if False:
+        # What is checked out is unknown, so nothing here may read `merged`.
+        return Verdict.unverified'''

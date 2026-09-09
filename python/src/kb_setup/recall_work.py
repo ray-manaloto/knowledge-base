@@ -14,7 +14,8 @@ saved upgrade workflow can run it and nobody has to remember to.
 WHAT IT REUSES (`use-tool-builtins.md`). `git grep --all-match` is the
 tracked-file search; `git for-each-ref`, `rev-list --left-right --count` and
 `worktree list --porcelain` are the branch census, with ONE `gh pr list
---state merged` per repo to tell a squash-merged head from live work; `gh api
+--state merged` per repo to tell a squash-merged head from live work — matched
+by the PR's head COMMIT against the measured tip, never by name alone; `gh api
 search/issues` is the issue search (never `gh search`, which returns `[]` on a
 rate limit and reads as "none"); `kb_setup.recall` is the work-memory ranking,
 called in-process.
@@ -153,6 +154,13 @@ _SUFFIXES = ("ies", "ing", "es", "ed", "s", "y", "e")
 DEFAULT_TOP = 10
 DEFAULT_LIMIT = 40
 _MAX_SEARCH_PAGE = 100
+#: The output contract's `topic` bound (`schemas/recall-work.schema.json`,
+#: `maxLength`). Enforced BEFORE searching: a 639-character topic once ran to
+#: completion and emitted JSON its own decoder refused (Astra round 1, P2).
+_MAX_TOPIC = 512
+#: Full object names travel internally so a merged PR's head can be matched to
+#: the measured tip; this many characters are shown.
+_SHORT_SHA = 12
 #: Merged PRs listed per repo, newest first. dotfiles is past 990 PRs, so 1000
 #: would already be a page that comes back full; the probe says when one does.
 _MERGED_PR_LIMIT = 3000
@@ -257,11 +265,15 @@ class RepoCtx:
     base: str
     base_branch: str
     slug: str | None
-    worktrees: tuple[Worktree, ...]
+    #: None when `git worktree list` itself failed. That is not "no worktrees":
+    #: with what is checked out unknown, no branch in this repo may read `merged`.
+    worktrees: tuple[Worktree, ...] | None
 
     @property
     def checked_out(self) -> frozenset[str]:
         """Branch names some worktree has checked out — never deletable from here."""
+        if self.worktrees is None:
+            return frozenset()
         return frozenset(w.branch for w in self.worktrees if w.branch is not None)
 
     def is_primary(self, worktree: Worktree) -> bool:
@@ -291,10 +303,15 @@ def _base_ref(path: Path, runner: Runner) -> tuple[str, str] | None:
     return None
 
 
-def _worktrees(top: Path, runner: Runner) -> list[Worktree]:
+def _worktrees(top: Path, runner: Runner) -> list[Worktree] | None:
+    """The porcelain worktree list, or None when git could not produce one.
+
+    None, not `[]`: an empty list reads as "nothing checked out anywhere" and
+    would let a checked-out branch be judged deletable (Astra round 1, P2).
+    """
     rc, out, _ = _git(top, runner, "worktree", "list", "--porcelain")
     if rc != 0:
-        return []
+        return None
     found: list[Worktree] = []
     path: Path | None = None
     head = ""
@@ -323,13 +340,14 @@ def repo_context(path: Path, runner: Runner) -> RepoCtx | None:
     if base is None:
         return None
     rc, url, _ = _git(top, runner, "remote", "get-url", "origin")
+    listed = _worktrees(top, runner)
     return RepoCtx(
         path=top,
         name=top.name,
         base=base[0],
         base_branch=base[1],
         slug=_slug_of(url) if rc == 0 else None,
-        worktrees=tuple(_worktrees(top, runner)),
+        worktrees=None if listed is None else tuple(listed),
     )
 
 
@@ -386,7 +404,13 @@ def _is_artifact_page(rel: str) -> bool:
 
 
 def _tracked_paths(ctx: RepoCtx, runner: Runner) -> list[str] | None:
-    rc, out, _ = _git(ctx.path, runner, "ls-files", "-z")
+    """The tracked files the grep can reach — the SAME pathspec, so the denominator is honest.
+
+    Counting every tracked file while grepping only the eligible ones reported
+    1,749 examined for 1,183 searchable on this checkout (Astra round 1, P2).
+    """
+    excludes = [f":(exclude){p}" for p in EXCLUDED_PATHSPECS]
+    rc, out, _ = _git(ctx.path, runner, "ls-files", "-z", "--", ".", *excludes)
     if rc != 0:
         return None
     return [p for p in out.split("\0") if p]
@@ -457,6 +481,7 @@ class _Ref:
     behind: int
 
 
+#: (full tip oid, date, subject, ahead, behind)
 type _RefMeta = tuple[str, str, str, int, int]
 
 
@@ -475,12 +500,15 @@ def _parse_ref_line(line: str) -> tuple[str, _RefMeta] | None:
 def _refs(ctx: RepoCtx, runner: Runner) -> tuple[list[_Ref], int] | None:
     """Every local and origin branch except the base, measured, in ONE git call.
 
-    Returns (rows, unmeasured). Local and remote refs of one name are one row —
-    `both` — carrying the local side's counts. `%(ahead-behind:<base>)` is what
-    makes this one call rather than one per branch.
+    Returns (rows, unmeasured). Local and remote refs of one name are ONE row
+    (`both`) only when their tips are identical; divergent tips are two rows,
+    each measured and judged on its own — collapsing them showed the local
+    counts as `both` and made a remote-only tip a deletion candidate (Astra
+    round 1, P1). `%(ahead-behind:<base>)` is what makes this one call rather
+    than one per branch.
     """
     fmt = (
-        "%(refname)%09%(objectname:short)%09%(committerdate:short)%09"
+        "%(refname)%09%(objectname)%09%(committerdate:short)%09"
         f"%(ahead-behind:{ctx.base})%09%(subject)"
     )
     rc, out, _ = _git(
@@ -503,22 +531,67 @@ def _refs(ctx: RepoCtx, runner: Runner) -> tuple[list[_Ref], int] | None:
             name = refname.removeprefix("refs/remotes/origin/")
             if name != "HEAD":
                 remote[name] = meta
+    return _merge_sides(local, remote, ctx.base_branch), unmeasured
+
+
+def _merge_sides(
+    local: dict[str, _RefMeta], remote: dict[str, _RefMeta], base_branch: str
+) -> list[_Ref]:
+    """One `both` row per identical pair; a divergent pair is two rows, one per tip."""
     rows: list[_Ref] = []
     for name in sorted(set(local) | set(remote)):
-        if name == ctx.base_branch:
+        if name == base_branch:
             continue
-        if name in local:
-            where = Where.both if name in remote else Where.local
-            meta = local[name]
-        else:
-            where = Where.remote
-            meta = remote[name]
-        rows.append(_Ref(name, where, *meta))
-    return rows, unmeasured
+        here, there = local.get(name), remote.get(name)
+        if here is not None and there is not None and here[0] == there[0]:
+            rows.append(_Ref(name, Where.both, *here))
+            continue
+        if here is not None:
+            rows.append(_Ref(name, Where.local, *here))
+        if there is not None:
+            rows.append(_Ref(name, Where.remote, *there))
+    return rows
 
 
-def _merged_heads(ctx: RepoCtx, runner: Runner) -> dict[str, int] | None:
-    """Head branch -> newest merged PR number, from ONE `gh pr list` per repo.
+@dataclass(frozen=True)
+class _MergedHead:
+    """One merged PR: its number and the head commit it was merged FROM."""
+
+    number: int
+    oid: str
+
+
+@dataclass(frozen=True)
+class _MergedHeads:
+    """A repo's PRs merged INTO its base, keyed by head branch name."""
+
+    by_name: dict[str, list[_MergedHead]]
+    #: Rows GitHub returned BEFORE any filtering or de-duplication — the only
+    #: honest saturation signal. Counting distinct names missed a full page whose
+    #: names repeated (Astra round 1, P2).
+    rows: int
+
+    @property
+    def saturated(self) -> bool:
+        """True when the page came back full, so an older merge may be missing."""
+        return self.rows >= _MERGED_PR_LIMIT
+
+    def match(self, name: str, tip: str) -> _MergedHead | None:
+        """The merged PR whose head commit IS this tip. A name alone is not evidence.
+
+        A branch reused after its PR merged carries the same name and a newer
+        tip; matching by name called that unfinished work `merged` (Astra round
+        1, P1). A squash merge leaves the branch tip where the PR's head was, so
+        an untouched merged branch still matches.
+        """
+        for head in self.by_name.get(name, []):
+            if head.oid == tip:
+                return head
+        return None
+
+
+def _merged_heads(ctx: RepoCtx, runner: Runner) -> _MergedHeads | None:
+    """The repo's merged PRs from ONE `gh pr list`, keyed by head branch.
 
     One call per repo rather than one per branch: the first live run asked GitHub
     once for each of 98 branches in this repo alone and took five minutes. This
@@ -526,14 +599,16 @@ def _merged_heads(ctx: RepoCtx, runner: Runner) -> dict[str, int] | None:
     GitHub origin, a failed call, non-JSON) — a state the caller keeps apart from
     "asked, and no PR was merged from that head".
 
-    The bound: only the newest `_MERGED_PR_LIMIT` merged PRs are listed, so a
-    branch merged further back than that reads `live`; the probe's detail says so
-    when the page came back full.
+    Only PRs merged INTO the base branch count; one merged into some other
+    branch is not merged into the base. The bound: only the newest
+    `_MERGED_PR_LIMIT` merged PRs are listed, so a branch merged further back
+    reads `live`; the probe's detail says so when the page came back full.
     """
     if ctx.slug is None:
         return None
     argv = ["gh", "pr", "list", "--repo", ctx.slug, "--state", "merged"]
-    argv += ["--json", "number,headRefName", "--limit", str(_MERGED_PR_LIMIT)]
+    argv += ["--json", "number,headRefName,headRefOid,baseRefName"]
+    argv += ["--limit", str(_MERGED_PR_LIMIT)]
     rc, out, _ = runner(argv, None, _GH_TIMEOUT)
     if rc != 0:
         return None
@@ -541,41 +616,45 @@ def _merged_heads(ctx: RepoCtx, runner: Runner) -> dict[str, int] | None:
         rows = json.loads(out)
     except json.JSONDecodeError:
         return None
-    heads: dict[str, int] = {}
-    for row in rows if isinstance(rows, list) else []:
-        if not isinstance(row, dict):
+    if not isinstance(rows, list):
+        return None
+    by_name: dict[str, list[_MergedHead]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or row.get("baseRefName") != ctx.base_branch:
             continue
-        number, head = row.get("number"), row.get("headRefName")
-        if isinstance(number, int) and isinstance(head, str) and number > heads.get(head, 0):
-            heads[head] = number
-    return heads
+        number, head, oid = row.get("number"), row.get("headRefName"), row.get("headRefOid")
+        if isinstance(number, int) and isinstance(head, str) and isinstance(oid, str):
+            by_name.setdefault(head, []).append(_MergedHead(number, oid))
+    return _MergedHeads(by_name, len(rows))
 
 
-def _verdict(ctx: RepoCtx, name: str, ahead: int, merged_pr: int | None, *, asked: bool) -> Verdict:
-    if name in ctx.checked_out:
+def _verdict(ctx: RepoCtx, row: _Ref, merged: _MergedHead | None, *, asked: bool) -> Verdict:
+    if ctx.worktrees is None:
+        # What is checked out is unknown, so nothing here may read `merged`.
+        return Verdict.unverified
+    if row.where is not Where.remote and row.name in ctx.checked_out:
         return Verdict.current
-    if ahead == 0 or merged_pr is not None:
+    if row.ahead == 0 or merged is not None:
         return Verdict.merged
     return Verdict.live if asked else Verdict.unverified
 
 
-def _branch_row(ctx: RepoCtx, row: _Ref, search: Search, merged: dict[str, int] | None) -> Branch:
-    asked = merged is not None
-    merged_pr = merged.get(row.name) if merged is not None else None
+def _branch_row(ctx: RepoCtx, row: _Ref, search: Search, merged: _MergedHeads | None) -> Branch:
+    matched = merged.match(row.name, row.tip) if merged is not None else None
     branch = Branch(
         repo=ctx.name,
         name=row.name,
         where=row.where,
-        tip=row.tip,
+        tip=row.tip[:_SHORT_SHA],
         date=row.date,
         subject=row.subject,
         ahead=row.ahead,
         behind=row.behind,
-        verdict=_verdict(ctx, row.name, row.ahead, merged_pr, asked=asked),
+        verdict=_verdict(ctx, row, matched, asked=merged is not None),
         topic_match=_any(f"{row.name} {row.subject}", search.stems),
     )
-    if merged_pr is not None:
-        branch.merged_pr = merged_pr
+    if matched is not None:
+        branch.merged_pr = matched.number
     return branch
 
 
@@ -619,7 +698,7 @@ def _census_repo(ctx: RepoCtx, search: Search, census: _Census) -> None:
     rows, unmeasured = listed
     census.unmeasured += unmeasured
     merged = None if search.offline else _merged_heads(ctx, search.runner)
-    if merged is not None and len(merged) >= _MERGED_PR_LIMIT:
+    if merged is not None and merged.saturated:
         census.full_pages.append(ctx.name)
     for row in rows:
         branch = _branch_row(ctx, row, search, merged)
@@ -654,25 +733,35 @@ def probe_worktrees(repos: Sequence[RepoCtx], search: Search) -> Probe:
     """`worktrees`: every LINKED worktree is listed; matched = its branch names a stem."""
     hits: list[Hit] = []
     matched = 0
+    broken: list[str] = []
     for ctx in repos:
+        if ctx.worktrees is None:
+            broken.append(ctx.name)
+            continue
         for wt in ctx.worktrees:
             if ctx.is_primary(wt):
                 continue
             match = wt.branch is not None and _any(wt.branch, search.stems)
             matched += int(match)
-            label = wt.branch if wt.branch is not None else f"detached at {wt.head[:12]}"
+            label = wt.branch if wt.branch is not None else f"detached at {wt.head[:_SHORT_SHA]}"
             hit = Hit(ref=str(wt.path), summary=label, repo=ctx.name)
             hit.state = "topic" if match else "other"
             hits.append(hit)
+    detail = (
+        "linked worktrees only (the primary is the repo itself); all listed, "
+        "matched = branch name contains a stem"
+    )
+    if broken:
+        detail += (
+            f"; COULD NOT LIST worktrees in {', '.join(broken)}, so no branch there reads merged"
+        )
+    all_broken = bool(broken) and len(broken) == len(repos)
     return Probe(
         name=ProbeName.worktrees,
-        status=ProbeStatus.ran,
+        status=ProbeStatus.could_not_ask if all_broken else ProbeStatus.ran,
         examined=len(hits),
         matched=matched,
-        detail=(
-            "linked worktrees only (the primary is the repo itself); all listed, "
-            "matched = branch name contains a stem"
-        ),
+        detail=detail,
         hits=hits,
     )
 
@@ -697,13 +786,28 @@ def _issues_enabled(ctx: RepoCtx, runner: Runner) -> tuple[bool | None, str]:
     return bool(data.get("has_issues")), ""
 
 
+#: GitHub search answers a timed-out query with rc 0, JSON, and this flag set —
+#: `sources/gh/pkg/search/searcher.go:201-205`. A count from such a payload is
+#: not a count (Astra round 1, P2).
+_INCOMPLETE = "GitHub search returned incomplete_results (its search timed out)"
+
+
+def _search_count(data: object) -> tuple[int | None, str]:
+    """A search payload's total, or why it cannot be trusted."""
+    if not isinstance(data, dict) or not isinstance(data.get("total_count"), int):
+        return None, "no total_count in the search payload"
+    if data.get("incomplete_results"):
+        return None, _INCOMPLETE
+    return int(data["total_count"]), ""
+
+
 def _issue_total(ctx: RepoCtx, runner: Runner) -> tuple[int | None, str]:
     query = f"q=repo:{ctx.slug} is:issue"
     argv = ["api", "-X", "GET", "search/issues", "-f", query, "-f", "per_page=1"]
     data, why = _gh_json(runner, argv)
-    if not isinstance(data, dict) or not isinstance(data.get("total_count"), int):
-        return None, why or "no total_count in the search payload"
-    return int(data["total_count"]), ""
+    if data is None:
+        return None, why
+    return _search_count(data)
 
 
 @dataclass(frozen=True)
@@ -721,8 +825,11 @@ def _issue_search(ctx: RepoCtx, search: Search) -> _Found:
     argv = ["api", "-X", "GET", "search/issues", "-f", query]
     argv += ["-f", f"per_page={min(search.limit, _MAX_SEARCH_PAGE)}", "-f", "sort=updated"]
     data, why = _gh_json(search.runner, argv)
-    if not isinstance(data, dict) or not isinstance(data.get("total_count"), int):
-        return _Found(None, why=why or "no total_count in the search payload")
+    if data is None:
+        return _Found(None, why=why)
+    total, why = _search_count(data)
+    if total is None or not isinstance(data, dict):
+        return _Found(None, why=why)
     hits: list[Hit] = []
     items = data.get("items")
     for item in items if isinstance(items, list) else []:
@@ -732,7 +839,7 @@ def _issue_search(ctx: RepoCtx, search: Search) -> _Found:
         hit.state = str(item.get("state") or "")
         hit.date = str(item.get("updated_at") or "")[:10]
         hits.append(hit)
-    return _Found(int(data["total_count"]), hits)
+    return _Found(total, hits)
 
 
 @dataclass(frozen=True)
@@ -824,17 +931,23 @@ def _mtime_date(path: Path) -> str:
     return datetime.fromtimestamp(stat.st_mtime, tz=UTC).date().isoformat()
 
 
-def probe_plans(repo_root: Path, search: Search, plans_home: Path | None) -> Probe:
-    """`plans`: the pwf plan files, the session handoffs, and `~/.claude/plans/*.md`."""
+def probe_plans(repos: Sequence[RepoCtx], search: Search, plans_home: Path | None) -> Probe:
+    """`plans`: every checkout's plan files and handoffs, plus `~/.claude/plans/*.md` once.
+
+    Every checkout, not only the root: a sibling's `.agent/plans/session-*.md` is
+    untracked, so no other probe can reach it, and the first version searched
+    the root alone while listing the siblings as examined (Astra round 1, P2).
+    """
     home = plans_home if plans_home is not None else Path.home() / ".claude" / "plans"
-    files: list[Path] = []
-    for pattern in PLAN_GLOBS:
-        files.extend(sorted(repo_root.glob(pattern)))
+    files: list[tuple[Path, RepoCtx | None]] = []
+    for ctx in repos:
+        for pattern in PLAN_GLOBS:
+            files.extend((p, ctx) for p in sorted(ctx.path.glob(pattern)))
     if home.is_dir():
-        files.extend(sorted(home.glob("*.md")))
+        files.extend((p, None) for p in sorted(home.glob("*.md")))
     hits: list[Hit] = []
     unreadable = 0
-    for path in files:
+    for path, ctx in files:
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -842,11 +955,16 @@ def probe_plans(repo_root: Path, search: Search, plans_home: Path | None) -> Pro
             continue
         if _all(text, search.stems):
             heading = _HEADING_RE.search(text)
-            hit = Hit(ref=_display(path, repo_root), summary=heading.group(1) if heading else "")
+            root = ctx.path if ctx is not None else Path.home()
+            hit = Hit(ref=_display(path, root), summary=heading.group(1) if heading else "")
             hit.date = _mtime_date(path)
+            if ctx is not None:
+                hit.repo = ctx.name
             hits.append(hit)
     examined = len(files) - unreadable
-    detail = f"{', '.join(PLAN_GLOBS)} and {home}; a plan must contain EVERY stem"
+    detail = (
+        f"{', '.join(PLAN_GLOBS)} in every checkout, and {home}; a plan must contain EVERY stem"
+    )
     if unreadable:
         detail += f"; {unreadable} file(s) could not be read"
     return Probe(
@@ -894,12 +1012,17 @@ def probe_memory(memory_dir: Path, search: Search) -> Probe:
         hit = Hit(ref=h.path, summary=h.question)
         hit.state, hit.date, hit.score = h.outcome, h.date[:10], h.score
         hits.append(hit)
+    detail = f"kb-recall BM25 over {memory_dir} (outcome=all); top {search.top} shown"
+    if report.unparsable:
+        # `kb-recall` counts the files it could not index; dropping that here
+        # reported a complete search over an incomplete store (Astra round 1, P2).
+        detail += f"; {report.unparsable} file(s) in the store were NOT indexed"
     return Probe(
         name=ProbeName.memory,
         status=ProbeStatus.ran,
         examined=report.searched,
         matched=report.matched,
-        detail=f"kb-recall BM25 over {memory_dir} (outcome=all); top {search.top} shown",
+        detail=detail,
         hits=hits,
     )
 
@@ -928,6 +1051,12 @@ def run(
     now: datetime | None = None,
 ) -> Result[RecallWork]:
     """Run every probe. Returns, never raises; writes nothing (that is `main`'s job)."""
+    if len(options.topic) > _MAX_TOPIC:
+        return Err(
+            f"the topic is {len(options.topic)} characters; the output contract "
+            f"allows {_MAX_TOPIC}",
+            rc=Rc.BAD_REQUEST,
+        )
     topic_stems = stems(options.topic)
     if not topic_stems:
         return Err(
@@ -963,7 +1092,7 @@ def run(
         branch_probe,
         probe_worktrees(repos, search),
         probe_issues(repos, search),
-        probe_plans(repo_root, search, options.plans_home),
+        probe_plans(repos, search, options.plans_home),
         probe_memory(memory_dir, search),
     ]
     ran = [p for p in probes if p.status is ProbeStatus.ran]

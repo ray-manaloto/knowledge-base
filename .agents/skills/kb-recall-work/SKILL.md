@@ -32,13 +32,13 @@ is the whole design: a `0` next to `4,213 examined` is a finding, a `0` next to
 
 | probe | what was searched | the rule |
 |---|---|---|
-| `tracked_files` | every tracked file, minus `graphify-out/`, `sources/`, `raw/` | a file must contain EVERY stem |
+| `tracked_files` | every tracked file the grep can reach — `graphify-out/`, `sources/`, `raw/` are excluded from the count too | a file must contain EVERY stem |
 | `artifact_pages` | the `docs/artifacts/*.html` subset, with each page's title | same |
-| `branches` | local + origin branches in each repo, ahead/behind its base | a name matches on ANY stem — but EVERY branch is in the census |
-| `worktrees` | linked worktrees | listed whatever the topic |
-| `issues` | GitHub search, open AND closed, `examined` = every issue in the repo | the topic words; `could_not_ask` on a rate limit, never `0` |
-| `plans` | `.planning/*/{task_plan,findings,progress}.md`, `.agent/plans/session-*.md`, `~/.claude/plans/*.md` | EVERY stem |
-| `memory` | `kb-recall`'s BM25 over `graphify-out/memory/` | ranked, top N shown |
+| `branches` | local + origin branches in each repo, ahead/behind its base; a local and a remote tip that DIFFER are two rows | a name matches on ANY stem — but EVERY branch is in the census |
+| `worktrees` | linked worktrees; a repo whose listing failed is `could_not_ask`, and nothing there reads merged | listed whatever the topic |
+| `issues` | GitHub search, open AND closed, `examined` = every issue in the repo | the topic words; `could_not_ask` on a rate limit or an `incomplete_results` answer, never `0` |
+| `plans` | `.planning/*/{task_plan,findings,progress}.md` and `.agent/plans/session-*.md` in EVERY checkout, `~/.claude/plans/*.md` once | EVERY stem |
+| `memory` | `kb-recall`'s BM25 over `graphify-out/memory/`; files it could not index are counted in the detail | ranked, top N shown |
 
 **The stems are printed on every run** (`dependency upgrade` -> `dependenc,
 upgrad`). A topic spelling is a bound: a branch named for its ticket number or
@@ -46,11 +46,13 @@ a plan written in synonyms is not found, and the report says so rather than
 implying it looked everywhere. Widen the topic and run again.
 
 **The branch census is the hygiene input.** Every branch with unique commits is
-listed live-first, with `merged` (no unique commits, or a merged PR found for
-that head), `live` (unique commits, GitHub asked, no merged PR), `unverified`
-(GitHub could not be asked, or `--offline`) and `current` (checked out in a
-worktree — never a deletion candidate from here). Delete only `merged`; read a
-`live` one before deciding; re-run online before trusting an `unverified`.
+listed live-first, with `merged` (no unique commits, or a PR merged INTO the
+base whose head commit IS this tip — a branch reused after its PR merged reads
+`live`, never `merged`), `live` (unique commits, GitHub asked, no such PR),
+`unverified` (GitHub could not be asked, `--offline`, or the repo's worktrees
+could not be listed) and `current` (checked out in a worktree — never a
+deletion candidate from here). Delete only `merged`; read a `live` one before
+deciding; re-run online before trusting an `unverified`.
 
 ## The two exits that are not "done"
 

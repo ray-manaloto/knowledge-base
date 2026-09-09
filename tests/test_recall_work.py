@@ -20,6 +20,8 @@ The two arms the module's contract makes mandatory (`probes-need-a-control-arm.m
 from __future__ import annotations
 
 import dataclasses
+import json
+import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -33,6 +35,7 @@ from kb_setup.generated.recall_work import (
     ProbeStatus,
     RecallWork,
     Verdict,
+    Where,
 )
 from kb_setup.result import Err, Ok, Rc
 
@@ -71,6 +74,40 @@ def _probe(work: RecallWork, name: ProbeName) -> Probe:
 
 def _branch(work: RecallWork, name: str) -> Branch:
     return next(b for b in work.branches if b.name == name)
+
+
+def _merged(*rows: tuple[int, str, str]) -> str:
+    """A `gh pr list --state merged` payload: (number, head branch, head oid), base main."""
+    return json.dumps(
+        [
+            {"number": n, "headRefName": head, "headRefOid": oid, "baseRefName": "main"}
+            for n, head, oid in rows
+        ]
+    )
+
+
+def _eligible(git: Callable[..., str]) -> int:
+    """How many tracked files the search can reach — the same pathspec the module uses."""
+    excludes = [f":(exclude){p}" for p in recall_work.EXCLUDED_PATHSPECS]
+    return len(git("ls-files", "--", ".", *excludes).splitlines())
+
+
+def _sibling_repo(path: Path) -> Path:
+    """A second throwaway repo shaped like the `git` fixture's, for the sibling probes."""
+    run = ["git", "-C", str(path)]
+    subprocess.run(["git", "init", "-q", "-b", "main", str(path)], check=True, timeout=30)
+    for args in (
+        ["config", "user.email", "t@example.com"],
+        ["config", "user.name", "T"],
+        ["config", "commit.gpgsign", "false"],
+        ["commit", "-q", "--allow-empty", "-m", "base"],
+    ):
+        subprocess.run([*run, *args], check=True, timeout=30)
+    head = subprocess.run(
+        [*run, "rev-parse", "main"], check=True, timeout=30, capture_output=True, text=True
+    ).stdout.strip()
+    subprocess.run([*run, "update-ref", "refs/remotes/origin/main", head], check=True, timeout=30)
+    return path
 
 
 # --- stems ------------------------------------------------------------------------
@@ -117,8 +154,10 @@ def test_the_topic_is_found_by_every_offline_probe_with_its_denominator(
     work = result.value
     files = _probe(work, ProbeName.tracked_files)
     assert files.status is ProbeStatus.ran
-    # The denominator is the whole tracked tree, cross-checked against git itself.
-    assert files.examined == len(git("ls-files").splitlines())
+    # The denominator is what the grep could REACH — the excluded `sources/` file
+    # is not counted as examined — cross-checked against git with the same pathspec.
+    assert files.examined == _eligible(git)
+    assert files.examined == len(git("ls-files").splitlines()) - 1
     assert [h.ref for h in files.hits] == ["docs/upgrade-plan.md"]
     assert files.hits[0].summary == "Upgrade plan"
     pages = _probe(work, ProbeName.artifact_pages)
@@ -212,17 +251,14 @@ def test_branch_verdicts_current_merged_live_and_unverified(
     git("branch", "twin-of-main", "origin/main")
     git("branch", "feat/squashed", "work")
     git("branch", "feat/open", "work")
-
+    tip = git("rev-parse", "feat/squashed")
     calls: list[list[str]] = []
 
     def gh(argv: list[str]) -> tuple[int, str, str]:
         calls.append(argv)
         if argv[0] == "api":  # the issues probe's own calls: not under test here
             return 0, '{"has_issues": false}', ""
-        merged = (
-            '[{"number": 41, "headRefName": "feat/squashed"}, {"number": 9, "headRefName": "x"}]'
-        )
-        return 0, merged, ""
+        return 0, _merged((41, "feat/squashed", tip), (9, "x", "0" * 40)), ""
 
     online = recall_work.run(
         tmp_path,
@@ -263,6 +299,138 @@ def test_a_gh_failure_leaves_a_branch_unverified_never_merged(
     assert isinstance(result, Ok)
     assert _branch(result.value, "feat/open").verdict is Verdict.unverified
     assert "left unverified" in _probe(result.value, ProbeName.branches).detail
+
+
+def test_a_branch_reused_after_its_pr_merged_reads_live_not_merged(
+    git: Callable[..., str], commit_file: Callable[..., str], tmp_path: Path
+) -> None:
+    """Round-1 P1: a merged PR is evidence about ITS head commit, never about a name.
+
+    Control: the branch still at the PR's head reads merged. Then one more commit
+    lands on the same branch name — the PR's head oid no longer matches the tip,
+    and the unfinished work must read live with no merged_pr attached.
+    """
+    git("remote", "add", "origin", "git@github.com:o/r.git")
+    commit_file("docs/a.md", "x\n")
+    git("branch", "feat/reused", "work")
+    merged_at = git("rev-parse", "feat/reused")
+
+    def gh(argv: list[str]) -> tuple[int, str, str]:
+        if argv[0] == "api":
+            return 0, '{"has_issues": false}', ""
+        return 0, _merged((77, "feat/reused", merged_at)), ""
+
+    options = _offline("anything", tmp_path, offline=False)
+    before = recall_work.run(tmp_path, options, runner=_with_fake_gh(gh))
+    assert isinstance(before, Ok)
+    control = _branch(before.value, "feat/reused")
+    assert (control.verdict, control.merged_pr) == (Verdict.merged, 77)
+
+    git("checkout", "-q", "feat/reused")
+    commit_file("docs/after-merge.md", "unfinished\n")
+    git("checkout", "-q", "work")
+    after = recall_work.run(tmp_path, options, runner=_with_fake_gh(gh))
+    assert isinstance(after, Ok)
+    reused = _branch(after.value, "feat/reused")
+    assert reused.verdict is Verdict.live
+    assert not isinstance(reused.merged_pr, int)
+    assert reused.ahead == 2
+
+
+def test_a_pr_merged_into_another_branch_is_not_merged_into_the_base(
+    git: Callable[..., str], commit_file: Callable[..., str], tmp_path: Path
+) -> None:
+    git("remote", "add", "origin", "git@github.com:o/r.git")
+    commit_file("docs/a.md", "x\n")
+    git("branch", "feat/elsewhere", "work")
+    tip = git("rev-parse", "feat/elsewhere")
+    payload = json.dumps(
+        [{"number": 5, "headRefName": "feat/elsewhere", "headRefOid": tip, "baseRefName": "v8"}]
+    )
+
+    def gh(argv: list[str]) -> tuple[int, str, str]:
+        return (0, '{"has_issues": false}', "") if argv[0] == "api" else (0, payload, "")
+
+    result = recall_work.run(
+        tmp_path, _offline("anything", tmp_path, offline=False), runner=_with_fake_gh(gh)
+    )
+    assert isinstance(result, Ok)
+    assert _branch(result.value, "feat/elsewhere").verdict is Verdict.live
+
+
+def test_divergent_local_and_remote_tips_are_two_rows_judged_separately(
+    git: Callable[..., str], commit_file: Callable[..., str], tmp_path: Path
+) -> None:
+    """Round-1 P1: a remote tip that differs from the local one is its own row.
+
+    `feat/x` locally sits AT the base (no unique commits), while origin's copy
+    carries one more commit; collapsing them called the pair merged and made the
+    remote-only work a deletion candidate. Control: `feat/same`, identical on
+    both sides, stays ONE `both` row.
+    """
+    commit_file("docs/a.md", "x\n")
+    git("branch", "feat/x", "origin/main")
+    git("update-ref", "refs/remotes/origin/feat/x", git("rev-parse", "work"))
+    git("branch", "feat/same", "work")
+    git("update-ref", "refs/remotes/origin/feat/same", git("rev-parse", "work"))
+
+    result = recall_work.run(tmp_path, _offline("anything", tmp_path))
+
+    assert isinstance(result, Ok)
+    rows = {(b.where, b.ahead, b.verdict) for b in result.value.branches if b.name == "feat/x"}
+    assert rows == {
+        (Where.local, 0, Verdict.merged),
+        (Where.remote, 1, Verdict.unverified),
+    }
+    same = [b for b in result.value.branches if b.name == "feat/same"]
+    assert [(b.where, b.ahead) for b in same] == [(Where.both, 1)]
+
+
+def test_a_failed_worktree_listing_blocks_every_merged_verdict(
+    git: Callable[..., str], tmp_path: Path
+) -> None:
+    """Round-1 P2: with what is checked out UNKNOWN, no branch may read merged."""
+    git("branch", "twin-of-main", "origin/main")
+
+    def run(argv: Sequence[str], cwd: Path | None, timeout: float) -> tuple[int, str, str]:
+        if list(argv[:3]) == ["git", "worktree", "list"]:
+            return 1, "", "fatal: injected failure"
+        return recall_work.subprocess_runner(argv, cwd, timeout)
+
+    result = recall_work.run(tmp_path, _offline("anything", tmp_path), runner=run)
+
+    assert isinstance(result, Ok)
+    worktrees = _probe(result.value, ProbeName.worktrees)
+    assert worktrees.status is ProbeStatus.could_not_ask
+    assert "COULD NOT LIST" in worktrees.detail
+    # ahead 0 would be `merged` with a listing; without one it is unverified.
+    assert _branch(result.value, "twin-of-main").verdict is Verdict.unverified
+    assert all(b.verdict is not Verdict.merged for b in result.value.branches)
+
+
+def test_a_full_merged_pr_page_is_reported_even_when_every_head_repeats(
+    git: Callable[..., str], commit_file: Callable[..., str], tmp_path: Path
+) -> None:
+    """Round-1 P2: saturation is the RAW row count, not the distinct-name count."""
+    git("remote", "add", "origin", "git@github.com:o/r.git")
+    commit_file("docs/a.md", "x\n")
+    git("branch", "feat/open", "work")
+    limit = recall_work._MERGED_PR_LIMIT
+    page = json.dumps(
+        [
+            {"number": n, "headRefName": "same", "headRefOid": "0" * 40, "baseRefName": "main"}
+            for n in range(1, limit + 1)
+        ]
+    )
+
+    def gh(argv: list[str]) -> tuple[int, str, str]:
+        return (0, '{"has_issues": false}', "") if argv[0] == "api" else (0, page, "")
+
+    result = recall_work.run(
+        tmp_path, _offline("anything", tmp_path, offline=False), runner=_with_fake_gh(gh)
+    )
+    assert isinstance(result, Ok)
+    assert f"only the newest {limit} merged PRs" in _probe(result.value, ProbeName.branches).detail
 
 
 # --- issues -----------------------------------------------------------------------------
@@ -346,6 +514,29 @@ def test_issues_disabled_on_a_fork_is_skipped_not_could_not_ask(
     assert "issues disabled" in issues.detail
 
 
+def test_an_incomplete_github_search_is_could_not_ask_never_a_count(
+    git: Callable[..., str], tmp_path: Path
+) -> None:
+    """Round-1 P2: GitHub answers a timed-out search with rc 0 and incomplete_results."""
+    git("remote", "add", "origin", "git@github.com:o/r.git")
+
+    def gh(argv: list[str]) -> tuple[int, str, str]:
+        if argv[:2] == ["pr", "list"]:
+            return 0, "[]", ""
+        if argv[:2] == ["api", "repos/o/r"]:
+            return 0, '{"has_issues": true}', ""
+        return 0, '{"total_count": 57, "incomplete_results": true, "items": []}', ""
+
+    result = recall_work.run(
+        tmp_path, _offline("dependency upgrade", tmp_path, offline=False), runner=_with_fake_gh(gh)
+    )
+    assert isinstance(result, Ok)
+    issues = _probe(result.value, ProbeName.issues)
+    assert issues.status is ProbeStatus.could_not_ask
+    assert (issues.examined, issues.matched) == (0, 0)
+    assert "incomplete_results" in issues.detail
+
+
 # --- plans and worktrees ---------------------------------------------------------------
 
 
@@ -370,6 +561,55 @@ def test_plans_are_read_from_the_repo_and_the_claude_home(
         ".agent/plans/session-2026-09-09.md",
         str(home / "upgrade-plan.md"),
     }
+
+
+def test_plans_are_searched_in_every_checkout_not_only_the_root(
+    git: Callable[..., str], tmp_path: Path
+) -> None:
+    """Round-1 P2: a sibling's untracked handoff is reachable by no other probe."""
+    git("rev-parse", "HEAD")
+    sibling = _sibling_repo(tmp_path.parent / f"{tmp_path.name}-sibling")
+    handoff = sibling / ".agent" / "plans" / "session-2026-08-27.md"
+    handoff.parent.mkdir(parents=True)
+    handoff.write_text("# Session 2026-08-27 — dependency upgrade\n", encoding="utf-8")
+
+    result = recall_work.run(tmp_path, _offline("dependency upgrade", tmp_path, repos=(sibling,)))
+
+    assert isinstance(result, Ok)
+    assert [r.name for r in result.value.repos] == [tmp_path.name, sibling.name]
+    plans = _probe(result.value, ProbeName.plans)
+    assert (plans.examined, plans.matched) == (1, 1)
+    assert (plans.hits[0].ref, plans.hits[0].repo) == (
+        ".agent/plans/session-2026-08-27.md",
+        sibling.name,
+    )
+
+
+def test_the_memory_probe_reports_files_the_store_could_not_index(tmp_path: Path) -> None:
+    """Round-1 P2: kb-recall counts the files it could not index; the probe must not drop it."""
+    store = tmp_path / "memory"
+    store.mkdir()
+    (store / "query_1.md").write_text(
+        "---\n"
+        'type: "query"\n'
+        'date: "2026-08-01T00:00:00+00:00"\n'
+        'question: "how do we upgrade a dependency"\n'
+        'outcome: "useful"\n'
+        "---\n\n# Q: how do we upgrade a dependency\n\n## Answer\n\n"
+        "bump the pin, then the manifest\n\n## Outcome\n\n- Signal: useful\n",
+        encoding="utf-8",
+    )
+    (store / "README.md").write_text("not a memory record\n", encoding="utf-8")
+    root = tmp_path / "root"
+    _sibling_repo(root)
+
+    result = recall_work.run(root, _offline("dependency upgrade", tmp_path, memory_dir=store))
+
+    assert isinstance(result, Ok)
+    memory = _probe(result.value, ProbeName.memory)
+    assert memory.status is ProbeStatus.ran
+    assert (memory.examined, memory.matched) == (1, 1)
+    assert "1 file(s) in the store were NOT indexed" in memory.detail
 
 
 def test_a_linked_worktree_is_listed_and_its_branch_can_match(
@@ -407,6 +647,22 @@ def test_the_output_round_trips_through_the_generated_contract(
 def test_the_report_slug_is_filesystem_safe() -> None:
     assert recall_work.slug("../../Dependency Upgrade / v2!") == "dependency-upgrade-v2"
     assert recall_work.slug("///") == "topic"
+
+
+def test_an_oversized_topic_is_refused_before_any_search(
+    git: Callable[..., str], tmp_path: Path
+) -> None:
+    """Round-1 P2: the contract caps `topic` at 512; a longer one must not run to invalid JSON."""
+    git("rev-parse", "HEAD")
+    limit = recall_work._MAX_TOPIC
+    too_long = recall_work.run(tmp_path, _offline("upgrade " * (limit // 7), tmp_path))
+    assert isinstance(too_long, Err)
+    assert too_long.rc is Rc.BAD_REQUEST
+    assert str(limit) in too_long.message
+    # The boundary itself is accepted and round-trips through the contract.
+    exact = recall_work.run(tmp_path, _offline("u" * limit, tmp_path))
+    assert isinstance(exact, Ok)
+    msgspec.json.decode(recall_work.render_json(exact.value).encode(), type=RecallWork)
 
 
 @pytest.mark.parametrize(
