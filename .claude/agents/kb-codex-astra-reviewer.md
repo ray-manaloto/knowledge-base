@@ -77,7 +77,26 @@ Four facts about that command, each of which has already cost something:
 - **`--output` is written by `kb-codex` itself**, because `codex review` has no
   `-o`. Do not go looking for codex's own last-message file; there is not one.
 
-Never a writable sandbox and never a network lane. You review; you change nothing.
+🔴 **YOU CANNOT SANDBOX THIS LANE, AND NOTHING IN THIS REPO CAN.** `codex review`
+accepts no `--sandbox`, and a `.codex/agents/*.toml` role file cannot set one
+either — codex refuses it on purpose. `apply_role` copies exactly seven fields
+into `AgentRoleOverrides` (`core/src/agent/role.rs:80-89`) and `sandbox_mode` is
+not among them; the test that pins this is named
+`apply_role_preserves_parent_sandbox_permissions`, and a second one feeds a
+fixture called `hostile-role.toml` and asserts *"role must not control
+sandbox_mode"* for `sandbox_mode`, `approval_policy`, `model_provider`,
+`openai_base_url` and four more (`role_tests.rs:351-480`).
+
+So the lane inherits whatever the invoking session has. Measured on this machine
+2026-09-09, the banner read `sandbox: danger-full-access`, because
+`~/.codex/config.toml:6` sets it — a USER-GLOBAL file `do-not.md` #11 forbids
+this repo to touch. Treat that as a standing condition of the `--review` path,
+not something a flag here fixes: **assume the lane can write, and rely on the
+instruction not to, plus your own check of the tree afterwards.** Never tell a
+reader this lane is sandboxed.
+
+Never ask for a writable sandbox or a network lane. You review; you change
+nothing — and you verify the tree yourself when the lane returns.
 
 ## METHOD — hand the lane this, and follow it yourself
 
@@ -85,6 +104,12 @@ Put this in the instructions file verbatim. It is the paragraph that separates a
 lane which could disagree from one that could only agree:
 
 ```text
+Review <FIXED>...HEAD in this repository. Read the diff yourself, using this
+exact scope — it excludes one tracked prose directory that is not code under
+review:
+
+    git diff <FIXED>...HEAD -- . ':(exclude)docs/research/**'
+
 Do NOT review only by reading. Wherever the diff asserts a FACT about this
 repository — a count, a path, a command's behaviour, a claim that two files
 agree — RUN the check that would refute it and report the exit code you saw.
