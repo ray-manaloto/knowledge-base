@@ -205,7 +205,50 @@ env_vars = ["GRAPHIFY_MAX_GRAPH_BYTES"]
 startup_timeout_sec = 120
 tool_timeout_sec = 120
 
-# `update_plan` became OPT-IN in codex 0.152.0 (PR #41744, "Make the update_plan
+# THE THIRD SERVER (U-R9's transport half — #681, Phase U/#672). `graphify` is
+# hosted, `kb` is this repo's 359k-node graph, and `kb-memory` is the committed
+# work-memory store under `graphify-out/memory/` — the one #540 called
+# WRITE-ONLY, because `kb-remember` wrote 382 records that nothing could rank or
+# read back.
+#
+# A separate server rather than a tool added to `kb`, because `kb_setup.mcp_serve`
+# proxies graphify's own binary and can only NARROW its tool list. Probed live,
+# three arms: unfiltered -> 10 tools; allowlist `query_graph` -> exactly 1, a
+# strict subset; allowlist a name graphify does not serve -> 0 tools, never a new
+# one. The middle arm is the control that makes the third an answer rather than a
+# broken probe.
+#
+# THREE NAMES IS NOT #668. That outage was a key COLLISION — a GLOBAL
+# `mcp_servers.graphify` URL entry against this file's stdio entry of the same
+# name, which stopped codex booting outright. Distinct names do not reproduce it.
+[mcp_servers.kb-memory]
+command = "uv"
+args = ["run", "kb-setup", "serve-memory"]
+
+# Same reasoning as `kb` above, and the same precondition: under `mise run
+# kb-codex`'s approval policy `never`, every MCP tool call is denied BEFORE the
+# server is contacted, which reads exactly like a broken server. `approve`
+# short-circuits that check.
+#
+# Safe here for the same reason and no other: `recall` only READS `.md` files out
+# of the memory store. There is no write path on this server. Do NOT copy this
+# line onto one that gains a `remember` tool — that is a different decision and
+# it has to be made again.
+default_tools_approval_mode = "approve"
+
+# NO `startup_timeout_sec` / `tool_timeout_sec` HERE, DELIBERATELY — and this is
+# the interesting difference from `kb` twenty lines up, not an omission.
+#
+# `kb` needs 120 s because it pins a 553 MB graph BEFORE it answers `initialize`:
+# parse 7.5 s + trigram index 13.0 s + communities 0.1 s, 21.0 s warm, peak RSS
+# 2.92 GiB. `kb-memory` loads none of that. Measured 2026-09-09, twice each:
+# handshake **0.52 s / 0.49 s**; a real `recall` over all 382 live records
+# **0.12 s / 0.08 s**. Codex's 30 s default is ~60x the measurement.
+#
+# Copying `kb`'s 120 s would have hidden a real regression: if this server ever
+# takes 30 s, something has started loading a graph it has no business loading,
+# and the default timeout is what would say so.
+
 # tool opt-in", merged 2026-08-31T00:55:03Z — verified via `gh api`, before the
 # rust-v0.152.0 release at 2026-09-01T01:58:32Z).
 #

@@ -1127,6 +1127,29 @@ raw = true
 # the claim. When a reviewer finds an instance, sweep for the class.
 run = "uv run kb-setup serve"
 
+[tasks.kb-serve-memory]
+description = "Start the kb-memory MCP server over this repo's work-memory (stdio)"
+# U-R9's transport half (#681, Phase U/#672). A THIRD server beside `graphify`
+# (hosted) and `kb` (this repo's graph) — not a tool added to either, because
+# `kb_setup.mcp_serve` proxies graphify's binary and can only NARROW its tool
+# list. Probed live rather than read: unfiltered -> 10 tools; allowlist
+# `query_graph` -> exactly 1; allowlist a name graphify does not serve -> 0
+# tools, never a new one. The middle arm is the control that makes the third an
+# answer instead of a broken probe.
+#
+# `raw` for the same reason `[tasks.kb-serve]` needs it, and it is NOT optional:
+# without it mise reads a task's stdio BY LINE instead of connecting it, so a
+# stdio MCP server hits EOF on its first read and exits rc=0 with empty stderr —
+# serving nothing, silently. That is the #105 failure, and the clean exit is why
+# nothing caught it for months.
+#
+# NOTE this task is a CONVENIENCE, not the registration path. Both clients spawn
+# the binary directly (`.mcp.json`, `.codex/config.toml`), so neither depends on
+# this line. It exists so a human can drive the server the same way they drive
+# every other workflow here.
+raw = true
+run = "uv run kb-setup serve-memory"
+
 [tasks.kb-add]
 description = 'Add a URL source then rebuild: mise run kb-add -- <url> [--author NAME]'
 # Fetches the URL into sources/ and updates the graph. Repo ingestion uses the
