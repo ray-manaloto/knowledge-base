@@ -51,6 +51,11 @@ title = "V1 — rebase the graphify fork onto the newest release; refresh both s
 blockers = [727]
 
 [[ticket]]
+issue = 739
+title = "V1b — automate the fork rebase: detect a newer PyPI-shipped graphify tag and act without being asked"
+blockers = [728]
+
+[[ticket]]
 issue = 729
 title = "V2 — research + architect the DBOS/SQLite upgrade system; spec + advisor + premise verification"
 blockers = [727]
