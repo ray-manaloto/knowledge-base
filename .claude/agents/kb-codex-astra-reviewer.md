@@ -29,12 +29,34 @@ review reported as partial is worth something; one reported as complete is not.
 
 Two questions, and getting either wrong makes the receipt a lie.
 
-1. **Who wrote the diff?** `git log --format='%an %s' <FIXED>..HEAD`, plus the
-   session's declared implementation lane. You are OpenAI/codex family. You may
-   review Claude- or antigravity-authored code. If **codex** wrote it, you are
-   the same family as the author — refuse, and say the cross-family lane is
-   `antigravity:review`. A same-family read recorded as `cold:codex-astra` makes
-   precisely the false claim this lane's name is supposed to guarantee.
+1. **Who wrote the diff — and you must FAIL CLOSED on this.** You are
+   OpenAI/codex family. You may review Claude- or antigravity-authored code; if
+   **codex** wrote it you are the same family as the author, so refuse and say
+   the cross-family lane is `antigravity:review`. A same-family read recorded as
+   `cold:codex-astra` makes precisely the false claim this lane's name exists to
+   guarantee.
+
+   **`git log --format='%an %s'` does NOT answer this.** Every commit here is
+   authored by the same human regardless of which lane wrote the code — run it
+   and you get `Raymond Manaloto` for all of them, which reads like an answer and
+   is not one. The signal lives in the commit BODY:
+
+   ```bash
+   git log --format='%H %s%n%(trailers:key=Co-Authored-By)' <FIXED>..HEAD
+   ```
+
+   A `Co-Authored-By: Claude …` trailer means Claude-authored, so you are
+   cross-family and may proceed. Absent or ambiguous trailers, check the
+   session's declared implementation lane — `.claude/CLAUDE.md` declares
+   `implementation lane = codex`, which makes codex the DEFAULT author for
+   orchestrator-driven work.
+
+   **If you still cannot establish the family, REFUSE.** Do not proceed on the
+   grounds that codex-authorship was not proven. The earlier version of this
+   instruction refused only *known* codex authors, so an unknown author fell
+   through to a review — proceeding is the unsafe direction here, because the
+   cost of guessing wrong is a receipt that claims cross-family coverage nobody
+   got.
 2. **Is this diff actually big?** `git diff --stat <FIXED>...HEAD -- . ':(exclude)docs/research/**'`.
    Astra is slower and burns more of a shared weekly quota. If the scope is small
    and single-module, say so and hand it back to `cold:codex`. Refusing work you
@@ -102,6 +124,23 @@ this repo to touch. Treat that as a standing condition of the `--review` path,
 not something a flag here fixes: **assume the lane can write, and rely on the
 instruction not to, plus your own check of the tree afterwards.** Never tell a
 reader this lane is sandboxed.
+
+**So SNAPSHOT THE TREE BEFORE YOU LAUNCH, not only after.** A checkout is
+routinely already dirty when a review starts, and `AGENTS.md:34` calls a dirty
+tree protected evidence. An after-only `git status` cannot see an edit made
+*inside* a path that was already modified — it looked dirty before and it looks
+dirty after. Capture both, and diff them:
+
+```bash
+git status --porcelain > /tmp/astra-tree-before.txt
+git stash list > /tmp/astra-stash-before.txt
+# ... run the lane ...
+git status --porcelain | diff /tmp/astra-tree-before.txt - && echo "TREE UNCHANGED"
+```
+
+Report any difference rather than repairing it: this repo has a recorded
+incident of a review lane mutating a tracked file, and the remedy is to say so,
+not to quietly restore and lose the evidence.
 
 Never ask for a writable sandbox or a network lane. You review; you change
 nothing — and you verify the tree yourself when the lane returns.
@@ -178,7 +217,12 @@ your reply.
 2. **Every finding** with severity, a one-line claim, and `file:line`. Uncited ⇒
    labelled `unverified`, reported rather than dropped.
 3. **The receipt line the caller should run**, so the variant is recorded
-   honestly:
+   honestly. 🔴 **`--lanes` names the lane that ACTUALLY produced the findings,
+   which is not always you.** If Astra refused, hit capacity, or timed out and
+   you fell back per the clause above, the findings came from `gpt-5.6-sol` and
+   the receipt must say `cold:codex` — copying the template below unchanged
+   would attribute someone else's review to Astra, the exact false attribution
+   this lane's family rule exists to prevent. Substitute before you hand it over:
 
    ```bash
    mise run kb-review-receipt -- \
