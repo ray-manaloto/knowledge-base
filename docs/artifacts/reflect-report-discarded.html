@@ -1,0 +1,126 @@
+<title>The Report Nobody Reads</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#F7F8FA;
+    --card:#FFFFFF;
+    --ink:#161A22;
+    --muted:#5A6376;
+    --line:#DDE2EA;
+    --accent:#2F5D8A;
+    --loss:#8C3A2E;
+    --keep:#2E6B4F;
+    --display:"Newsreader",Georgia,"Times New Roman",serif;
+    --body:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:var(--body); font-size:15px; line-height:1.5;
+    padding:28px 22px 34px;
+  }
+  .wrap{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:20px;}
+
+  header{display:flex;flex-direction:column;gap:6px;}
+  .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted);
+  }
+  h1{
+    font-family:var(--display); font-weight:600; font-size:38px;
+    line-height:1.08; margin:0; text-wrap:balance; letter-spacing:-.01em;
+  }
+  .sub{color:var(--muted);max-width:60ch;margin:0;}
+
+  .rows{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    display:grid; grid-template-columns:auto 1fr;
+  }
+  .rows > div{padding:13px 18px;border-bottom:1px solid var(--line);}
+  .rows > div:nth-last-child(-n+2){border-bottom:0;}
+  .k{
+    font-family:var(--mono); font-size:11px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--muted); white-space:nowrap;
+    padding-top:16px !important;
+  }
+  .v{text-wrap:pretty;}
+  .v b{font-weight:600;}
+  .loss{color:var(--loss);font-weight:600;}
+  .keep{color:var(--keep);font-weight:600;}
+
+  figure{margin:0;display:flex;flex-direction:column;gap:8px;}
+  figure svg{width:100%;height:auto;display:block;}
+  figcaption{font-size:12.5px;color:var(--muted);}
+
+  .ask{
+    border-left:3px solid var(--accent); padding:10px 0 10px 16px;
+    font-size:16px;
+  }
+  .ask b{font-family:var(--display);font-weight:600;}
+  .prov{
+    font-family:var(--mono); font-size:11px; color:var(--muted);
+    border-top:1px solid var(--line); padding-top:10px; line-height:1.6;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">knowledge-base &middot; issue 717</div>
+    <h1>The report nobody reads</h1>
+    <p class="sub">Every session already builds a full self-review of itself. Then it throws it away, one second before the session ends.</p>
+  </header>
+
+  <div class="rows">
+    <div class="k">What happens</div>
+    <div class="v">At the end of every session the project builds a complete report on what that session did by hand. All the work is already paid for.</div>
+
+    <div class="k">Then</div>
+    <div class="v">It prints <b>two numbers</b> and <span class="loss">deletes the report</span> &mdash; at the exact moment there is nobody left to read it.</div>
+
+    <div class="k">The fix</div>
+    <div class="v"><span class="keep">Keep the file.</span> Show it at the <b>start</b> of the next session, when there is a whole session's room to act on it.</div>
+
+    <div class="k">Not the other fix</div>
+    <div class="v">The plan was to hang the report off a "how full am I?" command. But that command is itself only ever run late &mdash; so the report would arrive just as tired as before.</div>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 820 132" role="img" aria-label="A session runs left to right. The self-review is built at the very end and discarded. The proposed fix carries it into the next session, which starts with full room.">
+      <!-- session A track -->
+      <rect x="8" y="34" width="470" height="26" rx="4" fill="#FFFFFF" stroke="#DDE2EA"/>
+      <text x="8" y="26" font-family="IBM Plex Mono, monospace" font-size="11" fill="#5A6376">THIS SESSION</text>
+      <!-- room gradient blocks -->
+      <rect x="9" y="35" width="150" height="24" fill="#E8EFF6"/>
+      <rect x="159" y="35" width="160" height="24" fill="#F2F5F8"/>
+      <text x="20" y="52" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#2F5D8A">plenty of room</text>
+      <text x="330" y="52" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#8C3A2E">nearly out of room</text>
+
+      <!-- late command marker -->
+      <line x1="330" y1="28" x2="330" y2="66" stroke="#8C3A2E" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="322" y="82" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#8C3A2E">the &ldquo;how full am I?&rdquo; command</text>
+      <text x="322" y="95" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#8C3A2E">is first run about here</text>
+
+      <!-- report built at end -->
+      <circle cx="470" cy="47" r="7" fill="#8C3A2E"/>
+      <text x="470" y="24" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" font-weight="600" fill="#8C3A2E">report built</text>
+      <text x="470" y="112" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#8C3A2E">&hellip;and thrown away</text>
+
+      <!-- arrow to next session -->
+      <path d="M 486 47 L 556 47" stroke="#2E6B4F" stroke-width="2" fill="none"/>
+      <path d="M 556 47 l -8 -5 l 0 10 z" fill="#2E6B4F"/>
+      <text x="521" y="36" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2E6B4F">keep it</text>
+
+      <!-- session B track -->
+      <rect x="562" y="34" width="250" height="26" rx="4" fill="#FFFFFF" stroke="#DDE2EA"/>
+      <rect x="563" y="35" width="248" height="24" fill="#E8F1EA"/>
+      <text x="562" y="26" font-family="IBM Plex Mono, monospace" font-size="11" fill="#5A6376">NEXT SESSION</text>
+      <circle cx="576" cy="47" r="7" fill="#2E6B4F"/>
+      <text x="596" y="51" font-family="IBM Plex Sans, sans-serif" font-size="12" font-weight="600" fill="#2E6B4F">read here, with room to act</text>
+    </svg>
+    <figcaption>Same report, same cost. The only change is <em>when</em> it is read.</figcaption>
+  </figure>
+
+  <p class="ask"><b>What I need from you:</b> pick where the report should surface &mdash; I have the question queued right after this.</p>
+
+  <p class="prov">Measured this session, 2026&#8209;09&#8209;08 &middot; the report is built then discarded at <span style="color:#161A22">session_reflect.py:818&#8209;829</span> &middot; the SessionEnd hook that runs it is in <span style="color:#161A22">.claude/settings.json</span>, confirmed by parsing the hook table &middot; &ldquo;first run about here&rdquo; = median first real invocation across <span style="color:#161A22">18 sessions / 30 invocations</span> over 21 days, filtered to actual Bash calls (prose mentions excluded) &middot; the five dropped rounds are recorded in the handoffs, not re&#8209;derived here.</p>
+</div>

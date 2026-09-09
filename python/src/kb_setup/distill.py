@@ -241,11 +241,21 @@ class Candidate:
 
 @dataclass(frozen=True)
 class Report:
-    """One distill run. ``candidates`` empty is the expected, common outcome."""
+    """One distill run. ``candidates`` empty is the expected, common outcome.
+
+    ``axis`` describes the grouping the run ACTUALLY used, carried on the report
+    rather than written into :func:`render` as a literal. It is a field because a
+    literal there went stale: the header said *"Grouped by IMPORT SIGNATURE"*
+    long after :data:`DEFAULT_POLICY` had moved to :func:`surface_signature`, and
+    two skill files then quoted the report rather than the code. A reader cannot
+    tell a stale header from a true one, so the string is derived
+    (:func:`axis_of`) and has no way to disagree with the policy that ran.
+    """
 
     candidates: tuple[Candidate, ...]
     scanned: tuple[str, ...]
     scripts_seen: int
+    axis: str
 
     @property
     def found(self) -> bool:
@@ -295,6 +305,57 @@ def surface_signature(
     if not hit:
         return "+".join(mods)
     return " ".join(hit) + (f" [{'+'.join(mods)}]" if mods else "")
+
+
+#: What each signature function GROUPS BY, in the words the report prints.
+#: Keyed by the FUNCTION OBJECT, not its name: a swapped policy then carries its
+#: own description, and a signature added without one is a loud ``KeyError`` at
+#: :func:`axis_of` rather than a plausible wrong sentence in the report. Keying
+#: on ``__name__`` was the first draft and ty refused it — a ``Callable`` is not
+#: guaranteed to be a function — which is the stricter answer anyway, since a
+#: replacement that reuses a name cannot silently inherit its wording.
+#:
+#: This exists because the alternative was measured and failed: the header was a
+#: literal in :func:`render` describing :func:`import_signature`, and it survived
+#: the change of :data:`DEFAULT_POLICY` to :func:`surface_signature` — then
+#: `.claude/skills/clear-prep/SKILL.md` and
+#: `.claude/skills/kb-session-reflect/SKILL.md` both restated it. A generated
+#: string cannot drift from the generator; a copied one always can
+#: (`probes-need-a-control-arm.md` rule 8).
+AXIS_BY_SIGNATURE: dict[Callable[[str], str], str] = {
+    surface_signature: (
+        "Grouped by the repo SURFACE each script touches (imports only when it "
+        "touches none), so two probes of one surface group together and a habit "
+        "spanning two surfaces is SPLIT across two rows. Treat each as a LEAD."
+    ),
+    import_signature: (
+        "Grouped by IMPORT SIGNATURE, which is deliberately coarse: two probes "
+        "sharing imports are grouped even if they asked different questions. "
+        "Treat each as a LEAD, not a finding."
+    ),
+}
+
+
+def axis_of(signature: Callable[[str], str]) -> str:
+    """The report wording for ``signature``, or raise if it declares none.
+
+    Raising is the point. A default here would let a new signature function ship
+    with the previous one's description — which is the exact defect this registry
+    replaced, reintroduced one layer up.
+
+    NOT REACHED AT TODAY'S ONLY CALL SITE, and saying so is the honest form
+    (cold review of `4a45b158b762`, P3). :data:`DEFAULT_POLICY` is the module's
+    only `Policy(...)` construction and its signature is registered, so nothing
+    in production can currently take the raise. It is reachable through the API
+    — the reviewer constructed an unregistered function and got the `KeyError` —
+    so this is dead-at-the-call-site, not dead code, and the claim was earned by
+    constructing the reaching case rather than argued from premises
+    (`probes-need-a-control-arm.md` rule 9). What keeps it from silently becoming
+    unreachable-and-wrong is
+    `test_every_signature_this_module_ships_declares_its_wording`, which fails the
+    moment a `*_signature` ships without a row here.
+    """
+    return AXIS_BY_SIGNATURE[signature]
 
 
 def detect_scripts(command: str) -> Iterator[tuple[str, str]]:
@@ -490,6 +551,7 @@ def distill(
         candidates=tuple(candidates),
         scanned=tuple(p.stem for p in paths),
         scripts_seen=scripts_seen,
+        axis=axis_of(policy.signature),
     )
 
 
@@ -516,11 +578,7 @@ def render(report: Report) -> str:
         )
         return "\n".join(out) + "\n"
 
-    out.append(
-        "\n  Grouped by IMPORT SIGNATURE, which is deliberately coarse: two "
-        "probes sharing imports are grouped even if they asked different "
-        "questions. Treat each as a LEAD, not a finding."
-    )
+    out.append("\n  " + report.axis)
     for i, cand in enumerate(report.candidates, start=1):
         out.append(
             f"\n{i}. {cand.signature}  "

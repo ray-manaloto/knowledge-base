@@ -1,0 +1,82 @@
+# Mutation arms for #717 — the session reflection is KEPT, not discarded.
+#
+# THE DEFECT. `.claude/settings.json`'s SessionEnd hook already ran a FULL
+# `kb-session-reflect -- --quiet` every session. `--quiet` computed the whole
+# report, printed two counts, and dropped it — every expensive part paid for, at
+# the one moment no reader is left. The ticket read as "the step never runs"; it
+# always ran, and what was missing was a reader.
+#
+# WHAT THESE MEASURE, and it is narrower than "the fix is right": whether this
+# repo's tests can go red when each piece of the kept-report path is removed.
+# None of them says reading it at resume-time actually changes a future round's
+# behaviour — that is a claim about people, and no mutation can settle it.
+#
+# WHY THE ARM IS AT THE CLI AND NOT AT `persist`. A1 deletes the CALL, not the
+# function, and leaves every count in the summary line correct. A test that
+# invoked `persist` directly would survive that deletion untouched — this repo
+# has already paid for that lesson once (PR #220: 15 of 15 `skill_lint` tests
+# called the library while its CLI dispatch was broken, and stayed green). The
+# test was written against `persist` first and moved to `reflect_main` for
+# exactly this reason, before these arms were run.
+
+suites = ["tests/test_session_reflect.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/session_reflect.py"
+old = '''    report = reflect(root, limit=limit)
+    kept = persist(root, report)'''
+new = '''    report = reflect(root, limit=limit)
+    kept = persist(root, report)  # control'''
+
+# A1 — THE REALISTIC BREAK: the wiring line that calls `persist` is deleted,
+# `persist` itself survives, and the summary line still prints correct counts.
+# This is the "delete the line that CALLS a function" mutation
+# `probes-need-a-control-arm.md` rule 2 names as realistic, and it is the state
+# the code was in before this change.
+[[arm]]
+id = "A1"
+test = "test_quiet_keeps_the_report_instead_of_discarding_it"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''    kept = persist(root, report)'''
+new = '''    kept = None'''
+
+# A2 — `persist` invents a filename instead of refusing when no session was
+# recorded. The refusal is what stops `/session-resume` reading a report that
+# describes nothing as if it were the previous round's findings.
+[[arm]]
+id = "A2"
+test = "test_persist_refuses_to_name_a_report_that_describes_no_session"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''    if not report.sessions:
+        return None
+    target = root / REFLECT_DIR / f"{report.sessions[0]}.md"'''
+new = '''    stem = report.sessions[0] if report.sessions else "unknown-session"
+    target = root / REFLECT_DIR / f"{stem}.md"'''
+
+# A3 — newest-by-NAME instead of newest-by-mtime. Filenames are session ids and
+# carry no order, so this silently returns an arbitrary old report. The fixture
+# is built so the alphabetically-last file is the OLDER one.
+[[arm]]
+id = "A3"
+test = "test_newest_report_is_by_mtime_not_by_name"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''    found = sorted(directory.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)'''
+new = '''    found = sorted(directory.glob("*.md"), reverse=True)'''
+
+# A4 — `--last` prints nothing when there is no kept report. An empty stdout is
+# indistinguishable from "the last round was clean", and the reader is a skill
+# that would report exactly that.
+[[arm]]
+id = "A4"
+test = "test_last_says_none_rather_than_printing_nothing"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''    found = newest_report(root)
+    if found is None:
+        print('''
+new = '''    found = newest_report(root)
+    if found is None:
+        return 0
+    if found is None:
+        print('''

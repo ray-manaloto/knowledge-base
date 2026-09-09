@@ -523,3 +523,63 @@ def test_distill_int_wrapper_is_exit_code_of_boundary(tmp_path, monkeypatch):
     """The equivalence that makes the split safe."""
     _with_transcripts(monkeypatch, [])
     assert distill.distill_main(tmp_path) == exit_code(distill.check_distill(tmp_path))
+
+
+# --- the report cannot misdescribe its own grouping ------------------------
+
+
+def test_render_describes_the_policy_that_actually_ran(tmp_path):
+    """The defect: the header was a literal naming a policy that no longer ran.
+
+    `render` said *"Grouped by IMPORT SIGNATURE"* while `DEFAULT_POLICY` used
+    `surface_signature` — and `.claude/skills/clear-prep/SKILL.md` and
+    `.claude/skills/kb-session-reflect/SKILL.md` both restated the false version,
+    because a reader cannot tell a stale header from a true one. The REALISTIC
+    break is swapping the policy's signature and leaving the wording behind, so
+    that is what this arms: same transcript, two policies, two headers.
+    """
+    path = _transcript(
+        tmp_path,
+        "axis",
+        [
+            _heredoc("import json\nPath('sources/extractions/a.json').read_text()"),
+            _heredoc("import json\nPath('sources/extractions/b.json').read_text()"),
+        ],
+    )
+    default = distill.render(distill.distill(tmp_path, transcripts=[path]))
+    assert "repo SURFACE" in default
+    assert "IMPORT SIGNATURE" not in default
+
+    by_imports = distill.render(
+        distill.distill(
+            tmp_path,
+            transcripts=[path],
+            policy=replace(distill.DEFAULT_POLICY, signature=distill.import_signature),
+        )
+    )
+    assert "IMPORT SIGNATURE" in by_imports
+    assert "repo SURFACE" not in by_imports
+
+
+def test_every_signature_this_module_ships_declares_its_wording():
+    """A third signature added without a description must fail LOUDLY, not plausibly.
+
+    Without this, a new `*_signature` would reach `axis_of` and raise only on the
+    run that used it — or, if someone gave the registry a default, would ship
+    wearing the previous policy's sentence. That is the original defect one layer
+    up, which is why `axis_of` raises rather than defaulting.
+    """
+    shipped = {
+        getattr(distill, name)
+        for name in dir(distill)
+        if name.endswith("_signature") and callable(getattr(distill, name))
+    }
+    assert shipped, "control arm: found no *_signature functions, so this proves nothing"
+    missing = sorted(fn.__name__ for fn in shipped if fn not in distill.AXIS_BY_SIGNATURE)
+    assert not missing, f"no report wording declared for: {missing}"
+
+
+def test_axis_of_refuses_an_unregistered_signature():
+    """The FAIL direction of `axis_of` itself — a default here would hide it."""
+    with pytest.raises(KeyError):
+        distill.axis_of(lambda _body: "always-the-same")

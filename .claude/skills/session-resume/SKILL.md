@@ -84,6 +84,33 @@ mise run kb-currency-check
 exist, a gate claim with no artifact, a gate that ran against a dirty tree.
 `kb-currency-check` is offline and silent when clean.
 
+### 2a. Read the previous round's self-reflection
+
+```bash
+mise run kb-session-reflect -- --last
+```
+
+The last session's SessionEnd hook already built a full reflection — what that
+round did by hand that a task owns, which standing directives it violated and at
+what RATE, which probes could not have answered. **This is where it gets read**,
+and the reason is scheduling: it used to be a step of `/clear-prep`, which runs
+at the end of a session with no budget left, and it was dropped five rounds
+running for exactly that reason (#717). Here there is a whole session's room.
+
+It is not a second handoff. The handoff says what the round DID; this says how
+the round WORKED, and the two disagree in the useful direction — a violation
+rate is measured, while a handoff's account of its own process is written from
+memory by the context that produced it.
+
+Two ways to read it wrong:
+
+- **"no kept reflection yet" is not "a clean round."** The command says so in
+  words rather than printing nothing, because `.agent/` dies with a fresh clone
+  and nothing was kept before #717.
+- **Every line is a LEAD.** It always exits 0 and gates nothing; an
+  un-automated step is future cost, not a failure. Carry a hit into the round's
+  plan or into the report's TRAPS line — do not open a ticket per row.
+
 ### 3. Reconcile, and report the disagreements first
 
 Compare what you read against what you found. The useful output is not a summary

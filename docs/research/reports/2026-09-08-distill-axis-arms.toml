@@ -1,0 +1,69 @@
+# Mutation arms for the `distill` report-axis fix.
+#
+# THE DEFECT. `render()` carried a literal header — "Grouped by IMPORT
+# SIGNATURE, which is deliberately coarse: two probes sharing imports are
+# grouped even if they asked different questions" — describing
+# `import_signature`. But `DEFAULT_POLICY` groups by `surface_signature`, and
+# `surface_signature`'s own docstring records that `import_signature` was
+# MEASURED AND REJECTED as the default (153 of 785 scripts in one `json`
+# bucket). The header survived the change that made it false, and then
+# `.claude/skills/clear-prep/SKILL.md` and
+# `.claude/skills/kb-session-reflect/SKILL.md` both restated it — a generated
+# artifact drifting from its generator, `probes-need-a-control-arm.md` rule 8.
+#
+# WHAT THESE MEASURE, and it is narrower than "the fix is right": whether this
+# repo's tests can go red when the fixed behaviour is removed. No arm here says
+# the new wording is ACCURATE — only that a mismatch between the policy that ran
+# and the sentence printed is now detectable. Accuracy was settled by reading
+# `surface_signature` (`distill.py:274-297`), not by a mutation.
+#
+# WHY NOT ARM THE STALE LITERAL DIRECTLY. Putting the old literal back into
+# `render` is not the realistic break: nobody will retype it. The realistic
+# break is the one that ALREADY HAPPENED — someone changes which signature the
+# default policy uses and the wording is left behind. A1 is exactly that, and it
+# is the only arm here that reproduces the original incident.
+
+suites = ["tests/test_distill.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/distill.py"
+old = '''    return AXIS_BY_SIGNATURE[signature]'''
+new = '''    return AXIS_BY_SIGNATURE[signature]  # control'''
+
+# A1 — THE ORIGINAL INCIDENT, replayed. Swap the default policy's grouping and
+# leave everything else alone. Before the fix this changed nothing a reader
+# could see, because the header was a constant. After it, the header follows.
+[[arm]]
+id = "A1"
+test = "test_render_describes_the_policy_that_actually_ran"
+file = "python/src/kb_setup/distill.py"
+old = '''    signature=surface_signature,'''
+new = '''    signature=import_signature,'''
+
+# A2 — a signature shipped without a description. The registry is the only thing
+# standing between that and a report wearing another policy's sentence.
+#
+# The mutation retargets the surface entry at `import_signature` rather than at
+# an invented name. An undefined name would be a NameError at IMPORT — the whole
+# suite would die for the wrong reason, which `kb-arms` calls an inert mutant and
+# which proves nothing about the test. A duplicate dict key is legal (last wins),
+# so the module still imports and `surface_signature` is simply unregistered:
+# the state this registry exists to make impossible.
+[[arm]]
+id = "A2"
+test = "test_every_signature_this_module_ships_declares_its_wording"
+file = "python/src/kb_setup/distill.py"
+old = '''    surface_signature: ('''
+new = '''    import_signature: ('''
+
+# A3 — the tempting softening: give `axis_of` a default so an unregistered
+# signature "just works". That is the original defect one layer up, and it must
+# be caught.
+[[arm]]
+id = "A3"
+test = "test_axis_of_refuses_an_unregistered_signature"
+file = "python/src/kb_setup/distill.py"
+old = '''    return AXIS_BY_SIGNATURE[signature]'''
+new = '''    return AXIS_BY_SIGNATURE.get(signature, AXIS_BY_SIGNATURE[import_signature])'''
