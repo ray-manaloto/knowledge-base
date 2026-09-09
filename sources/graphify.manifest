@@ -89,6 +89,15 @@
 # survival IS the proof that commit history plus comments failed to preserve
 # where these patches came from.
 #
+# RE-ARMED AT v0.9.57 (2026-09-09), because this claim ages and #658 exists
+# precisely because it had been left at v0.9.50 while the pin moved to v0.9.53:
+# pristine `v0.9.57`'s `graphify/llm.py` contains ZERO mentions of `openai-cli`,
+# control-armed against 23 mentions of `claude-cli` in the SAME file, so the zero
+# is an answer and not a broken search. The three `# PATCHED FOR TELB-COCKPIT`
+# markers survive on our branch against 0 on pristine v0.9.57. Upstream PR #3073
+# re-checked the same day: still OPEN, `mergedAt` null — so `clears_when` has not
+# fired and this remains a bridge.
+#
 # Upstream v0.9.50 still contained ZERO mentions of `openai-cli` — control-armed
 # against 23 mentions of `claude-cli` in the same file, so the zero is an answer
 # and not a broken search. What would clear it is upstream shipping an
@@ -102,6 +111,33 @@
 # `pyproject.toml` together. They are one pin in two files and must move in the
 # same commit — and `currency.toml`'s `ref_binding` rows are what find the OTHER
 # surfaces carrying the same SHA, which a research lane under-counted 3-to-7 once.
+#
+# REBASED 2026-09-09 onto upstream v0.9.57 (#728), in the checkout Ray
+# designated for all fork work — `/Users/rmanaloto/dev/github/ray-manaloto/graphify`,
+# never `sources/graphify/` and never a scratchpad. `v0.9.57` = `3f82bf7f837a…`,
+# which was ALSO `upstream/v8` HEAD at that moment, so tag-vs-HEAD was moot this
+# round; do not read that as a rule, it is a coincidence of timing.
+#
+# RESOLVING "NEWEST" NEEDS TWO PROBES, and this is where the `v1.0.0` warning
+# above stops being hypothetical: `git tag --sort=-v:refname` puts `v1.0.0`
+# FIRST. PyPI is what breaks the tie, control-armed so the negatives are worth
+# something — `1.0.0` -> 404, `0.9.57` -> 200, `0.9.99` -> 404.
+#
+# Eight pushed patches replayed with ONE conflict, in `CHANGELOG.md` only —
+# resolved by keeping BOTH sides with the fork's `## Unreleased` block above
+# upstream's newest release heading, the same shape the v0.9.50 and v0.9.53
+# rebases used. Scope RE-DERIVED against v0.9.57 rather than inherited from the
+# ticket: 54 commits / 64 files, conflict surface `CHANGELOG.md`, `cli.py`,
+# `llm.py`, `watch.py`. Acceptance was armed both directions — the fork suite on
+# our branch and on pristine `v0.9.57` produced an IDENTICAL 18-failure set
+# (`diff` empty), and the +48 passed delta was confirmed by a targeted run of the
+# four fork test files reporting exactly 48 passed.
+#
+# NOT A PURE PIN MOVE, and budget the next one accordingly: 0.9.57 added
+# keyword-only `ast_sources` to `graphify.build.build_merge` (upstream #3411), so
+# `graphify_sdk.py`'s exact-signature contract refused at `cli.py:142` and
+# blocked every `kb-setup` command until it was updated. A ticket that enumerates
+# pin sites is not thereby complete.
 #
 # REBASED 2026-08-25 onto upstream v0.9.50. Upstream's DEFAULT branch is `v8`,
 # not `main` (`main` has been frozen at 91f4d120 since 2026-05-14, so reading it
