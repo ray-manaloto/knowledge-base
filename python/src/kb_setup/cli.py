@@ -63,7 +63,8 @@ def _print_usage() -> int:
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | "
-        "telemetry-prune | serve | env-refresh [--sentinel] | instruction-edit-guard | "
+        "telemetry-prune | serve | env-refresh [--sentinel] | codex-config-check | "
+        "instruction-edit-guard | "
         "instruction-shell-write | "
         "merge <chunk> | label | "
         "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
@@ -220,6 +221,12 @@ def _run(argv: list[str] | None = None) -> int:
         # A bare arm, on `funnel`'s precedent: it neither reads nor writes the
         # graph, and its whole job is one write to a path only a hook knows.
         return env_refresh.main(rest)
+    if cmd == "codex-config-check":
+        from kb_setup import codex_config
+
+        # A bare arm on `env-refresh`'s precedent: no graph read or write, one
+        # `git diff` against a tracked path, and its only caller is a hook.
+        return codex_config.main(repo_root, rest)
     if cmd == "instruction-edit-guard":
         from kb_setup import instruction_edit_guard
 

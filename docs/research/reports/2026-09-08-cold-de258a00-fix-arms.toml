@@ -1,0 +1,86 @@
+# Mutation arms for the two fixes closing the cold review of `de258a00` (P2, P3).
+#
+# WHAT THESE MEASURE, and it is narrower than "the fixes are right": they measure
+# whether this repo's TESTS can go red when the fixed behaviour is removed. That
+# is the one thing `probes-need-a-control-arm.md` rule 2 asks of a fix, and it is
+# the arm most often skipped precisely because a fix arrives wearing a review
+# finding's authority.
+#
+# ONLY ONE OF THE TWO FINDINGS IS ARMABLE HERE, and saying which is the point.
+#
+#   P3 (the UNKNOWN wording) is armed below as A1. It is a real behaviour change:
+#   the old message asserted "in this repository", which is false when the
+#   directory is no repository at all — `ls-files --error-unmatch` exits non-zero
+#   for BOTH worlds and cannot separate them.
+#
+#   P2 (the unparenthesized `except` tuple) IS NOT ARMED, because there is
+#   nothing to arm: the recommendation cannot be implemented. `except (OSError,
+#   subprocess.SubprocessError):` was written, and `mise run fmt` rewrote it back
+#   to the bare form (`1 file reformatted`). Python 3.14 re-allows the
+#   unparenthesized form (PEP 758; `requires-python = ">=3.14"`, running 3.14.7)
+#   and `ruff format` at `target-version = "py314"` normalizes TO it. Both
+#   directions were observed: the parens form is rewritten, and the bare form
+#   passes `format --check` at rc=0. So the fix for P2 is a COMMENT recording
+#   that, and a comment is not a behaviour a mutation can kill. Arming a comment
+#   would produce a green row that means nothing — the failure mode
+#   `kb-arms` calls an inert mutant.
+#
+# A1's direction is worth stating because it is the easy one to get backwards.
+# The mutation puts the OLD, overclaiming wording back. The test must then go
+# RED. If it stays green, the assertion added alongside the fix was decoration —
+# which is exactly what happened on the first attempt here: the PRE-EXISTING
+# assertion (`"not tracked" in detail`) went red on the new message, proving that
+# test was real, while the NEW half of the claim ("does not name which world")
+# had no assertion at all until one was added. A test that only checks the part
+# that was already checked cannot see the part that changed.
+
+suites = ["tests/test_codex_config.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/codex_config.py"
+old = '''    tracked = _run(runner, repo_root, ["ls-files", "--error-unmatch", str(WATCHED)])'''
+new = '''    tracked = _run(runner, repo_root, ["ls-files", "--error-unmatch", str(WATCHED)])  # control'''
+
+# ── A1: restore the wording that asserts a repository exists ────────────────
+# The whole fix is that the message no longer picks one of two indistinguishable
+# worlds. Putting the old sentence back must be caught.
+[[arm]]
+id = "A1"
+test = "test_untracked_file_is_unknown_not_clean"
+file = "python/src/kb_setup/codex_config.py"
+old = '''            f"git does not report {WATCHED} as tracked here — either it is "
+            "untracked, or this is not a git repository — so there is no "
+            "committed copy to compare against",'''
+new = '''            f"{WATCHED} is not tracked in this repository, so there is no "
+            "committed copy to compare against",'''
+
+# ── A2/A3: the tripwire's RECOVERY ADVICE, added after Ray ruled "fix now" ──
+#
+# These two exist because the advice fix passed every gate on arrival WITHOUT a
+# single test going red. That is the gap, not a pass: the render had assertions
+# for the recovery command and the issue number and NONE for the guidance, so
+# the message could be rewritten — or reverted to the version that armed the
+# next rewrite — invisibly. `probes-need-a-control-arm.md` rule 2 in its most
+# literal form: a green suite said nothing about the thing that changed.
+#
+# A2 restores the ORIGINAL, defective advice: the stash command presented as
+# the remedy, with no warning that a restore re-creates the missing-server gap
+# the next import fills.
+[[arm]]
+id = "A2"
+test = "test_changed_warns_that_a_restore_re_arms_the_next_rewrite"
+file = "python/src/kb_setup/codex_config.py"
+old = '''        f"  A RESTORE ALONE RE-ARMS THE NEXT REWRITE. The importer writes only "'''
+new = '''        f"  Restore it and you are done. The importer writes only "'''
+
+# A3 puts the falsified schedule claim back. Three occurrences within two
+# seconds of one clock minute made "~03:29" persuasive; a fourth at 22:21:10Z
+# refuted it. This arm is what stops it being written a second time.
+[[arm]]
+id = "A3"
+test = "test_changed_does_not_claim_a_schedule"
+file = "python/src/kb_setup/codex_config.py"
+old = '''        f"this is #710 — ChatGPT desktop's import sync rewrites this file whole and "'''
+new = '''        f"this is #710 — ChatGPT desktop's import sync rewrites it at ~03:29 and "'''

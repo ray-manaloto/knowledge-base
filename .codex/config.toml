@@ -126,6 +126,84 @@ default_subagent_reasoning_effort = "high"
 [mcp_servers.kb]
 command = "uv"
 args = ["run", "kb-setup", "serve"]
+# REGISTERED IS NOT REACHABLE — this line is what makes the server usable from a
+# headless lane (#668, 2026-09-08). `mise run kb-codex` runs at approval policy
+# `never`, and under that policy every MCP tool call is denied OUTRIGHT before
+# the server is ever contacted: `mcp_tool_call.rs:1535` returns
+# `"MCP tool call requires approval, but approval policy is never"`. Live-armed —
+# a lane asked for `kb`'s graph_stats replied `KB-UNREACHABLE ... approval policy
+# is never`, which reads exactly like a broken server and is not one.
+#
+# `approve` is the one mode that short-circuits that check:
+# `codex-mcp/src/mcp/mod.rs:95-97` returns auto-approved BEFORE the policy test,
+# so it holds under `never` specifically. Read from the pinned source at
+# rust-v0.153.4, per Ray's directive 4 — a CLI's error strings are secondary
+# artifacts, the argument definitions are primary and we have them.
+#
+# Safe here because `kb` is READ-ONLY by construction: `kb-setup serve` exposes
+# graph reads and nothing that writes. Do NOT copy this line to a server that
+# can mutate anything.
+default_tools_approval_mode = "approve"
+
+# DOOR 3, WALL 1 — REACHABLE IS NOT LOADABLE (#668, 2026-09-08). With approval
+# fixed the server was contacted and still answered `could not load graph.json at
+# …/graphify-out/graph.json`, while the IDENTICAL command under Claude loaded it
+# fine. The three standing candidates — a timeout, the lane sandbox, a memory
+# ceiling — were ALL WRONG for this wall.
+#
+# A codex-spawned stdio MCP server does NOT inherit this shell's environment. It
+# is built from an ELEVEN-NAME ALLOWLIST — `rmcp-client/src/utils.rs:163-175`:
+# HOME, LOGNAME, PATH, SHELL, USER, __CF_USER_TEXT_ENCODING, LANG, LC_ALL, TERM,
+# TMPDIR, TZ — plus whatever `env_vars` names and `env` sets
+# (`create_env_for_mcp_server`, `:16-58`). So `mise.toml`'s
+# `GRAPHIFY_MAX_GRAPH_BYTES = "1GB"` is STRUCTURALLY unable to reach the server,
+# which then falls back to graphify's stock 512 MiB cap. This is independent of
+# `[shell_environment_policy] inherit` at the top of this file — that governs
+# `shell` calls, not MCP spawns.
+#
+# Two-armed on the real function (`graphify.security.check_graph_file_size_cap`),
+# 2026-09-08: with the var -> cap 1_073_741_824, PASS; with it stripped ->
+# cap 536_870_912 and `ValueError: graph file … is 553_662_506 bytes, exceeds
+# 536_870_912-byte cap`. Over the stock cap by 16_791_594 bytes.
+#
+# Why the message was useless, and why three sessions guessed at timeouts:
+# `serve.py:80-82` prints that ValueError to the server's STDERR and
+# `sys.exit(1)`s; `serve.py:130-131` catches the SystemExit and re-raises
+# `RuntimeError(f"could not load graph.json at {resolved_path}")` — `from exc`,
+# so THE CAUSE IS DISCARDED from the message the client sees.
+#
+# The fix passes the NAME through rather than restating "1GB" here: `mise.toml`
+# stays the one owner of that number, and a second copy would be a pin pair with
+# no gate. `env_vars` entries default to source `local` (`mcp_types.rs:97-132`),
+# and codex always carries the var because a raw `codex exec` is hook-DENIED in
+# favour of `mise run kb-codex`, a mise task and therefore under `[env]`.
+env_vars = ["GRAPHIFY_MAX_GRAPH_BYTES"]
+
+# DOOR 3, WALL 2 — and this one IS the timeout, which is why wall 1's refutation
+# above is scoped to wall 1. Fixing the cap changed the error rather than
+# clearing it: `MCP startup failed: timed out handshaking with MCP server after
+# 29.999999917s`. A message CHANGING is how you know a fix landed on a stack of
+# walls; a message repeating is how you know it did not.
+#
+# Chosen from a measurement, not a guess. A warm `initialize` + `tools/list`
+# handshake against `uv run kb-setup serve` answered in 21.0 s (2026-09-08),
+# decomposed as parse 7.5 s + trigram index 13.0 s + communities 0.1 s = 20.5 s
+# of graph work over 359_146 nodes, peak RSS 2.92 GiB. The server pins its
+# default graph BEFORE it answers, so that cost is inside the handshake budget
+# by construction. 21.0 s warm already exceeded codex's 30 s default once cold
+# (cold uv resolve, cold page cache), which is exactly what was observed.
+#
+# 120 s is ~6x the warm measurement. It is deliberately not tight: this bound
+# exists to stop a HANG, and the honest cost of a cold 553 MB load is not known
+# to within a few seconds. `tool_timeout_sec` gets the same number because a
+# query over this graph is not obviously faster than loading it.
+#
+# 🔴 IF THIS EVER NEEDS RAISING AGAIN, THAT IS THE SIGNAL, NOT THE FIX. Both
+# numbers here and the cap in `mise.toml` are the same ratchet, and the durable
+# answers are the same two open issues: #120 (the duplicated `repo::` prefix,
+# ~33% of the file) and #130 (federate instead of merging into one graph).
+startup_timeout_sec = 120
+tool_timeout_sec = 120
 
 # `update_plan` became OPT-IN in codex 0.152.0 (PR #41744, "Make the update_plan
 # tool opt-in", merged 2026-08-31T00:55:03Z — verified via `gh api`, before the

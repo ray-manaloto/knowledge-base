@@ -41,6 +41,23 @@ ask; this governs **how**, and it admits no exceptions:
   back is then about the summary rather than about the options.
 - Bundle related questions into ONE call (it takes up to four) rather than
   several round trips.
+- **A note typed onto a selected option OUTRANKS the option label, and you read
+  it back before acting** (Ray, 2026-09-08). An option is only a label and a
+  sentence — there is no per-option text field, and asking for one is asking for
+  something the tool does not have. What exists is the automatic **Other**
+  escape and free text attached to whichever option was picked, and that text is
+  where the real instruction often lives. When the note and the label point at
+  different work, you have TWO readings and no authority to pick one: say so and
+  ask, in one short round.
+
+  **Measured the same day it was written.** Asked which Phase U step to start,
+  Ray answered *"option 1 to the latest codex version 0.153.4"* — option 1 was
+  the wrong-graph fix (#668) while the note named U3's work. Acting on the label
+  alone would have skipped a version bump he had just asked for; acting on the
+  note alone would have dropped the step he selected. One clarifying question
+  settled it as *both, as one unit*. Nothing can gate this — no check can
+  confirm you read a note — so it is a promise, and it is recorded here because
+  a promise nobody wrote down is one the next session never made.
 
 **Why:** a prose question buried at the end of a long message is easy to miss
 and gives the user nothing to act on. `AskUserQuestion` renders labelled

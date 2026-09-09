@@ -35,12 +35,24 @@
 # and set ref/commit here to the `^{}` (peeled) line's SHA — NOT the bare
 # `<version>` line — then `mise run kb-build`.
 #
+# ⚠️⚠️ PASS BOTH PATTERNS, or omit the pattern entirely. `--refs` is not the only
+# way to lose the peeled line: a SINGLE bare pattern hides it just as silently.
+# Measured 2026-09-08 while bumping to 0.153.4 —
+#   `git ls-remote --tags <url> rust-v0.153.4`      -> ONE line, no `^{}`
+#   `git ls-remote --tags <url> | grep rust-v0.153` -> TWO lines, `^{}` present
+# The one-line output looks exactly like a lightweight tag, so it reads as "there
+# is no peeled line here" rather than "you filtered it out", and recording it
+# would have pinned `042fb41b…` (the tag object) instead of `3d2ee51c…` (the
+# commit). The control arm is this manifest's own previous pin: 0.153.1's bare
+# line is `f5c2c463…` while its `^{}` line is `98564127…`, the value that was
+# committed here — proving the peeled line existed all along.
+#
 # kind = code: AST extraction only, no LLM, no cost. NOTE this extracts the
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/openai/codex
-ref = rust-v0.153.1
-commit = 985641272869835d01d025ed2a218fbbce35fa9f
+ref = rust-v0.153.4
+commit = 3d2ee51ca2d5db578f328aa75e20aa22c0197c9a
 kind = code
 added = 2026-08-02
 # EXCLUDED FROM THE BUILD 2026-08-20 (Ray's ruling: skip any blocker, file it,
