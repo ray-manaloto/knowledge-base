@@ -1,0 +1,151 @@
+# Mutation arms for the three #687 defects in `kb_setup.recall`.
+#
+# THE DEFECTS, all three found by a cold `codex review` whose `--base` was one
+# commit too early (it diffed against a point before PR #684 merged `recall.py`
+# to main, so it read the whole file as new). The base mistake did not make the
+# findings wrong — but it did make them LEADS rather than readings, and one of
+# the three turned out to be described incorrectly:
+#
+#   1. `_answer_body` truncated at the FIRST footer marker, so an answer that
+#      DOCUMENTS the memory format — quoting `## Outcome` / `- Signal:`
+#      verbatim, which this store invites — lost every word after the quote.
+#   2. `render_report` printed `len(hits)` against `searched`, the whole
+#      post-filter population. #687 predicted the header would read "2 of 2";
+#      measured on the live store 2026-09-08 it read **"2 of 382 matched (382
+#      total memories in the store)"** — two printings of one number, naming
+#      the match count nowhere. The real shape is the more misleading one.
+#   3. The `unparsable` count was rendered "present but unreadable", but it is
+#      `real_total` minus what `load_memory_docs` returned, and that
+#      subtraction cannot separate a read failure from a readable `.md` that
+#      simply is not a memory document. The COUNT was right; the WORD was not.
+#
+# WHAT THESE MEASURE, and it is narrower than "the fixes are right": whether
+# this repo's tests can go red when each fixed behaviour is removed. No arm
+# here says the new wording is ACCURATE. Accuracy for (2) was settled by
+# RUNNING `mise run kb-recall -- "graphify fork" --top 2` and reading the
+# header, not by a mutation — which is also how the ticket's own prediction was
+# refuted.
+#
+# WHY THE MUTATIONS ARE THE REALISTIC BREAKS. Each one restores the exact code
+# that shipped, not an invented weakening: `rfind` -> `find` is the one-token
+# regression that caused (1); dropping `matched` back to `searched` in the
+# f-string is (2); putting the word "unreadable" back is (3). All three could
+# really happen — the first two by a reviewer "simplifying", the third by
+# anyone who reads the field name and trusts it.
+
+suites = ["tests/test_recall.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/recall.py"
+old = '''    marker = "\n## Answer"'''
+new = '''    marker = "\n## Answer"  # control'''
+
+# A1 — defect 1, replayed. `rfind` back to `find`: scanning from the front stops
+# at the first quoted example rather than the real trailing footer.
+#
+# ⚠️ RE-DERIVED IN ROUND 2, and the way it broke is the point. Its original
+# anchor was `idx = remainder.rfind(footer)`, inside a loop that round 2's
+# order-aware rewrite deleted outright — so `kb-arms` reported PROBE BROKEN -
+# pattern not found rather than quietly scoring a pass. An arm whose anchor a
+# refactor moved is an arm that measures nothing, and a spec of them would have
+# read 6/6 green while testing six lines that no longer exist. `-- --dry-run`
+# after any refactor of armed code is the cheap version of this lesson.
+[[arm]]
+id = "A1"
+test = "test_answer_body_survives_an_answer_that_documents_the_footer_format"
+file = "python/src/kb_setup/recall.py"
+old = '''    outcome_end = max(remainder.rfind(m) for m in _OUTCOME_MARKERS)'''
+new = '''    outcome_end = max(remainder.find(m) for m in _OUTCOME_MARKERS)'''
+
+# A2 — defect 2, replayed exactly: the header's denominator goes back to the
+# searched population. This is the mutation that reproduces "2 of 382 matched".
+#
+# ⚠️ IT SURVIVED ON THE FIRST RUN, and the code was already correct. The test's
+# fixture had three records, all three matching, so `matched` and `searched`
+# were both 3 and swapping one for the other changed no character of the output
+# — an INERT MUTANT. The fixture now carries a fourth record that survives
+# filtering and matches nothing, so the two numbers differ. Recorded rather
+# than quietly fixed: a surviving arm is a statement about the FIXTURE before
+# it is one about the code, and this is the second time that has bitten here.
+[[arm]]
+id = "A2"
+test = "test_matched_counts_before_top_slices_and_the_header_says_so"
+file = "python/src/kb_setup/recall.py"
+old = '''            f"{report.matched} matched (searched {report.searched} of "'''
+new = '''            f"{report.searched} matched (searched {report.searched} of "'''
+
+# A3 — defect 2's OTHER half, and the reason it is a separate arm. A2 mutates
+# only the rendering; the pre-slice count could still be computed correctly and
+# merely displayed wrong. This one destroys the count itself at its source, so a
+# test that passes here would be asserting the string and not the measurement.
+[[arm]]
+id = "A3"
+test = "test_matched_counts_before_top_slices_and_the_header_says_so"
+file = "python/src/kb_setup/recall.py"
+old = '''            matched=len(weighted),'''
+new = '''            matched=len(ranked),'''
+
+# A4 — defect 3. The word goes back to the one the subtraction cannot support.
+[[arm]]
+id = "A4"
+test = "test_a_readable_non_memory_file_is_reported_as_not_indexed"
+file = "python/src/kb_setup/recall.py"
+old = '''    return f" ({report.unparsable} {noun} present but not indexed)"'''
+new = '''    return f" ({report.unparsable} {noun} present but unreadable)"'''
+
+# --- round 2: arms for the COLD LANE'S P1, which was a defect in the fix above ---
+#
+# The first fix swapped `find` -> `rfind` and its comment claimed that closed the
+# class. It did not. `rfind` is applied per marker and the loop then took the
+# MINIMUM, so an answer quoting one marker type early (a `## Source Nodes`
+# example) while ending with a different one (`## Outcome`) still lost every word
+# between them — byte-identical to the pre-fix output. The lane found it by
+# CONSTRUCTING that input and RUNNING it; three reading passes, mine included,
+# had walked over it.
+#
+# The rule is now ORDER-AWARE, following graphify's writer (`ingest.py:329-336`
+# emits `## Outcome` then `## Source Nodes`): if an Outcome marker is present at
+# all, the footer starts at its LAST occurrence; otherwise at the last Source
+# Nodes marker.
+#
+# Re-measured over all 382 live memory files: the order-aware rule and the
+# earliest-rfind rule it replaces are byte-identical on every one. This closes a
+# LATENT class and changes nothing served today — stated because a fix that
+# changes no live output is exactly the kind whose arms are worth reading.
+
+# A5 — the cold P1 itself, replayed. Back to the earliest-of-the-last rule.
+[[arm]]
+id = "A5"
+test = "test_answer_body_boundary_is_order_aware_across_marker_types"
+file = "python/src/kb_setup/recall.py"
+old = '''    outcome_end = max(remainder.rfind(m) for m in _OUTCOME_MARKERS)
+    end = outcome_end if outcome_end != -1 else remainder.rfind(_SOURCE_NODES_MARKER)'''
+new = '''    _ends = [i for i in (remainder.rfind(m) for m in _FOOTER_MARKERS) if i != -1]
+    end = min(_ends) if _ends else -1'''
+
+# A6 — the OBVIOUS WRONG REPAIR, and the reason the rule is order-aware rather
+# than "take the last marker". Under this mutation the footer starts at Source
+# Nodes, so the whole `## Outcome` section stays inside the body of any record
+# carrying both. Without this arm nothing here would rule that repair out, and it
+# is the one a reader reaching for a one-line fix would write.
+[[arm]]
+id = "A6"
+test = "test_answer_body_excludes_both_footer_sections_when_a_record_has_both"
+file = "python/src/kb_setup/recall.py"
+old = '''    outcome_end = max(remainder.rfind(m) for m in _OUTCOME_MARKERS)
+    end = outcome_end if outcome_end != -1 else remainder.rfind(_SOURCE_NODES_MARKER)'''
+new = '''    _ends = [i for i in (remainder.rfind(m) for m in _FOOTER_MARKERS) if i != -1]
+    end = max(_ends) if _ends else -1'''
+
+# A7 — the Source-Nodes-only fallback. Deleting it makes a record whose only
+# footer is `## Source Nodes` keep that footer as body text. The branch exists
+# because `max()` over the Outcome markers returns -1 when neither is present,
+# which reads as "no footer" and is not.
+[[arm]]
+id = "A7"
+test = "test_answer_body_falls_back_to_source_nodes_when_there_is_no_outcome"
+file = "python/src/kb_setup/recall.py"
+old = '''    end = outcome_end if outcome_end != -1 else remainder.rfind(_SOURCE_NODES_MARKER)'''
+new = '''    end = outcome_end'''
