@@ -127,6 +127,30 @@ Four things about that command are load-bearing:
 Run it as a **background** call — 3–5× Sol puts it past the harness's ~600s
 foreground cap — and poll the `--output` file rather than waiting blind.
 
+🔴 **THE BANNER DOES NOT TELL YOU WHICH MODEL REVIEWED. Do not verify with it.**
+`codex review` prints a `model:` line at startup and it reports the **session**
+model, not the reviewer's — `review_model` selects the sub-agent
+`start_review_conversation` spawns (`core/src/tasks/review.rs:123-127`), which
+the banner never names. Measured three ways on 2026-09-09, same machine:
+
+| run | argv carried | banner said |
+|---|---|---|
+| Astra arm | `review_model="gpt-6-astra"` | `model: gpt-6-astra` |
+| Sol control | `review_model="gpt-5.6-sol"` | `model: gpt-6-astra` |
+| bogus slug | `review_model="definitely-not-a-real-model-xyz"` | `model: gpt-6-astra` |
+
+All three read the same, because `$CODEX_HOME/config.toml:2` (`~/.codex` by default) sets
+`model = "gpt-6-astra"` session-wide. The first row looks like confirmation and
+is a coincidence — it would have said that with no `--model` at all.
+
+**What DOES discriminate is the failure path.** The bogus run exited rc 1 with
+`The 'definitely-not-a-real-model-xyz' model is not supported when using Codex
+with a ChatGPT account` — the slug reaching the API, named. So `review_model` is
+genuinely read and used; there is simply no observable on a SUCCESSFUL run that
+names the reviewer, which is the same wall recorded for `openai-cli`. If you need
+to know a lane really ran on Astra, the arm is a deliberate bogus slug on a
+throwaway invocation, not a banner on the real one.
+
 **If it returns a policy refusal or `invalid_prompt` instead of a review**, that
 is a known Astra failure on security-adjacent diffs — openai/codex issues 43163,
 43781, 43131, 43208 and 42939 — and `Selected model is at capacity` is issue
