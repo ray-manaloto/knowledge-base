@@ -45,14 +45,6 @@
 # recall, the roster (V5) after both the build and the resync, the full run (V6)
 # last. Remove each entry in the commit that closes it.
 #
-# V-A (#735) sits AHEAD of V0 because it is in flight on the same branch as the
-# tracking commit: Ray asked (2026-09-09) for the GPT-6 Astra cold-review variant
-# to be researched and added so THIS branch is reviewed with it before it ships.
-[[ticket]]
-issue = 735
-title = "V-A — the GPT-6 Astra cold-review variant (cold:codex-astra): fix #678, --timeout, agent pair, kb-review rules"
-blockers = []
-
 [[ticket]]
 issue = 727
 title = "V0 — kb-recall-work: search project, branches/worktrees, issues, plans before designing"
