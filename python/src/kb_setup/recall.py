@@ -429,19 +429,28 @@ def _filter_records(
 #: heading-plus-bullet signature "cannot appear by coincidence in ordinary answer
 #: prose describing the same heading text"; #687 refuted it with the obvious
 #: counterexample, which this store invites: an answer that DOCUMENTS the memory
-#: format quotes the footer verbatim, bullet and all. `_answer_body` therefore
-#: scans from the END (`rfind`) — graphify writes the footer last, so the real
-#: boundary is the LAST match, never the first.
+#: format quotes the footer verbatim, bullet and all.
+#:
+#: ⚠️ AND "SCAN FROM THE END" IS NOT THE FIX EITHER — that was this comment's
+#: next claim, and a cold lane refuted it by CONSTRUCTING the input and running
+#: it rather than reading the code. Taking the earliest of the per-marker last
+#: occurrences still drops real text when a *different* marker type is quoted
+#: earlier as an example; taking the latest instead leaves the `## Outcome`
+#: footer inside the body of every record that also has `## Source Nodes`.
+#: `_answer_body` is ORDER-AWARE instead — see the comment on the rule itself.
 #:
 #: One case stays indistinguishable by construction, and is accepted rather than
-#: guessed at: an answer that quotes the footer shape and has NO real footer
-#: after it (foreign or hand-edited markdown). Nothing in the text separates that
-#: from a genuine footer, so it still truncates there.
-_FOOTER_MARKERS: tuple[str, ...] = (
+#: guessed at: an answer that quotes the `## Outcome` shape and has NO real
+#: footer after it (foreign or hand-edited markdown). Nothing in the text
+#: separates that from a genuine footer, so it still truncates there.
+#: The `## Outcome` half, which graphify writes FIRST when it writes a footer.
+_OUTCOME_MARKERS: tuple[str, ...] = (
     "\n## Outcome\n\n- Signal:",
     "\n## Outcome\n\n- Correction:",
-    "\n## Source Nodes\n\n- ",
 )
+#: The `## Source Nodes` half, which graphify writes LAST.
+_SOURCE_NODES_MARKER = "\n## Source Nodes\n\n- "
+_FOOTER_MARKERS: tuple[str, ...] = (*_OUTCOME_MARKERS, _SOURCE_NODES_MARKER)
 
 
 def _answer_body(text: str) -> str:
@@ -449,11 +458,17 @@ def _answer_body(text: str) -> str:
 
     Mirrors the shape `graphify.ingest.save_query_result` writes: frontmatter, a
     `# Q: ...` title, then `## Answer`, then that function's own `## Outcome` /
-    `## Source Nodes` footer section(s) — identified by `_FOOTER_MARKERS`, the
-    earliest of which wins (only one should normally be present; taking the
-    minimum is robust if more than one marker string appears). Re-measured
+    `## Source Nodes` footer section(s) — identified by `_OUTCOME_MARKERS` and
+    `_SOURCE_NODES_MARKER`, resolved in graphify's own WRITING ORDER rather than
+    by position alone. "The earliest marker wins" was this docstring's rule and
+    is refuted; so is "the last one wins". Re-measured over all **382** live
+    files under `graphify-out/memory/` (2026-09-08): the order-aware rule and
+    the earliest-rfind rule it replaces produce **byte-identical output on every
+    one** — so this closes a LATENT class and changes nothing being served
+    today, which is exactly what the cold lane predicted (3 files repeat one
+    marker type, 0 mix two). Measured
     against every one of the 364 live files under `graphify-out/memory/` after
-    this fix: **0 truncated, 0 bytes lost** (was 51 files / 154,261 bytes with
+    the first fix: **0 truncated, 0 bytes lost** (was 51 files / 154,261 bytes with
     the naive "next `## ` heading" rule this replaces — see the P1 finding in
     `.agent/kb/review/reports/review-062ab296…-cold.md`). A doc with no
     `## Answer` heading (foreign markdown that slipped past
@@ -468,12 +483,26 @@ def _answer_body(text: str) -> str:
     if start == -1:
         return ""
     remainder = text[start + len(marker) :]
-    end = None
-    for footer in _FOOTER_MARKERS:
-        idx = remainder.rfind(footer)
-        if idx != -1 and (end is None or idx < end):
-            end = idx
-    body = remainder if end is None else remainder[:end]
+    # ORDER-AWARE, not "the last marker" and not "the earliest of the last
+    # markers". Both of those are wrong, in opposite directions:
+    #
+    #   * the LAST marker overall leaves the `## Outcome` footer inside the body
+    #     of any record that also has `## Source Nodes`, because graphify writes
+    #     Source Nodes second;
+    #   * the EARLIEST of the per-marker last occurrences — what this function
+    #     did until a cold lane constructed the input and RAN it — drops real
+    #     answer text whenever a DIFFERENT marker type is quoted earlier as an
+    #     example. Measured: an answer quoting the `## Source Nodes` shape and
+    #     then ending with a real `## Outcome` footer lost every word between
+    #     them, byte-identical to the pre-`rfind` behaviour.
+    #
+    # graphify's writer fixes the order (`ingest.py:329-336`: `## Outcome`, then
+    # `## Source Nodes`), so the rule follows the writer: if an Outcome marker is
+    # present at all, the footer begins at its LAST occurrence; only a record
+    # with no Outcome footer falls back to Source Nodes.
+    outcome_end = max(remainder.rfind(m) for m in _OUTCOME_MARKERS)
+    end = outcome_end if outcome_end != -1 else remainder.rfind(_SOURCE_NODES_MARKER)
+    body = remainder if end == -1 else remainder[:end]
     return body.strip()
 
 

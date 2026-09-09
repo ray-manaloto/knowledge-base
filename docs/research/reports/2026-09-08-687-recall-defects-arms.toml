@@ -42,14 +42,22 @@ file = "python/src/kb_setup/recall.py"
 old = '''    marker = "\n## Answer"'''
 new = '''    marker = "\n## Answer"  # control'''
 
-# A1 — defect 1, replayed exactly. `rfind` back to `find`. graphify writes the
-# real footer LAST, so scanning from the front stops at any quoted example.
+# A1 — defect 1, replayed. `rfind` back to `find`: scanning from the front stops
+# at the first quoted example rather than the real trailing footer.
+#
+# ⚠️ RE-DERIVED IN ROUND 2, and the way it broke is the point. Its original
+# anchor was `idx = remainder.rfind(footer)`, inside a loop that round 2's
+# order-aware rewrite deleted outright — so `kb-arms` reported PROBE BROKEN -
+# pattern not found rather than quietly scoring a pass. An arm whose anchor a
+# refactor moved is an arm that measures nothing, and a spec of them would have
+# read 6/6 green while testing six lines that no longer exist. `-- --dry-run`
+# after any refactor of armed code is the cheap version of this lesson.
 [[arm]]
 id = "A1"
 test = "test_answer_body_survives_an_answer_that_documents_the_footer_format"
 file = "python/src/kb_setup/recall.py"
-old = '''        idx = remainder.rfind(footer)'''
-new = '''        idx = remainder.find(footer)'''
+old = '''    outcome_end = max(remainder.rfind(m) for m in _OUTCOME_MARKERS)'''
+new = '''    outcome_end = max(remainder.find(m) for m in _OUTCOME_MARKERS)'''
 
 # A2 — defect 2, replayed exactly: the header's denominator goes back to the
 # searched population. This is the mutation that reproduces "2 of 382 matched".
@@ -86,3 +94,58 @@ test = "test_a_readable_non_memory_file_is_reported_as_not_indexed"
 file = "python/src/kb_setup/recall.py"
 old = '''    return f" ({report.unparsable} {noun} present but not indexed)"'''
 new = '''    return f" ({report.unparsable} {noun} present but unreadable)"'''
+
+# --- round 2: arms for the COLD LANE'S P1, which was a defect in the fix above ---
+#
+# The first fix swapped `find` -> `rfind` and its comment claimed that closed the
+# class. It did not. `rfind` is applied per marker and the loop then took the
+# MINIMUM, so an answer quoting one marker type early (a `## Source Nodes`
+# example) while ending with a different one (`## Outcome`) still lost every word
+# between them — byte-identical to the pre-fix output. The lane found it by
+# CONSTRUCTING that input and RUNNING it; three reading passes, mine included,
+# had walked over it.
+#
+# The rule is now ORDER-AWARE, following graphify's writer (`ingest.py:329-336`
+# emits `## Outcome` then `## Source Nodes`): if an Outcome marker is present at
+# all, the footer starts at its LAST occurrence; otherwise at the last Source
+# Nodes marker.
+#
+# Re-measured over all 382 live memory files: the order-aware rule and the
+# earliest-rfind rule it replaces are byte-identical on every one. This closes a
+# LATENT class and changes nothing served today — stated because a fix that
+# changes no live output is exactly the kind whose arms are worth reading.
+
+# A5 — the cold P1 itself, replayed. Back to the earliest-of-the-last rule.
+[[arm]]
+id = "A5"
+test = "test_answer_body_boundary_is_order_aware_across_marker_types"
+file = "python/src/kb_setup/recall.py"
+old = '''    outcome_end = max(remainder.rfind(m) for m in _OUTCOME_MARKERS)
+    end = outcome_end if outcome_end != -1 else remainder.rfind(_SOURCE_NODES_MARKER)'''
+new = '''    _ends = [i for i in (remainder.rfind(m) for m in _FOOTER_MARKERS) if i != -1]
+    end = min(_ends) if _ends else -1'''
+
+# A6 — the OBVIOUS WRONG REPAIR, and the reason the rule is order-aware rather
+# than "take the last marker". Under this mutation the footer starts at Source
+# Nodes, so the whole `## Outcome` section stays inside the body of any record
+# carrying both. Without this arm nothing here would rule that repair out, and it
+# is the one a reader reaching for a one-line fix would write.
+[[arm]]
+id = "A6"
+test = "test_answer_body_excludes_both_footer_sections_when_a_record_has_both"
+file = "python/src/kb_setup/recall.py"
+old = '''    outcome_end = max(remainder.rfind(m) for m in _OUTCOME_MARKERS)
+    end = outcome_end if outcome_end != -1 else remainder.rfind(_SOURCE_NODES_MARKER)'''
+new = '''    _ends = [i for i in (remainder.rfind(m) for m in _FOOTER_MARKERS) if i != -1]
+    end = max(_ends) if _ends else -1'''
+
+# A7 — the Source-Nodes-only fallback. Deleting it makes a record whose only
+# footer is `## Source Nodes` keep that footer as body text. The branch exists
+# because `max()` over the Outcome markers returns -1 when neither is present,
+# which reads as "no footer" and is not.
+[[arm]]
+id = "A7"
+test = "test_answer_body_falls_back_to_source_nodes_when_there_is_no_outcome"
+file = "python/src/kb_setup/recall.py"
+old = '''    end = outcome_end if outcome_end != -1 else remainder.rfind(_SOURCE_NODES_MARKER)'''
+new = '''    end = outcome_end'''

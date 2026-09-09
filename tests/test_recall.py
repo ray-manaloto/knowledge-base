@@ -827,3 +827,60 @@ def test_a_readable_non_memory_file_is_reported_as_not_indexed(tmp_path: Path) -
     rendered = recall.render_report(report.value)
     assert "1 file present but not indexed" in rendered
     assert "unreadable" not in rendered, "the file reads fine; only the parse declined it"
+
+
+def test_answer_body_boundary_is_order_aware_across_marker_types() -> None:
+    """The cold lane's P1 on the first #687 fix: `rfind` alone is not enough.
+
+    Taking the EARLIEST of the per-marker last occurrences still truncates when
+    a DIFFERENT marker type is quoted earlier as an example — here a
+    `## Source Nodes` shape documented mid-answer, with the real footer being
+    `## Outcome` further down. Constructed and run by the lane; before the
+    order-aware rule this returned only the first sentence, byte-identical to
+    the pre-`rfind` behaviour the first fix claimed to have closed.
+    """
+    text = (
+        '---\ntype: "query"\n---\n\n# Q: does this truncate wrongly?\n\n'
+        "## Answer\n\n"
+        "A memory file sometimes has a Source Nodes footer like this:\n\n"
+        "## Source Nodes\n\n- some_node\n\n"
+        "and then the actual conclusion of the answer follows, which must survive.\n\n"
+        "## Outcome\n\n- Signal: useful\n"
+    )
+    body = recall._answer_body(text)
+    assert "the actual conclusion of the answer follows" in body, (
+        "text between a DOCUMENTED Source Nodes example and the real Outcome footer "
+        "was dropped — the earliest-rfind rule (cold P1 on the first #687 fix)"
+    )
+    assert "- Signal: useful" not in body, "the real footer must still be excluded"
+
+
+def test_answer_body_excludes_both_footer_sections_when_a_record_has_both() -> None:
+    """The regression the ORDER-AWARE rule exists to avoid.
+
+    graphify writes `## Outcome` then `## Source Nodes` (`ingest.py:329-336`),
+    so "take the LAST marker" — the obvious repair for the cold P1 — would start
+    the footer at Source Nodes and leave the whole Outcome section inside the
+    body. This is the arm that rules that repair out.
+    """
+    text = (
+        '---\ntype: "query"\n---\n\n# Q: x\n\n'
+        "## Answer\n\nthe real body.\n\n"
+        "## Outcome\n\n- Signal: useful\n\n"
+        "## Source Nodes\n\n- node_a\n"
+    )
+    assert recall._answer_body(text) == "the real body."
+
+
+def test_answer_body_falls_back_to_source_nodes_when_there_is_no_outcome() -> None:
+    """A record whose only footer is `## Source Nodes` still gets a boundary.
+
+    The order-aware rule prefers Outcome; this is the branch that fires when
+    there is none, and without it such a record would keep its footer as body.
+    """
+    text = (
+        '---\ntype: "query"\n---\n\n# Q: x\n\n'
+        "## Answer\n\nbody with no outcome footer.\n\n"
+        "## Source Nodes\n\n- node_a\n"
+    )
+    assert recall._answer_body(text) == "body with no outcome footer."
