@@ -342,6 +342,18 @@ def axis_of(signature: Callable[[str], str]) -> str:
     Raising is the point. A default here would let a new signature function ship
     with the previous one's description — which is the exact defect this registry
     replaced, reintroduced one layer up.
+
+    NOT REACHED AT TODAY'S ONLY CALL SITE, and saying so is the honest form
+    (cold review of `4a45b158b762`, P3). :data:`DEFAULT_POLICY` is the module's
+    only `Policy(...)` construction and its signature is registered, so nothing
+    in production can currently take the raise. It is reachable through the API
+    — the reviewer constructed an unregistered function and got the `KeyError` —
+    so this is dead-at-the-call-site, not dead code, and the claim was earned by
+    constructing the reaching case rather than argued from premises
+    (`probes-need-a-control-arm.md` rule 9). What keeps it from silently becoming
+    unreachable-and-wrong is
+    `test_every_signature_this_module_ships_declares_its_wording`, which fails the
+    moment a `*_signature` ships without a row here.
     """
     return AXIS_BY_SIGNATURE[signature]
 

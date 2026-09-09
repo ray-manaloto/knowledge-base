@@ -1,0 +1,81 @@
+# Mutation arms for the fix closing the cold review of `4a45b158b762` (P2).
+#
+# WHAT THESE MEASURE, and it is narrower than "the fix is right": whether this
+# repo's tests can go red when the fixed behaviour is removed. That is the one
+# thing `probes-need-a-control-arm.md` rule 2 asks of a fix, and it is the arm
+# most often skipped precisely because a fix arrives wearing a finding's
+# authority.
+#
+# ONLY ONE OF THE TWO FINDINGS IS ARMABLE, and saying which is the point.
+#
+#   P2 (two subcommands run together in the usage text) is armed below as A1,
+#   and A2 arms the probe that detects it. The defect: the usage string is ~50
+#   implicitly-concatenated literals each ending `" | "`, so a dropped trailing
+#   space is INVISIBLE IN THE SOURCE — the literals still align and still read
+#   correctly — and appears only in the rendered output as `…|arms <spec.toml>`.
+#   No test had ever rendered the string, which is why a reading pass could not
+#   have caught it and running `uv run kb-setup` did.
+#
+#   P3 (`axis_of`'s raise is not reached at today's only call site) IS NOT
+#   ARMED, because there is nothing to arm: the reviewer's own probe already
+#   constructed the reaching case and observed the `KeyError`, so the branch is
+#   reachable through the API and correct. The finding is about the DOCSTRING
+#   not admitting that `DEFAULT_POLICY` never takes it, and the fix is a
+#   sentence. A comment is not a behaviour a mutation can kill; arming one
+#   produces a green row that means nothing — the failure `kb-arms` calls an
+#   inert mutant.
+#
+# A1's DIRECTION is the easy one to get backwards. The mutation puts the DEFECT
+# back — drops the trailing space exactly as the original `replace_all` edit did
+# — and the test must then go RED. A2 is the mirror and matters more than it
+# looks: it breaks the DETECTOR's regex instead of the string, because a
+# lookbehind that matched nothing for the wrong reason would leave A1's test
+# green forever against genuinely broken output.
+
+suites = ["tests/test_cli_usage.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/cli.py"
+old = '''    args = sys.argv[1:] if argv is None else argv'''
+new = '''    args = sys.argv[1:] if argv is None else argv  # control'''
+
+# A1 — THE DEFECT, replayed exactly. One literal loses its trailing space; the
+# source still looks right and the rendered output runs two subcommands together.
+[[arm]]
+id = "A1"
+test = "test_usage_renders_without_two_subcommands_run_together"
+file = "python/src/kb_setup/cli.py"
+old = '''        "brain [record|reflect|audit] | distill | session-reflect [--sessions N|--last] | "'''
+new = '''        "brain [record|reflect|audit] | distill | session-reflect [--sessions N|--last] |"'''
+
+# A2 — the DETECTOR broken instead of the string. A regex that cannot fire makes
+# A1's test decoration, and nothing else in the suite would notice. This is the
+# arm on the arm, and it is why the control-arm test exists as its own case.
+[[arm]]
+id = "A2"
+test = "test_the_run_together_probe_can_actually_fire"
+file = "tests/test_cli_usage.py"
+old = '''_RUN_TOGETHER = re.compile(r"(?<=[\s\]])\|\w")'''
+new = '''_RUN_TOGETHER = re.compile(r"(?<=[\s\]])\|\|\w")'''
+
+# A3 WAS HERE AND WAS REMOVED AFTER IT RAN. Recorded rather than deleted,
+# because the way it failed is the more useful result.
+#
+# It mutated `test_usage_names_every_separator_the_same_way`'s OWN assertion to
+# `assert spaced or tight or True` and expected that test to die. It SURVIVED —
+# rc=0, "no test fails under this mutation" — and it could not have done
+# anything else: weakening a test's own assertion makes that test unable to
+# fail, so no test fails, so the arm scores as a survivor. It is an INERT
+# MUTANT in the most literal sense, and reading it as a coverage gap would be
+# reading a statement about the harness as a statement about the code.
+#
+# The general rule it re-taught: an arm must mutate the thing UNDER test, never
+# the test. A survivor that mutated a test says nothing about either.
+#
+# There is also no honest replacement for it. That third test is a second,
+# independent read of the same rendered string, and every realistic break of
+# the property it checks is a malformed separator — which A1 already covers.
+# Two arms on one property, one of which cannot fire, is worse than one arm
+# that does.
