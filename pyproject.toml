@@ -350,6 +350,12 @@ output = "python/src/kb_setup/generated/research_record.py"
 custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
 """Generated research-record models; edit the schema and rerun the generator."""'''
 
+[tool.datamodel-codegen.jobs.recall-work]
+input = "schemas/recall-work.schema.json"
+output = "python/src/kb_setup/generated/recall_work.py"
+custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
+"""Generated recall-work models; edit the schema and rerun the generator."""'''
+
 [tool.datamodel-codegen.jobs.packages]
 input = "schemas/deps-dev-api-v3.proto"
 output = "python/src/kb_setup/generated/packages.py"

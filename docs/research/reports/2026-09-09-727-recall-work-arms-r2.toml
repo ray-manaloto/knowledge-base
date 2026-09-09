@@ -1,0 +1,47 @@
+# Mutation arms for the Astra round-2 fixes on kb_setup.recall_work (#727).
+# Same discipline as 2026-09-09-727-recall-work-arms.toml: each arm REVERTS one
+# fix to its pre-fix shape, so a survivor means the test beside the fix cannot
+# see the defect it was written for. Three P2s, review order.
+
+suites = ["tests/test_recall_work.py"]
+
+[[arm]]
+id = "B0"
+control = true
+file = "python/src/kb_setup/recall_work.py"
+old = '''#: Pending branches shown on stdout; the report carries the rest.'''
+new = '''#: Pending branches shown on stdout; the report carries the rest. (control)'''
+
+# B1 — P2: the filename-pattern globs that missed `task_plan-archived-*.md`.
+[[arm]]
+id = "B1"
+test = "test_an_archived_plan_with_any_filename_is_still_a_plan"
+file = "python/src/kb_setup/recall_work.py"
+old = '''PLAN_GLOBS = (
+    ".planning/**/*.md",
+    ".agent/plans/*.md",
+)'''
+new = '''PLAN_GLOBS = (
+    ".planning/*/task_plan.md",
+    ".agent/plans/session-*.md",
+)'''
+
+# B2 — P2: search only the checkout itself, never its linked worktrees.
+[[arm]]
+id = "B2"
+test = "test_a_linked_worktree_is_listed_and_its_branch_can_match"
+file = "python/src/kb_setup/recall_work.py"
+old = '''    for wt in ctx.worktrees or ():
+        if ctx.is_primary(wt) or not wt.path.is_dir():'''
+new = '''    for wt in ():
+        if ctx.is_primary(wt) or not wt.path.is_dir():'''
+
+# B3 — P2: let a following option be consumed as a flag's value.
+[[arm]]
+id = "B3"
+test = "test_a_malformed_request_is_a_bad_request"
+file = "python/src/kb_setup/recall_work.py"
+old = '''            if not pending or pending[0].startswith("-"):
+                return Err(f"{item} needs a value", rc=Rc.BAD_REQUEST)'''
+new = '''            if not pending:
+                return Err(f"{item} needs a value", rc=Rc.BAD_REQUEST)'''

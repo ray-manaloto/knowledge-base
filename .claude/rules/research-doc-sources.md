@@ -27,6 +27,13 @@ the first option that returns the answer. Lower steps cost more tokens
    `probes-need-a-control-arm.md` § "The graph is a probe too". A miss may be a
    term-spelling mismatch against the extracted node labels, not an absence.
 
+   **Before DESIGNING anything, also run `mise run kb-recall-work -- "<topic>"`**
+   (#727; Ray, 2026-09-09: *"ensure we never forget this"*). It searches this
+   repo, the sibling checkouts, branches and worktrees, issues open and closed,
+   every plan and the work-memory, with an examined count beside each match. It
+   is phase 0 of every saved workflow and is never skipped: the day it was built,
+   13 design pages, ~10 plans and ~12 branches already existed for the topic.
+
 1. **`curl <site>/llms.txt`** — AI-optimized plain-text index, one entry per
    page. The cheapest *remote* lookup. `grep` the output to pick the page(s)
    you want.
