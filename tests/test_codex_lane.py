@@ -8,11 +8,17 @@ evasion, and a guard that refuses the procedure it protects is worse than none.
 
 from __future__ import annotations
 
+import io
 import json
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
 
 import pytest
 from kb_setup import codex_lane, codex_run, hook_guard
-from kb_setup.result import Ok
+from kb_setup.result import Ok, Rc
 
 # ---------------------------------------------------------------------------
 # DENY
@@ -283,3 +289,260 @@ def test_the_short_aliases_are_guarded(command: str) -> None:
     from both while the guard allowed them.
     """
     assert codex_lane.decide(command) is not None, command
+
+
+# ---------------------------------------------------------------------------
+# `--review` argv — #678. NOTHING pinned this shape, which is how three flags
+# were accepted and dropped for a whole release. Every assertion below fails on
+# the pre-fix builder.
+# ---------------------------------------------------------------------------
+
+
+def _review(**spec: str | None) -> str:
+    return " ".join(codex_run._review_argv(codex_run.ReviewSpec(base="origin/main", **spec)))
+
+
+def test_review_forwards_the_model_as_review_model() -> None:
+    """`codex review` has no `-m`; `-c review_model=` is the only channel.
+
+    `ReviewArgs` (`sources/codex/codex-rs/exec/src/cli.rs:270-303`) declares no
+    model flag, and `start_review_conversation` reads `config.review_model` first
+    (`core/src/tasks/review.rs:123-127`).
+    """
+    argv = _review(model="gpt-6-astra")
+    assert '-c review_model="gpt-6-astra"' in argv
+    # The flag `codex review` would REJECT must never appear.
+    assert "--model" not in argv
+
+
+def test_review_forwards_the_reasoning_effort() -> None:
+    """The whole point of the lane is xhigh; it ran at codex's default instead."""
+    assert "-c model_reasoning_effort=xhigh" in _review(effort="xhigh")
+
+
+def test_review_omits_both_keys_when_neither_is_asked_for() -> None:
+    """The control arm: the probe above discriminates, rather than always passing."""
+    argv = _review()
+    assert "review_model" not in argv
+    assert "model_reasoning_effort" not in argv
+    assert argv == "codex review --base origin/main"
+
+
+def test_review_never_grows_an_output_flag() -> None:
+    """`codex review --help` lists no `-o`. `--output` is teed by us instead."""
+    argv = _review(model="gpt-6-astra", effort="xhigh", instructions="METHOD: run it")
+    assert " -o " not in f" {argv} "
+    assert "--output-last-message" not in argv
+
+
+def test_review_still_delivers_the_method_paragraph() -> None:
+    """Regression guard: the channel that already worked must survive the fix."""
+    argv = _review(model="gpt-6-astra", instructions='say "hi"')
+    assert 'developer_instructions="say \\"hi\\""' in argv
+
+
+def test_both_builders_spell_the_effort_key_the_same_way() -> None:
+    """One key, two builders, one spelling — the drift this fix could have added."""
+    exec_argv = " ".join(codex_run._codex_argv(codex_run.LaneSpec(effort="xhigh")))
+    assert "-c model_reasoning_effort=xhigh" in exec_argv
+    assert "-c model_reasoning_effort=xhigh" in _review(effort="xhigh")
+
+
+def test_print_argv_pins_the_whole_review_shape(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """End-to-end through `run()`, which is where #678 was actually observed.
+
+    Its "Suggested fix" asks for exactly this: a `--print-argv` test pinning
+    review-mode argv, so the next flag added to `exec` cannot quietly skip
+    `review` again.
+
+    stdin is stubbed EMPTY rather than left alone: `_run_review` reads it
+    whenever it is not a tty to pick up a piped METHOD paragraph, and under
+    pytest's capture that read raises. An empty read is the honest stand-in for
+    "no instructions were piped", and it keeps `developer_instructions` out of
+    the argv this test is pinning.
+    """
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    rc = codex_run.run(
+        [
+            "--review",
+            "--base",
+            "origin/main",
+            "--model",
+            "gpt-6-astra",
+            "--effort",
+            "xhigh",
+            "--output",
+            str(tmp_path / "does-not-matter.md"),
+            "--print-argv",
+        ]
+    )
+    assert rc == Rc.OK
+    printed = capsys.readouterr().out.strip()
+    assert printed == (
+        "codex review --base origin/main "
+        '-c review_model="gpt-6-astra" '
+        "-c model_reasoning_effort=xhigh"
+    )
+
+
+# ---------------------------------------------------------------------------
+# `_spawn` — the timeout bound and the review-mode tee.
+# ---------------------------------------------------------------------------
+
+
+def test_an_unbounded_spawn_returns_the_child_rc() -> None:
+    """Default unchanged: no timeout, no new session, the lane's own code."""
+    assert codex_run._spawn(["true"]) == 0
+    assert codex_run._spawn(["false"]) == 1
+
+
+def test_a_timeout_ends_the_lane_and_returns_124() -> None:
+    """The bound must KILL, not wait the sleep out — the wall clock is the arm.
+
+    `sleep 30` under a 0.3s bound: rc 124 proves the watchdog reported, and
+    finishing in well under 30s proves it actually ended the process rather than
+    letting it run and relabelling the result.
+    """
+    started = time.monotonic()
+    rc = codex_run._spawn(["sleep", "30"], timeout=0.3)
+    elapsed = time.monotonic() - started
+    assert rc == 124
+    assert elapsed < 10.0, f"the lane was not killed; it took {elapsed:.1f}s"
+
+
+def test_a_lane_that_finishes_inside_its_bound_keeps_its_own_rc() -> None:
+    """The other direction: a bound that does not fire changes nothing."""
+    assert codex_run._spawn(["true"], timeout=30) == 0
+    assert codex_run._spawn(["false"], timeout=30) == 1
+
+
+def test_the_tee_writes_the_file_and_still_prints(
+    tmp_path: Path, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """#678's actual cost: rc 0, and no file where `--output` promised one."""
+    target = tmp_path / "nested" / "review-abc-cold.md"
+    rc = codex_run._spawn(["echo", "NO FINDINGS"], tee=target)
+    assert rc == 0
+    assert target.read_text(encoding="utf-8") == "NO FINDINGS\n"
+    assert "NO FINDINGS" in capfd.readouterr().out
+
+
+def test_the_tee_creates_a_missing_report_directory(tmp_path: Path) -> None:
+    """`.agent/kb/review/reports/` is gitignored, so a fresh clone lacks it."""
+    target = tmp_path / "a" / "b" / "c" / "report.md"
+    assert codex_run._spawn(["echo", "hi"], tee=target) == 0
+    assert target.exists()
+
+
+def test_a_timed_out_tee_keeps_what_the_lane_had_already_written(tmp_path: Path) -> None:
+    """A killed lane reviewed a SUBSET — its partial report must survive.
+
+    This is the line-buffered flush earning its keep: a capture-then-write tee
+    would leave an empty file exactly when the run was long enough to need one.
+    """
+    target = tmp_path / "partial.md"
+    rc = codex_run._spawn(
+        ["sh", "-c", "echo first-finding; sleep 30"],
+        timeout=1.0,
+        tee=target,
+    )
+    assert rc == 124
+    assert "first-finding" in target.read_text(encoding="utf-8")
+
+
+def test_spawn_refuses_to_write_stdin_and_drain_stdout_at_once(tmp_path: Path) -> None:
+    """They never co-occur, and the deadlock if they did would be silent."""
+    with pytest.raises(ValueError, match="stdin"):
+        codex_run._spawn(["true"], prompt="hi", tee=tmp_path / "never-written.md")
+
+
+def test_terminate_group_signals_a_child_that_shares_our_own_group() -> None:
+    """The `own_group` arm, and the fact that this test returns IS the arm.
+
+    The child below is spawned with no `start_new_session`, so it sits in this
+    test runner's own process group. `_terminate_group` must therefore signal the
+    child alone: if it took the `killpg` branch it would SIGTERM this process,
+    pytest, and the mise task around it, and no assertion below would ever run.
+    """
+    proc = subprocess.Popen(["sleep", "30"], text=True)
+    try:
+        codex_run._terminate_group(proc)
+        assert proc.wait(timeout=10) != 0  # died by signal, not by finishing
+    finally:
+        if proc.poll() is None:  # pragma: no cover — only on a failed arm
+            proc.kill()
+
+
+def test_review_mode_hands_output_and_timeout_to_the_spawn(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """#678 in one line: a flag is only honoured if it reaches what acts on it.
+
+    `--output` cannot be an argv flag here (`codex review` has no `-o`), so the
+    ONLY evidence it was honoured is that `_run_review` handed it to `_spawn` as
+    the tee. Asserting the argv — the obvious test — would pass while the file
+    was never written, which is exactly how the bug shipped.
+    """
+    seen: dict[str, object] = {}
+
+    def _fake_spawn(
+        argv: list[str],
+        *,
+        prompt: str | None = None,
+        timeout: float | None = None,
+        tee: Path | None = None,
+    ) -> int:
+        seen["argv"] = argv
+        seen["timeout"] = timeout
+        seen["tee"] = tee
+        return 0
+
+    monkeypatch.setattr(codex_run, "_spawn", _fake_spawn)
+    monkeypatch.setattr(codex_run.shutil, "which", lambda _name: "/usr/bin/codex")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+
+    report = tmp_path / "review-abc123456789-cold.md"
+    rc = codex_run.run(["--review", "--output", str(report), "--timeout", "5400"])
+
+    assert rc == 0
+    assert seen["tee"] == report
+    assert seen["timeout"] == 5400.0
+
+
+def test_the_tee_flushes_each_line_while_the_lane_is_still_running(tmp_path: Path) -> None:
+    """The per-line flush, armed against what it is actually FOR.
+
+    A first version of this arm mutated the flush away and SURVIVED: closing the
+    file at the end of `_tee` flushes the buffer regardless, so a report read
+    after the lane exits looks identical either way. The property the flush buys
+    is only observable WHILE the lane runs — a caller tailing a 40-minute Astra
+    review sees nothing until 8KB has accumulated without it.
+
+    So the assertion that the lane had not yet exited is not decoration; it is
+    the control on this test. Without it the test would pass for the wrong
+    reason, which is exactly how the first arm survived.
+    """
+    target = tmp_path / "live.md"
+    finished = threading.Event()
+
+    def _run_lane() -> None:
+        codex_run._spawn(["sh", "-c", "echo early-finding; sleep 2"], tee=target)
+        finished.set()
+
+    worker = threading.Thread(target=_run_lane, daemon=True)
+    worker.start()
+    try:
+        seen = ""
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline and "early-finding" not in seen:
+            if target.exists():
+                seen = target.read_text(encoding="utf-8")
+            time.sleep(0.02)
+        assert not finished.is_set(), "the lane already exited; this proves nothing about flushing"
+        assert "early-finding" in seen, "the report was still sitting in a buffer mid-run"
+    finally:
+        worker.join(timeout=15)

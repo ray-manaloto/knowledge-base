@@ -1,0 +1,138 @@
+# Mutation arms for #678 — `kb-codex --review` silently dropped --model/--effort/--output.
+#
+# WHAT IS ACTUALLY AT RISK, and it is not the argv string. #678's cost was that
+# the lane returned **rc 0 with the flag ignored**: the review ran at codex's own
+# default model and effort, and the `--output` file was never created. Nothing
+# failed, so nothing was noticed until `--print-argv` was run by hand. An
+# accepted flag that does nothing is worse than a rejected one — a rejected flag
+# fails loudly at the call site; an ignored one succeeds and takes the guarantee
+# with it.
+#
+# So the arms split in two, and the second half is the one that matters:
+#
+#   * A1-A3 break the BUILDER. These are cheap and would have been caught by any
+#     argv test — which is precisely the point: no argv test existed for review
+#     mode at all, so `_review_argv` had ZERO coverage while `_codex_argv` had
+#     seven tests. The asymmetry is what let the bug ship.
+#   * A4-A8 break the WIRING and the ARTIFACT. A builder that is right and a
+#     caller that never passes it the flag produces the identical silent failure,
+#     and so does a tee that writes only on a clean exit. These are the shapes a
+#     "does the argv look right" test can never see.
+#
+# TWO DIRECTIONS ARE DELIBERATELY NOT ARMED, stated rather than left to be
+# assumed covered (`verify-before-advancing.md`: an unverified item is not a pass):
+#
+#   1. **PID-kill vs GROUP-kill.** `_terminate_group` signals the process group so
+#      codex's child tool-call workers die with it. Mutating it to signal only the
+#      PID SURVIVES every test here, because `sleep 30` has no children — arming
+#      it needs a child that outlives its parent while holding stdout, and the
+#      failure mode of that fixture is a HANG, not a red test. Unarmed, and known
+#      to be unarmed.
+#   2. **`own_group = True`.** Forcing the killpg branch would make
+#      `_terminate_group` SIGTERM the test runner's own process group — pytest,
+#      the mise task and the shell. The guard is instead armed POSITIVELY by
+#      `test_terminate_group_signals_a_child_that_shares_our_own_group`, whose
+#      returning at all is the evidence.
+
+suites = ["tests/test_codex_lane.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/codex_run.py"
+old = '''    argv = ["codex", "review", "--base", spec.base]'''
+new = '''    argv = ["codex", "review", "--base", spec.base]  # control'''
+
+# A1 — the literal PRE-FIX state: the model is simply never emitted. This is not
+# a synthetic mutation, it is the code as it shipped, so a survival here would
+# mean the fix's own test cannot see the bug it was written for.
+[[arm]]
+id = "A1"
+test = "test_review_forwards_the_model_as_review_model"
+file = "python/src/kb_setup/codex_run.py"
+old = '''    if spec.model:
+        argv += ["-c", f"review_model={_toml_str(spec.model)}"]'''
+new = '''    if False:
+        argv += ["-c", f"review_model={_toml_str(spec.model)}"]'''
+
+# A2 — the same for effort. Separate arm because they fail independently: a lane
+# on the right model at the wrong effort is a different, quieter defect.
+[[arm]]
+id = "A2"
+test = "test_review_forwards_the_reasoning_effort"
+file = "python/src/kb_setup/codex_run.py"
+old = '''    if spec.effort:
+        argv += ["-c", f"model_reasoning_effort={spec.effort}"]'''
+new = '''    if False:
+        argv += ["-c", f"model_reasoning_effort={spec.effort}"]'''
+
+# A3 — THE PLAUSIBLE WRONG FIX, and the reason the test asserts `--model` is
+# ABSENT rather than only that `review_model` is present. `-m/--model` is a real
+# flag on `codex exec` and on the nested `codex exec review`, so forwarding it
+# here is the obvious move; `ReviewArgs` (`sources/codex/codex-rs/exec/src/
+# cli.rs:270-303`) declares no such flag, so the top-level surface would exit 2.
+# A test that only checked for the presence of `review_model` would pass over it.
+[[arm]]
+id = "A3"
+test = "test_review_forwards_the_model_as_review_model"
+file = "python/src/kb_setup/codex_run.py"
+old = '''        argv += ["-c", f"review_model={_toml_str(spec.model)}"]'''
+new = '''        argv += ["--model", spec.model]'''
+
+# A4 — the builder is CORRECT and the caller does not use it. This is #678's own
+# shape one layer up, and it is invisible to A1-A3: every `_review_argv` test
+# still passes, because `_review_argv` is still right.
+[[arm]]
+id = "A4"
+test = "test_print_argv_pins_the_whole_review_shape"
+file = "python/src/kb_setup/codex_run.py"
+old = '''            model=args.model,
+            effort=args.effort,'''
+new = '''            model=None,
+            effort=None,'''
+
+# A5 — `--output` is accepted and never reaches the tee. THE EXACT #678 DEFECT
+# for the flag that cost the most: the lane returns rc 0 and no report exists.
+[[arm]]
+id = "A5"
+test = "test_review_mode_hands_output_and_timeout_to_the_spawn"
+file = "python/src/kb_setup/codex_run.py"
+old = '''        tee=Path(args.output) if args.output else None,'''
+new = '''        tee=None,'''
+
+# A6 — the watchdog is never started, so `--timeout` is accepted and ignored: a
+# wedged Astra lane runs until mise's own task timeout kills it with no rc 124
+# and no "it reviewed a SUBSET" warning. The test's wall-clock assertion is what
+# catches this; an rc-only assertion would not.
+[[arm]]
+id = "A6"
+test = "test_a_timeout_ends_the_lane_and_returns_124"
+file = "python/src/kb_setup/codex_run.py"
+old = '''    watchdog = threading.Timer(timeout, _fire) if timeout is not None else None'''
+new = '''    watchdog = None'''
+
+# A7 - the tee buffers instead of flushing per line. THIS ARM SURVIVED ITS FIRST
+# ANCHOR and the survival was the finding, not a coverage gap to wave at: it was
+# first aimed at `test_a_timed_out_tee_keeps_what_the_lane_had_already_written`,
+# which reads the report AFTER the lane dies - and closing the file flushes the
+# buffer anyway, so the mutant and the original are genuinely identical there.
+# The flush only buys anything WHILE the lane runs, so the arm now names the test
+# that reads the file mid-run and asserts the lane had not yet exited.
+[[arm]]
+id = "A7"
+test = "test_the_tee_flushes_each_line_while_the_lane_is_still_running"
+file = "python/src/kb_setup/codex_run.py"
+old = '''            handle.write(line)
+            handle.flush()'''
+new = '''            handle.write(line)'''
+
+# A8 — the report directory is not created. `.agent/kb/review/reports/` is
+# gitignored, so this is green on any machine that has already run a review and
+# red on a fresh clone — the environment-dependent failure this repo's
+# `clean-git-state.md` is entirely about.
+[[arm]]
+id = "A8"
+test = "test_the_tee_creates_a_missing_report_directory"
+file = "python/src/kb_setup/codex_run.py"
+old = '''    path.parent.mkdir(parents=True, exist_ok=True)'''
+new = '''    pass'''

@@ -29,12 +29,17 @@ vs 0.152.0 was measured on this machine the day this module was written.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import shutil
+import signal
 import subprocess
 import sys
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import IO
 
 from kb_setup.result import Rc
 
@@ -42,6 +47,26 @@ from kb_setup.result import Rc
 #: the workspace writable. Without this the lane cannot open the cache and dies
 #: rc 2 — armed on codex-cli 0.152.0 against `mise run kb-context`.
 _UV_CACHE = Path.home() / "Library" / "Caches"
+
+_RC_TIMED_OUT = 124
+"""What `--timeout` returns when the watchdog fired, GNU `timeout`'s own code.
+
+Not an :class:`Rc` member on purpose. `Rc` names THIS repo's vocabulary, and 124
+is a borrowed one — `long-running-command-hangs.md` rule 3a already cites it as
+*"`timeout`'s rc 124 on expiry"*, so a lane bounded here reports the same integer
+a `timeout(1)`-bounded one would, and a caller comparing the two is not reading
+two conventions. It is deliberately NOT `Rc.NOT_RUN`: the lane DID run, it just
+never finished, and collapsing those is the exact "we did not look" confusion
+`Rc.NOT_RUN`'s own docstring exists to prevent.
+"""
+
+_KILL_GRACE = 5.0
+"""Seconds between the watchdog's SIGTERM and its SIGKILL.
+
+TERM first so codex can flush the session file `mise run kb-session-search`
+reads — the whole reason `--ephemeral` is refused. KILL after, because a
+watchdog that can be ignored is not a bound.
+"""
 
 
 @dataclass(frozen=True)
@@ -107,9 +132,159 @@ def _toml_str(value: str) -> str:
     return f'"{escaped}"'
 
 
-def _review_argv(
-    *, base: str, title: str | None, commit: str | None, instructions: str | None
-) -> list[str]:
+def _terminate_group(proc: subprocess.Popen[str]) -> None:
+    """End the lane's whole process GROUP, TERM then KILL.
+
+    The group, not the PID, because codex spawns child tool-call workers that
+    outlive a bare `kill <pid>` and go on holding the terminal — the lesson
+    `fable-orchestrator`'s own watchdog records as *kill the group, never just
+    the PID*.
+
+    🔴 **The group is only ours to kill when we CREATED it.** `_spawn` passes
+    `start_new_session` exactly when a timeout is set, so the two are coupled;
+    if that coupling ever breaks, `os.getpgid(proc.pid)` returns the CALLER's
+    group and `killpg` would take down this process, its mise task and its
+    shell. The comparison below is the arm on that — same group as ours ⇒ signal
+    the child alone. It is cheap, and the failure it prevents is not.
+    """
+    try:
+        pgid = os.getpgid(proc.pid)
+    except ProcessLookupError, PermissionError:  # already reaped
+        return
+    own_group = pgid != os.getpgid(0)
+
+    def _signal(sig: int) -> None:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            if own_group:
+                os.killpg(pgid, sig)
+            else:
+                proc.send_signal(sig)
+
+    _signal(signal.SIGTERM)
+    # Poll rather than sleep the grace out: the moment the child is reaped we
+    # stop, so SIGKILL can never reach a PID the OS has since handed to someone
+    # else. `poll()` is non-blocking and safe from this thread.
+    deadline = time.monotonic() + _KILL_GRACE
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            return
+        time.sleep(0.1)
+    _signal(signal.SIGKILL)
+
+
+def _tee(stream: IO[str], path: Path) -> None:
+    """Copy the lane's stdout to `path` AND to ours, line by line.
+
+    Line-buffered rather than captured-then-written because an Astra review runs
+    for tens of minutes: a caller polling a background run needs to see progress,
+    and a report that only exists after a clean exit is exactly the artifact #678
+    was filed about — the flag was accepted, the run returned rc 0, and no file
+    existed.
+
+    The parent directory is created first. `.agent/kb/review/reports/` is
+    gitignored, so a fresh clone does not have it, and losing a 40-minute review
+    to a missing directory is the same class of loss with a longer fuse.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for line in stream:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            handle.write(line)
+            handle.flush()
+
+
+def _spawn(
+    argv: list[str],
+    *,
+    prompt: str | None = None,
+    timeout: float | None = None,
+    tee: Path | None = None,
+) -> int:
+    """Run the lane and return ITS exit code — bounded, and optionally teed.
+
+    Two behaviours ride on `timeout` being set, and neither happens without it,
+    so an unbounded call is byte-for-byte the `subprocess.run` this replaced:
+
+    - the child gets its OWN session, which is what makes a group-kill safe;
+    - a watchdog thread ends that group at the deadline and the call returns
+      `_RC_TIMED_OUT` instead of codex's own code.
+
+    A new session also means Ctrl-C no longer reaches the child, which is why it
+    is not the default: an interactive lane should stay interruptible.
+
+    `prompt` (stdin) and `tee` (stdout) never co-occur — `exec` takes its prompt
+    on stdin and writes its own `-o` file, while `review` takes its instructions
+    through `-c developer_instructions=` and has no `-o` to write. Feeding a pipe
+    while draining another needs a select loop nothing here calls for, so the
+    combination raises rather than deadlocking on a caller's first large prompt.
+    """
+    if prompt is not None and tee is not None:
+        raise ValueError("_spawn cannot write stdin and tee stdout in one call")
+
+    # argv is built by this module from validated flags and never goes through a
+    # shell, so nothing here interpolates caller text into a command line.
+    bounded = timeout is not None
+    proc = subprocess.Popen(
+        argv,
+        stdin=subprocess.PIPE if prompt is not None else None,
+        stdout=subprocess.PIPE if tee is not None else None,
+        text=True,
+        env=os.environ.copy(),
+        start_new_session=bounded,
+    )
+
+    timed_out = threading.Event()
+
+    def _fire() -> None:
+        timed_out.set()
+        _terminate_group(proc)
+
+    watchdog = threading.Timer(timeout, _fire) if timeout is not None else None
+    if watchdog is not None:
+        watchdog.daemon = True
+        watchdog.start()
+    try:
+        if tee is not None and proc.stdout is not None:
+            _tee(proc.stdout, tee)
+        if prompt is not None and proc.stdin is not None:
+            proc.stdin.write(prompt)
+            proc.stdin.close()
+        rc = proc.wait()
+    finally:
+        if watchdog is not None:
+            watchdog.cancel()
+
+    if timed_out.is_set():
+        print(
+            f"kb-codex: the lane exceeded --timeout {timeout:g}s and was ended. "
+            "Its output up to that point is above (and in --output, if given); "
+            "it reviewed a SUBSET, which is not a clean pass.",
+            file=sys.stderr,
+        )
+        return _RC_TIMED_OUT
+    return rc
+
+
+@dataclass(frozen=True)
+class ReviewSpec:
+    """What a `codex review` lane needs, as one object.
+
+    A dataclass for the same reason `LaneSpec` is one: #678's fix takes this
+    builder from four arguments to six and trips the same complexity gate, and
+    raising the gate to admit a wider signature is the trade
+    `use-tool-builtins.md` asks us not to make.
+    """
+
+    base: str
+    title: str | None = None
+    commit: str | None = None
+    instructions: str | None = None
+    model: str | None = None
+    effort: str | None = None
+
+
+def _review_argv(spec: ReviewSpec) -> list[str]:
     """Build the argv for `codex review`, which is NOT `codex exec` with a flag.
 
     Measured on 0.152.1 from `codex review --help`: it accepts `-c key=value`,
@@ -162,17 +337,64 @@ def _review_argv(
     branch (`exec/src/lib.rs:2132-2149`), so a title beside `--base` parses and is
     then silently IGNORED. This code passed one for an entire review run before
     the source said so.
+
+    🔴 **MODEL AND EFFORT TRAVEL AS `-c`, NEVER AS A FLAG — #678.** This builder
+    emitted neither until 2026-09-09, so `--model`/`--effort` were accepted by the
+    parser and dropped on the floor: the lane ran at whatever `codex review`
+    defaulted to while `--print-argv` was the only way to notice. An accepted flag
+    that does nothing is worse than a rejected one.
+
+    There IS no flag to forward. Read from the pinned source at `sources/codex/`
+    (`rust-v0.153.4`, the version we run): `ReviewArgs`
+    (`codex-rs/exec/src/cli.rs:270-303`) declares exactly `--uncommitted`,
+    `--base`, `--commit`, `--title` and `[PROMPT]` — no `-m`, no `-o`, no
+    `--sandbox`. Live-confirmed against `codex review --help` on 0.153.4, which
+    lists only those plus `-c`, `--strict-config`, `--enable`, `--disable`.
+    `-m/--model` is real on `codex exec` and on the NESTED `codex exec review`,
+    which is a different surface than the one this builder uses.
+
+    So the two keys go through `-c`, and both are plain top-level `ConfigToml`
+    fields, i.e. legal `-c key=value` overrides:
+
+    - **`review_model`** (`config/src/config_toml.rs:157`, and documented at
+      `developers.openai.com/codex/config-reference.md`) is what
+      `start_review_conversation` reads FIRST — `config.review_model` else the
+      current session's own slug (`core/src/tasks/review.rs:123-127`). It is the
+      only way in: `override_review_model` has no CLI flag wired to it anywhere,
+      so there is no `--review-model` to prefer over this.
+    - **`model_reasoning_effort`** (`:360`) is untouched by that function, which
+      clones the whole effective config for the reviewer child — so the
+      top-level override is inherited rather than overwritten.
+
+    `review_model` is TOML-quoted and `model_reasoning_effort` is not, which looks
+    inconsistent and is deliberate: the effort key is emitted bare by
+    `_codex_argv` too, and ONE key spelled two ways across the two builders is the
+    drift worth avoiding. A model slug is caller text, so it is quoted rather than
+    left to `-c`'s parse-then-fall-back-to-literal path.
     """
-    argv = ["codex", "review", "--base", base]
-    if title and commit:
-        argv += ["--title", title]
-    if instructions:
-        argv += ["-c", f"developer_instructions={_toml_str(instructions)}"]
+    argv = ["codex", "review", "--base", spec.base]
+    if spec.title and spec.commit:
+        argv += ["--title", spec.title]
+    if spec.model:
+        argv += ["-c", f"review_model={_toml_str(spec.model)}"]
+    if spec.effort:
+        argv += ["-c", f"model_reasoning_effort={spec.effort}"]
+    if spec.instructions:
+        argv += ["-c", f"developer_instructions={_toml_str(spec.instructions)}"]
     return argv
 
 
 def _run_review(args: argparse.Namespace) -> int:
-    """Spawn `codex review`, prompt on stdin. Returns codex's own exit code."""
+    """Spawn `codex review`. Returns codex's own exit code.
+
+    `--output` is honoured HERE rather than as an argv flag, because `codex
+    review` has none — see `_review_argv` for the source citation. So this path
+    tees the lane's stdout to the file itself, and that is a real difference from
+    `exec` mode worth stating: `-o` is codex's own `--output-last-message` and
+    holds only the final message, while this holds everything the lane printed.
+    For a review report that is the better artifact, but it is not the same
+    artifact, and a caller diffing the two should know why.
+    """
     # Instructions come from the positional prompt or stdin, and are delivered
     # through `-c developer_instructions=` rather than as `[PROMPT]`, which the
     # target flags conflict with. See `_review_argv`.
@@ -180,7 +402,16 @@ def _run_review(args: argparse.Namespace) -> int:
     if instructions is None and not sys.stdin.isatty():
         instructions = sys.stdin.read()
 
-    built = _review_argv(base=args.base, title=args.title, commit=None, instructions=instructions)
+    built = _review_argv(
+        ReviewSpec(
+            base=args.base,
+            title=args.title,
+            commit=None,
+            instructions=instructions,
+            model=args.model,
+            effort=args.effort,
+        )
+    )
 
     if args.print_argv:
         print(" ".join(built))
@@ -207,8 +438,11 @@ def _run_review(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
-    completed = subprocess.run(built, check=False, env=os.environ.copy())
-    return completed.returncode
+    return _spawn(
+        built,
+        timeout=args.timeout,
+        tee=Path(args.output) if args.output else None,
+    )
 
 
 def run(argv: list[str] | None = None) -> int:
@@ -253,8 +487,27 @@ def run(argv: list[str] | None = None) -> int:
         help="review fixed point; origin/main, not local main, matching kb-review",
     )
     parser.add_argument("--title", default=None, help="review title; needs --commit to apply")
-    parser.add_argument("--model", default=None, help="model override, e.g. gpt-5.6-sol")
-    parser.add_argument("--output", default=None, help="write the transcript to this file (-o)")
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="model override, e.g. gpt-5.6-sol or gpt-6-astra; in --review mode "
+        "this is sent as `-c review_model=`, the only channel that exists (#678)",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="persist the lane's output to this file. exec: codex's own `-o` "
+        "last-message file. --review: this task tees stdout, since `codex review` "
+        "has no -o (#678)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=None,
+        help="seconds before the lane's process GROUP is ended and rc 124 is "
+        "returned; unbounded when omitted. Must be <= the mise task's own timeout "
+        "or mise kills the lane first",
+    )
     args = parser.parse_args(argv)
 
     if args.review:
@@ -301,13 +554,4 @@ def run(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
 
-    # argv is built by `_codex_argv` from validated flags and never goes through
-    # a shell, so nothing here interpolates caller text into a command line.
-    completed = subprocess.run(
-        built,
-        input=prompt,
-        text=True,
-        check=False,
-        env=os.environ.copy(),
-    )
-    return completed.returncode
+    return _spawn(built, prompt=prompt, timeout=args.timeout)
