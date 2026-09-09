@@ -23,6 +23,16 @@ ruled it out on its own stated flip condition.
   tool graphify does not serve -> **0 tools, never a new one**. The middle arm is
   the control that makes the third an answer instead of a broken probe. The relay
   only ever narrows an existing `tools/list` and never answers a `tools/call`.
+
+  ⚠️ **AND THAT LAST CLAUSE CUTS BOTH WAYS — "narrow" means ADVERTISE, not
+  forbid.** Because `tools/call` is never intercepted, a tool hidden from
+  `tools/list` still EXECUTES when called by name: measured 2026-09-09 with
+  `KB_MCP_TOOLS="query_graph,get_node"`, `graph_stats` was absent from the
+  advertised 2 and `tools/call graph_stats` still returned
+  `Nodes: 359146 / Edges: 807085`. The allowlist is a context-cost and
+  model-steering measure, never access control. It does not change the verdict —
+  B is still impossible, for the same reason — but the `narrowed to N` banner
+  reads like a capability boundary and is not one.
 - **C — a third stdio server (CHOSEN).** No fork patch, no pin bump, no permanent
   relay in the data path.
 - **D — compose in-process** by importing graphify's `_build_server` and
