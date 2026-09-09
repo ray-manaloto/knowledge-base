@@ -34,10 +34,22 @@ ruled it out on its own stated flip condition.
 The advisor reached D first and then tested its own flip condition — "flip to C
 if even one required behavior needs `_private` access" — against the code.
 graphify's public SDK is a 17-name lazy `__getattr__` map at
-`graphify/__init__.py:5-22` and **`query` is not in it**; every read-tool is a
-closure nested inside `_build_server` over private helpers
-(`_query_graph_text:1197`, `_pick_seeds:666`). So D cannot reach parity without
-reimplementing ~1,000 lines, and it flipped to C by its own rule.
+`graphify/__init__.py:6-24` (the entries themselves run `:7-23`) and **`query` is
+not in it**. `_build_server` (`serve.py:1543`) registers TOOL HANDLERS that are
+closures nested inside it, and those handlers call MODULE-LEVEL private helpers —
+`_query_graph_text` (`serve.py:1197`) and `_pick_seeds` (`serve.py:666`), both
+defined at column 0 and both ABOVE `_build_server`. So D cannot reach parity
+without reimplementing ~1,000 lines, and it flipped to C by its own rule.
+
+⚠️ **Both citations in the previous sentence were corrected by a cold review of
+the commit that recorded them** (2026-09-09, two P3s). The map was cited as
+`:5-22`, which lands mid-dict; and the helpers were described as *"a closure
+nested inside `_build_server`"*, which they are not — the closures are the
+handlers, the helpers are module-level functions those closures call. The
+CONCLUSION is unchanged, because what makes D unreachable is that the helpers are
+`_private` and absent from the public map, not where they sit in the file. Kept
+verbatim rather than silently rewritten: the argument was right and two of its
+three supporting details were wrong, which is the shape worth remembering.
 
 **Three names is not #668.** That outage was a registration-key COLLISION: a
 GLOBAL `mcp_servers.graphify` URL entry against this repo's PROJECT stdio entry
