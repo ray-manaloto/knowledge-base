@@ -98,12 +98,13 @@ mise run kb-codex -- --review \
   --base <FIXED> \
   --model gpt-6-astra \
   --effort xhigh \
+  --sandbox read-only \
   --timeout 3600 \
   --output .agent/kb/review/reports/review-<HEAD SHA>-cold.md \
   < /tmp/astra-method.txt
 ```
 
-Four things about that command are load-bearing:
+Things about that command that are load-bearing:
 
 - **`--model` becomes `-c review_model=` and `--effort` becomes
   `-c model_reasoning_effort=`.** `codex review` accepts NO `-m` — `ReviewArgs`
@@ -120,6 +121,16 @@ Four things about that command are load-bearing:
   `report_path` strips the variant (`review.py:200-202`, called at `:620`).
   Writing the variant into the filename produces a file the receipt gate cannot
   see, and the refusal then reads as *the lane never ran* (#60).
+- **`--sandbox read-only` is MANDATORY, not optional.** Without it the review
+  inherits `$CODEX_HOME/config.toml`'s `sandbox_mode`, which on this machine is
+  `danger-full-access` — the thing `do-not.md` #13 forbids. `codex review` has no
+  `-s` flag, so it travels as `-c sandbox_mode=`; that lands in `SessionFlags`
+  (precedence 30, above the user config's 20 —
+  `config/src/config_layer_source.rs:38-47`) and the reviewer inherits it because
+  `start_review_conversation` clones the whole config (`review.rs:106`) without
+  touching the sandbox. Two-armed 2026-09-09: without the flag the banner read
+  `sandbox: danger-full-access`, with it `sandbox: read-only`. **That banner line,
+  unlike `model:`, IS a valid observable — read it every run.**
 - **`--timeout 3600` is under the task's own `5400s` ceiling on purpose.** The
   flag returns rc 124 and prints that the lane reviewed a SUBSET; mise killing
   the task says neither. Keep the flag the smaller number.

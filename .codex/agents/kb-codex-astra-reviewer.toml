@@ -106,6 +106,7 @@ mise run kb-codex -- --review \
   --base <FIXED> \
   --model gpt-6-astra \
   --effort xhigh \
+  --sandbox read-only \
   --timeout 3600 \
   --output .agent/kb/review/reports/review-<HEAD SHA>-cold.md \
   < /tmp/astra-method.txt
@@ -116,7 +117,7 @@ harness's ~600s foreground cap, so a foreground call will be killed and look
 exactly like the lane failing. Poll the `--output` file: it is flushed per line,
 so it shows progress rather than only a final result.
 
-Four facts about that command, each of which has already cost something:
+Facts about that command, each of which has already cost something:
 
 - **`--model` and `--effort` are translated to `-c review_model=` and
   `-c model_reasoning_effort=`.** `codex review` accepts no `-m`; `ReviewArgs`
@@ -141,23 +142,40 @@ Four facts about that command, each of which has already cost something:
   back by the API — but a successful run offers no observable that names the
   reviewer. See `references/lanes.md` for the table.
 
-🔴 **YOU CANNOT SANDBOX THIS LANE, AND NOTHING IN THIS REPO CAN.** `codex review`
-accepts no `--sandbox`, and a `.codex/agents/*.toml` role file cannot set one
-either — codex refuses it on purpose. `apply_role` copies exactly seven fields
-into `AgentRoleOverrides` (`core/src/agent/role.rs:80-89`) and `sandbox_mode` is
-not among them; the test that pins this is named
-`apply_role_preserves_parent_sandbox_permissions`, and a second one feeds a
-fixture called `hostile-role.toml` and asserts *"role must not control
-sandbox_mode"* for `sandbox_mode`, `approval_policy`, `model_provider`,
-`openai_base_url` and four more (`role_tests.rs:351-480`).
+🔴 **`--sandbox read-only` IS MANDATORY ON THIS LANE, and it is the only thing
+standing between the review and `do-not.md` #13.** Without it the review inherits
+`$CODEX_HOME/config.toml`'s `sandbox_mode`, which on this machine is
+`danger-full-access` — a repository lane running with no sandbox at all.
 
-So the lane inherits whatever the invoking session has. Measured on this machine
-2026-09-09, the banner read `sandbox: danger-full-access`, because
-`$CODEX_HOME/config.toml:6` (`~/.codex` by default) sets it — a USER-GLOBAL file `do-not.md` #11 forbids
-this repo to touch. Treat that as a standing condition of the `--review` path,
-not something a flag here fixes: **assume the lane can write, and rely on the
-instruction not to, plus your own check of the tree afterwards.** Never tell a
-reader this lane is sandboxed.
+**CORRECTION, 2026-09-09.** An earlier version of this section said the lane
+could not be sandboxed from our side at all. That was wrong, and the mistake was
+generalising from the ROLE-file case: a `.codex/agents/*.toml` genuinely cannot
+set a sandbox — `apply_role` copies seven fields into `AgentRoleOverrides` and
+`sandbox_mode` is not among them (`core/src/agent/role.rs:80-89`; the fixture
+`hostile-role.toml` asserts *"role must not control sandbox_mode"*,
+`role_tests.rs:351-480`) — because a role file is untrusted input. A **CLI `-c`
+is a different layer and is not filtered.** It lands in
+`ConfigLayerSource::SessionFlags`, precedence **30**, above the user config's
+**20** (`config/src/config_layer_source.rs:38-47`), and the reviewer sub-agent
+inherits it because `start_review_conversation` clones the whole effective config
+(`core/src/tasks/review.rs:106`) and never touches the sandbox.
+
+Two-armed on this machine, same task, same user config, one variable:
+
+| invocation | banner |
+|---|---|
+| without `--sandbox` | `sandbox: danger-full-access` |
+| with `--sandbox read-only` | `sandbox: read-only` |
+
+Unlike the `model:` line above, **the `sandbox:` line IS a valid observable** —
+the sub-agent clones the session's sandbox, so what the banner reports is what
+the reviewer gets. Read it every run.
+
+`approval_policy` is deliberately not forwarded: the sub-agent's is hard-set to
+`Never` at `review.rs:121`, so sending one would be a flag that does nothing.
+
+Even so, still snapshot the tree — a read-only sandbox is a claim to verify, not
+a reason to stop checking.
 
 **So SNAPSHOT THE TREE BEFORE YOU LAUNCH, not only after.** A checkout is
 routinely already dirty when a review starts, and `AGENTS.md:34` calls a dirty

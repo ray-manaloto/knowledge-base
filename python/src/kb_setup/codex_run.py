@@ -282,6 +282,7 @@ class ReviewSpec:
     instructions: str | None = None
     model: str | None = None
     effort: str | None = None
+    sandbox: str | None = None
 
 
 def _review_argv(spec: ReviewSpec) -> list[str]:
@@ -371,10 +372,34 @@ def _review_argv(spec: ReviewSpec) -> list[str]:
     `_codex_argv` too, and ONE key spelled two ways across the two builders is the
     drift worth avoiding. A model slug is caller text, so it is quoted rather than
     left to `-c`'s parse-then-fall-back-to-literal path.
+
+    🔴 **`--sandbox` ALSO travels as `-c`, and it is the ONLY way to sandbox a
+    review.** `codex review` has no `-s/--sandbox` (same `ReviewArgs`), and a
+    `.codex/agents/*.toml` role file is REFUSED one by design — `apply_role`
+    copies seven fields into `AgentRoleOverrides` and `sandbox_mode` is not among
+    them (`core/src/agent/role.rs:80-89`; the test feeding `hostile-role.toml`
+    asserts *"role must not control sandbox_mode"*, `role_tests.rs:351-480`).
+
+    A CLI `-c` is a different layer and is NOT filtered: it lands in
+    `ConfigLayerSource::SessionFlags`, precedence **30**, above the user config's
+    **20** (`config/src/config_layer_source.rs:38-47`) — so it overrides a
+    `sandbox_mode` set in `$CODEX_HOME/config.toml`. The reviewer sub-agent then
+    inherits it, because `start_review_conversation` CLONES the whole effective
+    config (`core/src/tasks/review.rs:106`) and modifies only `web_search_mode`,
+    two features, `base_instructions`, `approval_policy` and `model` — never the
+    sandbox.
+
+    Without this, a review here runs at whatever the user config says, which on
+    the machine this was written on is `danger-full-access` — the thing
+    `do-not.md` #13 forbids. `approval_policy` is deliberately NOT forwarded: the
+    sub-agent's is hard-set to `Never` at `review.rs:121`, so passing one would
+    be a flag that does nothing, which is the defect #678 was about.
     """
     argv = ["codex", "review", "--base", spec.base]
     if spec.title and spec.commit:
         argv += ["--title", spec.title]
+    if spec.sandbox:
+        argv += ["-c", f"sandbox_mode={_toml_str(spec.sandbox)}"]
     if spec.model:
         argv += ["-c", f"review_model={_toml_str(spec.model)}"]
     if spec.effort:
@@ -410,6 +435,7 @@ def _run_review(args: argparse.Namespace) -> int:
             instructions=instructions,
             model=args.model,
             effort=args.effort,
+            sandbox=args.sandbox,
         )
     )
 
@@ -470,7 +496,13 @@ def run(argv: list[str] | None = None) -> int:
         help="allow network egress; implies --write, since the flag is a write-sandbox key",
     )
     parser.add_argument("--effort", default="xhigh", help="model_reasoning_effort (default: xhigh)")
-    parser.add_argument("--sandbox", default=None, help="override the sandbox outright")
+    parser.add_argument(
+        "--sandbox",
+        default=None,
+        help="override the sandbox outright. exec: `--sandbox <v>`. --review: sent "
+        'as `-c sandbox_mode="<v>"`, the only channel that exists, and the only way '
+        "a review is not run at whatever $CODEX_HOME/config.toml says",
+    )
     parser.add_argument(
         "--print-argv",
         action="store_true",

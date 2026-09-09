@@ -546,3 +546,34 @@ def test_the_tee_flushes_each_line_while_the_lane_is_still_running(tmp_path: Pat
         assert "early-finding" in seen, "the report was still sitting in a buffer mid-run"
     finally:
         worker.join(timeout=15)
+
+
+def test_review_forwards_the_sandbox_as_a_config_override() -> None:
+    """The ONLY channel that sandboxes a review, and `do-not.md` #13 needs it.
+
+    `codex review` has no `-s/--sandbox`, and a role file is refused one by
+    design (`role.rs:80-89`). A CLI `-c` is a different layer and is not
+    filtered — `SessionFlags` precedence 30 beats the user config's 20
+    (`config_layer_source.rs:38-47`) — and the reviewer sub-agent inherits it
+    because `start_review_conversation` clones the whole config
+    (`review.rs:106`) without touching the sandbox.
+    """
+    argv = _review(sandbox="read-only")
+    assert '-c sandbox_mode="read-only"' in argv
+    # The flag `codex review` would REJECT must never appear.
+    assert "--sandbox" not in argv
+
+
+def test_review_omits_the_sandbox_key_when_not_asked() -> None:
+    """Control arm: the probe above discriminates rather than always passing."""
+    assert "sandbox_mode" not in _review()
+
+
+def test_review_never_forwards_approval_policy() -> None:
+    """It would be a flag that does nothing — the #678 defect, re-introduced.
+
+    `start_review_conversation` hard-sets the sub-agent's approval policy to
+    `Never` (`review.rs:121`), so any value we sent would be overwritten before
+    the reviewer ran.
+    """
+    assert "approval_policy" not in _review(sandbox="read-only", model="gpt-6-astra")

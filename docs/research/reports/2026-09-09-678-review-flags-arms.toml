@@ -136,3 +136,17 @@ test = "test_the_tee_creates_a_missing_report_directory"
 file = "python/src/kb_setup/codex_run.py"
 old = '''    path.parent.mkdir(parents=True, exist_ok=True)'''
 new = '''    pass'''
+
+# A9 - the sandbox override is accepted and dropped. This is the #678 defect
+# with the highest stakes of the four flags: `do-not.md` #13 forbids a repository
+# lane at danger-full-access, and on this machine that is EXACTLY what a review
+# inherits from $CODEX_HOME/config.toml when the key does not reach the argv. The
+# lane still runs, still returns findings, still exits 0 - unsandboxed.
+[[arm]]
+id = "A9"
+test = "test_review_forwards_the_sandbox_as_a_config_override"
+file = "python/src/kb_setup/codex_run.py"
+old = '''    if spec.sandbox:
+        argv += ["-c", f"sandbox_mode={_toml_str(spec.sandbox)}"]'''
+new = '''    if False:
+        argv += ["-c", f"sandbox_mode={_toml_str(spec.sandbox)}"]'''
