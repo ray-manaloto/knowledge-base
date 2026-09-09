@@ -128,13 +128,18 @@ Run it as a **background** call — 3–5× Sol puts it past the harness's ~600s
 foreground cap — and poll the `--output` file rather than waiting blind.
 
 **If it returns a policy refusal or `invalid_prompt` instead of a review**, that
-is a known Astra failure on security-adjacent diffs (openai/codex #43163,
+is a known Astra failure on security-adjacent diffs — openai/codex issues 43163,
+43781, 43131, 43208 and 42939 — and `Selected model is at capacity` is issue
+43706. Report either **verbatim**, fall back to `cold:codex`, and record the lane
+that actually produced the findings. It is not `NO FINDINGS` — that asserts a
+lane read the diff and had nothing to say, and this one never read it.
 
-# 43781, #43131, #43208, #42939) and `Selected model is at capacity` is #43706
-
-Report either **verbatim**, fall back to `cold:codex`, and record the lane that
-actually produced the findings. It is not `NO FINDINGS` — that asserts a lane
-read the diff and had nothing to say, and this one never read it.
+Those five are written without a leading `#` deliberately. The first version of
+this paragraph used the `#43781` form, `ruff`-adjacent markdown formatting
+wrapped it to line-start, and `#` at line-start is an H1 — the citation became a
+heading and the sentence lost its ending, mid-commit. SKILL.md's closing section
+carries the identical scar from `#399` and says so; this is the second occurrence
+of one formatting hazard, so spell issue numbers out in prose here.
 
 ### The fallback chain — loud at every step
 

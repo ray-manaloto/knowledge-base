@@ -180,16 +180,16 @@ there records a same-family read as cross-family, which is the one claim this
 whole step is built to keep honest.
 
 **A refusal is not a finding, and never "no findings".** Five independent
-upstream reports (openai/codex #43163, #43781, #43131, #43208, #42939) have Astra
-returning `invalid_prompt` or a usage-policy rejection on *authorized* security
-work — and this repo's cold lane is pointed straight at `hook_guard.py`,
+upstream reports — openai/codex issues 43163, 43781, 43131, 43208 and 42939 —
+have Astra returning `invalid_prompt` or a usage-policy rejection on *authorized*
+security work, and this repo's cold lane is pointed straight at `hook_guard.py`,
 `secret_guard.py` and friends. If the lane comes back with a refusal instead of a
 review: report it **verbatim**, do not retry it silently, fall back to
 `cold:codex`, and record in the receipt the lane that actually produced the
-findings. `#43706` ("Selected model is at capacity") is the same handling.
+findings. Issue 43706 ("Selected model is at capacity") is the same handling.
 
 **Expect 3–5× Sol, and plan the call around that.** OpenAI's model card rates
-Astra Speed 2/5, and #43038 reports 3–5× slower compaction. That is past the
+Astra Speed 2/5, and issue 43038 reports 3–5× slower compaction. That is past the
 harness's ~600s foreground cap, so run it as a background call with `--output`
 and poll — see `references/lanes.md` for the exact invocation. A lane killed by
 its bound reviewed a SUBSET; §3's rule about naming what it did not finish
