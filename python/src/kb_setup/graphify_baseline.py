@@ -240,12 +240,12 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.53"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.57"
 # FORKED 2026-08-24: this names WHAT RUNS, so it followed the pin onto the fork
 # (`currency.toml` binds it with `tracks = "manifest"`). Contrast the semantic
 # corpus/slice constants, which are snapshot identities of completed runs and
 # correctly hold at the upstream base `v0.9.48`.
-_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.53"
+_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.57"
 
 #: The public spelling of the version above, for the ONE cross-module consumer:
 #: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
@@ -289,18 +289,18 @@ _LPK_FILE_ID = _LPK_COLLISION_ID
 _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
-    "sdk_fingerprint_sha256": "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
+    "sdk_fingerprint_sha256": "153870e2a461b346aeba87bbd1e64aaf6e03e9e53a47146b329bcd08631067dc",
     # FORKED 2026-08-24: a git-locked dependency has NO wheel and NO sdist, so
     # the two hashes that used to live here cannot exist and their absence is
     # not a gap to paper over. `git_commit` is the substitute and it is a
     # STRONGER identity — a wheel hash names a built artifact, a resolved
     # commit names the source tree it was built from. Reverts to the wheel/sdist
     # pair when #2981 merges and the pin returns to PyPI.
-    "git_commit": "157a957e89a16246bba3a078de2777711ee85e31",
+    "git_commit": "3c9b930f386f80c393fe658e1afb685030828c6a",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="157a957e89a16246bba3a078de2777711ee85e31",
+    source_commit="3c9b930f386f80c393fe658e1afb685030828c6a",
     source_tree="707bdb5074beb3743e1c77f38db31c23a04f9497",
     catalog_sha256="2a1f353a5d6ee0f087744197e56d07a8f2bcbf84bb048cfd6c8b281821bf5ac0",
     source_manifest_sha256="b1c4aebb1f17dc9b473925797c1d9a8980d83fe18fbce3be419d7db11653d523",

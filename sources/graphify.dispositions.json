@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "source": "graphify",
-  "source_ref": "kb-pin/openai-cli-backend-v0.9.53",
-  "source_commit": "157a957e89a16246bba3a078de2777711ee85e31",
+  "source_ref": "kb-pin/openai-cli-backend-v0.9.57",
+  "source_commit": "3c9b930f386f80c393fe658e1afb685030828c6a",
   "source_tree": "707bdb5074beb3743e1c77f38db31c23a04f9497",
   "entries": [
     {
