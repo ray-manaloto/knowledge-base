@@ -83,6 +83,59 @@ reviewer given the design intent confirms the happy path, which is the failure
 mode a second lens exists to break. It shares no weights with Claude, so its
 blind spots are different ones.
 
+### The `cold:codex-astra` variant — the exact call
+
+SKILL.md §2a owns WHEN to ask for this (explicitly, for a large or
+multi-guard diff, and never in place of `cold:antigravity`). This is the call,
+and it lives here because the last three times a lane instruction lived only in
+SKILL.md, a reader following this file verbatim got the older behaviour.
+
+Write the block above to a file — prose reaches a CLI through a file, never
+through backticks in zsh — and pipe it in:
+
+```bash
+mise run kb-codex -- --review \
+  --base <FIXED> \
+  --model gpt-6-astra \
+  --effort xhigh \
+  --timeout 3600 \
+  --output .agent/kb/review/reports/review-<HEAD SHA>-cold.md \
+  < /tmp/astra-method.txt
+```
+
+Four things about that command are load-bearing:
+
+- **`--model` becomes `-c review_model=` and `--effort` becomes
+  `-c model_reasoning_effort=`.** `codex review` accepts NO `-m` — `ReviewArgs`
+  (`sources/codex/codex-rs/exec/src/cli.rs:270-303`) declares only
+  `--uncommitted`/`--base`/`--commit`/`--title`/`[PROMPT]`. `kb-codex` does that
+  translation; **before #678 landed it accepted all three flags and dropped
+  them**, so a lane run on an older checkout reviewed at codex's own default and
+  said nothing about it.
+- **`--output` is written by `kb-codex` itself**, because `codex review` has no
+  `-o` either. It holds the whole review rather than `exec`'s last message, and
+  it is flushed per line — so a poll mid-run shows progress, and a lane killed at
+  its bound still leaves the findings it had reached.
+- **The report path ends in `-cold.md`, not `-cold:codex-astra.md`.**
+  `report_path` strips the variant (`review.py:200-202`, called at `:620`).
+  Writing the variant into the filename produces a file the receipt gate cannot
+  see, and the refusal then reads as *the lane never ran* (#60).
+- **`--timeout 3600` is under the task's own `5400s` ceiling on purpose.** The
+  flag returns rc 124 and prints that the lane reviewed a SUBSET; mise killing
+  the task says neither. Keep the flag the smaller number.
+
+Run it as a **background** call — 3–5× Sol puts it past the harness's ~600s
+foreground cap — and poll the `--output` file rather than waiting blind.
+
+**If it returns a policy refusal or `invalid_prompt` instead of a review**, that
+is a known Astra failure on security-adjacent diffs (openai/codex #43163,
+
+# 43781, #43131, #43208, #42939) and `Selected model is at capacity` is #43706
+
+Report either **verbatim**, fall back to `cold:codex`, and record the lane that
+actually produced the findings. It is not `NO FINDINGS` — that asserts a lane
+read the diff and had nothing to say, and this one never read it.
+
 ### The fallback chain — loud at every step
 
 | Step | Lane | Family |
