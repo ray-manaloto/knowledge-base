@@ -1,0 +1,120 @@
+<title>Pin It Or Let It Go</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,600&family=Playfair+Display:wght@600&display=swap">
+<style>
+  :root{
+    --ground:#FAF9F6;
+    --panel:#FFFFFF;
+    --ink:#1B1A17;
+    --muted:#6E6A61;
+    --rule:#E2DFD6;
+    --keep:#2D5F4C;
+    --lose:#93502A;
+    --display:"Playfair Display",Georgia,serif;
+    --body:"DM Sans","Helvetica Neue",Arial,sans-serif;
+    --mono:"DM Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);color:var(--ink);
+    font-family:var(--body);font-size:15px;line-height:1.5;margin:0;padding:20px;
+  }
+  main{max-width:670px;margin:0 auto;display:flex;flex-direction:column;gap:17px}
+
+  .eyebrow{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);margin:0;
+  }
+  h1{
+    font-family:var(--display);font-weight:600;font-size:31px;line-height:1.12;
+    margin:6px 0 0;text-wrap:balance;
+  }
+  .lede{margin:0;font-size:16px;color:var(--muted);max-width:58ch}
+  .lede b{color:var(--ink);font-weight:600}
+
+  .opts{display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule)}
+  .opt{background:var(--panel);padding:13px 16px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  .tag{
+    font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;
+    padding:3px 8px;border-radius:2px;white-space:nowrap;margin-top:2px;
+  }
+  .tag.a{background:#93502A;color:#fff}
+  .tag.b{background:#8A867B;color:#fff}
+  .tag.c{background:#2D5F4C;color:#fff}
+  .opt .body{flex:1 1 240px;min-width:0}
+  .opt .body b{display:block;font-size:15px;font-weight:600;margin-bottom:2px}
+  .opt .body span{display:block;font-size:13.5px;color:var(--muted)}
+  .opt .body .cost{display:block;font-size:13px;margin-top:4px}
+  .opt .body .cost em{font-style:normal;color:var(--lose);font-weight:600}
+  .opt .body .cost i{font-style:normal;color:var(--keep);font-weight:600}
+
+  .proof{
+    background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--keep);
+    padding:12px 16px;
+  }
+  .proof h2{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+    margin:0 0 6px;color:var(--keep);font-weight:500;
+  }
+  .proof p{margin:0;font-size:14px}
+
+  .ask{
+    background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--ink);
+    padding:12px 16px;font-size:15px;
+  }
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">the last decision in this round</p>
+    <h1>Name it, or let it be changed. You can&rsquo;t have both.</h1>
+  </header>
+
+  <p class="lede">
+    Writing a setting into a helper&rsquo;s file makes it <b>permanent</b> &mdash; anyone
+    who later asks for something different is quietly ignored. Leaving it out makes it
+    changeable, but then the helper doesn&rsquo;t guarantee what its name promises.
+  </p>
+
+  <div class="opts">
+    <div class="opt">
+      <span class="tag a">A</span>
+      <span class="body">
+        <b>Write both settings in</b>
+        <span>The expensive brain and the deep thinking are locked in.</span>
+        <span class="cost"><i>Always what it says on the tin.</i> &middot;
+        <em>Nobody can ever run it cheaper, and they get no warning.</em></span>
+      </span>
+    </div>
+    <div class="opt">
+      <span class="tag b">B</span>
+      <span class="body">
+        <b>Write neither in</b>
+        <span>Both come from the project-wide default, and any caller can change them.</span>
+        <span class="cost"><i>Fully changeable.</i> &middot;
+        <em>Defaults to the cheap brain &mdash; so the name would be a lie.</em></span>
+      </span>
+    </div>
+    <div class="opt">
+      <span class="tag c">C</span>
+      <span class="body">
+        <b>Write only the brain in</b>
+        <span>The expensive model is guaranteed; how hard it thinks stays adjustable.</span>
+        <span class="cost"><i>Name kept, thinking dial free.</i> &middot;
+        <em>Its default depth is the ordinary one, not the deep one.</em></span>
+      </span>
+    </div>
+  </div>
+
+  <div class="proof">
+    <h2>this is measured, not read</h2>
+    <p>A live run asked for a cheaper brain than a helper&rsquo;s file names. It got the
+    file&rsquo;s choice, silently, with no warning &mdash; and a second run asking for
+    different thinking depth was overruled the same way. Both confirmed against the
+    machine&rsquo;s own recording, not the helper&rsquo;s word for it.</p>
+  </div>
+
+  <p class="ask">
+    <b>Which one?</b> C is my read &mdash; it is the closest thing to the
+    &ldquo;changeable default&rdquo; you asked for that still keeps the name honest.
+  </p>
+</main>

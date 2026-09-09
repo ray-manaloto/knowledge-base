@@ -1,0 +1,111 @@
+<title>Already Running The New Engine</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Karla:wght@400;600&family=Newsreader:opsz,wght@6..72,500&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#F8F9FA;
+    --panel:#FFFFFF;
+    --ink:#15191E;
+    --muted:#5F6B76;
+    --rule:#DCE1E6;
+    --on:#0E6E62;
+    --off:#8E3B4A;
+    --display:"Newsreader",Georgia,serif;
+    --body:"Karla","Helvetica Neue",Arial,sans-serif;
+    --mono:"Roboto Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);color:var(--ink);
+    font-family:var(--body);font-size:15px;line-height:1.5;margin:0;padding:20px;
+  }
+  main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:17px}
+
+  .correction{
+    background:#FBF1F2;border:1px solid #E4C7CB;border-left:3px solid var(--off);
+    padding:11px 15px;
+  }
+  .correction b{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--off);display:block;margin-bottom:5px;font-weight:500;
+  }
+  .correction p{margin:0;font-size:14px}
+
+  .eyebrow{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);margin:0;
+  }
+  h1{
+    font-family:var(--display);font-weight:500;font-size:32px;line-height:1.1;
+    margin:6px 0 0;text-wrap:balance;
+  }
+
+  .two{display:flex;flex-wrap:wrap;gap:1px;background:var(--rule);border:1px solid var(--rule)}
+  .q{background:var(--panel);flex:1 1 270px;padding:13px 16px}
+  .q h2{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+    margin:0 0 7px;font-weight:500;
+  }
+  .q.a h2{color:var(--off)}
+  .q.b h2{color:var(--on)}
+  .q .ans{font-family:var(--display);font-size:21px;line-height:1.2;margin:0 0 6px}
+  .q p{margin:0;font-size:13.5px;color:var(--muted)}
+
+  .lesson{
+    background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--on);
+    padding:13px 16px;
+  }
+  .lesson h2{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+    margin:0 0 7px;color:var(--on);font-weight:500;
+  }
+  .lesson p{margin:0 0 6px;font-size:14.5px}
+  .lesson p:last-child{margin-bottom:0}
+
+  .ask{
+    background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--on);
+    padding:12px 16px;font-size:15px;
+  }
+  .ask b{color:var(--on)}
+</style>
+
+<main>
+  <div class="correction">
+    <b>corrected after publishing</b>
+    <p>The first version of this page said the newer engine was switched off. <b>That was
+    wrong</b>, and it was wrong in an instructive way &mdash; kept here rather than quietly
+    replaced, in case it was already acted on.</p>
+  </div>
+
+  <header>
+    <p class="eyebrow">two questions that look identical</p>
+    <h1>The switch is off. The new engine is running anyway.</h1>
+  </header>
+
+  <div class="two">
+    <div class="q a">
+      <h2>what I asked</h2>
+      <p class="ans">&ldquo;Is the switch on?&rdquo;</p>
+      <p>Answer: no. True, checked twice, from two places. And it settles nothing.</p>
+    </div>
+    <div class="q b">
+      <h2>what mattered</h2>
+      <p class="ans">&ldquo;Which engine runs?&rdquo;</p>
+      <p>Answer: the new one. The model you use asks for it by name, and that beats the switch.</p>
+    </div>
+  </div>
+
+  <div class="lesson">
+    <h2>why the check couldn&rsquo;t have caught it</h2>
+    <p>The command I ran reports switches. It never looks at which model you picked &mdash;
+    and that is what actually decides.</p>
+    <p>I ran it from two different places to prove it wasn&rsquo;t lying. It wasn&rsquo;t.
+    <b>It was answering a different question, correctly.</b></p>
+    <p>Our own notes said so all along: <em>&ldquo;Sol and Terra already select v2 &mdash;
+    do not turn the switch on for them.&rdquo;</em></p>
+  </div>
+
+  <p class="ask">
+    <b>So: leave the switch alone.</b> Turning it on changes nothing here and would
+    quietly alter how four other models behave. I need nothing from you on this one.
+  </p>
+</main>

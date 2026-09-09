@@ -1,0 +1,133 @@
+<title>Codex Already Has Teams</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Code+Pro:wght@400;600&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+  :root{
+    --ground:#F7F7F5;
+    --panel:#FFFFFF;
+    --ink:#1C1C1A;
+    --muted:#6B6B63;
+    --rule:#DFDFD8;
+    --accent:#3D5A45;
+    --limit:#8C4A2F;
+    --display:"Fraunces",Georgia,serif;
+    --body:"Source Sans 3","Helvetica Neue",Arial,sans-serif;
+    --mono:"Source Code Pro",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);color:var(--ink);
+    font-family:var(--body);font-size:15px;line-height:1.5;
+    margin:0;padding:20px;
+  }
+  main{max-width:660px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);margin:0;
+  }
+  h1{
+    font-family:var(--display);font-weight:600;font-size:30px;line-height:1.1;
+    margin:5px 0 0;text-wrap:balance;
+  }
+  .lede{margin:0;font-size:16.5px;color:var(--muted);max-width:56ch}
+  .lede b{color:var(--ink);font-weight:600}
+
+  figure{margin:0}
+  svg{width:100%;height:auto;max-width:100%;display:block}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:8px;text-align:center}
+
+  .split{display:flex;flex-wrap:wrap;gap:14px}
+  .half{
+    flex:1 1 250px;background:var(--panel);border:1px solid var(--rule);padding:12px 14px;
+  }
+  .half.no{border-left:3px solid var(--limit)}
+  .half.yes{border-left:3px solid var(--accent)}
+  .half h2{
+    font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    margin:0 0 6px;color:var(--muted);font-weight:600;
+  }
+  .half p{margin:0;font-size:14px}
+  .half p em{color:var(--muted);font-style:normal;display:block;margin-top:4px;font-size:13px}
+
+  .ask{
+    background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);
+    padding:12px 16px;font-size:15px;
+  }
+  .ask b{color:var(--accent)}
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">the team you asked for</p>
+    <h1>Codex already builds teams. We don&rsquo;t have to invent one.</h1>
+  </header>
+
+  <p class="lede">
+    You wanted one lane that reads your prompt, picks roles, and puts a team on the job.
+    <b>That is a shipped feature</b>, not something to design &mdash; it just has to be
+    switched on and given roles.
+  </p>
+
+  <figure>
+    <svg viewBox="0 0 560 250" role="img"
+         aria-label="One driving lane reads the prompt and spawns three worker lanes with roles it chooses; each worker reports its result back to the driver.">
+      <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <polygon points="0,1 10,5 0,9" fill="#3D5A45"/>
+        </marker>
+        <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+          <polygon points="0,1 10,5 0,9" fill="#6B6B63"/>
+        </marker>
+      </defs>
+
+      <rect x="150" y="6" width="260" height="46" rx="3" fill="#FFFFFF" stroke="#DFDFD8"/>
+      <text x="280" y="26" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="13.5" font-weight="600" fill="#1C1C1A">you type one prompt</text>
+      <text x="280" y="43" text-anchor="middle" font-family="Source Code Pro, monospace" font-size="11.5" fill="#6B6B63">codex exec &#8220;fix the seven values&#8221;</text>
+
+      <line x1="280" y1="52" x2="280" y2="76" stroke="#3D5A45" stroke-width="1.5" marker-end="url(#a)"/>
+
+      <rect x="150" y="80" width="260" height="46" rx="3" fill="#FFFFFF" stroke="#3D5A45" stroke-width="1.5"/>
+      <text x="280" y="100" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="13.5" font-weight="600" fill="#3D5A45">the driving lane</text>
+      <text x="280" y="117" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="12" fill="#6B6B63">reads your words, picks who is needed</text>
+
+      <line x1="230" y1="126" x2="100" y2="164" stroke="#3D5A45" stroke-width="1.3" marker-end="url(#a)"/>
+      <line x1="280" y1="126" x2="280" y2="164" stroke="#3D5A45" stroke-width="1.3" marker-end="url(#a)"/>
+      <line x1="330" y1="126" x2="460" y2="164" stroke="#3D5A45" stroke-width="1.3" marker-end="url(#a)"/>
+      <text x="280" y="150" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11" fill="#6B6B63">spawns, one per role</text>
+
+      <rect x="30" y="168" width="140" height="44" rx="3" fill="#FFFFFF" stroke="#DFDFD8"/>
+      <text x="100" y="187" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="12.5" font-weight="600" fill="#1C1C1A">a worker</text>
+      <text x="100" y="203" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11" fill="#6B6B63">cheaper model</text>
+
+      <rect x="210" y="168" width="140" height="44" rx="3" fill="#FFFFFF" stroke="#DFDFD8"/>
+      <text x="280" y="187" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="12.5" font-weight="600" fill="#1C1C1A">a worker</text>
+      <text x="280" y="203" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11" fill="#6B6B63">cheaper model</text>
+
+      <rect x="390" y="168" width="140" height="44" rx="3" fill="#FFFFFF" stroke="#DFDFD8"/>
+      <text x="460" y="187" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="12.5" font-weight="600" fill="#1C1C1A">a worker</text>
+      <text x="460" y="203" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11" fill="#6B6B63">cheaper model</text>
+
+      <path d="M100 212 L100 232 L460 232 L460 212" fill="none" stroke="#6B6B63" stroke-width="1" stroke-dasharray="4 3"/>
+      <line x1="280" y1="232" x2="280" y2="216" stroke="#6B6B63" stroke-width="1" marker-end="url(#b)"/>
+      <text x="280" y="246" text-anchor="middle" font-family="Source Sans 3, sans-serif" font-size="11" fill="#6B6B63">each hands its result back up</text>
+    </svg>
+    <figcaption>Six built-in tools do all of this. Nothing here is ours to write.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="half yes">
+      <h2>a role can set</h2>
+      <p>its own model, its own thinking effort, its own standing instructions, and it can <em>give up</em> tools it doesn&rsquo;t need.</p>
+    </div>
+    <div class="half no">
+      <h2>a role can never set</h2>
+      <p>what it&rsquo;s allowed to touch on disk, or when it has to ask.<em>Those stay the parent&rsquo;s. Deliberate &mdash; a worker can shrink its own powers, never grow them.</em></p>
+    </div>
+  </div>
+
+  <p class="ask">
+    <b>I need two decisions:</b> whether the codex source has to become searchable
+    (it is deliberately excluded today), and whether we bump codex now &mdash; it is
+    one release behind, and your standing rule says always pin to the newest.
+  </p>
+</main>
