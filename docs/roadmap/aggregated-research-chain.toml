@@ -34,6 +34,60 @@
 # answered by Ray ("full" = every pin site, 35). Its two STILL-OWED bumps were
 # carved out to #641 rather than closed with it. #581 is therefore now the head.
 #
+# PHASE V — the reusable dependency-upgrade workflow (Ray, 2026-09-09; parent #726).
+# Placed at the HEAD deliberately: Ray, verbatim, "add this as pwf task plan items
+# with linked github issues to ensure all of this is the top priority and completed
+# first". Until now the head (#581) had been outranked by hand fourteen rounds
+# running; putting the ruled priority IN the chain is what lets `kb-next-ticket`
+# agree with the handoff instead of contradicting it. Blockers encode Ray's
+# ordering: recall first (V0), then the fork rebase (V1) and the research (V2) in
+# parallel, build (V3) after the spec, the Claude Code docs resync (V4) after
+# recall, the roster (V5) after both the build and the resync, the full run (V6)
+# last. Remove each entry in the commit that closes it.
+#
+# V-A (#735) sits AHEAD of V0 because it is in flight on the same branch as the
+# tracking commit: Ray asked (2026-09-09) for the GPT-6 Astra cold-review variant
+# to be researched and added so THIS branch is reviewed with it before it ships.
+[[ticket]]
+issue = 735
+title = "V-A — the GPT-6 Astra cold-review variant (cold:codex-astra): fix #678, --timeout, agent pair, kb-review rules"
+blockers = []
+
+[[ticket]]
+issue = 727
+title = "V0 — kb-recall-work: search project, branches/worktrees, issues, plans before designing"
+blockers = []
+
+[[ticket]]
+issue = 728
+title = "V1 — rebase the graphify fork onto the newest release; refresh both skill trees + stamps; kb-fork-rebase"
+blockers = [727]
+
+[[ticket]]
+issue = 729
+title = "V2 — research + architect the DBOS/SQLite upgrade system; spec + advisor + premise verification"
+blockers = [727]
+
+[[ticket]]
+issue = 730
+title = "V3 — build kb_setup.deps + kb_setup.upgrade + the kb-upgrade tasks per the V2 spec"
+blockers = [729]
+
+[[ticket]]
+issue = 731
+title = "V4 — resync sources/claude-code + sources/claude-code-docs; kb-build"
+blockers = [727]
+
+[[ticket]]
+issue = 732
+title = "V5 — saved workflow kb-upgrade.js + skill + eight reusable subagents, knobs finalised against the resynced docs"
+blockers = [730, 731]
+
+[[ticket]]
+issue = 733
+title = "V6 — first full run: 35 pins + manifests, corpus sweep, one kb-build, one PR; close the loop; U-R3 resumes"
+blockers = [732]
+
 [[ticket]]
 issue = 581
 title = "breadth verb — first source"

@@ -144,6 +144,59 @@ remaining cross-family lane, and only then to a Claude Opus subagent. Record
 which lane actually ran in the receipt; a same-family reviewer still catches
 things, but the receipt must not imply it was cross-family.
 
+#### 2a. `cold:codex-astra` — the same slot, a bigger model
+
+Ray, 2026-09-09: *"we will have 2 types of codex lanes — the astra model one is
+used when performing a complicated and large review"*. **Two VARIANTS of the one
+cold slot, never two lanes.** The one-lane cap above is unchanged, and so is
+everything else — same METHOD paragraph, same scope, same two-round bound, same
+receipt. Only the model and the effort differ.
+
+| | `cold:codex` (default) | `cold:codex-astra` |
+|---|---|---|
+| Model | `gpt-5.6-sol` | `gpt-6-astra` |
+| Report file | `review-<sha>-cold.md` | `review-<sha>-cold.md` — the SAME name |
+
+The identical filename is not a convention to remember, it is what
+`review.report_path` computes: it runs the lane through `_lane_prefix`
+(`review.py:200-202`, called at `review.py:620`), which strips everything after
+the first `:`. Run against all three spellings, `cold` / `cold:codex` /
+`cold:codex-astra` all resolve to `review-<sha>-cold.md`. So **no change to
+`LANES` and no new receipt schema** — `--lanes cold:codex-astra` is already legal.
+
+**It is REQUESTED, never detected.** Step 2 deleted a per-diff routing table
+because deciding lanes per diff is what cost 2.93M tokens; do not rebuild that
+table one layer deeper. A human or the orchestrator asks for Astra by name. The
+guidance for asking — not a trigger the skill evaluates — is a reviewed scope
+past roughly **20 files or 1,000 changed lines**, or a diff that changes **two or
+more interacting guards, gates or modules**. Below that, `cold:codex` is the
+answer and the burden is on whoever wants otherwise.
+
+**The family rule is unchanged and Astra does not bend it.** `gpt-6-astra` is
+still OpenAI/codex family. It may stand in for `cold:codex` — Claude- or
+antigravity-authored diffs — and it may **never** stand in for
+`cold:antigravity`, which exists precisely because codex wrote the code. Using it
+there records a same-family read as cross-family, which is the one claim this
+whole step is built to keep honest.
+
+**A refusal is not a finding, and never "no findings".** Five independent
+upstream reports — openai/codex issues 43163, 43781, 43131, 43208 and 42939 —
+have Astra returning `invalid_prompt` or a usage-policy rejection on *authorized*
+security work, and this repo's cold lane is pointed straight at `hook_guard.py`,
+`secret_guard.py` and friends. If the lane comes back with a refusal instead of a
+review: report it **verbatim**, do not retry it silently, fall back to
+`cold:codex`, and record in the receipt the lane that actually produced the
+findings. Issue 43706 ("Selected model is at capacity") is the same handling.
+
+**Expect 3–5× Sol, and plan the call around that.** OpenAI's model card rates
+Astra Speed 2/5, and issue 43038 reports 3–5× slower compaction. That is past the
+harness's ~600s foreground cap, so run it as a background call with `--output`
+and poll — see `references/lanes.md` for the exact invocation. A lane killed by
+its bound reviewed a SUBSET; §3's rule about naming what it did not finish
+applies with more force here, not less. A slower lane also makes a mandatory
+round 2 proportionally more expensive, which is another reason the request is
+explicit.
+
 ### 3. Report the lane verbatim
 
 Present under `## Cold (<lane>)`, verbatim or lightly cleaned. End with the

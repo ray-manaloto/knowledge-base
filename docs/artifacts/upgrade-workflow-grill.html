@@ -1,0 +1,73 @@
+<title>Upgrade Workflow Grill</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #F2F6F3;
+    --card: #FFFFFF;
+    --ink: #14201A;
+    --muted: #4E5E56;
+    --line: #C5D0C8;
+    --pick: #0F6B4E;
+    --ask: #7A5A10;
+    --ask-bg: #FBF4E2;
+    --settled-bg: #E6EFE9;
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+    --body: "Atkinson Hyperlegible", "Helvetica Neue", Arial, sans-serif;
+  }
+  html, body { background: var(--paper); color: var(--ink); }
+  body { margin: 0; font-family: var(--body); font-size: 17px; line-height: 1.4; }
+  main { max-width: 860px; margin: 0 auto; padding: 26px 24px 24px; display: grid; gap: 14px; }
+  h1 { font-family: var(--display); font-weight: 700; font-size: 34px; line-height: 1.1; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+  .card h2 { font-family: var(--display); font-weight: 700; font-size: 17px; margin: 0 0 6px; color: var(--pick); }
+  .card ol, .card ul { margin: 0; padding-left: 20px; }
+  .card li { margin: 0 0 4px; }
+  .card li b { font-weight: 700; }
+  .settled { background: var(--settled-bg); border-radius: 6px; padding: 10px 14px; margin: 0; font-size: 15px; color: var(--muted); }
+  .settled b { color: var(--pick); }
+  .ask { background: var(--ask-bg); border-left: 4px solid var(--ask); border-radius: 4px; padding: 12px 14px; }
+  .ask b { color: var(--ask); }
+  .ask p { margin: 0; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } body { font-size: 16px; } h1 { font-size: 28px; } }
+</style>
+<main>
+  <h1>Upgrade workflow — the shared understanding</h1>
+  <p class="settled"><b>Four rounds, sixteen answers.</b> This page is the whole agreement in one place. If every line reads as what you meant, say so and I start writing it down as issues, plan rows, workflow and agents.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>One run, in order</h2>
+      <ol>
+        <li><b>Recall</b> — search this project, branches and worktrees, issues, plans; never start from a blank page.</li>
+        <li><b>Research + architect</b> — re-examine the durable-workflow database (DBOS on SQLite), fold the per-tool config into it, audit for bugs, waste and vagueness, write the spec.</li>
+        <li><b>Fork rebase</b> — you, in the fork checkout: park the unpushed commit, replay the eight patches onto the newest release, push, move all eight pin sites, refresh both skill folders and version stamps.</li>
+        <li><b>Build</b> — I build the system from the spec; codex reviews it cold.</li>
+        <li><b>Upgrade</b> — all 35 pin sites by their own tool's command, each with its source pin, one commit each; then the corpus sweep; one graph rebuild; one pull request.</li>
+        <li><b>Close</b> — memory, reflection, plan rows ticked.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2>Settled rules</h2>
+      <ul>
+        <li>Newest <b>release tag</b> by default; a switch pins a branch tip.</li>
+        <li>Pins move by the <b>tool's own command</b>; text edit only as fallback.</li>
+        <li><b>Two layers</b>: Python does everything mechanical for free; agents do only judgment.</li>
+        <li>Done per tool = pin, lock, install, source pin, gates, one commit. <b>One rebuild per run</b>; deep re-extraction recorded as skipped.</li>
+        <li>Roster of <b>eight new agents</b> plus four reused — final knobs set <b>after</b> the Claude Code docs source is resynced.</li>
+        <li><b>New parent issue</b> at the head of the ticket chain, new top phase in the plan; the rest of Phase U resumes after.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Assumptions I will carry unless you object</h2>
+    <ul>
+      <li>"Latest" is automatic; a release note is read only when a gate goes red.</li>
+      <li>The pin files stay the truth for <em>which version</em>; the database owns <em>how far along</em> and the per-tool judgment (holds, probes, watched issues, the old run records).</li>
+      <li>Everything runs on subscriptions and local tools — no API keys, no hosted workflow service.</li>
+    </ul>
+  </div>
+
+  <div class="ask"><p><b>What I need from you:</b> one answer in the prompt — <em>confirmed</em>, or the line that is still fuzzy.</p></div>
+</main>

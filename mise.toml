@@ -1074,7 +1074,7 @@ run = "uv run kb-setup manifest-audit"
 timeout = "120s"
 
 [tasks.kb-codex]
-description = "Run a codex lane with this repo's mandatory flags (#672 U1)"
+description = "Run a codex lane with this repo's mandatory flags; --timeout bounds it (#672 U1)"
 # The ONE place that owns the codex flags, so a lane cannot be wrong by
 # OMISSION — which is exactly how `--dangerously-bypass-hook-trust` was missing
 # from every invocation until Ray pointed it out. `kb_setup.codex_lane` denies a
@@ -1089,9 +1089,28 @@ description = "Run a codex lane with this repo's mandatory flags (#672 U1)"
 # Running through mise is not incidental — it is how the lane gets the PINNED
 # codex. Measured 2026-09-03 on this machine: `mise exec -- codex` resolved
 # 0.152.1 while a bare `codex` on the same PATH resolved 0.152.0.
+#
+# TWO BOUNDS, AND THE OUTER ONE MUST NOT BE THE ONE THAT FIRES. `--timeout
+# <seconds>` (kb_setup.codex_run) ends the lane's process GROUP and returns 124
+# with an explicit "it reviewed a SUBSET, which is not a clean pass" on stderr.
+# The `timeout` below is mise killing the task, which says none of that — so
+# whenever both are set, the flag must be the SMALLER number or the informative
+# bound never runs. The `cold:codex-astra` review variant documents
+# `--timeout 3600`, and this ceiling sits deliberately above it.
+#
+# 1800s -> 5400s, 2026-09-09, and the reason is Ray's Astra directive rather
+# than a measurement: a gpt-6-astra review at xhigh is expected to run in tens of
+# minutes (OpenAI's own model card rates it Speed 2/5), and 30 minutes was
+# already inside that range. NO LARGE ASTRA REVIEW HAS BEEN TIMED HERE — the only
+# measurement is a trivial prompt, which bounds the floor and says nothing about
+# the ceiling. Revisit this number once a real one exists.
+#
+# The cost, stated because raising a ceiling is not free: a lane invoked with NO
+# `--timeout` can now hang for 90 minutes rather than 30. The remedy is the flag,
+# which is why the description names it.
 raw = true
 run = "uv run kb-setup codex"
-timeout = "1800s"
+timeout = "5400s"
 
 [tasks.kb-serve]
 description = "Start the read-only MCP server pinned to THIS graph (stdio)"
