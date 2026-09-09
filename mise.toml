@@ -1280,6 +1280,24 @@ description = 'Rank work-memory against a question: mise run kb-recall -- "<ques
 # states apart: hits / looked-and-found-nothing / did-not-look.
 run = "uv run kb-setup recall"
 
+[tasks.kb-recall-work]
+description = 'What already exists on a topic, BEFORE designing: mise run kb-recall-work -- "<topic>" [--offline] [--no-siblings] [--json]'
+# Phase 0 of the saved dependency-upgrade workflow (#727; Ray, 2026-09-09: "the
+# dynamic workflows should search this project, git local branches or git
+# worktrees, github issues, plans (include from ~/.claude) and ensure we never
+# forget this"). Seven probes, one denominator each: tracked files and
+# docs/artifacts pages (git grep --all-match), branches with ahead/behind and
+# merged-by-squash (ONE gh pr list per repo), linked worktrees, issues open AND closed
+# (gh api search/issues, never gh search), plans (.planning, .agent/plans,
+# ~/.claude/plans), and work-memory (kb-recall in-process). Sibling checkouts
+# ../graphify and ../dotfiles are examined when present.
+# Writes .agent/kb/recall/<slug>.md. REFUSES rather than returning an empty
+# list: nothing examined -> rc 127 and no report; examined but no match -> the
+# branch census is still written and rc 127 names every count, so a workflow
+# step cannot read "no prior work" as "the step was skipped".
+run = "uv run kb-setup recall-work"
+timeout = "10m"
+
 # --- second brain (routing seam; see dotfiles docs/specs/second-brain-design.md) ---
 # The brain/ vault is its OWN graph (separate from the aggregate — a vault note never
 # connects to code structurally, measured). Keys stripped so update stays the FREE

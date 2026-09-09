@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ray-manaloto/knowledge-base/schemas/recall-work.schema.json",
+  "title": "RecallWork",
+  "description": "The output of `mise run kb-recall-work -- \"<topic>\"`: what already exists on a topic across this repo, its sibling checkouts, GitHub issues, plans and work-memory, with an examined/matched count per probe so a zero is never mistaken for a probe that did not run. Phase 0 of the saved dependency-upgrade workflow consumes it (#727), which is why it is generated rather than hand-written.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "topic",
+    "stems",
+    "generated_at",
+    "repos",
+    "probes",
+    "branches",
+    "matched_total",
+    "report_path"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "topic": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "The topic as invoked, echoed verbatim."
+    },
+    "stems": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "The prefix stems searched for; a spelling is a bound."
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "When the run happened, ISO 8601 UTC."
+    },
+    "repos": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/Repo"
+      },
+      "description": "Every checkout examined; an unmeasurable one is absent."
+    },
+    "probes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/Probe"
+      }
+    },
+    "branches": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Branch"
+      },
+      "description": "Every branch measured, topic-matching or not."
+    },
+    "matched_total": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Topic matches over the probes that ran."
+    },
+    "report_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Where the markdown report was written."
+    }
+  },
+  "$defs": {
+    "ProbeName": {
+      "enum": [
+        "tracked_files",
+        "artifact_pages",
+        "branches",
+        "worktrees",
+        "issues",
+        "plans",
+        "memory"
+      ]
+    },
+    "ProbeStatus": {
+      "enum": [
+        "ran",
+        "could_not_ask",
+        "skipped"
+      ],
+      "description": "ran = examined and counted; could_not_ask = the tool or network failed, so its zero is not a zero; skipped = deliberately not run (offline, disabled, empty store)."
+    },
+    "Where": {
+      "enum": [
+        "local",
+        "remote",
+        "both"
+      ]
+    },
+    "Verdict": {
+      "enum": [
+        "merged",
+        "live",
+        "unverified",
+        "current"
+      ],
+      "description": "merged = no unique commits vs base, or a merged PR for this head; live = unique commits and no merged PR found; unverified = unique commits and GitHub could not be asked; current = checked out in a worktree, never deletable from here."
+    },
+    "Repo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "path",
+        "base",
+        "slug"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Measured against origin/HEAD, else origin/main, else main."
+        },
+        "slug": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "owner/repo from the origin URL; null when not GitHub."
+        }
+      }
+    },
+    "Probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "status",
+        "examined",
+        "matched",
+        "detail",
+        "hits"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/ProbeName"
+        },
+        "status": {
+          "$ref": "#/$defs/ProbeStatus"
+        },
+        "examined": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many items were looked at: the denominator."
+        },
+        "matched": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "detail": {
+          "type": "string",
+          "description": "The bound the probe ran under, or why it could not ask."
+        },
+        "hits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Hit"
+          }
+        }
+      }
+    },
+    "Hit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "summary"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A path, a branch name, an issue number, or a memory file."
+        },
+        "summary": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "score": {
+          "type": "number"
+        }
+      }
+    },
+    "Branch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repo",
+        "name",
+        "where",
+        "tip",
+        "date",
+        "subject",
+        "ahead",
+        "behind",
+        "verdict",
+        "topic_match"
+      ],
+      "properties": {
+        "repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "where": {
+          "$ref": "#/$defs/Where"
+        },
+        "tip": {
+          "type": "string",
+          "minLength": 1
+        },
+        "date": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "ahead": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "behind": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "merged_pr": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The merged PR whose head was this branch, if any."
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        },
+        "topic_match": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
