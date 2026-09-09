@@ -32,6 +32,7 @@ Together they are the property the module docstring now actually claims.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -128,8 +129,11 @@ def test_an_unrelated_question_returns_nothing(tmp_path: Path) -> None:
     assert isinstance(report, Ok)
     assert report.value.hits == []
     assert report.value.searched == 1
+    assert report.value.matched == 0
     rendered = recall.render_report(report.value)
-    assert "0 of 1 matched" in rendered
+    # Not "0 of 1 matched": the 1 there was the SEARCHED population, and reusing
+    # it as the denominator of "matched" is the #687 conflation this line lost.
+    assert "0 matched (searched 1 of 1 total memories" in rendered
 
 
 # --- outcome + recency weighting (spec §4) --------------------------------
@@ -648,7 +652,10 @@ def test_total_reports_the_real_file_count_and_surfaces_unparsable_files(
     assert report.value.total == 2, "total must count the real file on disk, not just parsed ones"
     assert report.value.unparsable == 1
     rendered = recall.render_report(report.value)
-    assert "1 file present but unreadable" in rendered
+    # "not indexed", not "unreadable" — this fixture IS a genuine read failure,
+    # but the count is a subtraction that cannot tell one from a readable
+    # non-memory file (#687), so the wording may only claim what it measured.
+    assert "1 file present but not indexed" in rendered
 
 
 # --- rendering -----------------------------------------------------------------
@@ -724,3 +731,99 @@ def test_answer_body_stops_at_the_real_footer_even_when_correction_has_headings(
         "more correction prose here.\n"
     )
     assert recall._answer_body(text) == "the real answer body."
+
+
+# --- #687: three defects found by a cold review whose base pre-dated PR #684 ---
+
+
+def test_answer_body_survives_an_answer_that_documents_the_footer_format() -> None:
+    """#687 finding 1: quoting the footer VERBATIM must not truncate the answer.
+
+    `_FOOTER_MARKERS` was chosen as heading-plus-bullet on the claim that the
+    signature "cannot appear by coincidence in ordinary answer prose". This
+    store invites the counterexample: a memory whose answer DOCUMENTS the
+    memory format quotes `## Outcome` / `- Signal:` exactly, and every word
+    after it was dropped before indexing. Scanning from the END fixes it —
+    graphify writes the real footer last.
+    """
+    text = (
+        '---\ntype: "query"\n---\n\n# Q: what shape does a memory file take?\n\n'
+        "## Answer\n\n"
+        "A memory file ends with graphify's own footer, which looks like this:\n\n"
+        "## Outcome\n\n- Signal: useful\n\n"
+        "and everything above that heading is the answer body.\n\n"
+        "## Outcome\n\n- Signal: useful\n"
+    )
+    body = recall._answer_body(text)
+    assert "which looks like this" in body
+    assert "everything above that heading is the answer body" in body, (
+        "text after the DOCUMENTED footer example was dropped — the first-match rule (#687)"
+    )
+
+
+def test_matched_counts_before_top_slices_and_the_header_says_so(tmp_path: Path) -> None:
+    """#687 finding 2: the header's "of N matched" must be the MATCH count.
+
+    It was `searched` — the whole post-filter population — so a two-hit query
+    on the live store rendered "2 of 382 matched (382 total memories)", two
+    printings of one number that never named how many memories the terms hit.
+    (The ticket predicted "2 of 2"; measured 2026-09-08, the real shape was
+    the more misleading one. An inherited finding is a lead, not a reading.)
+    """
+    for name in ("one", "two", "three"):
+        _memory(
+            tmp_path,
+            name,
+            question=f"How does the quokka subsystem handle {name}?",
+            answer="The quokka subsystem is deterministic.",
+        )
+    # A fourth record that SURVIVES filtering but matches none of the terms, so
+    # searched (4) and matched (3) differ. Without it the two are equal and the
+    # mutation swapping one for the other is an INERT MUTANT — measured: arm A2
+    # of `2026-09-08-687-recall-defects-arms.toml` survived on the first pass
+    # for exactly this reason, and a surviving arm is a statement about the
+    # fixture before it is one about the code.
+    _memory(
+        tmp_path,
+        "unrelated",
+        question="What pins the lychee version?",
+        answer="An exact pin in mise.toml, never a floating range.",
+    )
+    request = recall.check_recall(["quokka subsystem", "--top", "2"])
+    assert isinstance(request, Ok)
+    report = recall.run_recall(request.value, tmp_path)
+    assert isinstance(report, Ok)
+    assert len(report.value.hits) == 2, "--top must still bound the hits"
+    assert report.value.matched == 3, "matched is the PRE-slice count"
+    assert report.value.searched == 4, "searched must exceed matched, or A2 is inert"
+    rendered = recall.render_report(report.value)
+    assert "showing 2 of 3 matched (searched 4 of 4 total memories" in rendered
+    assert json.loads(recall.render_json(report.value))["matched"] == 3
+
+
+def test_a_readable_non_memory_file_is_reported_as_not_indexed(tmp_path: Path) -> None:
+    """#687 finding 3: a readable `.md` that is not a memory is not "unreadable".
+
+    `load_memory_docs` `continue`s identically for a read failure and for a
+    perfectly readable file with no frontmatter, so the count is a subtraction
+    that cannot tell them apart. The COUNT was right; the WORD was not.
+    """
+    _memory(
+        tmp_path,
+        "real",
+        question="How does kb-build reproduce the graph?",
+        answer="kb-build clones every pinned manifest and re-extracts.",
+    )
+    # Readable UTF-8, valid markdown, simply not a memory document.
+    (tmp_path / "README.md").write_text(
+        "# Notes\n\nAn ordinary readable markdown file someone dropped in here.\n",
+        encoding="utf-8",
+    )
+    request = recall.check_recall(["kb-build reproduce graph"])
+    assert isinstance(request, Ok)
+    report = recall.run_recall(request.value, tmp_path)
+    assert isinstance(report, Ok)
+    assert report.value.unparsable == 1
+    rendered = recall.render_report(report.value)
+    assert "1 file present but not indexed" in rendered
+    assert "unreadable" not in rendered, "the file reads fine; only the parse declined it"

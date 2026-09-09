@@ -203,16 +203,36 @@ class RecallReport:
     below closes that gap.
     """
     unparsable: int
-    """`.md` files present on disk that `load_memory_docs` could NOT parse.
+    """`.md` files present on disk that `load_memory_docs` did NOT return.
 
     0 on every live run today — the corpus has no such file — but a store that
     silently under-reports its own denominator is exactly the failure
     `probes-need-a-control-arm.md` names, and this module's own docstring
     already promises the searched-count is never silent about what it looked
     at. `render_report` surfaces this only when nonzero.
+
+    ⚠️ IT CONFLATES TWO CAUSES, AND CANNOT TELL THEM APART. `load_memory_docs`
+    swallows `OSError`/`UnicodeDecodeError` per file AND skips a readable `.md`
+    that is simply not a memory document (no frontmatter) — both `continue`,
+    identically, so this number is a subtraction and nothing more. #687 filed
+    the second half as a defect, reading a foreign-but-readable file being
+    rendered "unreadable" as an inflated count. The COUNT is right; the WORD
+    was wrong, so the rendering now says *not indexed* — which is all the
+    subtraction can support — rather than claiming a read failed.
     """
     searched: int
     """How many memories survived `--outcome`/`--since`, before term matching."""
+    matched: int
+    """How many memories matched the question's terms, BEFORE `--top` sliced them.
+
+    `hits` is post-slice, so it cannot answer "how many matched" — and until
+    #687 nothing could: this count was computed inside `run_recall` and thrown
+    away, leaving `render_report` to print `len(hits)` against `searched`. That
+    read as *"2 of 382 matched"* on the live store (measured 2026-09-08), where
+    382 is the whole searched population and the true match count was never
+    shown. #687 predicted the header would say `2 of 2`; the arm disagreed with
+    the ticket, and the real shape is the more misleading of the two.
+    """
     outcome: str
     since: str | None
     question: str = field(repr=False)
@@ -403,9 +423,20 @@ def _filter_records(
 #: body can itself contain markdown headings (measured: at least one live
 #: record's correction is a multi-paragraph write-up with nested `## `
 #: headings) — so neither "first `## `" nor "first `## Outcome`" is a safe
-#: terminator. The first bullet is the writer's own structural signature and
-#: cannot appear by coincidence in ordinary answer prose describing the same
-#: heading text.
+#: terminator.
+#:
+#: ⚠️ AND NEITHER IS THE FIRST MATCH OF THESE MARKERS. This comment claimed the
+#: heading-plus-bullet signature "cannot appear by coincidence in ordinary answer
+#: prose describing the same heading text"; #687 refuted it with the obvious
+#: counterexample, which this store invites: an answer that DOCUMENTS the memory
+#: format quotes the footer verbatim, bullet and all. `_answer_body` therefore
+#: scans from the END (`rfind`) — graphify writes the footer last, so the real
+#: boundary is the LAST match, never the first.
+#:
+#: One case stays indistinguishable by construction, and is accepted rather than
+#: guessed at: an answer that quotes the footer shape and has NO real footer
+#: after it (foreign or hand-edited markdown). Nothing in the text separates that
+#: from a genuine footer, so it still truncates there.
 _FOOTER_MARKERS: tuple[str, ...] = (
     "\n## Outcome\n\n- Signal:",
     "\n## Outcome\n\n- Correction:",
@@ -439,7 +470,7 @@ def _answer_body(text: str) -> str:
     remainder = text[start + len(marker) :]
     end = None
     for footer in _FOOTER_MARKERS:
-        idx = remainder.find(footer)
+        idx = remainder.rfind(footer)
         if idx != -1 and (end is None or idx < end):
             end = idx
     body = remainder if end is None else remainder[:end]
@@ -564,6 +595,7 @@ def run_recall(request: RecallRequest, memory_dir: Path) -> Result[RecallReport]
                 total=real_total,
                 unparsable=unparsable,
                 searched=0,
+                matched=0,
                 outcome=request.outcome,
                 since=request.since,
                 question=request.question,
@@ -613,6 +645,7 @@ def run_recall(request: RecallRequest, memory_dir: Path) -> Result[RecallReport]
             total=real_total,
             unparsable=unparsable,
             searched=len(filtered),
+            matched=len(weighted),
             outcome=request.outcome,
             since=request.since,
             question=request.question,
@@ -621,26 +654,39 @@ def run_recall(request: RecallRequest, memory_dir: Path) -> Result[RecallReport]
 
 
 def _unparsable_suffix(report: RecallReport) -> str:
-    """The " (N file(s) present but unreadable)" suffix, or "" when unparsable is 0."""
+    """The " (N file(s) present but not indexed)" suffix, or "" when unparsable is 0.
+
+    "not indexed" rather than "unreadable" (#687): the number is `real_total`
+    minus what `load_memory_docs` returned, and that subtraction cannot
+    distinguish a file that failed to READ from a readable `.md` that is not a
+    memory document. Saying "unreadable" claimed the first when only the union
+    was measured — see `RecallReport.unparsable`.
+    """
     if not report.unparsable:
         return ""
     noun = "file" if report.unparsable == 1 else "files"
-    return f" ({report.unparsable} {noun} present but unreadable)"
+    return f" ({report.unparsable} {noun} present but not indexed)"
 
 
 def render_report(report: RecallReport) -> str:
     """The operator-facing rendering of a `RecallReport`."""
     if not report.hits:
         return (
-            f'[recall] "{report.question}" — 0 of {report.searched} matched '
+            f'[recall] "{report.question}" — 0 matched '
             f"(searched {report.searched} of {report.total} total memories; "
             f"outcome={report.outcome}, since={report.since or 'any'})"
             f"{_unparsable_suffix(report)}"
         )
+    # `matched`, not `searched`, is the denominator "of N matched" promises. The
+    # earlier form printed `len(hits)` against the whole searched population, so
+    # a two-hit query on the live store read "2 of 382 matched (382 total …)" —
+    # a line whose two numbers were the same number, saying nothing about how
+    # many memories the terms actually hit (#687).
     lines = [
         (
-            f'[recall] "{report.question}" — {len(report.hits)} of {report.searched} '
-            f"matched ({report.total} total memories in the store)"
+            f'[recall] "{report.question}" — showing {len(report.hits)} of '
+            f"{report.matched} matched (searched {report.searched} of "
+            f"{report.total} total memories in the store)"
             f"{_unparsable_suffix(report)}"
         )
     ]
@@ -661,6 +707,7 @@ def render_json(report: RecallReport) -> str:
         "total": report.total,
         "unparsable": report.unparsable,
         "searched": report.searched,
+        "matched": report.matched,
         "outcome": report.outcome,
         "since": report.since,
         "hits": [asdict(hit) for hit in report.hits],
