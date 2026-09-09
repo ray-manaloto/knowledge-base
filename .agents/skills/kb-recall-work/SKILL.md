@@ -37,7 +37,7 @@ is the whole design: a `0` next to `4,213 examined` is a finding, a `0` next to
 | `branches` | local + origin branches in each repo, ahead/behind its base; a local and a remote tip that DIFFER are two rows | a name matches on ANY stem — but EVERY branch is in the census |
 | `worktrees` | linked worktrees; a repo whose listing failed is `could_not_ask`, and nothing there reads merged | listed whatever the topic |
 | `issues` | GitHub search, open AND closed, `examined` = every issue in the repo | the topic words; `could_not_ask` on a rate limit or an `incomplete_results` answer, never `0` |
-| `plans` | `.planning/*/{task_plan,findings,progress}.md` and `.agent/plans/session-*.md` in EVERY checkout, `~/.claude/plans/*.md` once | EVERY stem |
+| `plans` | every `.md` under `.planning/` and `.agent/plans/` in EVERY checkout and each of its linked worktrees, `~/.claude/plans/*.md` once | EVERY stem |
 | `memory` | `kb-recall`'s BM25 over `graphify-out/memory/`; files it could not index are counted in the detail | ranked, top N shown |
 
 **The stems are printed on every run** (`dependency upgrade` -> `dependenc,

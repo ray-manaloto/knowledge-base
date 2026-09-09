@@ -617,6 +617,11 @@ def test_a_linked_worktree_is_listed_and_its_branch_can_match(
 ) -> None:
     linked = tmp_path.parent / f"{tmp_path.name}-wt"
     git("worktree", "add", "-q", "-b", "feat/upgrade-wt", str(linked), "main")
+    # Round-2 P2: a plan that lives only in the linked worktree (untracked, so no
+    # other probe can reach it) is found and labelled with the worktree.
+    plan = linked / ".agent" / "plans" / "session-2026-09-09-wt.md"
+    plan.parent.mkdir(parents=True)
+    plan.write_text("# worktree handoff\n\nthe upgrade in progress\n", encoding="utf-8")
     try:
         result = recall_work.run(tmp_path, _offline("upgrade", tmp_path))
         assert isinstance(result, Ok)
@@ -625,8 +630,35 @@ def test_a_linked_worktree_is_listed_and_its_branch_can_match(
         assert worktrees.hits[0].summary == "feat/upgrade-wt"
         # A branch checked out in ANY worktree is `current`, never a deletion candidate.
         assert _branch(result.value, "feat/upgrade-wt").verdict is Verdict.current
+        plans = _probe(result.value, ProbeName.plans)
+        assert (plans.examined, plans.matched) == (1, 1)
+        assert plans.hits[0].ref == ".agent/plans/session-2026-09-09-wt.md"
+        assert plans.hits[0].repo == f"{tmp_path.name} worktree {linked.name}"
     finally:
         git("worktree", "remove", "--force", str(linked))
+
+
+def test_an_archived_plan_with_any_filename_is_still_a_plan(
+    git: Callable[..., str], tmp_path: Path
+) -> None:
+    """Round-2 P2: `session-*.md` missed a sibling's `task_plan-archived-*.md`."""
+    git("rev-parse", "HEAD")
+    archived = tmp_path / ".agent" / "plans" / "task_plan-archived-20260830.003.md"
+    archived.parent.mkdir(parents=True)
+    archived.write_text("# archived plan\n\nthe dependency upgrade protocol\n", encoding="utf-8")
+    nested = tmp_path / ".planning" / "archive" / "old-round" / "task_plan.md"
+    nested.parent.mkdir(parents=True)
+    nested.write_text("# old round\n\nupgrade every dependency\n", encoding="utf-8")
+
+    result = recall_work.run(tmp_path, _offline("dependency upgrade", tmp_path))
+
+    assert isinstance(result, Ok)
+    plans = _probe(result.value, ProbeName.plans)
+    assert (plans.examined, plans.matched) == (2, 2)
+    assert {h.ref for h in plans.hits} == {
+        ".agent/plans/task_plan-archived-20260830.003.md",
+        ".planning/archive/old-round/task_plan.md",
+    }
 
 
 # --- the contract and the CLI grammar ----------------------------------------------------
@@ -674,6 +706,8 @@ def test_an_oversized_topic_is_refused_before_any_search(
         (["--limit", "0", "t"], "non-positive --limit"),
         (["--bogus", "t"], "unknown flag"),
         (["t", "--repo"], "flag with no value"),
+        (["t", "--repo", "--offline"], "a flag where a value belongs must not become the value"),
+        (["t", "--out", "--json"], "same, for --out"),
     ],
 )
 def test_a_malformed_request_is_a_bad_request(args: list[str], why: str) -> None:

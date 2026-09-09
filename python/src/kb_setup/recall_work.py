@@ -97,13 +97,14 @@ DEFAULT_SIBLINGS = ("graphify", "dotfiles")
 #: (the graph's territory) — a hit there is not OUR prior work.
 EXCLUDED_PATHSPECS = ("graphify-out", "sources", "raw")
 
-#: Plan locations, relative to the repo root. `~/.claude/plans` is added at run
-#: time because Ray asked for it by name ("include from ~/.claude").
+#: Plan locations, relative to each checkout (and each of its linked worktrees).
+#: `~/.claude/plans` is added at run time because Ray asked for it by name
+#: ("include from ~/.claude"). Every `.md`, not a filename pattern: a
+#: `session-*.md` restriction missed a sibling's `task_plan-archived-*.md`
+#: (Astra round 2, P2).
 PLAN_GLOBS = (
-    ".planning/*/task_plan.md",
-    ".planning/*/findings.md",
-    ".planning/*/progress.md",
-    ".agent/plans/session-*.md",
+    ".planning/**/*.md",
+    ".agent/plans/*.md",
 )
 
 #: Words that carry no topic. Short and deliberately incomplete: a stopword list
@@ -931,6 +932,26 @@ def _mtime_date(path: Path) -> str:
     return datetime.fromtimestamp(stat.st_mtime, tz=UTC).date().isoformat()
 
 
+def _plan_roots(ctx: RepoCtx) -> list[tuple[Path, str]]:
+    """The checkout and each of its linked worktrees, labelled, without duplicates.
+
+    A linked worktree's `.agent/plans/` is untracked and lives only there; the
+    branch census already knew the path and the plan probe never looked (Astra
+    round 2, P2).
+    """
+    roots: list[tuple[Path, str]] = [(ctx.path, ctx.name)]
+    seen = {ctx.path.resolve()}
+    for wt in ctx.worktrees or ():
+        if ctx.is_primary(wt) or not wt.path.is_dir():
+            continue
+        resolved = wt.path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        roots.append((wt.path, f"{ctx.name} worktree {wt.path.name}"))
+    return roots
+
+
 def probe_plans(repos: Sequence[RepoCtx], search: Search, plans_home: Path | None) -> Probe:
     """`plans`: every checkout's plan files and handoffs, plus `~/.claude/plans/*.md` once.
 
@@ -939,15 +960,16 @@ def probe_plans(repos: Sequence[RepoCtx], search: Search, plans_home: Path | Non
     the root alone while listing the siblings as examined (Astra round 1, P2).
     """
     home = plans_home if plans_home is not None else Path.home() / ".claude" / "plans"
-    files: list[tuple[Path, RepoCtx | None]] = []
+    files: list[tuple[Path, str | None, Path]] = []
     for ctx in repos:
-        for pattern in PLAN_GLOBS:
-            files.extend((p, ctx) for p in sorted(ctx.path.glob(pattern)))
+        for root, label in _plan_roots(ctx):
+            for pattern in PLAN_GLOBS:
+                files.extend((p, label, root) for p in sorted(root.glob(pattern)))
     if home.is_dir():
-        files.extend((p, None) for p in sorted(home.glob("*.md")))
+        files.extend((p, None, Path.home()) for p in sorted(home.glob("*.md")))
     hits: list[Hit] = []
     unreadable = 0
-    for path, ctx in files:
+    for path, label, root in files:
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -955,15 +977,15 @@ def probe_plans(repos: Sequence[RepoCtx], search: Search, plans_home: Path | Non
             continue
         if _all(text, search.stems):
             heading = _HEADING_RE.search(text)
-            root = ctx.path if ctx is not None else Path.home()
             hit = Hit(ref=_display(path, root), summary=heading.group(1) if heading else "")
             hit.date = _mtime_date(path)
-            if ctx is not None:
-                hit.repo = ctx.name
+            if label is not None:
+                hit.repo = label
             hits.append(hit)
     examined = len(files) - unreadable
     detail = (
-        f"{', '.join(PLAN_GLOBS)} in every checkout, and {home}; a plan must contain EVERY stem"
+        f"{', '.join(PLAN_GLOBS)} in every checkout and its linked worktrees, and {home}; "
+        "a plan must contain EVERY stem"
     )
     if unreadable:
         detail += f"; {unreadable} file(s) could not be read"
@@ -1260,7 +1282,10 @@ def parse(args: Sequence[str]) -> Result[Options]:
         if item in _BOOL_FLAGS:
             flags.add(item)
         elif item in _VALUE_FLAGS:
-            if not pending:
+            # A following option is not a value: `--repo --offline` once took
+            # `--offline` as the repository path and silently dropped the mode
+            # (Astra round 2, P2).
+            if not pending or pending[0].startswith("-"):
                 return Err(f"{item} needs a value", rc=Rc.BAD_REQUEST)
             refusal = _apply_value(item, pending.pop(0), values)
             if refusal is not None:
