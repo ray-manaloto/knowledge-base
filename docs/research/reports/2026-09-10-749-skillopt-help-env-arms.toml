@@ -1,0 +1,85 @@
+# Mutation arms for the skillopt help-fingerprint fix (PR #749, found in-session).
+#
+# THE DEFECT. `cli_help_fingerprint` hashes SkillOpt's `--help` to detect a change
+# in its CLI surface, and it INHERITED the ambient environment. Two ambient facts
+# reach the hashed bytes:
+#
+#   * Python 3.14 colourises argparse help and honours `FORCE_COLOR` even when
+#     stdout is a pipe. This repo's sessions export `FORCE_COLOR=3`.
+#   * argparse wraps to `shutil.get_terminal_size()`, which reads `COLUMNS`.
+#
+# Measured 2026-09-10 against the pinned commit `93bdf3d7…`, with the installed
+# package verified unchanged via `direct_url.json` and Python at the pinned 3.14.7:
+#
+#   COLUMNS=80  -> da8b083e…      COLUMNS=120 -> df1f2fd8…
+#   COLUMNS=100 -> ef3a7b30…      COLUMNS=200 -> 2a38f537…
+#   pinned env  -> ebf79f8b…   == the recorded expectation, exactly
+#
+# So `mise run test` was rc 0 at `6d109e5f` (gates artifact, clean tree, 17:57Z)
+# and rc 2 an hour later in a shell exporting `FORCE_COLOR`. Nothing in the repo
+# moved. The gate reported "SkillOpt's CLI changed" about a window.
+#
+# THE FIX was already in the same file: `mock_dry_run_probe` builds an explicit
+# `env` dict and is immune; the help capture inherited. `_help_env()` closes that
+# asymmetry, and causes NO hash churn — the pinned environment reproduces the
+# recorded digest.
+#
+# 🔴 WHY THE ARMS ALONE ARE NOT ENOUGH, and why the fix ships a TEST too.
+# An arm that reverts `env=_help_env(...)` dies only in a shell that happens to
+# export `FORCE_COLOR` or `COLUMNS`. In a clean shell it SURVIVES — and would be
+# read as "the test cannot see this defect", when the truth is "this environment
+# cannot exhibit it". That is `probes-need-a-control-arm.md` rule 1 pointed at the
+# harness itself. So `test_the_help_fingerprint_ignores_a_hostile_ambient_
+# environment` sets the hostile values ITSELF and asks the question in every
+# environment; C1 below is the complementary arm, and its result is only
+# meaningful when the run's own environment is hostile.
+#
+# Ran here with FORCE_COLOR=3 exported, which is why C1 is expected to die.
+
+suites = ["tests/test_skillopt_contract.py"]
+
+# C0 — the control. Docstring-only, must change nothing.
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/skillopt_contract.py"
+old = '''    `PATH` is the venv first so the entry point resolves here rather than to a
+    user-global install, matching the confinement check's posture.
+    """'''
+new = '''    `PATH` is the venv first so the entry point resolves here rather than to a
+    user-global install, matching the confinement check's posture. (control)
+    """'''
+
+# C1 — THE FIX ITSELF, reverted to the literal pre-fix call: drop the `env=`
+# kwarg so the capture inherits again. This is the realistic break (a kwarg
+# deleted, which is how it was absent in the first place), not a renamed symbol.
+[[arm]]
+id = "C1"
+test = "test_the_help_fingerprint_ignores_a_hostile_ambient_environment"
+file = "python/src/kb_setup/skillopt_contract.py"
+old = '''            [str(executable), "--help"],
+            cwd=repo_root,
+            env=_help_env(repo_root),'''
+new = '''            [str(executable), "--help"],
+            cwd=repo_root,'''
+
+# C2 — colour only. Keep the pinned env but let colour through, to prove the
+# colour half is load-bearing on its own and not carried by the width pin.
+[[arm]]
+id = "C2"
+test = "test_the_help_env_pins_every_variable_that_reaches_the_bytes"
+file = "python/src/kb_setup/skillopt_contract.py"
+old = '''        "PYTHON_COLORS": "0",
+        "NO_COLOR": "1",'''
+new = '''        "NO_COLOR": "1",'''
+
+# C3 — width only. Drop the `COLUMNS` pin and let argparse ask the terminal.
+# Separated from C2 because a single arm covering both would leave it unknown
+# which one the test actually sees.
+[[arm]]
+id = "C3"
+test = "test_the_help_env_pins_every_variable_that_reaches_the_bytes"
+file = "python/src/kb_setup/skillopt_contract.py"
+old = '''        "COLUMNS": "80",
+    }'''
+new = '''    }'''

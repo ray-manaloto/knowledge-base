@@ -291,6 +291,60 @@ def _git(repo: Path, *args: str) -> str:
     return result.stdout.strip() if result.returncode == 0 and not result.stderr else ""
 
 
+def _help_env(repo_root: Path) -> dict[str, str]:
+    """The environment `--help` is captured in — PINNED, never inherited.
+
+    🔴 THIS FUNCTION IS THE FIX FOR A GATE THAT MEASURED THE TERMINAL. The
+    fingerprint below hashes `--help` to detect a change in SkillOpt's CLI
+    surface. It inherited the ambient environment, and **two ambient facts reach
+    those bytes**:
+
+    * **Colour.** Python 3.14 colourises argparse help. `capture_output=True`
+      pipes stdout, which would normally disable it — but `FORCE_COLOR` overrides
+      the tty check, and this repo's sessions export `FORCE_COLOR=3`. ANSI escapes
+      then land inside the hash.
+    * **Width.** argparse wraps to `shutil.get_terminal_size()`, which reads
+      `COLUMNS` before falling back to 80.
+
+    Measured 2026-09-10 against the pinned commit, package verified unchanged via
+    `direct_url.json`:
+
+        COLUMNS=80  -> da8b083e...      COLUMNS=120 -> df1f2fd8...
+        COLUMNS=100 -> ef3a7b30...      COLUMNS=200 -> 2a38f537...
+        pinned env  -> ebf79f8b...  == the recorded expectation
+
+    So the gate could fail on a window resize and pass on a resize back, with
+    nothing in the repo having moved — and it did exactly that: `test` was rc 0
+    at `6d109e5f` and rc 2 an hour later in a shell that exported `FORCE_COLOR`.
+    A check that cannot tell "the thing changed" from "my environment changed"
+    reports the wrong subject.
+
+    The remedy was already in this file: :func:`mock_dry_run_is_confined` builds
+    an explicit `env` dict and is immune. The help capture inherited. That
+    asymmetry was the whole defect, and closing it causes NO hash churn — the
+    pinned environment reproduces the recorded digest exactly, armed both ways
+    (clean shell, and a shell exporting `FORCE_COLOR=3 CLICOLOR_FORCE=1
+    COLUMNS=200`: identical digests).
+
+    `PATH` is the venv first so the entry point resolves here rather than to a
+    user-global install, matching the confinement check's posture.
+    """
+    return {
+        "PATH": f"{repo_root / '.venv' / 'bin'}:/usr/bin:/bin",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        # The three that decide the BYTES. Named, not merely omitted: an
+        # inherited-and-empty environment would still let a future default flip
+        # colour back on, and a reader deleting one of these should have to
+        # notice what it is for.
+        "PYTHON_COLORS": "0",
+        "NO_COLOR": "1",
+        "TERM": "dumb",
+        # argparse's wrap width. 80 is `shutil.get_terminal_size()`'s own
+        # fallback, so pinning it preserves every digest recorded before this fix.
+        "COLUMNS": "80",
+    }
+
+
 def cli_help_fingerprint(repo_root: Path) -> tuple[tuple[str, str], ...]:
     """Run every installed console entry point's help without user-global lookup."""
     bin_dir = repo_root / ".venv" / "bin"
@@ -302,6 +356,7 @@ def cli_help_fingerprint(repo_root: Path) -> tuple[tuple[str, str], ...]:
         result = subprocess.run(
             [str(executable), "--help"],
             cwd=repo_root,
+            env=_help_env(repo_root),
             capture_output=True,
             text=True,
             check=False,
