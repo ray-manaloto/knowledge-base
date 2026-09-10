@@ -85,7 +85,10 @@ reviewing anything.
 
 Pass the exclusion to every lane, not just to your own `git diff`. Those files
 are still tracked, still promoted, still verbatim (`agent-report-persistence.md`
-is unchanged) — they are simply not code under review.
+is unchanged) — they are simply not code under review. **Exclude generated
+lockfiles the same way — `':(exclude)mise.lock' ':(exclude)uv.lock'` — and SAY
+one was withheld.** One was 91% of a review's input and the lane then reported
+the real change as absent, marked CONFIRMED; `references/lanes.md` has it.
 
 **A branch touching ONLY `docs/research/**` therefore has an empty SCOPED diff,
 and that is a different state from a bad ref — do not report it as "nothing to

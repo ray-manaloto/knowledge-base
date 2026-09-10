@@ -30,14 +30,58 @@ codex-authored branch recorded a **same-family** read as `cold:codex`. Three
 separate lanes flagged it in one round: SKILL.md had been corrected and its own
 reference file had not.
 
+### 🔴 A GENERATED LOCKFILE WILL EAT THE REVIEW — exclude it, and say so
+
+SKILL.md step 1 carries the norm; this is the measurement, because the norm alone
+reads like tidiness and it is not.
+
+On 2026-09-10 a branch whose real change was one module, one test file and a
+two-line config edit was piped to a lane with only the `docs/research/**`
+exclusion applied:
+
+| | bytes |
+|---|---|
+| total piped | **473,216** |
+| `mise.lock` | 21,716 → 451,607 — **91%** |
+| `mise.toml` | 451,607 |
+| `lock_drift.py` | 455,990 |
+| `test_lock_drift.py` | 468,478 |
+
+Everything reviewable sat in the last 5%. The lane came back reporting, three
+times and marked **CONFIRMED-FROM-DIFF**, that *"the code for the check is
+completely missing from this diff"*, *"the parser code is completely missing"*,
+and *"the two-line config change is missing"*. None of that was true.
+
+**That is worse than an ordinary truncation.** The same day, a different lane
+said *"no tests included or modified"* — a quiet omission that invites a second
+look. This one asserted the change did not exist, with a confidence marker, as
+its headline. Acted on, it says the branch is empty prose.
+
+Re-run with `':(exclude)mise.lock'` added and one sentence in the prompt saying a
+generated file was withheld and why: **19,235 input tokens instead of 116,172**,
+and six real findings — including one that would have let the new gate report a
+CRASHED tool as a clean result.
+
+Two rules follow:
+
+1. **Exclude it** — `':(exclude)mise.lock' ':(exclude)uv.lock'` beside the prose
+   exclusion, in the prompt template below as well as in your own `git diff`.
+2. **Tell the lane.** An unexplained gap is something a reviewer reasons about;
+   an explained one is something it can set aside. A lockfile's semantic content
+   is one or two facts, and they belong in the commit message where a human wrote
+   them — the other 4,400 lines are machine-resolved checksums nobody reviews by
+   reading.
+
 **By ref, and cold.** Hand it the range and nothing else:
 
 ```text
 Review <FIXED>...HEAD in this repository. Read the diff yourself, using this
-exact scope — it excludes one tracked prose directory that is not code under
-review:
+exact scope. It withholds three things that are not code under review: one
+tracked prose directory, and two GENERATED lockfiles whose churn would otherwise
+crowd out the change (one was 91% of a review's input once, and the lane then
+reported the real change as absent):
 
-    git diff <FIXED>...HEAD -- . ':(exclude)docs/research/**'
+    git diff <FIXED>...HEAD -- . ':(exclude)docs/research/**' ':(exclude)mise.lock' ':(exclude)uv.lock'
 
 METHOD — include this whenever the diff contains a check, a gate or a guard:
 
