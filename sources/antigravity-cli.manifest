@@ -38,7 +38,7 @@
 # changed between 1.1.20 and 1.1.25". `kind = docs` ingests exactly those two
 # files instead.
 url = https://github.com/google-antigravity/antigravity-cli
-ref = 1.1.25
-commit = 7e1316ca775dc3805aac13b2db5cd37d89d5aae8
+ref = 1.2.0
+commit = 34406bef8e87fc103783c0c9715e5e2cce3c3e1b
 kind = docs
 added = 2026-08-02
