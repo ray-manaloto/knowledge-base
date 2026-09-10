@@ -13,6 +13,11 @@ import pytest
 from kb_setup import skillopt_contract
 
 
+def _repo() -> Path:
+    """The repo root, the same way `test_real_help_and_mock_dry_run…` resolves it."""
+    return Path(__file__).parent.parent
+
+
 def _contract_repo(tmp_path: Path) -> Path:
     source = Path(__file__).parent.parent
     for relative in (
@@ -315,3 +320,58 @@ def test_locked_sync_rejects_and_retains_warning(
     )
     with pytest.raises(RuntimeError, match="warning: source changed"):
         skillopt_contract.locked_sync_is_stable(tmp_path)
+
+
+def test_the_help_fingerprint_ignores_a_hostile_ambient_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """🔴 The gate measured the TERMINAL, not the CLI. Found 2026-09-10.
+
+    `cli_help_fingerprint` hashes `--help` to detect a change in SkillOpt's CLI
+    surface, and it INHERITED the ambient environment. Two ambient facts reach
+    those bytes: Python 3.14 colourises argparse help and honours `FORCE_COLOR`
+    even into a pipe, and argparse wraps to `COLUMNS`. Measured against the
+    pinned commit with the package verified unchanged:
+
+        COLUMNS=80 -> da8b083e...   100 -> ef3a7b30...   200 -> 2a38f537...
+
+    So `mise run test` was rc 0 at `6d109e5f` and rc 2 an hour later in a shell
+    exporting `FORCE_COLOR=3`, with nothing in the repo having moved.
+
+    WHY THIS TEST AND NOT ONLY A MUTATION ARM: an arm that reverts the fix dies
+    only in a shell that happens to export one of these, so in a clean shell it
+    would SURVIVE and be read as "the fix was unnecessary". This test sets the
+    hostile values itself, so it asks the question in every environment —
+    `probes-need-a-control-arm.md`, a probe that can only pass is not a check.
+    """
+    for name, value in (
+        ("FORCE_COLOR", "3"),
+        ("CLICOLOR_FORCE", "1"),
+        ("COLUMNS", "200"),
+        ("TERM", "xterm-256color"),
+    ):
+        monkeypatch.setenv(name, value)
+    hostile = skillopt_contract.cli_help_fingerprint(_repo())
+
+    for name in ("FORCE_COLOR", "CLICOLOR_FORCE", "COLUMNS"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("TERM", "dumb")
+    clean = skillopt_contract.cli_help_fingerprint(_repo())
+
+    assert hostile == clean, "the help fingerprint still depends on the ambient environment"
+
+
+def test_the_help_env_pins_every_variable_that_reaches_the_bytes() -> None:
+    """The pinned keys are named, not merely absent from an inherited dict.
+
+    An empty inherited environment would still let a future Python default flip
+    colour back on. Naming them also means a reader deleting one has to notice
+    what it is for.
+    """
+    env = skillopt_contract._help_env(_repo())
+    assert env["PYTHON_COLORS"] == "0"
+    assert env["NO_COLOR"] == "1"
+    assert env["COLUMNS"] == "80"
+    assert env["TERM"] == "dumb"
+    assert "FORCE_COLOR" not in env
+    assert str(_repo() / ".venv" / "bin") in env["PATH"]

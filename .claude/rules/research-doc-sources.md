@@ -77,6 +77,75 @@ next session's too:
 At minimum, append the repo to `sources/REGISTRY.md` — see
 `research-repo-enumeration.md`.
 
+## When you need EXAMPLES rather than docs, SEARCH GITHUB — all four indexes
+
+The chain above answers *"what do the docs say"*. It does not answer *"how does
+anyone actually use this"*, and for an undocumented or experimental feature that
+is the only answerable question. **GitHub is a first-class source here, not a
+fallback.**
+
+**Ray has asked for this FOUR times** — `docs/direction/2026-08-26:62`,
+`2026-09-03:55`, and twice on 2026-09-10, the last verbatim: *"we need to start
+actually using github as a source of information on how to find examples."* It
+was never written down, so it was never done. That is why it is a rule now
+rather than a preference.
+
+### The four indexes are four different answers
+
+Search **code**, **repositories**, **issues** and **discussions** separately.
+Measured 2026-09-10 on `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`: the code index alone
+would have found **20% of the dedicated projects and none of the issues** — 4 of
+5 dedicated repos appeared in no code result, and **the two most valuable
+artifacts of that day were issues**. A code-only sweep is not a GitHub search;
+it is one quarter of one.
+
+### `gh api`, never `gh search`
+
+```bash
+gh api -X GET search/code   -f q='<query>' --paginate
+gh api -X GET search/issues -f q='<query>'
+```
+
+Still prefer `gh api` — but this rule's REASON was refuted, armed on gh 2.98.0
+by a cold review of `7b28f460`. It claimed `gh search` "returns an empty array
+rather than an error", making a missing token look like no results:
+
+| failure | `gh search code` | `gh api search/code` |
+|---|---|---|
+| missing token | **rc 4**, auth error | **rc 4**, same error |
+| bad `repo:` scope | rc 0, `[]` | rc 0, `incomplete_results: true` |
+
+Missing-token is false, and false SYMMETRICALLY — no reason to prefer either.
+Bad-scope holds, and what rescues it is a field this rule never named:
+**`incomplete_results`**, kept by the body and by `--jq .`, dropped only by a
+PROJECTION like `--jq .items` — round 2 caught this correction overstating that
+as "`--jq` drops it". **Unarmed, so open:** whether a rate limit reads as a zero.
+Never report one as a zero; this rule no longer claims to know how you'd tell.
+
+### A bare query is mostly noise, and this is measurable
+
+GitHub's legacy code tokenizer splits on `-` and `.`, so `plugin-types` returns
+**288,256** junk hits and quoting does not help. `filename:`, `path:`, `repo:`
+and `language:` qualifiers are what make a query discriminating. A tool that
+takes a bare string and no qualifiers will mostly return noise.
+
+### Control-arm every zero, and pin every quote
+
+Before reporting a search found nothing, run the same shape against a term you
+KNOW has hits and say which arm you ran — `probes-need-a-control-arm.md` rule 1,
+and code search is where it bites hardest because so many zeros are real.
+
+Permalinks go to a **commit SHA**, never a branch: a branch link rots silently
+and takes your quoted bytes with it. Note that a commit-pinned link still does
+not prove the bytes you quoted are at that commit — only a blob fetch does.
+
+### Then route it into the corpus
+
+Same obligation as the rest of this file: a repo worth reading is a candidate
+source. Append it to `sources/REGISTRY.md` at minimum
+(`research-repo-enumeration.md`), and prefer a `sources/<name>.manifest` when the
+examples are worth querying later.
+
 ## Why per-repo mintlify MCP URLs are NOT in the chain
 
 `https://mintlify.com/<owner>/<repo>/mcp` URLs are **GET-only preview

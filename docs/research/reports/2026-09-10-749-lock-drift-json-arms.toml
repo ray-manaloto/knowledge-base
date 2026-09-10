@@ -1,0 +1,156 @@
+# Mutation arms for the cold-review P1 fix on kb_setup.lock_drift (PR #749).
+#
+# THE FINDING. `kb-lock-drift` shipped parsing mise's HUMAN report. A tool newly
+# pinned in `mise.toml` with NO entry in `mise.lock` makes mise print the
+# `→ Dry run - would update:` header plus per-platform `✓ node@24.0.0 for
+# linux-arm64` rows and nothing else — rows byte-identical in shape to the
+# resolution progress a fully-in-sync run prints. The parser skipped them, saw
+# zero changes, and reported `mise.lock agrees` at rc 0.
+#
+# Armed END-TO-END against the real repo before writing a line of the fix, which
+# is the arm that actually matters here — no mutation of the module can be more
+# realistic than running the gate against a genuinely unlocked pin:
+#
+#   clean                             -> "agrees"            rc=0   correct
+#   MISE_UV_VERSION=0.12.12 (changed) -> "does not describe"  rc=1   correct
+#   MISE_NODE_VERSION=24.0.0 (ADDED)  -> "agrees"            rc=0   *** WRONG ***
+#
+# and after the fix the middle and last rows both read rc=1, the first still 0.
+#
+# THE FIX is `--json`: mise emits one object per tool it would change, so an
+# addition is `old_versions == []` — a fact the prose cannot express at all. The
+# arms below revert each half of that fix. A SURVIVOR means the test written
+# beside it cannot see the defect it was written for.
+#
+# B3 is the one to read twice. It is the JSON layer's copy of the defect a cold
+# review of `7f4035cd` found in the rc layer hours earlier: a run that did not
+# answer decaying into "clean". Same collapse, different road.
+
+suites = ["tests/test_lock_drift.py"]
+
+# B0 — the control. A comment-only edit that must change nothing.
+[[arm]]
+id = "B0"
+control = true
+file = "python/src/kb_setup/lock_drift.py"
+old = '''@dataclass(frozen=True, slots=True)
+class Drift:
+    """One tool whose lock entry mise would change."""'''
+new = '''@dataclass(frozen=True, slots=True)
+class Drift:
+    """One tool whose lock entry mise would change. (control)"""'''
+
+# B1 — P1, the fix itself: drop `--json` from the argv. This is the REALISTIC
+# break (a flag deleted, not a symbol renamed) and it is exactly the pre-fix
+# invocation. Without the flag mise answers in prose and every fixture stops
+# parsing, so the whole suite should go red — including the added-tool arm the
+# finding was about.
+[[arm]]
+id = "B1"
+test = "test_the_dry_run_and_json_flags_are_present_in_the_argv"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''_ARGV = ("mise", "lock", "--dry-run", "--json")'''
+new = '''_ARGV = ("mise", "lock", "--dry-run")'''
+
+# B2 — the discriminator. `old_versions == []` is the ONLY thing that separates
+# an added tool from an in-sync one; treating an empty `old` as "nothing to
+# compare" and skipping it reproduces the exact blindness, while leaving the
+# changed-version and orphan cases working. This is the mutation that a naive
+# "does it still parse JSON?" test would survive.
+[[arm]]
+id = "B2"
+test = "test_a_tool_absent_from_the_lock_is_caught"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''        if old == new:'''
+new = '''        if old == new or not old:'''
+
+# B3 — the third state, JSON edition. Let an unparseable report decay to an
+# empty list instead of raising. rc stays 0, `drift` returns [], and the gate
+# says `mise.lock agrees` for a mise that printed `unknown flag --json`. A
+# broken environment reading as a clean lockfile is the finding this repo
+# already fixed once at the rc layer (`36069fb0`).
+[[arm]]
+id = "B3"
+test = "test_an_unparsable_report_is_not_a_clean_lockfile"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''    except json.JSONDecodeError as exc:
+        raise LockUnavailableError(
+            f"`{' '.join(_ARGV)}` printed something that is not its JSON report: {exc}"
+        ) from exc'''
+new = '''    except json.JSONDecodeError:
+        return []'''
+
+# B4 — the wrong-shape guard. Valid JSON that is not the report (an error object,
+# a bare list of strings) must be NOT_RUN, never clean. Reverting to a permissive
+# read makes `{"error": ...}` iterate zero entries and pass.
+[[arm]]
+id = "B4"
+test = "test_a_json_document_of_the_wrong_shape_is_not_run"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''    if not isinstance(entries, list):
+        raise LockUnavailableError(
+            f"`{' '.join(_ARGV)}` returned {type(entries).__name__}, not the expected list"
+        )'''
+new = '''    if not isinstance(entries, list):
+        entries = []'''
+
+# B5 — `main` must keep `drift()` INSIDE the try. Moving it out lets an
+# unparseable report raise past the handler and die as a traceback, which in a
+# gate run reads as the gate being broken rather than the environment being
+# unreadable — a different wrong answer, not a louder right one.
+[[arm]]
+id = "B5"
+test = "test_an_unparsable_report_is_not_a_clean_lockfile"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''        rows = drift(preview(repo_root))
+    except LockUnavailableError as exc:'''
+new = '''        _out = preview(repo_root)
+    except LockUnavailableError as exc:'''
+
+# ---------------------------------------------------------------------------
+# ROUND 2 of the same cold review, against b51e6ac4. It confirmed the round-1
+# fix works — and found THREE defects inside it. That is the skill's own
+# prediction landing: "the fix you just wrote is the least-reviewed code in the
+# diff". Two of the three are this repo's most familiar failure arriving one
+# layer deeper than the fix that was supposed to close it.
+# ---------------------------------------------------------------------------
+
+# D1 — THE THIRD STATE, THIRD TIME. Round 1 fixed "a crashed mise reads as
+# clean" at the rc layer, then wrote `json.loads(output or "[]")`, which turns
+# *mise printed nothing at rc 0* straight back into *the lockfile is clean*.
+[[arm]]
+id = "D1"
+test = "test_an_empty_report_is_not_a_clean_lockfile"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''    if not output.strip():'''
+new = '''    if False:'''
+
+# D2 — Ray's 2026-09-10 §1 complaint, reintroduced INSIDE the fix for a
+# different silent drop, one commit later: "the stdout/stderr is being silently
+# dropped and i see a lot of warnings and errors that are not being handled".
+# Moving from `stdout + stderr` to `stdout` alone (so the JSON would parse) is
+# what dropped it. Deleting the warn call is the literal pre-fix shape.
+[[arm]]
+id = "D2"
+test = "test_a_warning_on_a_successful_run_is_reported_not_dropped"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''    if proc.stderr.strip():
+        events.warn('''
+new = '''    if False:
+        events.warn('''
+
+# D3 — a schema change read as a no-op entry. `entry.get(field) or ()` made a
+# renamed or dropped key look like "no versions on either side", which the
+# `old == new` skip then discards entirely: a gate silently emptied by an
+# upstream rename, which is the class this module exists to catch one directory
+# up. The revert restores the permissive read.
+[[arm]]
+id = "D3"
+test = "test_a_renamed_version_field_is_not_a_clean_lockfile"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''        for field in ("old_versions", "new_versions"):
+            if not isinstance(entry.get(field), list):
+                raise LockUnavailableError('''
+new = '''        for field in ():
+            if not isinstance(entry.get(field), list):
+                raise LockUnavailableError('''

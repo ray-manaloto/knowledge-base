@@ -64,7 +64,7 @@ spawning anything:
 
 ```bash
 git rev-parse <fixed-point>
-git diff --stat <fixed-point>...HEAD -- . ':(exclude)docs/research/**'
+git diff --stat <fixed-point>...HEAD -- . ':(exclude)docs/research/**' ':(exclude)mise.lock' ':(exclude)uv.lock'
 git log <fixed-point>..HEAD --oneline
 ```
 
@@ -85,11 +85,14 @@ reviewing anything.
 
 Pass the exclusion to every lane, not just to your own `git diff`. Those files
 are still tracked, still promoted, still verbatim (`agent-report-persistence.md`
-is unchanged) — they are simply not code under review.
+is unchanged) — they are simply not code under review. **Exclude generated
+lockfiles the same way — `':(exclude)mise.lock' ':(exclude)uv.lock'` — and SAY
+one was withheld.** One was 91% of a review's input and the lane then reported
+the real change as absent, marked CONFIRMED; `references/lanes.md` has it.
 
-**A branch touching ONLY `docs/research/**` therefore has an empty SCOPED diff,
-and that is a different state from a bad ref — do not report it as "nothing to
-review".** There is something to ship; it is simply all excluded from review.
+**A branch touching ONLY the excluded paths — `docs/research/**`, `mise.lock`,
+`uv.lock`, or any mix — therefore has an empty SCOPED diff, and that is a
+different state from a bad ref: do not report it as "nothing to review".** There is something to ship; it is simply all excluded from review.
 
 There is no receipt for this case, and that is deliberate. Every lane would be
 skipped, so `kb-review-receipt` refuses with `records no lane that actually ran`
@@ -136,7 +139,7 @@ and the session's declared lane before choosing.
 Review it **by ref and COLD** — hand it the SHA and nothing about what the change
 was *supposed* to do. Design context primes happy-path confirmation, which is the
 one thing a second lens exists not to do. Hand it the same
-`':(exclude)docs/research/**'` scope from step 1.
+`':(exclude)docs/research/**' ':(exclude)mise.lock' ':(exclude)uv.lock'` scope from step 1.
 
 If the chosen CLI is missing or unauthenticated it returns a structured error
 rather than substituting itself. Fall back **loudly, never silently**, to any
