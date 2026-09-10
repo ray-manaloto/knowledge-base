@@ -289,19 +289,27 @@ _EXPECTED_METADATA_ONLY = (
     graphify_health.ExpectedMetadataOnly(
         source_name="codex-docs",
         relative_path="pyproject.toml",
-        # RE-APPROVED at codex-docs 3b1ef69d (2026-09-08). The approval is keyed
-        # to BOTH values, so advancing the manifest correctly invalidated it and
-        # `kb-manifest-audit` blocked the ship — the gate working, not noise.
+        # RE-APPROVED at codex-docs 262d53df (2026-09-09), the SECOND such
+        # re-approval in two days. The approval is keyed to BOTH values, so
+        # advancing the manifest correctly invalidated it and `kb-manifest-audit`
+        # blocked the ship — the gate working, not noise. It is also the only
+        # thing that caught this pin site: `mise run kb-update -- codex-docs`
+        # moves the manifest and does NOT move the registry entry.
         #
-        # The premise was re-verified rather than the numbers re-typed:
-        # `grep -c '^\[project\]' sources/codex-docs/pyproject.toml` -> **0**,
-        # and the file's only tables are `[tool.ruff]`, `[tool.ruff.lint]`,
-        # `[tool.coverage.run]`, `[tool.coverage.report]`. So the zero-node
-        # result is still correct for the recorded reason. The file did change
-        # upstream — it gained the two `.lint`/`.report` tables the comment above
-        # predates — which is exactly why the SHA is part of the key.
+        # The premise was re-verified at the NEW commit rather than the numbers
+        # re-typed: the clone is at 262d53df, `grep -c '^\[project\]'` -> **0**,
+        # the file's only tables are `[tool.ruff]`, `[tool.ruff.lint]`,
+        # `[tool.coverage.run]`, `[tool.coverage.report]`, and it is 254 bytes.
+        # So the zero-node result is still correct for the recorded reason.
+        #
+        # UNLIKE the 3b1ef69d re-approval, the file is BYTE-IDENTICAL across this
+        # bump — `content_sha256` below is unchanged and only `pinned_commit`
+        # moved. That is the DELIBERATE ASYMMETRY `manifest_audit`'s docstring
+        # describes: tier 1 flags DRIFT on a pin bump even when the file did not
+        # change, because a cheap re-stamp is the correct direction to be wrong
+        # in. Do not read the unchanged hash as evidence the gate misfired.
         content_sha256="3ee45be83e41d61eb7d77dedf9e4c2c499ee080ef1b3aac96ee739e302b8192f",
-        pinned_commit="3b1ef69d01c53b1de818703e73a6235df2248277",
+        pinned_commit="262d53df92e9cf7495206e64e3f6c4edc757116f",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
     graphify_health.ExpectedMetadataOnly(
