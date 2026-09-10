@@ -465,3 +465,54 @@ expected outcome is "probably triggers another `/grilling` round before
 - [anthropics/anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python) — corpus source correlated to (but independent of) the `anthropic` PyPI dep; manifest read.
 - [anthropics/claude-agent-sdk-python](https://github.com/anthropics/claude-agent-sdk-python) — pure corpus source, no first-level pin; manifest read for the pin-vs-manifest cross-reference in §1b/§2.
 - [anthropics/claude-code](https://github.com/anthropics/claude-code) — self-updating harness tracked via `currency.toml`/manifest, not a mise/pyproject pin; manifest read; drift confirmed via `kb-currency-check`.
+
+---
+
+## Correction — 2026-09-09, session `kb-20260909.007`
+
+Appended rather than edited in place: this repo does not rewrite a research
+report to tidy it, and line 385's claim should stay visible alongside what
+refutes it.
+
+**Line 385 cites dbos-transact-py PR `#680` as the merged SQLite-support PR. It
+is not.** Verified directly with `gh pr view` against `dbos-inc/dbos-transact-py`:
+
+| PR | actual title | state |
+|---|---|---|
+| **#680** | *Retry Serialization Errors in Datasources* | MERGED — **unrelated to SQLite** |
+| **#441** | *SQLite Support* | MERGED — this is the real one |
+| **#442** | *System Database URL* | MERGED — its companion |
+
+**The underlying fact is unharmed: SQLite support is real, merged, and is the
+zero-config DEFAULT** (`system_database_url` unset resolves to
+`sqlite:///[app].sqlite`). Only the citation was wrong.
+
+**The provenance of the error is the lesson.** This report inherited the wrong
+number from issue **#638**, which had itself cited a *closed, unmerged issue*
+(`#101`) as a merged PR. A wrong citation was corrected once — to a different
+wrong citation — and the second one read as verified because it was now a real
+merged PR with a plausible number. Nobody opened it until this session.
+
+**Re-derived facts, this session, on the live index** (the report's other DBOS
+numbers were not re-measured and remain as originally written):
+
+- PyPI `dbos` **2.31.1**, MIT, `requires_python >=3.10`, and the classifiers
+  **explicitly list Python 3.14** — so this repo's 3.14 pin is a declared
+  supported version, not a risk. Resolved cleanly against the real 3.14.7 via a
+  read-only `uv pip compile`; `pyproject.toml` was not touched.
+- **6 genuinely new** packages against this repo's `uv.lock`: `dbos`, `greenlet`,
+  `psycopg`, `psycopg-binary`, `sqlalchemy`, `websockets`. `psycopg-binary` is a
+  ~4.6 MiB compiled wheel installed **unconditionally**, even when only SQLite is
+  used.
+- No mandatory server. DBOS Conductor is opt-in via `conductor_key`, absent by
+  default.
+- `dbos-inc/dbos-transact-py`: `has_issues=true`, **`has_discussions=false`** —
+  so a Discussions search there is a structural zero and proves nothing. Control
+  arm on the search that WAS used: a known-present term returned 40 hits, so the
+  mechanism discriminates.
+
+**Verdict carried forward: VIABLE WITH CONSTRAINTS.** The constraint is the
+maintainers' own — their live docs say Postgres is recommended for production —
+plus the unconditional psycopg pair. Neither blocks an offline single-laptop CLI.
+
+Full re-research: `.agent/kb/reports/agents/dbos-research.md`.

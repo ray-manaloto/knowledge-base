@@ -52,24 +52,36 @@
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/openai/codex
 ref = rust-v0.154.0
-commit = 36eab01061df3cde5f95ec20a526777b430091ba
+commit = 6b9826e3aa83b1a5947db50f4332cb9c65f1b340
 kind = code
 added = 2026-08-02
-# EXCLUDED FROM THE BUILD 2026-08-20 (Ray's ruling: skip any blocker, file it,
-# and triage after the graphify extraction). Not a de-registration: the pin above
-# stays committed and fingerprinted, and the INVARIANT above still binds — this
-# manifest must keep tracking the version we run, skipped or not.
+# INCLUDED IN THE BUILD AGAIN, 2026-09-09 (#728 step 4). It was `build = skip`
+# from 2026-08-20 under Ray's "skip any blocker, file it, triage later" ruling,
+# tracked in #417. The skip_reason claimed `kb-build` fails closed on ONE file —
+# `codex-rs/Cargo.toml` producing zero nodes (#1666) — and that approving it was
+# impossible because "the reviewed-metadata approver is JSON-only, so a TOML file
+# needs new machinery".
 #
-# ⚠️ THIS IS A TOOLCHAIN SOURCE, so the loss has a specific shape: while skipped,
-# the corpus cannot answer questions about a tool this repo actually RUNS. That
-# is the failure the invariant above was written to prevent, arrived at from the
-# other direction. Tracked in #417.
+# BOTH HALVES OF THAT ARE REFUTED at the installed graphify 0.9.57, read from the
+# source rather than from the issue tracker:
+#   * `manifest_ingest.py` gives `Cargo.toml` its OWN first-class parser, routed
+#     ahead of the JSON extractor by `extract.py:5933-5934`. TOML has had a
+#     dedicated path since #1377, predating this skip.
+#   * `manifest_ingest.py:94-96` returns `{"nodes": [], "edges": []}` for a
+#     manifest with no name. A Rust virtual `[workspace]` root genuinely has no
+#     package to emit, so zero nodes is a CORRECT parse, not data loss.
 #
-# `kb-build` fails closed on ONE file: `Cargo.toml` produced zero nodes (#1666).
-# One entry would normally be trivial, but the reviewed-metadata approver is
-# JSON-only by construction — `graphify_sdk` calls `extract_json(path)` on every
-# inventory item and compares graphify's own `skipped` disposition — so a TOML
-# file cannot be approved through it without new machinery.
-# Restore by deleting these two lines.
-build = skip
-skip_reason = #417: Cargo.toml produces zero nodes (#1666) and the reviewed-metadata approver is JSON-only, so a TOML file needs new machinery; skipped under Ray's 2026-08-20 ruling. TOOLCHAIN source, so the corpus cannot describe a tool we run while this holds
+# No graphify fork change was needed. What was missing was one registry entry, of
+# the exact shape eight sibling sources already carry (uv, ruff, biome, typos,
+# taplo, logbook, picologging, pensyve): see
+# `graph.py`'s `_EXPECTED_METADATA_ONLY`, `source_name="codex"`.
+#
+# ⚠️ THE ENTRY IS LOAD-BEARING, NOT BOOKKEEPING. `require_complete`
+# (`graphify_health.py:528`) fails a build CLOSED on any zero-node file that is
+# not pre-registered — so deleting these lines WITHOUT that entry swaps a skipped
+# source for a failing build. PR #550 is the precedent: it let a different skip
+# through and died on `ast-grep`'s Cargo.toml warning.
+#
+# The invariant at the top of this file binds again in the direction it was
+# written for: this is a TOOLCHAIN source, and the corpus can now describe the
+# codex we actually run.

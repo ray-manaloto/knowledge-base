@@ -1,5 +1,25 @@
 # Source manifest — reproducible-by-reference (Invariant 3).
+#
+# ⚠️ INVARIANT: this pin MUST track the version we actually run.
+#   version source: `mise.toml`'s `"npm:firecrawl-cli"`
+#   pinned here:    1.23.3
+#
+# RESYNCED 2026-09-09. It had drifted to v1.23.1 while `mise.toml` pinned
+# 1.23.3, and NOTHING REPORTED IT — `currency.toml` declared no `manifest =`
+# row for this tool, so the manifest-vs-pin comparison never ran. The row is
+# added in the same change; without it this file can silently drift again.
+#
+# Found while reviewing why `kb-tool-sync` refuses 15 of 20 tools. The five it
+# ACCEPTS are exactly the five with no `manifest =` key — so the tools the
+# automated sync can touch were precisely the ones whose provenance nothing was
+# checking, and this one was already wrong. Eligibility was inversely correlated
+# with coverage.
+#
+# `commit` came from `manifest.resolve_tag(url, "1.23.3", prefix="v")`, never a
+# hand `ls-remote` — see `sources/mise.manifest`'s header for the #395 trap that
+# call reproduces, and `sources/codex.manifest` for the day it was walked into
+# again.
 url = https://github.com/firecrawl/cli
-ref = v1.23.1
-commit = 026c820bebd7040720079a05d4d428c193e23a7b
+ref = v1.23.3
+commit = 86aaf06cb139029ff5ad2a249670f42b01d40b13
 kind = code

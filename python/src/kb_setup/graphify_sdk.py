@@ -37,6 +37,7 @@ from graphify.llm import extract_corpus_parallel
 from graphify.manifest_ingest import extract_package_manifest, is_package_manifest_path
 from graphify.reflect import build_learning_overlay, reflect
 
+from kb_setup.generated.reviewed_classification import ReviewedClassification
 from kb_setup.graphify_health import (
     APPROVED_METADATA_ZERO_NODE_WARNING,
     APPROVED_PARTIAL_EXTRACTION_WARNING,
@@ -1340,14 +1341,42 @@ def source_detection_policy(
     for item in reviewed:
         if item.source_name != source_name:
             continue
-        if item.classification == "reviewed-version-marker" and _safe_exact_reviewed_file(
-            root, item
-        ):
-            allowed.append(item.relative_path)
-        if item.classification == "reviewed-root-ignore-metadata" and _safe_reviewed_ignore(
-            root, item
-        ):
-            allowed.append(item.relative_path)
+        match item.classification:
+            # Three classes share ONE predicate deliberately. `_safe_exact_
+            # reviewed_file` is not version-marker-specific: it rejects absolute
+            # paths, `..`, symlinks and anything escaping `root`, then pins the
+            # file by content hash. That is the whole guarantee these classes
+            # need — the classification says WHY a file carries no source, while
+            # the predicate proves WHICH bytes were reviewed.
+            case (
+                ReviewedClassification.reviewed_version_marker
+                | ReviewedClassification.reviewed_build_toolchain_config
+                | ReviewedClassification.reviewed_binary_docs_asset
+            ):
+                if _safe_exact_reviewed_file(root, item):
+                    allowed.append(item.relative_path)
+            case ReviewedClassification.reviewed_root_ignore_metadata:
+                if _safe_reviewed_ignore(root, item):
+                    allowed.append(item.relative_path)
+            case _:  # pragma: no cover - unreachable while the enum is exhaustive
+                # THE POINT OF THIS BRANCH. Until 2026-09-09 this loop was two
+                # `if`s with no else, so a classification naming no branch was
+                # silently dropped: the entry looked reviewed and absorbed
+                # nothing. Two such entries cost two full `kb-build` runs before
+                # anything said why.
+                #
+                # It is unreachable for today's four members, and that is not a
+                # reason to omit it. The live risk is the HALF-CHANGE the schema
+                # warns about: adding a value to
+                # `schemas/reviewed-classification.schema.json` without adding a
+                # branch here. The enum would accept it, the registry would
+                # decode it, and the file would still block the build with no
+                # explanation. Now it names itself instead.
+                raise ValueError(
+                    f"reviewed classification {item.classification!r} has no absorption "
+                    f"branch in source_detection_policy (source={item.source_name!r}, "
+                    f"path={item.relative_path!r}); add one with its safety predicate"
+                )
     return SourceCoveragePolicy(optional_unclassified_paths=tuple(sorted(allowed)))
 
 

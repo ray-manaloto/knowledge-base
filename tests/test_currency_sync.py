@@ -1582,3 +1582,43 @@ def test_parse_version_prefers_the_pattern_and_falls_back_to_the_last_field() ->
     assert sync.parse_version("v1.2.3") == "1.2.3"
     assert sync.parse_version("anything at all", r"(NOPE\d+)") == ""
     assert sync.parse_version("") == ""
+
+
+@pytest.mark.parametrize("tool", ["ctx7", "ffmpeg", "firecrawl-cli"])
+def test_real_tool_source_bindings_detect_pin_drift(tool: str) -> None:
+    """These three declare a manifest binding, and the binding must AGREE.
+
+    Added 2026-09-09 for a defect the suite could not have caught: none of the
+    three declared `manifest =` at all, so nothing compared their manifest to
+    their pin, and `firecrawl-cli` had silently drifted to `v1.23.1` against a
+    `1.23.3` pin — the corpus describing code we do not run, with every check
+    green. The absence of a declaration WAS the defect, so a fixture test cannot
+    reach it; this reads the real `currency.toml` and the real manifests.
+
+    It fails in BOTH useful directions. Delete a `manifest =` row and the first
+    assertion fails, because the binding vanished rather than merely disagreeing
+    — the shape a fixture would report as a harmless SKIP. Let a pin drift from
+    its manifest and the last assertion fails.
+
+    `tag_prefix` is load-bearing here, not decoration: upstream tags these
+    `ctx7@<v>`, `n<v>` and `v<v>`, so a comparison that ignored the prefix would
+    report a PERMANENT false drift — which `[tool.codex]` records as worse than
+    no check at all, because it teaches a reader to ignore the line.
+    """
+    repo_root = Path(__file__).parents[1]
+    spec = next(s for s in config.load(repo_root) if s.name == tool)
+
+    assert spec.manifest, f"[tool.{tool}] declares no manifest binding"
+    manifest_path = repo_root / spec.manifest
+    assert manifest_path.is_file(), f"{spec.manifest} is declared but absent"
+
+    ref = next(
+        line.split("= ", 1)[1].strip()
+        for line in manifest_path.read_text(encoding="utf-8").splitlines()
+        if line.startswith("ref = ")
+    )
+    pinned, _extras = sync.pinned_version(repo_root, spec)
+    assert pinned, f"{tool} has no readable exact pin"
+    assert ref == f"{spec.tag_prefix}{pinned}", (
+        f"{tool}: manifest ref {ref!r} != tag_prefix {spec.tag_prefix!r} + pin {pinned!r}"
+    )

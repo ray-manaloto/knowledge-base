@@ -619,6 +619,20 @@ version_pattern = '^ffmpeg version (\d+\.\d+(?:\.\d+)?)'
 # Host-only, like graphify: on a Linux CI runner this reports not-applicable
 # rather than failing, since the conda install lives on the Mac host.
 os = ["macos"]
+# ADDED 2026-09-09 alongside firecrawl-cli's and ctx7's. Not drifting —
+# `resolve_tag(url, "9.0.1", prefix="n")` reproduces the recorded commit exactly
+# — but unchecked, which is the state firecrawl-cli's REAL drift hid in.
+#
+# `tag_prefix = "n"` is REQUIRED: FFmpeg tags releases `n<version>`, so without
+# it the check compares `n9.0.1` against the installed `9.0.1` and reports a
+# permanent false drift. `[tool.codex]` records why that is worse than no row.
+#
+# Note the pin is `conda:ffmpeg` while the manifest tracks the GitHub source.
+# The comparison is meaningful only because the conda build and the `n<version>`
+# tag name the same release; if that ever stops being true, this row starts
+# lying rather than checking.
+tag_prefix = "n"
+manifest = "sources/ffmpeg.manifest"
 
 # ---- coreutils: GNU behaviour this repo's own rules/probes depend on ---------
 #
@@ -2165,16 +2179,23 @@ so that abort reads as a known shape rather than a bug."""
 #
 # npm publishes it; GitHub is `firecrawl/cli`, NOT `firecrawl/firecrawl-cli`
 # (guessed once, 404) — the npm `repository.url` is what settled it. Its tags
-# track the npm version exactly: npm latest 1.23.1, newest tag `v1.23.1`, so a
-# GitHub upstream check here is meaningful rather than decorative.
+# track the npm version exactly, so a GitHub upstream check here is meaningful
+# rather than decorative. (This comment named 1.23.1 as "npm latest" until
+# 2026-09-09; the pin is 1.23.3. A version quoted in prose beside the row that
+# owns it goes stale — re-derive, never quote.)
 #
-# `firecrawl --version` prints a BARE `1.23.1` with no tool name, unlike agnix
+# `firecrawl --version` prints a BARE version with no tool name, unlike agnix
 # and ruff which anchor their own name. Measured by running it, not assumed.
 mise_key = "npm:firecrawl-cli"
 binary = "firecrawl"
 github = "firecrawl/cli"
 tag_prefix = "v"
 version_pattern = '^(\d+\.\d+\.\d+)$'
+# ADDED 2026-09-09, and it was NOT cosmetic: without this row the manifest-vs-pin
+# comparison never ran, and `sources/firecrawl-cli.manifest` had silently drifted
+# to v1.23.1 against a 1.23.3 pin. The absence WAS the defect — the corpus
+# described a firecrawl-cli we do not run, and every check reported clean.
+manifest = "sources/firecrawl-cli.manifest"
 
 [tool.ctx7]
 # The official Context7 CLI (npm `ctx7` -> github.com/upstash/context7), pinned
@@ -2205,6 +2226,18 @@ version_pattern = '^(\d+\.\d+\.\d+)$'
 mise_key = "npm:ctx7"
 binary = "ctx7"
 version_pattern = '^(\d+\.\d+\.\d+)$'
+# ADDED 2026-09-09 alongside firecrawl-cli's. This manifest was NOT drifting —
+# `resolve_tag(url, "0.5.9", prefix="ctx7@")` reproduces the recorded commit
+# byte-for-byte — but nothing was checking, which is the same exposure
+# firecrawl-cli was already sitting in.
+#
+# `tag_prefix` is REQUIRED here and is not decoration: upstash tags releases
+# `ctx7@<version>`, so without it the check compares `ctx7@0.5.9` against the
+# installed `0.5.9` and reports a PERMANENT FALSE DRIFT. `[tool.codex]` records
+# why that is worse than no row at all — it trains a reader to ignore the line,
+# which is how a real drift gets missed.
+tag_prefix = "ctx7@"
+manifest = "sources/ctx7.manifest"
 
 [tool.lychee]
 # The link checker behind the hk `lychee` step and `mise run kb-links`. Pinned

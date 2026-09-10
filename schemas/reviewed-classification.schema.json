@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ray-manaloto/knowledge-base/schemas/reviewed-classification.schema.json",
+  "title": "ReviewedClassification",
+  "description": "The CLOSED set of reasons a file Graphify cannot classify may still be absorbed so a build proceeds. Each value names why the file provably carries no source to lose. Generated rather than hand-written because the set is consumed in two places that must never drift: `graphify_health.ExpectedUnclassifiedFile.classification` declares it, and `graphify_sdk.source_detection_policy` dispatches on it. The field was a bare `str` until 2026-09-09, and an unrecognised value was SILENTLY DROPPED there — no error, no warning, no log — so a registry entry could look reviewed and do nothing. Two entries were added that way in one session and cost two full `kb-build` runs to find. Typing it as this enum makes an invalid value a decode error at the registry, which is where it is cheap.",
+  "enum": [
+    "reviewed-version-marker",
+    "reviewed-root-ignore-metadata",
+    "reviewed-build-toolchain-config",
+    "reviewed-binary-docs-asset"
+  ],
+  "$comment": "Adding a value here is HALF a change: `source_detection_policy` must also gain a branch pairing it with a safety predicate, or the value is accepted by the type and still absorbs nothing. That asymmetry is exactly what this schema exists to make visible, so it is stated rather than assumed. reviewed-version-marker: a small text file whose content IS a version or generation marker, read back by the tool that wrote it. reviewed-root-ignore-metadata: a root-level ignore file. reviewed-build-toolchain-config: build-system configuration for a vendored toolchain, in a language Graphify ships no extractor for. reviewed-binary-docs-asset: a binary asset served by a documentation site, containing no source in any language."
+}

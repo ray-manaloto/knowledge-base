@@ -79,19 +79,28 @@ def test_every_committed_manifest_still_loads() -> None:
     # never a line that slid in. Compared as a SET so the assertion survives a
     # change in `load_all`'s ordering — exactness is the point, order is not.
     #
-    # GitNexus is #409. The other four were skipped 2026-08-20 under Ray's
-    # ruling to skip any blocker, file it, and triage after the graphify
-    # extraction; all four are registered in #417, which also records that
-    # `codegraph` is the one whose `scope = corpus` makes it real aggregate loss.
+    # GitNexus is #409. The rest were skipped 2026-08-20 under Ray's ruling to
+    # skip any blocker, file it, and triage after the graphify extraction; all
+    # are registered in #417, which also records that `codegraph` is the one
+    # whose `scope = corpus` makes it real aggregate loss.
     # `deps-dev` is #575: a schema-only provenance pin, never intended as a
     # corpus-ingestion source (`google/deps.dev`'s Go source is not wanted in
     # the graph) — `build = skip` here is deliberate from the manifest's first
     # commit, not a later exclusion of a source that used to build.
+    #
+    # `codex` LEFT this set 2026-09-09 (#728 step 4) and its absence is the
+    # assertion now. It is the first source to graduate OUT of #417's skip list,
+    # so this pin flipping direction is the intended signal rather than a
+    # regression: the skip_reason claimed a fork change was needed, and both
+    # halves of it were refuted at graphify 0.9.57 — `Cargo.toml` has had a
+    # first-class parser since #1377, and a `[workspace]` root's zero-node
+    # result is correct, not data loss. One `_EXPECTED_METADATA_ONLY` entry plus
+    # one `_EXPECTED_UNCLASSIFIED` entry replaced it, and `mise run kb-build`
+    # then reproduced the corpus green with codex included for the first time.
     assert {m.name for m in loaded if m.build == "skip"} == {
         "GitNexus",
         "codebase-memory-mcp",
         "codegraph",
-        "codex",
         "colibri",
         "deps-dev",
     }
