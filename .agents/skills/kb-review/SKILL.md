@@ -90,9 +90,9 @@ lockfiles the same way — `':(exclude)mise.lock' ':(exclude)uv.lock'` — and S
 one was withheld.** One was 91% of a review's input and the lane then reported
 the real change as absent, marked CONFIRMED; `references/lanes.md` has it.
 
-**A branch touching ONLY `docs/research/**` therefore has an empty SCOPED diff,
-and that is a different state from a bad ref — do not report it as "nothing to
-review".** There is something to ship; it is simply all excluded from review.
+**A branch touching ONLY the excluded paths — `docs/research/**`, `mise.lock`,
+`uv.lock`, or any mix — therefore has an empty SCOPED diff, and that is a
+different state from a bad ref: do not report it as "nothing to review".** There is something to ship; it is simply all excluded from review.
 
 There is no receipt for this case, and that is deliberate. Every lane would be
 skipped, so `kb-review-receipt` refuses with `records no lane that actually ran`

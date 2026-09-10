@@ -244,3 +244,64 @@ def test_the_dry_run_and_json_flags_are_present_in_the_argv() -> None:
     assert "--dry-run" in ld._ARGV
     assert "--json" in ld._ARGV
     assert ld._ARGV[:2] == ("mise", "lock")
+
+
+# --- round 2 of the cold review: three defects INSIDE the round-1 fix --------
+
+
+def test_an_empty_report_is_not_a_clean_lockfile() -> None:
+    """🔴 THE THIRD STATE, THIRD TIME — and this one was inside the fix for it.
+
+    Round 1 fixed "a crashed mise reads as clean" at the rc layer. The JSON
+    parser it shipped then wrote `json.loads(output or "[]")`, which turns
+    *mise printed nothing at rc 0* back into *the lockfile is clean*. Round 2 of
+    the same review caught it. `probes-need-a-control-arm.md` rule 4: "answered
+    no" is not "never asked", however many layers you fix it at.
+    """
+    for silent in ("", "   ", "\n"):
+        with pytest.raises(ld.LockUnavailableError, match="printed nothing"):
+            ld.drift(silent)
+
+
+def test_a_renamed_version_field_is_not_a_clean_lockfile() -> None:
+    """A schema change must be NOT_RUN, never a silent pass.
+
+    `entry.get("old_versions") or ()` read mise renaming or dropping these keys
+    as "no versions on either side" — a no-op entry, which the `old == new` skip
+    then discards. A gate silently emptied by an upstream rename is precisely
+    what this module exists to catch one directory up.
+    """
+    with pytest.raises(ld.LockUnavailableError, match="no list `old_versions`"):
+        ld.drift('[{"name":"uv","from_versions":["0.12.8"],"new_versions":["0.12.12"]}]')
+    with pytest.raises(ld.LockUnavailableError, match="no list `new_versions`"):
+        ld.drift('[{"name":"uv","old_versions":["0.12.8"]}]')
+
+
+def test_a_warning_on_a_successful_run_is_reported_not_dropped(tmp_path: Path, monkeypatch) -> None:
+    """🔴 Ray's 2026-09-10 §1 complaint, reintroduced inside the fix for it.
+
+    *"the stdout/stderr is being silently dropped and i see a lot of warnings
+    and errors that are not being handled"* — and round 1's fix, moving from
+    `stdout + stderr` to `stdout` alone so the JSON would parse, dropped exactly
+    that. mise exits 0 and warns for things worth seeing (a legacy lockfile
+    format, a backend it fell back from).
+
+    Reported, never fatal: a warning is not drift, so the run still returns OK.
+    """
+    (tmp_path / "mise.toml").write_text("[tools]\n", encoding="utf-8")
+    (tmp_path / "mise.lock").write_text("", encoding="utf-8")
+
+    def _warns(*_a: object, **_k: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=list(ld._ARGV),
+            returncode=0,
+            stdout="[]\n",
+            stderr="mise WARN  mise.lock uses legacy lockfile format version 0\n",
+        )
+
+    monkeypatch.setattr(subprocess, "run", _warns)
+    seen: list[str] = []
+    monkeypatch.setattr(ld.events, "warn", lambda _id, msg, **_k: seen.append(msg))
+
+    assert ld.main(tmp_path) == Rc.OK, "a warning is not drift"
+    assert any("legacy lockfile format" in m for m in seen), "the warning was dropped"

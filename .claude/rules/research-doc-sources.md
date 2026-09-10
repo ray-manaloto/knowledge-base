@@ -117,10 +117,10 @@ rather than an error", making a missing token look like no results:
 
 Missing-token is false, and false SYMMETRICALLY — no reason to prefer either.
 Bad-scope holds, and what rescues it is a field this rule never named:
-**`incomplete_results`**, carried by the raw body and dropped by `--json`/`--jq`.
-That is the discriminator; the exit code is not. **Unarmed, so open:** whether a
-rate limit reaches you as a zero. Never report one as a zero — this rule just no
-longer claims to know how you would tell.
+**`incomplete_results`**, kept by the body and by `--jq .`, dropped only by a
+PROJECTION like `--jq .items` — round 2 caught this correction overstating that
+as "`--jq` drops it". **Unarmed, so open:** whether a rate limit reads as a zero.
+Never report one as a zero; this rule no longer claims to know how you'd tell.
 
 ### A bare query is mostly noise, and this is measurable
 

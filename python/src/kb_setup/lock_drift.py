@@ -171,11 +171,28 @@ def preview(repo_root: Path) -> str:
         raise LockUnavailableError(
             f"`{' '.join(_ARGV)}` exited {proc.returncode} — its report cannot be trusted: {tail}"
         )
-    # STDOUT ONLY, now that the answer is JSON. The text version merged both
-    # streams because it did not know which one carried the report; a JSON
-    # document cannot survive having mise's warnings interleaved into it, and
-    # merging them would turn every warning into a parse failure — i.e. into a
-    # NOT_RUN on a run that answered perfectly well.
+    # STDOUT ONLY carries the JSON. The text version merged both streams because
+    # it did not know which one held the report; a JSON document cannot survive
+    # mise's warnings interleaved into it, and merging them would turn every
+    # warning into a parse failure — a NOT_RUN on a run that answered fine.
+    #
+    # 🔴 BUT DROPPING STDERR IS NOT THE SAME AS NOT PARSING IT, and the first
+    # version of this fix conflated them — found by round 2 of the same cold
+    # review that produced the fix. mise exits 0 and warns on stderr for things
+    # worth seeing (a legacy lockfile format, an unreachable backend it fell
+    # back from). Those vanished. That is Ray's 2026-09-10 §1 complaint verbatim
+    # — "the stdout/stderr is being silently dropped and i see a lot of warnings
+    # and errors that are not being handled" — reintroduced inside the fix for a
+    # different silent drop, one commit later.
+    #
+    # Reported, never fatal: a warning is not drift, and failing on one would
+    # make this gate fire on a lockfile that is perfectly in sync.
+    if proc.stderr.strip():
+        events.warn(
+            "lock_drift.tool_warning",
+            f"[lock-drift] `{' '.join(_ARGV)}` exited 0 but warned: {proc.stderr.strip()}",
+            stderr=proc.stderr.strip(),
+        )
     return proc.stdout
 
 
@@ -188,8 +205,15 @@ def drift(output: str) -> list[Drift]:
     lockfile — the same collapse the exit code made before `36069fb0`, arriving
     by a different road.
     """
+    if not output.strip():
+        # 🔴 THE THIRD STATE, THIRD TIME. `json.loads(output or "[]")` — the
+        # first version of this line — turned "mise printed NOTHING" into "the
+        # lockfile is clean". rc 0 with empty stdout is a run that did not
+        # answer: `probes-need-a-control-arm.md` rule 4 again, in the fix for
+        # the rc-layer instance of itself, caught by round 2.
+        raise LockUnavailableError(f"`{' '.join(_ARGV)}` exited 0 but printed nothing")
     try:
-        entries = json.loads(output or "[]")
+        entries = json.loads(output)
     except json.JSONDecodeError as exc:
         raise LockUnavailableError(
             f"`{' '.join(_ARGV)}` printed something that is not its JSON report: {exc}"
@@ -204,8 +228,19 @@ def drift(output: str) -> list[Drift]:
             raise LockUnavailableError(
                 f"`{' '.join(_ARGV)}` returned a non-object entry: {entry!r}"
             )
-        old = tuple(entry.get("old_versions") or ())
-        new = tuple(entry.get("new_versions") or ())
+        # REQUIRED, not defaulted. `entry.get(...) or ()` read a schema change
+        # — mise renaming or dropping these keys — as "no versions either side",
+        # i.e. as a no-op entry, which the `old == new` skip below then drops
+        # entirely. A gate silently emptied by an upstream rename is the exact
+        # shape this module exists to catch one directory up.
+        for field in ("old_versions", "new_versions"):
+            if not isinstance(entry.get(field), list):
+                raise LockUnavailableError(
+                    f"`{' '.join(_ARGV)}` entry for {entry.get('name', '?')!r} has no "
+                    f"list `{field}` — its report schema is not what this gate reads"
+                )
+        old = tuple(entry["old_versions"])
+        new = tuple(entry["new_versions"])
         if old == new:
             # mise emits an entry only for a tool it would change, so this is
             # belt-and-braces — but a no-op entry reported as drift is how a

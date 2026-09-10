@@ -106,3 +106,51 @@ old = '''        rows = drift(preview(repo_root))
     except LockUnavailableError as exc:'''
 new = '''        _out = preview(repo_root)
     except LockUnavailableError as exc:'''
+
+# ---------------------------------------------------------------------------
+# ROUND 2 of the same cold review, against b51e6ac4. It confirmed the round-1
+# fix works — and found THREE defects inside it. That is the skill's own
+# prediction landing: "the fix you just wrote is the least-reviewed code in the
+# diff". Two of the three are this repo's most familiar failure arriving one
+# layer deeper than the fix that was supposed to close it.
+# ---------------------------------------------------------------------------
+
+# D1 — THE THIRD STATE, THIRD TIME. Round 1 fixed "a crashed mise reads as
+# clean" at the rc layer, then wrote `json.loads(output or "[]")`, which turns
+# *mise printed nothing at rc 0* straight back into *the lockfile is clean*.
+[[arm]]
+id = "D1"
+test = "test_an_empty_report_is_not_a_clean_lockfile"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''    if not output.strip():'''
+new = '''    if False:'''
+
+# D2 — Ray's 2026-09-10 §1 complaint, reintroduced INSIDE the fix for a
+# different silent drop, one commit later: "the stdout/stderr is being silently
+# dropped and i see a lot of warnings and errors that are not being handled".
+# Moving from `stdout + stderr` to `stdout` alone (so the JSON would parse) is
+# what dropped it. Deleting the warn call is the literal pre-fix shape.
+[[arm]]
+id = "D2"
+test = "test_a_warning_on_a_successful_run_is_reported_not_dropped"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''    if proc.stderr.strip():
+        events.warn('''
+new = '''    if False:
+        events.warn('''
+
+# D3 — a schema change read as a no-op entry. `entry.get(field) or ()` made a
+# renamed or dropped key look like "no versions on either side", which the
+# `old == new` skip then discards entirely: a gate silently emptied by an
+# upstream rename, which is the class this module exists to catch one directory
+# up. The revert restores the permissive read.
+[[arm]]
+id = "D3"
+test = "test_a_renamed_version_field_is_not_a_clean_lockfile"
+file = "python/src/kb_setup/lock_drift.py"
+old = '''        for field in ("old_versions", "new_versions"):
+            if not isinstance(entry.get(field), list):
+                raise LockUnavailableError('''
+new = '''        for field in ():
+            if not isinstance(entry.get(field), list):
+                raise LockUnavailableError('''
