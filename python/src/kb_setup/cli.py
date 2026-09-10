@@ -62,7 +62,7 @@ def _print_usage() -> int:
         "kb-setup: build | update <name> | watch | prose | query <question> [--prose] | "
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
-        "insights [--top N] | graph-size | funnel | manifest-audit | "
+        "insights [--top N] | graph-size | funnel | manifest-audit | graphify-catalog | "
         "telemetry-prune | serve | serve-memory | env-refresh [--sentinel] | "
         "codex-config-check | "
         "instruction-edit-guard | "
@@ -209,6 +209,15 @@ def _run(argv: list[str] | None = None) -> int:
         # `cli.py`) — one more `if cmd == ...` arm is the intended shape here,
         # not a ceiling to work around with a new grouping helper.
         return funnel.main(repo_root, rest)
+    if cmd == "graphify-catalog":
+        from kb_setup import graphify_catalog
+
+        # A bare arm on `funnel`'s precedent: no graph read or write, so no
+        # `_GRAPH_WRITERS` membership and no pinned-graphify preflight. It asks
+        # one question — do the values recorded in the disposition catalog and
+        # in `graphify_baseline`'s authority literal describe the commit the
+        # manifest pins — and it reads the pinned COMMIT, never the worktree.
+        return graphify_catalog.main(repo_root, rest)
     if cmd == "manifest-audit":
         from kb_setup import manifest_audit
 
@@ -675,6 +684,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | funnel | "
+        "graphify-catalog | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
         "research-links <URL...> [--out PATH] | "

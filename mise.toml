@@ -1073,6 +1073,28 @@ run = "uv run kb-setup manifest-audit"
 # happen to be present. Nowhere near the outer 1800s `gates._GATE_TIMEOUT`.
 timeout = "120s"
 
+[tasks.kb-graphify-catalog]
+description = "Gate: sources/graphify.dispositions.json + the baseline authority still describe the PINNED commit"
+# Built because the 0.9.57 pin move advanced `source_commit` and left FIVE
+# derived values behind — the catalog's `source_tree`, the `uv.lock` row's
+# sha256 and size, and the authority literal's `source_tree` and
+# `catalog_sha256` — while all eight gates reported green. A cold review found
+# four of the five; the fifth was found by this gate on its first run, because
+# `catalog_sha256` digests the catalog and therefore MOVES when you fix the
+# catalog.
+#
+# Distinct from `kb-manifest-audit`, which asks whether registry entries agree
+# with a manifest's `commit`. This asks whether values DERIVED from that commit
+# still describe it — a different question, and the one nothing was asking.
+#
+# It reads the pinned COMMIT via `git cat-file`, never the clone's worktree, so
+# a stray untracked file in `sources/graphify/` cannot change the answer. No
+# clone is `Rc.NOT_RUN` (127), never a pass.
+run = "uv run kb-setup graphify-catalog"
+# Twenty `git cat-file` reads against a local clone. Milliseconds in practice;
+# the bound exists so a wedged git cannot hold the gate batch open.
+timeout = "120s"
+
 [tasks.kb-codex]
 description = "Run a codex lane with this repo's mandatory flags; --timeout bounds it (#672 U1)"
 # The ONE place that owns the codex flags, so a lane cannot be wrong by

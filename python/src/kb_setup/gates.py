@@ -179,6 +179,15 @@ GATE_TASKS = (
     "hk-test",
     "funnel",
     "kb-manifest-audit",
+    # Added 2026-09-10. `kb-manifest-audit` already asks whether a registry
+    # entry agrees with its manifest's `commit`; this asks the question nothing
+    # was asking — whether the values DERIVED from that commit still describe
+    # it. The 0.9.57 pin move left five of them behind and this whole tuple ran
+    # green over it. Reads a local clone with `git cat-file` and writes nothing,
+    # but clone IO against `test`'s xdist workers is uncharacterised, so it stays
+    # OUT of `CONCURRENT_SAFE` on `kb-manifest-audit`'s own fail-closed
+    # precedent.
+    "kb-graphify-catalog",
 )
 #: `kb-corpus-integrity` WAS here, gating the semantic-corpus layer's staged
 #: evidence tree. It left with that layer's removal (2026-08-24) — see

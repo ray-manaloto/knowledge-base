@@ -1,0 +1,146 @@
+<title>The Pin Moved Alone</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#F6F7F5; --surface:#FFFFFF; --ink:#1B2021; --muted:#5F6B6D;
+    --line:#DDE2E0; --stale:#A03D2E; --current:#2E6B5E;
+    --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --serif:"Newsreader",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:var(--sans);
+       margin:0;padding-block:26px;padding-left:20px;padding-right:20px;line-height:1.45}
+  .wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--muted);margin:0}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(28px,5.2vw,40px);
+     line-height:1.08;margin:0;text-wrap:balance;letter-spacing:-.01em}
+  .sub{margin:0;color:var(--muted);font-size:15px;max-width:60ch}
+
+  .rows{background:var(--surface);border:1px solid var(--line);border-radius:3px;
+        display:grid;grid-template-columns:112px 1fr}
+  .rows>div{padding:11px 16px;border-bottom:1px solid var(--line)}
+  .rows>div:nth-last-child(-n+2){border-bottom:0}
+  .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+     color:var(--muted);padding-top:14px!important}
+  .v{font-size:15px}
+  .v b{font-weight:600}
+  .bad{color:var(--stale);font-weight:600}
+  .good{color:var(--current);font-weight:600}
+
+  figure{margin:0;background:var(--surface);border:1px solid var(--line);
+         border-radius:3px;padding:16px 16px 12px;overflow-x:auto}
+  svg{display:block;width:100%;max-width:100%;height:auto;color:var(--ink)}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.4}
+
+  .second{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--stale);
+          border-radius:3px;padding:13px 16px}
+  .second p{margin:0;font-size:14.5px}
+  .second .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+               text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+
+  .fix{margin:0;font-size:13px;line-height:1.45;color:var(--muted);
+       border-left:3px solid var(--stale);padding:2px 0 2px 12px}
+  .fix b{color:var(--stale)}
+  .ask{font-size:16px;font-weight:600;margin:0;padding:13px 16px;
+       background:var(--surface);border:1px solid var(--ink);border-radius:3px}
+  code{font-family:var(--mono);font-size:.9em}
+  @media (max-width:460px){ .rows{grid-template-columns:1fr}
+    .rows>div{border-bottom:1px solid var(--line)}
+    .k{padding-bottom:0!important;padding-top:11px!important} }
+</style>
+
+<div class="wrap">
+
+  <div>
+    <p class="eyebrow">Cold review · 2 findings · both fixed</p>
+    <h1>The pin moved alone</h1>
+  </div>
+  <p class="sub">We upgraded graphify and pointed at a newer commit. Five values that describe
+     that commit were never re-derived, so the project's own safety check refused its own inputs.
+     <b>All five are fixed.</b></p>
+
+  <p class="fix"><b>Corrected after publishing.</b> This page first said <i>four</i>. The review found
+     four; the gate built to catch them found a fifth it had missed — and that one changes again when
+     you fix the others, so order matters.</p>
+
+  <div class="rows">
+    <div class="k">Cause</div>
+    <div class="v">The pin was updated. Its <b>five fingerprints were not.</b></div>
+    <div class="k">Breaks</div>
+    <div class="v">The identity check compares recorded vs real and <span class="bad">refuses</span>
+       — armed: old commit <span class="good">passes</span>, new one <span class="bad">fails</span>.</div>
+    <div class="k">Fix</div>
+    <div class="v">Re-derive them from the new commit — <b>the digest last</b>, because fixing the others moves it. <span class="good">Done.</span></div>
+    <div class="k">Risk</div>
+    <div class="v">All 8 gates passed over this. <b>Nothing we ran would have caught it</b> — there is now a 9th that does.</div>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 720 234" role="img"
+         aria-label="The pin moved from the old commit to the new one, but five derived values still described the old commit, so the identity check refused. The last of the five, the authority digest, changes again when the others are fixed, so it must be re-derived last.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+        <marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#A03D2E"/>
+        </marker>
+      </defs>
+
+      <!-- commits -->
+      <rect x="8" y="20" width="150" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".45"/>
+      <text x="83" y="38" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".6">old commit</text>
+      <text x="83" y="53" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".6">157a957e</text>
+
+      <line x1="164" y1="41" x2="234" y2="41" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="199" y="31" text-anchor="middle" font-size="11" fill="currentColor" opacity=".7">bumped</text>
+
+      <rect x="240" y="20" width="150" height="42" rx="3" fill="none" stroke="#2E6B5E" stroke-width="1.8"/>
+      <text x="315" y="38" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="#2E6B5E">new commit</text>
+      <text x="315" y="53" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="#2E6B5E">3c9b930f</text>
+
+      <!-- the five stranded values -->
+      <text x="530" y="18" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace"
+            fill="#A03D2E" letter-spacing="1">FIVE VALUES LEFT BEHIND</text>
+      <g font-size="12" fill="#A03D2E" font-family="IBM Plex Mono, monospace">
+        <rect x="432" y="26" width="196" height="21" rx="2" fill="none" stroke="#A03D2E" stroke-width="1.1" opacity=".8"/>
+        <text x="440" y="41">tree digest</text>
+        <rect x="432" y="52" width="196" height="21" rx="2" fill="none" stroke="#A03D2E" stroke-width="1.1" opacity=".8"/>
+        <text x="440" y="67">uv.lock hash</text>
+        <rect x="432" y="78" width="196" height="21" rx="2" fill="none" stroke="#A03D2E" stroke-width="1.1" opacity=".8"/>
+        <text x="440" y="93">uv.lock size</text>
+        <rect x="432" y="104" width="196" height="21" rx="2" fill="none" stroke="#A03D2E" stroke-width="1.1" opacity=".8"/>
+        <text x="440" y="119">authority tree</text>
+        <rect x="432" y="130" width="196" height="21" rx="2" fill="none" stroke="#A03D2E" stroke-width="1.1" opacity=".8"/>
+        <text x="440" y="145">authority digest ← moves last</text>
+      </g>
+
+      <!-- they still describe the old commit -->
+      <path d="M 432 128 C 380 128, 396 72, 83 68" fill="none" stroke="#A03D2E" stroke-width="1.3"
+            stroke-dasharray="4 3" marker-end="url(#ahr)"/>
+      <text x="250" y="112" font-size="11" fill="#A03D2E">still describe the OLD one</text>
+
+      <!-- the check -->
+      <rect x="8" y="176" width="620" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1.2"/>
+      <text x="24" y="202" font-size="13" fill="currentColor">identity check: does the recorded fingerprint match the real one?</text>
+      <text x="600" y="202" text-anchor="end" font-size="14" font-weight="600" fill="#A03D2E"
+            font-family="IBM Plex Mono, monospace">NO → refuse</text>
+      <line x1="530" y1="157" x2="530" y2="172" stroke="#A03D2E" stroke-width="1.3" marker-end="url(#ahr)"/>
+    </svg>
+    <figcaption>Armed both ways: the check passes on the old commit and on the new one with the tree
+      corrected in memory, and fails on what is committed today. So the check works — the data is wrong.</figcaption>
+  </figure>
+
+  <div class="second">
+    <span class="tag">Finding 2 · smaller · fixed</span>
+    <p>The new deep-thinking advisor had an <b>effort dial that wasn't connected.</b> Ask it to think
+       less and only the wrapper listened; the real call was hard-wired to maximum. Cause: its
+       instructions were copied word-for-word from a file written for a different reader.</p>
+  </div>
+
+  <p class="ask">→ Nothing needed from you here — both findings are fixed and gated.</p>
+
+</div>
