@@ -73,10 +73,17 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 _ARGV = ("mise", "lock", "--dry-run")
 
 #: A previewed change names a tool; narration does not. `prune` covers a stale
-#: version and a stale tool, `add`/`update` the other direction. Anchored on
-#: mise's own "Dry run - would …" prefix so an unrelated line carrying the word
-#: "add" cannot match.
-_CHANGE = re.compile(r"Dry run - would (prune|add|update|remove)\b(?P<rest>.*)", re.IGNORECASE)
+#: version and a stale tool, `add`/`update` the other direction.
+#:
+#: ANCHORED AT LINE START, after mise's `→ ` bullet. The first version said it was
+#: "anchored on mise's own prefix" and used a bare `.search()` — true of the
+#: STRING, false of the REGEX, so any line merely CONTAINING `Dry run - would`
+#: matched. A cold review of `7f4035cd` read the comment against the line beneath
+#: it and found they disagreed, which is the defect class this repo flags in
+#: everyone else's code.
+_CHANGE = re.compile(
+    r"^\s*(?:→\s*)?Dry run - would (prune|add|update|remove)\b(?P<rest>.*)", re.IGNORECASE
+)
 
 #: `--dry-run` is not bounded by mise itself and re-resolves every platform, so
 #: it reaches the network. The task carries a `timeout` too; this is the inner
@@ -120,6 +127,24 @@ def preview(repo_root: Path) -> str:
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise LockUnavailableError(f"`{' '.join(_ARGV)}` did not complete: {exc}") from exc
+    if proc.returncode != 0:
+        # 🔴 THE THIRD STATE, and the first version of this module collapsed it
+        # into "clean" — found by a cold review of `7f4035cd`.
+        #
+        # mise returns rc 0 whether the lock is in sync or five versions stale,
+        # which is why the REPORT is the answer. But a mise that CRASHED — a bad
+        # `mise.toml`, an unreachable backend, a wedged resolver — also prints no
+        # "would" line, and the parser then sees zero changes and returns OK. A
+        # broken environment would have read as perfectly in sync.
+        #
+        # "the rc cannot tell in-sync from stale" is TRUE and does not license
+        # ignoring the rc. It is exactly `probes-need-a-control-arm.md` rule 4:
+        # distinguish "answered no" from "never asked".
+        detail = (proc.stderr or proc.stdout or "").strip().splitlines()
+        tail = detail[-1] if detail else "no output"
+        raise LockUnavailableError(
+            f"`{' '.join(_ARGV)}` exited {proc.returncode} — its report cannot be trusted: {tail}"
+        )
     # stdout AND stderr: mise puts the dry-run report on one and its warnings on
     # the other, and which is which is not a contract worth depending on.
     return f"{proc.stdout}\n{proc.stderr}"
@@ -132,7 +157,7 @@ def drift(output: str) -> list[Drift]:
         found = _CHANGE.search(raw)
         if not found:
             continue
-        detail = found.group("rest").rstrip().removesuffix(":").rstrip()
+        detail = found.group("rest").strip().removesuffix(":").strip()
         if not detail:
             # `→ Dry run - would update:` is a HEADER mise prints on every run,
             # followed by per-platform `✓ tool@version for <platform>` lines that

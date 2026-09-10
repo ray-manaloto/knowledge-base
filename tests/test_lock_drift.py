@@ -81,13 +81,53 @@ def test_both_drifts_at_once_are_both_reported() -> None:
 
 
 def test_a_word_in_ordinary_prose_is_not_a_change() -> None:
-    """Anchored on mise's own prefix, so a line merely containing `add` is inert.
+    """Anchored at line start, so a line merely CONTAINING the phrase is inert.
 
     This repo's guards have failed on exactly this shape more than once — a
     regex seeing `ruff check` inside `git commit -m "…"`.
+
+    The third case is the one a cold review of `7f4035cd` said was missing: the
+    first two never contained `Dry run - would` at all, so they could not have
+    exercised the anchor and would have passed against the unanchored regex too.
+    A test that cannot fail against the defect is not a test for it.
     """
     assert ld.drift("→ Processing 21 tool(s): would-update-tool@1.0.0\n") == []
     assert ld.drift("some prose that would add nothing\n") == []
+    assert ld.drift("mise WARN  cache dir /tmp/Dry run - would add/x is unwritable\n") == []
+
+
+def test_a_crashed_mise_is_not_a_clean_lockfile(tmp_path: Path, monkeypatch) -> None:
+    """🔴 The defect a cold review found: rc>0 printed no rows and read as CLEAN.
+
+    mise returns rc 0 whether the lock is in sync or stale, which is why the
+    REPORT is the answer — but a mise that CRASHED also prints no `would` line,
+    and the first version returned `Rc.OK` for it. A broken environment read as
+    perfectly in sync: `probes-need-a-control-arm.md` rule 4, "answered no"
+    collapsed into "never asked".
+    """
+    import subprocess
+
+    (tmp_path / "mise.toml").write_text("[tools]\n", encoding="utf-8")
+    (tmp_path / "mise.lock").write_text("", encoding="utf-8")
+
+    def _boom(*_a: object, **_k: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=list(ld._ARGV),
+            returncode=1,
+            stdout="",
+            stderr="mise ERROR failed to parse mise.toml\n",
+        )
+
+    monkeypatch.setattr(subprocess, "run", _boom)
+    with pytest.raises(ld.LockUnavailableError, match="exited 1"):
+        ld.preview(tmp_path)
+    assert ld.main(tmp_path) == Rc.NOT_RUN
+
+
+def test_the_rendered_line_is_not_double_spaced() -> None:
+    """Cosmetic, and it was real: `rest` keeps the space after the verb."""
+    rows = ld.drift(_ORPHAN_TOOL)
+    assert "  " not in rows[0].line()
 
 
 # --- the states that are NOT findings ----------------------------------------
