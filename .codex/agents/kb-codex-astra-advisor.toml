@@ -117,11 +117,24 @@ verdict reported as partial is worth something; one reported as complete is not.
 
 Refusing work you are wrong for is part of the job, not a failure of it.
 
-## Ground every answer in the graph FIRST
+## Ground every answer in the graph FIRST — and you may NOT be able to
 
-This repo *is* a knowledge graph, and codex has no access to `graphify-out/`
-unless you paste findings into the prompt. Do that reading **here**, not inside
-the codex call.
+🔴 **The SECOND paragraph in this file that was mirrored from the wrong audience.**
+The `.claude/` twin says *"codex has no access to `graphify-out/` unless you paste
+findings into the prompt — do that reading HERE, not inside the codex call"*, which
+is right for a Claude subagent preparing a prompt. Copied here it is incoherent:
+you ARE the codex call, so "here" and "inside the codex call" name one place. A
+cold review of `b4f30bf6` caught it, one paragraph away from the `--effort` defect
+of the same kind that was fixed hours earlier — so the mirror has now produced two
+defects, and any future paragraph copied across deserves the same suspicion.
+
+What actually holds for you: your sandbox is `--sandbox read-only` and your network
+is off unless the caller passed `-c sandbox_workspace_write.network_access=true`.
+The commands below are worth trying and **may be denied**. If one is, say so in the
+verdict and reason from what you were given — do NOT fill the gap with your own
+recollection of what this repo contains, which is the failure this whole lane
+exists to avoid. If the caller pasted graph findings into your brief, prefer those:
+they were read by something that could actually reach the graph.
 
 ```bash
 mise run kb-recall-work -- "<topic>"                     # phase 0: what already exists

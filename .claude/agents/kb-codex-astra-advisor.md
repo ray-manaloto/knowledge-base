@@ -99,6 +99,16 @@ rates it Speed 2/5), which puts a real consult past the harness's ~600s
 foreground cap — a foreground call will be killed and look exactly like the lane
 failing.
 
+🔴 **"Background" means the HARNESS's background run, never `&`.** The snippet
+above carries no `&`, `nohup` or `disown` and must not grow one: a `&`-detached
+local `mise run` is REAPED when the turn goes idle, which killed a 20-minute pull
+in the sibling repo (`long-running-command-hangs.md` rule 2). Use the Bash tool's
+own background run — it stays tracked — and poll the `--output` file in
+SUCCESSIVE calls rather than one long in-turn loop, which the harness kills at
+600s anyway. A cold review of `b4f30bf6` flagged this paragraph as telling you to
+background something with no mechanism; the mechanism is the harness, not the
+shell.
+
 Facts about that command, each of which has already cost something here:
 
 - **`--effort xhigh` is stated explicitly even though it is `kb-codex`'s

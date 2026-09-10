@@ -349,6 +349,21 @@ def _report(report: Report) -> None:
             derived=row.derived,
             kind=row.kind,
         )
+    # EVERY run says what it did not look at. A blind spot recorded only in a
+    # docstring is a blind spot nobody reads: a cold review of `b4f30bf6` pointed
+    # out that this gate can report CLEAN while `detected_count`/`extracted_count`
+    # are stale, because it never reads them — true, declared, and invisible at
+    # the one moment a reader is deciding whether green means safe.
+    #
+    # NOT drift rows, deliberately. They would flip the rc to `NOT_RUN` on every
+    # run and turn a real signal into background noise, which is how a gate loses
+    # its readers. They are a standing caveat printed beside the verdict instead.
+    events.say(
+        "graphify_catalog.not_covered",
+        "[graphify-catalog] NOT COVERED, and a build is what settles them: "
+        "authority detected_count + extracted_count",
+        not_covered=("detected_count", "extracted_count"),
+    )
 
 
 def main(repo_root: Path, args: Sequence[str] | None = None) -> int:
