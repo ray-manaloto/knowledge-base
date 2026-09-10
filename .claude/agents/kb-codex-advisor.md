@@ -129,6 +129,7 @@ Carry a fact's **condition**, never just the fact.
 ## Fallback
 
 When `codex` is unavailable or fails outright, say so and hand the decision
-back to the caller: the sanctioned fallback is `kb-advisor` (Claude/Fable) once
-Claude tokens are no longer constrained, never a silent switch to reasoning in
-this agent's own context.
+back to the caller: the sanctioned fallback is `kb-advisor` (Claude/Fable),
+never a silent switch to reasoning in this agent's own context. That condition
+used to read *"once Claude tokens are no longer constrained"* — a ration that
+expired on 2026-09-01 and outlived its own correction here by a diff.
