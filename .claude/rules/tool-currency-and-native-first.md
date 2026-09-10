@@ -80,6 +80,17 @@ Design facts worth not rediscovering:
 - **graphify stamps no version into its own output**, so `kb-build` writes
   `graphify-out/.currency-stamp.json` recording the version that ACTUALLY RAN
   — never the pin, which would launder drift.
+- **The offline check is STRUCTURALLY BLIND to a new graphify release, and that
+  is not a bug.** "pin-vs-upstream" holds for every tool whose manifest pins an
+  upstream ref; `sources/graphify.manifest` pins **our own fork branch**
+  (`ref = kb-pin/openai-cli-backend-v0.9.53`), which only moves when we move it.
+  Measured 2026-09-09: installed, `pyproject.toml`'s pin and the stamp all read
+  0.9.53, so the row is correctly silent — while PyPI had reached **0.9.57**,
+  four releases on. Control arm in the same run: claude-code and mise BOTH
+  reported drift, so the check was working and discriminating. What noticed the
+  gap was Ray reading a release announcement. **#739** exists to close it; until
+  it lands, a graphify release is checked by `mise run kb-currency` (network) or
+  by nothing.
 - **An unambiguous bump may apply itself**, where unambiguous means all six
   gates pass, and it **fails closed**: anything unreadable is ambiguity, not
   consent.

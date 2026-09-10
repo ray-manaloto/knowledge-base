@@ -5,7 +5,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: the mise binary itself (`mise --version`)
-#   pinned here:    2026.9.0
+#   pinned here:    2026.9.4
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -35,8 +35,24 @@
 # kind = code: AST extraction only, no LLM, no cost. NOTE this extracts the
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
+# RESYNCED 2026-09-09 to v2026.9.4 (Ray: "resync the mise graphify sources for
+# offline research"). `mise run kb-update -- mise` reported "already at latest" —
+# correct and useless here: it follows the PINNED REF, and this ref is a tag, so
+# it can never discover a newer release. A tag-pinned source is advanced by
+# moving `ref`, never by kb-update.
+#
+# The commit below came from `manifest.resolve_tag(url, "2026.9.4", prefix="v")`,
+# NOT from a hand `ls-remote`. Armed at the moment of the bump: the engine
+# returned 794948606e02… while a hand `ls-remote refs/tags/v2026.9.4` returned
+# 	d0c2938993c5… — the tag object. Different SHAs, exactly the #395 trap the
+# header above describes, still live four months on.
+#
+# That arm matters beyond this file: on the SAME DAY, `sources/codex.manifest`
+# was bumped by hand and recorded a tag object, because codex's manifest carries
+# no warning like this one and the knowledge did not transfer. The engine's
+# resolver has been correct since #500; only the hand path is exposed.
 url = https://github.com/jdx/mise
-ref = v2026.9.0
-commit = c6f6130a03205ee1f9b63142244a8ebff4d1e918
+ref = v2026.9.4
+commit = 794948606e02cde091653a165291b06cae43c352
 kind = code
 added = 2026-08-02

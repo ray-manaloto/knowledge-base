@@ -229,8 +229,8 @@ gh = "2.98.0"
 # `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
-"npm:@openai/codex" = "0.153.4"
-antigravity-cli = "1.1.25"
+"npm:@openai/codex" = "0.154.0"
+antigravity-cli = "1.2.0"
 "npm:ctx7" = { version = "0.5.9", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.3"
 # coreutils: macOS ships BSD userland, not GNU — this repo's own rules and
@@ -1071,6 +1071,28 @@ description = "Gate: registry entries still agree with sources/*.manifest (offli
 run = "uv run kb-setup manifest-audit"
 # Offline tier 1 is milliseconds; tier 2 hashes and scans whatever clones
 # happen to be present. Nowhere near the outer 1800s `gates._GATE_TIMEOUT`.
+timeout = "120s"
+
+[tasks.kb-graphify-catalog]
+description = "Gate: sources/graphify.dispositions.json + the baseline authority still describe the PINNED commit"
+# Built because the 0.9.57 pin move advanced `source_commit` and left FIVE
+# derived values behind — the catalog's `source_tree`, the `uv.lock` row's
+# sha256 and size, and the authority literal's `source_tree` and
+# `catalog_sha256` — while all eight gates reported green. A cold review found
+# four of the five; the fifth was found by this gate on its first run, because
+# `catalog_sha256` digests the catalog and therefore MOVES when you fix the
+# catalog.
+#
+# Distinct from `kb-manifest-audit`, which asks whether registry entries agree
+# with a manifest's `commit`. This asks whether values DERIVED from that commit
+# still describe it — a different question, and the one nothing was asking.
+#
+# It reads the pinned COMMIT via `git cat-file`, never the clone's worktree, so
+# a stray untracked file in `sources/graphify/` cannot change the answer. No
+# clone is `Rc.NOT_RUN` (127), never a pass.
+run = "uv run kb-setup graphify-catalog"
+# Twenty `git cat-file` reads against a local clone. Milliseconds in practice;
+# the bound exists so a wedged git cannot hold the gate batch open.
 timeout = "120s"
 
 [tasks.kb-codex]

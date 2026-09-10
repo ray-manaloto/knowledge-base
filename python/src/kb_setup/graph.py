@@ -38,6 +38,7 @@ import msgspec
 
 from kb_setup import atomic, graph_checks, graphify_health, graphify_ops
 from kb_setup import manifest as mf
+from kb_setup.generated.reviewed_classification import ReviewedClassification
 from kb_setup.graphify_env import (
     assert_pinned_graphify,
     clean_env,
@@ -143,7 +144,7 @@ _EXPECTED_UNCLASSIFIED = (
         relative_path=".claudeignore",
         content_sha256="ea4bc0ca648a2339096adda7b96bc619eae53d96c7ccd4a1fe7d3f6dcf86319a",
         pinned_commit="34a52ce09db146035ca56db160388034de629693",
-        classification="reviewed-root-ignore-metadata",
+        classification=ReviewedClassification.reviewed_root_ignore_metadata,
     ),
     graphify_health.ExpectedUnclassifiedFile(
         source_name="Attacca",
@@ -151,7 +152,67 @@ _EXPECTED_UNCLASSIFIED = (
         content_sha256="2819592ffada78626fb51ebec43f23a97c1447270ec7f96b0567f830f530c462",
         pinned_commit="34a52ce09db146035ca56db160388034de629693",
         # Operational input read by scripts/validate-plugins.mjs at this immutable pin.
-        classification="reviewed-version-marker",
+        classification=ReviewedClassification.reviewed_version_marker,
+    ),
+    # --- codex, registered 2026-09-09 with the `build = skip` -> `include` flip.
+    #
+    # This is the file the flip ACTUALLY died on, and it is not the one the old
+    # `skip_reason` predicted. That field said `kb-build` fails closed on
+    # `codex-rs/Cargo.toml` producing zero nodes; the `_EXPECTED_METADATA_ONLY`
+    # entry below handles that, codex sailed past it, and detect then failed
+    # closed on ONE unrelated path. The lane report that cleared the flip named
+    # this exact risk as its stated unknown — "whether any OTHER file in the
+    # now-current clone would produce a new warning… can only be answered by an
+    # actual extraction pass" — so this entry is that answer, not a surprise.
+    #
+    # 650 bytes of CMake driving a Bazel action (`set(CMAKE_MAKE_PROGRAM …)`,
+    # `get_filename_component(CMAKE_AR …)`). Build configuration for a vendored
+    # audio toolchain, not codex source. graphify ships no CMake extractor, so
+    # zero nodes is correct and absorbing it loses nothing.
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="codex",
+        relative_path="third_party/voice/opus-toolchain.cmake",
+        content_sha256="f3a869be2009349f2e698856f57ad0b8e6065c060e1c242fd68cd8ff8543fe86",
+        pinned_commit="6b9826e3aa83b1a5947db50f4332cb9c65f1b340",
+        classification=ReviewedClassification.reviewed_build_toolchain_config,
+    ),
+    # --- mise, registered 2026-09-09 with the v2026.9.0 -> v2026.9.4 resync.
+    #
+    # 🔴 BOTH OF THESE ARE NEW AT v2026.9.4 — a VERSION BUMP CHANGED THE CORPUS
+    # INPUT SET. Neither exists at v2026.9.0 (`git cat-file -e
+    # c6f6130a03205ee1f9b63142244a8ebff4d1e918:<path>`), so the resync alone is
+    # what turned a passing build into a failing one, with no manifest error and
+    # nothing wrong with mise.
+    #
+    # Control-armed before that was believed, because a shallow clone reports a
+    # missing OBJECT identically to a missing FILE: the old commit resolves
+    # locally (`git cat-file -t` -> `commit`) and `Cargo.toml`, `README.md` and
+    # `src/main.rs` all report PRESENT at it. So the two absences are real.
+    #
+    # The lesson is bigger than these two rows and belongs to the upgrade-command
+    # design: a pin bump is NOT metadata-only. It can fail the build on files
+    # that have nothing to do with the tool's behaviour, and no amount of
+    # pin/hash/registry consistency predicts it — only a real extraction does.
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="mise",
+        relative_path="crates/mise-shim/native-shim-marker",
+        content_sha256="72a27cc1537be66f5237c8b99ee2dfe89a52b1cc9447884321176f0c6aee1be8",
+        pinned_commit="794948606e02cde091653a165291b06cae43c352",
+        # 30 bytes, extensionless, whose entire content is the literal
+        # "mise generated native shim v1" — a marker mise writes and reads back
+        # to identify its own generated shims. Same class as Attacca's
+        # BOILERPLATE_VERSION above.
+        classification=ReviewedClassification.reviewed_version_marker,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="mise",
+        relative_path="docs/.vitepress/fonts/SpaceGrotesk.ttf",
+        content_sha256="acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
+        pinned_commit="794948606e02cde091653a165291b06cae43c352",
+        # 136 KB of TrueType binary (`file` reports 21 tables, DSIG-signed) —
+        # a web font for mise's VitePress docs site. There is no source in it to
+        # lose, and no extractor could produce one.
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
     ),
 )
 
@@ -205,8 +266,12 @@ _ATTACCA_METADATA_ONLY_PATHS = (
 # Enumerated through graphify's own `detect()` (the collector `graphify
 # extract` uses) -> `is_package_manifest_path` -> `extract_package_manifest`
 # -> `extract.py:5613-5616`'s `_empty_sources` predicate, applied literally, at
-# each source's pinned commit. `GitNexus` and `codex` carry the identical shape
-# but stay `build = skip` and are deliberately NOT registered — out of scope.
+# each source's pinned commit. `GitNexus` carries the identical shape but stays
+# `build = skip` and is deliberately NOT registered — out of scope.
+#
+# `codex` WAS in that sentence until 2026-09-09 (#728 step 4). It is now
+# registered below and `build = include`, which is what this comment had been
+# describing as the obvious next step for four sources' worth of precedent.
 _DATAMODEL_CODE_GENERATOR_MANIFEST_PATHS = (
     (
         "docs/assets/playground/pyproject.toml",
@@ -289,19 +354,27 @@ _EXPECTED_METADATA_ONLY = (
     graphify_health.ExpectedMetadataOnly(
         source_name="codex-docs",
         relative_path="pyproject.toml",
-        # RE-APPROVED at codex-docs 3b1ef69d (2026-09-08). The approval is keyed
-        # to BOTH values, so advancing the manifest correctly invalidated it and
-        # `kb-manifest-audit` blocked the ship — the gate working, not noise.
+        # RE-APPROVED at codex-docs 262d53df (2026-09-09), the SECOND such
+        # re-approval in two days. The approval is keyed to BOTH values, so
+        # advancing the manifest correctly invalidated it and `kb-manifest-audit`
+        # blocked the ship — the gate working, not noise. It is also the only
+        # thing that caught this pin site: `mise run kb-update -- codex-docs`
+        # moves the manifest and does NOT move the registry entry.
         #
-        # The premise was re-verified rather than the numbers re-typed:
-        # `grep -c '^\[project\]' sources/codex-docs/pyproject.toml` -> **0**,
-        # and the file's only tables are `[tool.ruff]`, `[tool.ruff.lint]`,
-        # `[tool.coverage.run]`, `[tool.coverage.report]`. So the zero-node
-        # result is still correct for the recorded reason. The file did change
-        # upstream — it gained the two `.lint`/`.report` tables the comment above
-        # predates — which is exactly why the SHA is part of the key.
+        # The premise was re-verified at the NEW commit rather than the numbers
+        # re-typed: the clone is at 262d53df, `grep -c '^\[project\]'` -> **0**,
+        # the file's only tables are `[tool.ruff]`, `[tool.ruff.lint]`,
+        # `[tool.coverage.run]`, `[tool.coverage.report]`, and it is 254 bytes.
+        # So the zero-node result is still correct for the recorded reason.
+        #
+        # UNLIKE the 3b1ef69d re-approval, the file is BYTE-IDENTICAL across this
+        # bump — `content_sha256` below is unchanged and only `pinned_commit`
+        # moved. That is the DELIBERATE ASYMMETRY `manifest_audit`'s docstring
+        # describes: tier 1 flags DRIFT on a pin bump even when the file did not
+        # change, because a cheap re-stamp is the correct direction to be wrong
+        # in. Do not read the unchanged hash as evidence the gate misfired.
         content_sha256="3ee45be83e41d61eb7d77dedf9e4c2c499ee080ef1b3aac96ee739e302b8192f",
-        pinned_commit="3b1ef69d01c53b1de818703e73a6235df2248277",
+        pinned_commit="262d53df92e9cf7495206e64e3f6c4edc757116f",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
     graphify_health.ExpectedMetadataOnly(
@@ -423,6 +496,41 @@ _EXPECTED_METADATA_ONLY = (
         relative_path="Cargo.toml",
         content_sha256="4447101af02598ae78268af3c8226655a7b50ffef155191c87a4e125274a9055",
         pinned_commit="4d9c1d53ff57c44247e7a32718e1c69a0c1735af",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
+    # codex's `codex-rs/Cargo.toml` — the SAME bare `[workspace]` shape as biome
+    # and pensyve above. Registered 2026-09-09 (#728 step 4), which is what let
+    # `sources/codex.manifest` flip `build = skip` -> `include`: `require_complete`
+    # (`graphify_health.py:528`) fails a build CLOSED on any zero-node file that is
+    # not pre-registered, so removing the skip WITHOUT this entry would swap one
+    # blocked source for a failing build. PR #550 is the precedent — it let a
+    # different skip through and died on `ast-grep`'s Cargo.toml warning.
+    #
+    # The skip_reason this replaces claimed "#1666: Cargo.toml produces zero nodes
+    # and the reviewed-metadata approver is JSON-only, so a TOML file needs new
+    # machinery". Both halves are refuted at the INSTALLED 0.9.57, not at the
+    # issue tracker: `manifest_ingest.py` gives `Cargo.toml` its own first-class
+    # parser routed ahead of the JSON extractor by `extract.py:5933-5934`, and
+    # `:94-96` returns `{"nodes": [], "edges": []}` for a manifest with no name.
+    # A virtual workspace root genuinely has no package to emit. Correct parse,
+    # not data loss — and no fork change was needed.
+    #
+    # Premise re-verified at the pinned bytes rather than inherited: line 1 is
+    # `[workspace]`, `grep -c '^\[package\]'` -> 0, 620 lines. Both values below
+    # MOVED with the 0.153.4 -> 0.154.0 bump (the file was 613 lines and hashed
+    # 673bd2b1… at 3d2ee51c), which is why they are derived here and not copied
+    # from the research that proposed this entry.
+    #
+    # `pinned_commit` is the PEELED commit, matching every sibling: codex tags are
+    # annotated, so `git ls-remote refs/tags/rust-v0.154.0` returns the TAG OBJECT
+    # 36eab010… and only `refs/tags/rust-v0.154.0^{}` gives 6b9826e3aa…. The tag
+    # object was briefly committed here and no gate caught it — `_check_manifest_commit`
+    # accepts either identity by design (#246), so nothing enforces which one we record.
+    graphify_health.ExpectedMetadataOnly(
+        source_name="codex",
+        relative_path="codex-rs/Cargo.toml",
+        content_sha256="be81959425540d70c4735936293a8e119e498573d5b57121849eee0539c127d1",
+        pinned_commit="6b9826e3aa83b1a5947db50f4332cb9c65f1b340",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
     # A 3-line `pyproject.toml` holding only `[tool.uv]` config (`no-build =
@@ -566,7 +674,7 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         source_name="graphify",
         relative_path="tests/fixtures/sample.luau",
         content_sha256="c1aa998580d46b917014567ad39fe125c2a63ac540c3840fd27813d2004d2bd5",
-        pinned_commit="157a957e89a16246bba3a078de2777711ee85e31",
+        pinned_commit="3c9b930f386f80c393fe658e1afb685030828c6a",
         first_error_line=8,
         extracted_nodes=5,
         lost_symbols=0,

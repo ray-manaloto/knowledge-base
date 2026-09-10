@@ -29,7 +29,7 @@ dependencies = [
   # A subscription-minted CLAUDE_CODE_OAUTH_TOKEN authorizes that endpoint —
   # verified 2026-08-17, 200 for a real model against 404 for a bogus one.
   "anthropic>=1.0.0",
-  "graphifyy[all]==0.9.53",
+  "graphifyy[all]==0.9.57",
   "httpx2>=2.12.0",
   "msgspec==0.21.1",
   "skillopt @ git+https://github.com/microsoft/SkillOpt@93bdf3d770b99128daf35278218e5a666fe392f3",
@@ -136,6 +136,28 @@ ignore = [
   # irrelevant to a CLI; keeps imports in one obvious place.
   "TC003",
 ]
+
+[tool.ruff.lint.flake8-type-checking]
+# NOT a suppression — a true fact about this codebase that ruff cannot infer.
+# msgspec resolves a Struct's annotations AT RUNTIME (it builds the decoder from
+# them), so an application type used only in a Struct field annotation is a
+# runtime dependency, not a typing-only one. Without this, TC001 tells you to
+# move such an import into `if TYPE_CHECKING`, and following that advice breaks
+# decoding.
+#
+# MEASURED 2026-09-09 rather than argued, on the real
+# `ExpectedUnclassifiedFile.classification: ReviewedClassification`, three arms:
+#   construct -> OK        (annotations never evaluated)
+#   encode    -> OK        (reads the instance, not the annotation)
+#   decode    -> NameError: name 'ReviewedClassification' is not defined
+# Only the third touches the annotation, which is why the trap is quiet: two of
+# three operations keep working, so a TYPE_CHECKING move looks harmless until
+# something round-trips.
+#
+# `TC003` is already ignored outright above for a weaker, stylistic reason. This
+# is the stronger case and gets the precise fix instead: naming the base class
+# keeps TC001 live everywhere it is still correct.
+runtime-evaluated-base-classes = ["msgspec.Struct"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests: assert IS the mechanism (S101), self-describing names (D103), magic
@@ -261,7 +283,7 @@ cpy = "cpy"
 nativ = "nativ"
 
 [tool.uv.sources]
-graphifyy = { git = "https://github.com/ray-manaloto/graphify", rev = "157a957e89a16246bba3a078de2777711ee85e31" }
+graphifyy = { git = "https://github.com/ray-manaloto/graphify", rev = "3c9b930f386f80c393fe658e1afb685030828c6a" }
 
 # Every strict msgspec model generated from a committed schema, as datamodel-codegen's
 # own `--all-jobs`/`--all-jobs --check` batch (0.75.1). Replaces four
@@ -355,6 +377,12 @@ input = "schemas/recall-work.schema.json"
 output = "python/src/kb_setup/generated/recall_work.py"
 custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
 """Generated recall-work models; edit the schema and rerun the generator."""'''
+
+[tool.datamodel-codegen.jobs.reviewed-classification]
+input = "schemas/reviewed-classification.schema.json"
+output = "python/src/kb_setup/generated/reviewed_classification.py"
+custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
+"""Generated reviewed-classification enum; edit the schema and rerun the generator."""'''
 
 [tool.datamodel-codegen.jobs.packages]
 input = "schemas/deps-dev-api-v3.proto"

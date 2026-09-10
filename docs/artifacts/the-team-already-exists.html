@@ -1,0 +1,110 @@
+<title>The Team Is Already Built</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=JetBrains+Mono:wght@400;600&family=Public+Sans:wght@400;600&display=swap">
+<style>
+  :root{
+    --ground:#FCFCFA;
+    --panel:#FFFFFF;
+    --ink:#1A1D23;
+    --muted:#666E7A;
+    --rule:#E3E3DE;
+    --accent:#4A4370;
+    --warn:#9A6510;
+    --ok:#2F6446;
+    --display:"Instrument Serif",Georgia,serif;
+    --body:"Public Sans","Helvetica Neue",Arial,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);color:var(--ink);
+    font-family:var(--body);font-size:15px;line-height:1.5;margin:0;padding:20px;
+  }
+  main{max-width:670px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+  .eyebrow{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--muted);margin:0;
+  }
+  h1{
+    font-family:var(--display);font-weight:400;font-size:36px;line-height:1.05;
+    margin:6px 0 0;text-wrap:balance;letter-spacing:-.01em;
+  }
+
+  .cols{display:flex;flex-wrap:wrap;gap:14px}
+  .col{flex:1 1 260px;background:var(--panel);border:1px solid var(--rule);padding:13px 15px}
+  .col h2{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+    margin:0 0 9px;font-weight:600;
+  }
+  .col.have h2{color:var(--ok)}
+  .col.need h2{color:var(--warn)}
+  .col ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+  .col li{font-size:14px;padding-left:19px;position:relative}
+  .col.have li::before{content:"\2713";position:absolute;left:0;color:var(--ok);font-weight:600}
+  .col.need li::before{content:"\2022";position:absolute;left:2px;color:var(--warn);font-weight:600}
+  .col li em{display:block;color:var(--muted);font-style:normal;font-size:12.5px;margin-top:1px}
+
+  .trap{
+    background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--warn);
+    padding:13px 16px;
+  }
+  .trap h2{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+    margin:0 0 7px;color:var(--warn);font-weight:600;
+  }
+  .trap p{margin:0 0 7px;font-size:14.5px}
+  .trap p:last-child{margin-bottom:0}
+  .quote{
+    font-family:var(--display);font-size:19px;line-height:1.3;color:var(--ink);
+    margin:0 0 7px;padding-left:12px;border-left:2px solid var(--rule);
+  }
+  .trap .fact{color:var(--muted);font-size:13.5px}
+
+  .ask{
+    background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);
+    padding:12px 16px;font-size:15px;
+  }
+  .ask b{color:var(--accent)}
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">the codex subagent team</p>
+    <h1>Most of it is already here. Three switches are off.</h1>
+  </header>
+
+  <div class="cols">
+    <div class="col have">
+      <h2>already in this repo</h2>
+      <ul>
+        <li>Eight named roles<em>each with its own thinking level</em></li>
+        <li>A cheap default for workers<em>so the expensive one doesn&rsquo;t do everything</em></li>
+        <li>The spawn-and-wait machinery<em>ships with the tool</em></li>
+        <li>A worked SDLC pipeline<em>plan &rarr; review &rarr; design &rarr; build, already in the corpus</em></li>
+      </ul>
+    </div>
+    <div class="col need">
+      <h2>still missing</h2>
+      <ul>
+        <li>The feature is never switched on<em>the roles exist; nothing arms them</em></li>
+        <li>The ninth role &mdash; your new advisor<em>doesn&rsquo;t exist yet</em></li>
+        <li>The parent is never told the truth<em>see below &mdash; this is the real one</em></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="trap">
+    <h2>the trap</h2>
+    <p class="quote">&ldquo;All agents in the team are equally intelligent and capable.&rdquo;</p>
+    <p>That sentence is fed to the expensive model every time it starts work. <b>It is not true here.</b>
+    This project quietly gives every helper a cheaper brain &mdash; which is exactly the saving you asked for.</p>
+    <p class="fact">So the expensive one decides what is safe to hand off while believing the helpers are its equals.
+    Nothing in the tool corrects this. The instruction has to say it.</p>
+  </div>
+
+  <p class="ask">
+    <b>Three decisions:</b> which thinking level the new advisor runs at, whether to switch
+    the feature on, and whether its role file should pin the expensive model permanently
+    or let each call choose.
+  </p>
+</main>

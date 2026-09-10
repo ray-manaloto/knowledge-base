@@ -1,0 +1,129 @@
+<title>Seven Stale Values</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+  :root{
+    --ground:#FAFBFC;
+    --panel:#FFFFFF;
+    --ink:#16202B;
+    --muted:#5A6B7C;
+    --rule:#DDE3E9;
+    --accent:#0B5D8A;
+    --alarm:#A8341F;
+    --serif:"IBM Plex Serif",Georgia,serif;
+    --sans:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+    margin:0;
+    padding:20px;
+  }
+  main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--muted);margin:0;
+  }
+  h1{
+    font-family:var(--serif);font-weight:600;font-size:28px;line-height:1.15;
+    margin:4px 0 0;text-wrap:balance;
+  }
+
+  .verdict{
+    display:grid;grid-template-columns:auto 1fr;gap:4px 16px;
+    font-variant-numeric:tabular-nums;align-items:baseline;
+  }
+  .verdict dt{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+  .verdict dd{margin:0;font-size:17px;font-weight:500}
+  .verdict .big{font-size:22px;font-weight:600;color:var(--accent)}
+
+  .found{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+  .found li{
+    border-left:3px solid var(--alarm);padding:2px 0 2px 14px;
+  }
+  .found b{display:block;font-weight:600;font-size:15px}
+  .found span{display:block;color:var(--muted);font-size:13.5px;margin-top:1px}
+  code{font-family:var(--mono);font-size:.92em}
+
+  figure{margin:0}
+  svg{width:100%;height:auto;max-width:100%;display:block}
+  figcaption{
+    font-size:12.5px;color:var(--muted);margin-top:8px;text-align:center;
+  }
+
+  .ask{
+    background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);
+    padding:12px 16px;font-size:15px;
+  }
+  .ask b{color:var(--accent)}
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">before I write the tool</p>
+    <h1>The list of things to fix was wrong. Again.</h1>
+  </header>
+
+  <dl class="verdict">
+    <dt>the ticket says</dt><dd>6 values are out of date</dd>
+    <dt>actually</dt><dd class="big">7 &mdash; and 3 were never on any list</dd>
+  </dl>
+
+  <ul class="found">
+    <li>
+      <b>Two file counts, measured four releases ago</b>
+      <span>They say 471 and 463. Nineteen new files arrived since. Nobody re&#8209;counted.</span>
+    </li>
+    <li>
+      <b>One recorded file size is 153 bytes stale</b>
+      <span><code>uv.lock</code> grew. Its size and fingerprint are still the old ones.</span>
+    </li>
+  </ul>
+
+  <figure>
+    <svg viewBox="0 0 420 322" role="img"
+         aria-label="Three ordered stages: values read from the git snapshot feed values computed from them, and only the last stage — the two file counts — requires graphify to actually run.">
+      <defs>
+        <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <polygon points="0,1 10,5 0,9" fill="#0B5D8A"/>
+        </marker>
+      </defs>
+
+      <rect x="4" y="4" width="412" height="76" rx="3" fill="#FFFFFF" stroke="#DDE3E9"/>
+      <text x="20" y="27" font-family="IBM Plex Mono, monospace" font-size="11" fill="#0B5D8A">STEP 1</text>
+      <text x="20" y="47" font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="600" fill="#16202B">Read straight off the git snapshot</text>
+      <text x="20" y="67" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#5A6B7C">the tree id (2 places) &#183; uv.lock&#8217;s size and fingerprint</text>
+
+      <line x1="210" y1="80" x2="210" y2="108" stroke="#0B5D8A" stroke-width="1.5" marker-end="url(#tip)"/>
+      <text x="220" y="99" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="#5A6B7C">both feed &#8595;</text>
+
+      <rect x="4" y="112" width="412" height="76" rx="3" fill="#FFFFFF" stroke="#DDE3E9"/>
+      <text x="20" y="135" font-family="IBM Plex Mono, monospace" font-size="11" fill="#0B5D8A">STEP 2</text>
+      <text x="20" y="155" font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="600" fill="#16202B">Computed from what step 1 produced</text>
+      <text x="20" y="175" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#5A6B7C">the catalog fingerprint &#183; the manifest fingerprint</text>
+
+      <line x1="4" y1="212" x2="416" y2="212" stroke="#A8341F" stroke-width="1" stroke-dasharray="5 4"/>
+      <text x="210" y="206" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+            font-size="10.5" letter-spacing="0.05em" fill="#A8341F">BELOW HERE, GRAPHIFY HAS TO ACTUALLY RUN</text>
+
+      <line x1="210" y1="216" x2="210" y2="240" stroke="#0B5D8A" stroke-width="1.5" marker-end="url(#tip)"/>
+
+      <rect x="4" y="244" width="412" height="74" rx="3" fill="#FFFFFF" stroke="#DDE3E9"/>
+      <text x="20" y="267" font-family="IBM Plex Mono, monospace" font-size="11" fill="#0B5D8A">STEP 3</text>
+      <text x="20" y="287" font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="600" fill="#16202B">Only a real build can know these</text>
+      <text x="20" y="306" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#5A6B7C">the two file counts &#8212; 471 and 463 today, unknown tomorrow</text>
+    </svg>
+    <figcaption>Fix them out of order and an early change silently invalidates a later one.</figcaption>
+  </figure>
+
+  <p class="ask">
+    <b>I need one decision:</b> should the new tool stop at the dashed line and hand
+    the counts back to the existing build, or run the build itself and cover all seven?
+  </p>
+</main>

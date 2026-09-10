@@ -1,0 +1,190 @@
+<title>What's Left on #728</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Spectral:wght@400;500&family=DM+Mono:wght@500&display=swap">
+<style>
+  :root {
+    --ground: #EDEDF2;
+    --card:   #FFFFFF;
+    --ink:    #1A1726;
+    --soft:   #5C5670;
+    --faint:  #6E6885;
+    --rule:   #CBC7D8;
+    --live:   #3D3AA6;
+    --shut:   #B0304F;
+    --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --serif: "Spectral", Georgia, "Times New Roman", serif;
+    --mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    margin: 0;
+    padding-block: 34px 40px;
+    padding-left: 18px;
+    padding-right: 18px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .card {
+    background: var(--card);
+    max-width: 620px;
+    margin: 0 auto;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 30px 30px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .head { display: flex; flex-direction: column; gap: 7px; }
+
+  h1 {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 31px;
+    line-height: 1.08;
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .deck {
+    font-size: 15.5px;
+    line-height: 1.45;
+    color: var(--soft);
+    margin: 0;
+    max-width: 46ch;
+  }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  figure svg { width: 100%; max-width: 470px; height: auto; display: block; }
+
+  figcaption {
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--faint);
+    text-align: center;
+    max-width: 44ch;
+  }
+
+  .rows { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--rule); padding-top: 20px; }
+
+  .row { display: flex; gap: 12px; align-items: baseline; }
+
+  .row .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--faint);
+    white-space: nowrap;
+    flex: 0 0 auto;
+    min-width: 52px;
+  }
+
+  .row p { margin: 0; font-size: 15px; line-height: 1.45; }
+
+  .ask {
+    font-family: var(--sans);
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--live);
+    background: #F3F2FC;
+    border-left: 3px solid var(--live);
+    padding: 12px 14px;
+    border-radius: 0 3px 3px 0;
+  }
+
+  @media (max-width: 460px) {
+    h1 { font-size: 26px; }
+    .card { padding: 22px 18px 20px; }
+    .row { flex-direction: column; gap: 2px; }
+  }
+</style>
+
+<div class="card">
+
+  <div class="head">
+    <h1>What&rsquo;s left on&nbsp;#728</h1>
+    <p class="deck">Three pieces. Two of them can happen in either order &mdash; the third can&rsquo;t start until both are in.</p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 460 358" role="img"
+         aria-label="Two independent steps, refreshing the snapshot and building the rebase tool, both feed into a cold review; the review produces a receipt, and the ship step stays shut until that receipt exists.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#CBC7D8"></path>
+        </marker>
+        <marker id="ar-shut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#B0304F"></path>
+        </marker>
+      </defs>
+
+      <!-- done stub -->
+      <rect x="60" y="6" width="340" height="30" rx="15" fill="#F1F0F5" stroke="#CBC7D8"></rect>
+      <text x="230" y="25" text-anchor="middle" font-family="Spectral, Georgia, serif" font-size="12" fill="#6E6885">Done &mdash; rebased onto 0.9.57, all pins moved</text>
+
+      <line x1="230" y1="36" x2="230" y2="54" stroke="#CBC7D8" stroke-width="1.5" marker-end="url(#ar)"></line>
+
+      <!-- either-order group -->
+      <rect x="16" y="56" width="428" height="132" rx="8" fill="none" stroke="#CBC7D8" stroke-width="1.5" stroke-dasharray="5 4"></rect>
+      <rect x="176" y="48" width="108" height="17" rx="8.5" fill="#FFFFFF"></rect>
+      <text x="230" y="60.5" text-anchor="middle" font-family="DM Mono, monospace" font-size="10" letter-spacing="0.06em" fill="#6E6885">EITHER ORDER</text>
+
+      <!-- step 1 -->
+      <rect x="30" y="74" width="400" height="48" rx="5" fill="#FFFFFF" stroke="#CBC7D8"></rect>
+      <rect x="42" y="86" width="24" height="24" rx="4" fill="#3D3AA6"></rect>
+      <text x="54" y="102.5" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="600" fill="#FFFFFF">1</text>
+      <text x="78" y="95" font-family="Archivo, sans-serif" font-size="15" font-weight="600" fill="#1A1726">Refresh the stored snapshot</text>
+      <text x="78" y="112" font-family="Spectral, Georgia, serif" font-size="12" fill="#5C5670">nothing refuses to run without it</text>
+
+      <!-- step 2 -->
+      <rect x="30" y="130" width="400" height="48" rx="5" fill="#F5F4FC" stroke="#3D3AA6" stroke-width="1.5"></rect>
+      <rect x="42" y="142" width="24" height="24" rx="4" fill="#3D3AA6"></rect>
+      <text x="54" y="158.5" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="600" fill="#FFFFFF">2</text>
+      <text x="78" y="151" font-family="Archivo, sans-serif" font-size="15" font-weight="600" fill="#1A1726">Build the tool that does this rebase</text>
+      <text x="78" y="168" font-family="Spectral, Georgia, serif" font-size="12" fill="#5C5670">the only piece that doesn&rsquo;t exist yet</text>
+
+      <line x1="230" y1="188" x2="230" y2="204" stroke="#CBC7D8" stroke-width="1.5" marker-end="url(#ar)"></line>
+
+      <!-- step 3 -->
+      <rect x="16" y="206" width="428" height="52" rx="6" fill="#FFFFFF" stroke="#CBC7D8"></rect>
+      <rect x="28" y="220" width="24" height="24" rx="4" fill="#3D3AA6"></rect>
+      <text x="40" y="236.5" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="600" fill="#FFFFFF">3</text>
+      <text x="64" y="229" font-family="Archivo, sans-serif" font-size="15" font-weight="600" fill="#1A1726">Cold review by a different model</text>
+      <text x="64" y="246" font-family="Spectral, Georgia, serif" font-size="12" fill="#5C5670">this is what writes the receipt</text>
+
+      <line x1="230" y1="258" x2="230" y2="288" stroke="#B0304F" stroke-width="1.5" marker-end="url(#ar-shut)"></line>
+      <text x="240" y="277" font-family="DM Mono, monospace" font-size="10.5" fill="#B0304F">receipt</text>
+
+      <!-- the shut gate -->
+      <rect x="16" y="292" width="428" height="54" rx="6" fill="#FCEFF3" stroke="#B0304F" stroke-width="1.5"></rect>
+      <rect x="28" y="307" width="24" height="24" rx="4" fill="#B0304F"></rect>
+      <rect x="34" y="318" width="12" height="9" rx="1.5" fill="#FFFFFF"></rect>
+      <path d="M 36.5 318 v -3 a 3.5 3.5 0 0 1 7 0 v 3" stroke="#FFFFFF" stroke-width="2" fill="none"></path>
+      <text x="64" y="316" font-family="Archivo, sans-serif" font-size="15" font-weight="600" fill="#1A1726">Ship</text>
+      <text x="64" y="333" font-family="Spectral, Georgia, serif" font-size="12" fill="#5C5670">shut until that receipt exists</text>
+    </svg>
+    <figcaption>Two independent steps feed one review. The review makes the receipt; without it, ship refuses.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <span class="tag">Step 1</span>
+      <p>Blocks nothing. It is owed, not required &mdash; skipping it holds nothing else up.</p>
+    </div>
+    <div class="row">
+      <span class="tag">Step 2</span>
+      <p>The only thing here that has to be built. The other two re-run something that already works.</p>
+    </div>
+  </div>
+
+  <p class="ask">&rarr; Tell me which one to start. If you just wanted the picture, I need nothing.</p>
+
+</div>

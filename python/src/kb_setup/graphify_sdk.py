@@ -37,6 +37,7 @@ from graphify.llm import extract_corpus_parallel
 from graphify.manifest_ingest import extract_package_manifest, is_package_manifest_path
 from graphify.reflect import build_learning_overlay, reflect
 
+from kb_setup.generated.reviewed_classification import ReviewedClassification
 from kb_setup.graphify_health import (
     APPROVED_METADATA_ZERO_NODE_WARNING,
     APPROVED_PARTIAL_EXTRACTION_WARNING,
@@ -91,12 +92,30 @@ _PUBLIC_SYMBOLS = (
         "(extraction: 'dict', *, directed: 'bool' = False, root: 'str | Path | None' = None) "
         "-> 'nx.Graph'",
     ),
+    # `ast_sources` ARRIVED IN 0.9.57 (upstream #3411, `build.py:1560-1625`) and is
+    # deliberately NOT passed by our one call site. It scopes which AST-tier
+    # sources a merge is allowed to REPLACE, so a `.sln`/ProjectReference stub
+    # cannot wipe the referenced project's nodes.
+    #
+    # Why leaving it None is correct here, measured rather than assumed:
+    # `_tier_replacement_sources` unions `ast_sources` with each chunk's
+    # `extracted_sources` key into `explicit_ast_sources`, and that set governs
+    # `new_ast_sources` ONLY — `new_sem_sources` is computed from the chunk's
+    # non-AST-tier nodes and the parameter never touches it (`:1608-1621`).
+    # Our sole call site is `_merge_docs.py:384`, which merges DOC chunks: their
+    # nodes are semantic-tier, and `grep -l extracted_sources
+    # sources/extractions/*.json` returns 0. So `explicit_ast_sources` is empty
+    # both before and after the bump, the `else` branch runs, and it finds no
+    # AST-tier nodes to collect — our path's behaviour is unchanged.
+    #
+    # Revisit the moment a chunk we merge here carries AST-tier nodes.
     PublicSymbol(
         "graphify.build.build_merge",
         build_merge,
         "(new_chunks: 'list[dict]', graph_path: 'str | Path | None' = None, prune_sources: "
         "'list[str] | None' = None, *, directed: 'bool | None' = None, dedup: 'bool' = True, "
-        "dedup_llm_backend: 'str | None' = None, root: 'str | Path | None' = None) -> "
+        "dedup_llm_backend: 'str | None' = None, root: 'str | Path | None' = None, "
+        "ast_sources: \"'Iterable[str | Path] | None'\" = None) -> "
         "'nx.Graph'",
     ),
     PublicSymbol(
@@ -1322,14 +1341,42 @@ def source_detection_policy(
     for item in reviewed:
         if item.source_name != source_name:
             continue
-        if item.classification == "reviewed-version-marker" and _safe_exact_reviewed_file(
-            root, item
-        ):
-            allowed.append(item.relative_path)
-        if item.classification == "reviewed-root-ignore-metadata" and _safe_reviewed_ignore(
-            root, item
-        ):
-            allowed.append(item.relative_path)
+        match item.classification:
+            # Three classes share ONE predicate deliberately. `_safe_exact_
+            # reviewed_file` is not version-marker-specific: it rejects absolute
+            # paths, `..`, symlinks and anything escaping `root`, then pins the
+            # file by content hash. That is the whole guarantee these classes
+            # need — the classification says WHY a file carries no source, while
+            # the predicate proves WHICH bytes were reviewed.
+            case (
+                ReviewedClassification.reviewed_version_marker
+                | ReviewedClassification.reviewed_build_toolchain_config
+                | ReviewedClassification.reviewed_binary_docs_asset
+            ):
+                if _safe_exact_reviewed_file(root, item):
+                    allowed.append(item.relative_path)
+            case ReviewedClassification.reviewed_root_ignore_metadata:
+                if _safe_reviewed_ignore(root, item):
+                    allowed.append(item.relative_path)
+            case _:  # pragma: no cover - unreachable while the enum is exhaustive
+                # THE POINT OF THIS BRANCH. Until 2026-09-09 this loop was two
+                # `if`s with no else, so a classification naming no branch was
+                # silently dropped: the entry looked reviewed and absorbed
+                # nothing. Two such entries cost two full `kb-build` runs before
+                # anything said why.
+                #
+                # It is unreachable for today's four members, and that is not a
+                # reason to omit it. The live risk is the HALF-CHANGE the schema
+                # warns about: adding a value to
+                # `schemas/reviewed-classification.schema.json` without adding a
+                # branch here. The enum would accept it, the registry would
+                # decode it, and the file would still block the build with no
+                # explanation. Now it names itself instead.
+                raise ValueError(
+                    f"reviewed classification {item.classification!r} has no absorption "
+                    f"branch in source_detection_policy (source={item.source_name!r}, "
+                    f"path={item.relative_path!r}); add one with its safety predicate"
+                )
     return SourceCoveragePolicy(optional_unclassified_paths=tuple(sorted(allowed)))
 
 

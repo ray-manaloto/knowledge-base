@@ -207,8 +207,8 @@ os = ["macos"]
 # instructions above stay correct however many bindings remain.
 [tool.graphify.fork]
 upstream = "Graphify-Labs/graphify"
-base_ref = "v0.9.53"
-base_commit = "33362d969292b57eda82f3fbd9eb5f3f5bc9bbc2"
+base_ref = "v0.9.57"
+base_commit = "3f82bf7f837a07fb0f7668fbdbd5662801906942"
 pr = "#3073 — OPEN (measured 2026-09-02); supersedes #2981, which was closed 2026-08-25"
 reason = "upstream does not YET ship a codex backend: openai-cli (a sibling of claude-cli that shells to the locally authenticated codex CLI) reached upstream as PR #2981, closed unmerged 2026-08-25, and again as #3073, open as of 2026-09-02. Upstream v0.9.50 contains ZERO mentions of openai-cli, control-armed against 23 mentions of claude-cli in the same file. This fork is where that capability lives FOR NOW. CORRECTED 2026-09-02: this line read 'is not getting ours' and 'this fork is where that capability lives', which asserted permanence — the same claim clears_when below retracts. A cold review caught the two lines arguing with each other."
 clears_when = "upstream merges an openai-cli backend. CORRECTED 2026-09-02: this said 'NOT #2981, which is closed and will not merge' and concluded the fork was PERMANENT. #2981 was closed on 2026-08-25 and RESUPPLIED two days later as #3073 — same author (Azeem1985), byte-identical title, still OPEN as of 2026-09-02. So the fork is a BRIDGE that may yet close, not a permanent divergence. The 2026-08-25 ruling was CORRECT ON ITS EVIDENCE — #3073 did not exist yet — and went stale two days later when upstream resupplied; nothing re-asked until 2026-09-02. (An earlier version of this sentence said the ruling 'rested on a PR number that had already moved', which is chronologically impossible by its own dates; a cold review caught it.) Watch #3073. Our own transport was fork-to-fork from TelB-io, never a cherry-pick of either PR — three `# PATCHED FOR TELB-COCKPIT` markers survive in our tree (control: 0 on tag v0.9.53). If upstream merges: revert pyproject.toml to an == pin, point sources/graphify.manifest back at Graphify-Labs, and delete this block."
@@ -619,6 +619,20 @@ version_pattern = '^ffmpeg version (\d+\.\d+(?:\.\d+)?)'
 # Host-only, like graphify: on a Linux CI runner this reports not-applicable
 # rather than failing, since the conda install lives on the Mac host.
 os = ["macos"]
+# ADDED 2026-09-09 alongside firecrawl-cli's and ctx7's. Not drifting —
+# `resolve_tag(url, "9.0.1", prefix="n")` reproduces the recorded commit exactly
+# — but unchecked, which is the state firecrawl-cli's REAL drift hid in.
+#
+# `tag_prefix = "n"` is REQUIRED: FFmpeg tags releases `n<version>`, so without
+# it the check compares `n9.0.1` against the installed `9.0.1` and reports a
+# permanent false drift. `[tool.codex]` records why that is worse than no row.
+#
+# Note the pin is `conda:ffmpeg` while the manifest tracks the GitHub source.
+# The comparison is meaningful only because the conda build and the `n<version>`
+# tag name the same release; if that ever stops being true, this row starts
+# lying rather than checking.
+tag_prefix = "n"
+manifest = "sources/ffmpeg.manifest"
 
 # ---- coreutils: GNU behaviour this repo's own rules/probes depend on ---------
 #
@@ -1933,7 +1947,7 @@ manifest = "sources/codex.manifest"
 # did not mention antigravity at all. Both halves wrong, and the figure reached
 # Ray's own directive text before anyone re-derived it.
 mise_key = "antigravity-cli"
-expected = "1.1.25"
+expected = "1.2.0"
 binary = "agy"
 github = "google-antigravity/antigravity-cli"
 # The HOUSE form (`^v?(\d+\.\d+\.\d+)`, as at `[tool.hk]` and `[tool.fnox]`),
@@ -2165,16 +2179,23 @@ so that abort reads as a known shape rather than a bug."""
 #
 # npm publishes it; GitHub is `firecrawl/cli`, NOT `firecrawl/firecrawl-cli`
 # (guessed once, 404) — the npm `repository.url` is what settled it. Its tags
-# track the npm version exactly: npm latest 1.23.1, newest tag `v1.23.1`, so a
-# GitHub upstream check here is meaningful rather than decorative.
+# track the npm version exactly, so a GitHub upstream check here is meaningful
+# rather than decorative. (This comment named 1.23.1 as "npm latest" until
+# 2026-09-09; the pin is 1.23.3. A version quoted in prose beside the row that
+# owns it goes stale — re-derive, never quote.)
 #
-# `firecrawl --version` prints a BARE `1.23.1` with no tool name, unlike agnix
+# `firecrawl --version` prints a BARE version with no tool name, unlike agnix
 # and ruff which anchor their own name. Measured by running it, not assumed.
 mise_key = "npm:firecrawl-cli"
 binary = "firecrawl"
 github = "firecrawl/cli"
 tag_prefix = "v"
 version_pattern = '^(\d+\.\d+\.\d+)$'
+# ADDED 2026-09-09, and it was NOT cosmetic: without this row the manifest-vs-pin
+# comparison never ran, and `sources/firecrawl-cli.manifest` had silently drifted
+# to v1.23.1 against a 1.23.3 pin. The absence WAS the defect — the corpus
+# described a firecrawl-cli we do not run, and every check reported clean.
+manifest = "sources/firecrawl-cli.manifest"
 
 [tool.ctx7]
 # The official Context7 CLI (npm `ctx7` -> github.com/upstash/context7), pinned
@@ -2205,6 +2226,18 @@ version_pattern = '^(\d+\.\d+\.\d+)$'
 mise_key = "npm:ctx7"
 binary = "ctx7"
 version_pattern = '^(\d+\.\d+\.\d+)$'
+# ADDED 2026-09-09 alongside firecrawl-cli's. This manifest was NOT drifting —
+# `resolve_tag(url, "0.5.9", prefix="ctx7@")` reproduces the recorded commit
+# byte-for-byte — but nothing was checking, which is the same exposure
+# firecrawl-cli was already sitting in.
+#
+# `tag_prefix` is REQUIRED here and is not decoration: upstash tags releases
+# `ctx7@<version>`, so without it the check compares `ctx7@0.5.9` against the
+# installed `0.5.9` and reports a PERMANENT FALSE DRIFT. `[tool.codex]` records
+# why that is worse than no row at all — it trains a reader to ignore the line,
+# which is how a real drift gets missed.
+tag_prefix = "ctx7@"
+manifest = "sources/ctx7.manifest"
 
 [tool.lychee]
 # The link checker behind the hk `lychee` step and `mise run kb-links`. Pinned

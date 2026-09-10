@@ -5,11 +5,13 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from typing import cast
 
 import networkx as nx
 import pytest
 from kb_setup import graphify_baseline, graphify_sdk
 from kb_setup.currency import config as currency_config
+from kb_setup.generated.reviewed_classification import ReviewedClassification
 from kb_setup.graphify_health import (
     EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ExpectedMetadataOnly,
@@ -958,7 +960,7 @@ def test_detection_policy_requires_exact_reviewed_source_path_and_hash(tmp_path:
         relative_path=".github/BOILERPLATE_VERSION",
         content_sha256=hashlib.sha256(marker.read_bytes()).hexdigest(),
         pinned_commit=_PINNED_COMMIT,
-        classification="reviewed-version-marker",
+        classification=ReviewedClassification.reviewed_version_marker,
     )
 
     accepted = graphify_sdk.source_detection_policy(tmp_path, "Attacca", (expected,))
@@ -969,6 +971,55 @@ def test_detection_policy_requires_exact_reviewed_source_path_and_hash(tmp_path:
     assert accepted.optional_unclassified_paths == (".github/BOILERPLATE_VERSION",)
     assert wrong_source.optional_unclassified_paths == ()
     assert changed.optional_unclassified_paths == ()
+
+
+def test_detection_policy_refuses_a_classification_with_no_absorption_branch(
+    tmp_path: Path,
+) -> None:
+    """An unrecognised classification must RAISE, never fall through silently.
+
+    Both arms, because the point is that it discriminates. Until 2026-09-09 this
+    dispatch was two `if`s with no else, so an entry naming no branch absorbed
+    nothing and said nothing — two such entries cost two full `kb-build` runs.
+
+    The bogus arm passes a raw STRING deliberately. That is not a contrived
+    input: msgspec Structs do not coerce, so a plain string sails past
+    `ExpectedUnclassifiedFile`'s constructor even though the field is typed as
+    `ReviewedClassification`. This test is therefore the ONLY thing standing
+    between a typo and a silent no-op — which is exactly how the real defect got
+    in, and why an enum alone would not have been enough.
+    """
+    import hashlib
+
+    marker = tmp_path / ".github" / "BOILERPLATE_VERSION"
+    marker.parent.mkdir()
+    marker.write_text("v1\n", encoding="utf-8")
+    digest = hashlib.sha256(marker.read_bytes()).hexdigest()
+
+    def entry(classification: object) -> ExpectedUnclassifiedFile:
+        # `cast` rather than a suppression: the WHOLE POINT of the bogus arm is
+        # to pass a value the annotation forbids, because msgspec does not
+        # enforce it at runtime. Narrowing here keeps `no_lint_skip` satisfied
+        # without pretending the value is valid.
+        return ExpectedUnclassifiedFile(
+            source_name="Attacca",
+            relative_path=".github/BOILERPLATE_VERSION",
+            content_sha256=digest,
+            pinned_commit=_PINNED_COMMIT,
+            classification=cast("ReviewedClassification", classification),
+        )
+
+    # CONTROL: a real member still absorbs, so the refusal below is about the
+    # classification and not about the file, the hash or the source name.
+    good = graphify_sdk.source_detection_policy(
+        tmp_path, "Attacca", (entry(ReviewedClassification.reviewed_version_marker),)
+    )
+    assert good.optional_unclassified_paths == (".github/BOILERPLATE_VERSION",)
+
+    with pytest.raises(ValueError, match="no absorption branch"):
+        graphify_sdk.source_detection_policy(
+            tmp_path, "Attacca", (entry("reviewed-invented-class"),)
+        )
 
 
 def test_claudeignore_requires_exact_source_root_hash_utf8_size_and_grammar(
@@ -983,7 +1034,7 @@ def test_claudeignore_requires_exact_source_root_hash_utf8_size_and_grammar(
         relative_path=".claudeignore",
         content_sha256=hashlib.sha256(ignored.read_bytes()).hexdigest(),
         pinned_commit=_PINNED_COMMIT,
-        classification="reviewed-root-ignore-metadata",
+        classification=ReviewedClassification.reviewed_root_ignore_metadata,
     )
 
     accepted = graphify_sdk.source_detection_policy(tmp_path, "Attacca", (expected,))
@@ -993,7 +1044,7 @@ def test_claudeignore_requires_exact_source_root_hash_utf8_size_and_grammar(
         relative_path=".claudeignore",
         content_sha256=hashlib.sha256(ignored.read_bytes()).hexdigest(),
         pinned_commit=_PINNED_COMMIT,
-        classification="reviewed-root-ignore-metadata",
+        classification=ReviewedClassification.reviewed_root_ignore_metadata,
     )
     rejected = graphify_sdk.source_detection_policy(tmp_path, "Attacca", (hostile,))
 

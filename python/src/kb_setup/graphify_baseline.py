@@ -240,12 +240,12 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.53"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.57"
 # FORKED 2026-08-24: this names WHAT RUNS, so it followed the pin onto the fork
 # (`currency.toml` binds it with `tracks = "manifest"`). Contrast the semantic
 # corpus/slice constants, which are snapshot identities of completed runs and
 # correctly hold at the upstream base `v0.9.48`.
-_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.53"
+_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.57"
 
 #: The public spelling of the version above, for the ONE cross-module consumer:
 #: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
@@ -289,21 +289,43 @@ _LPK_FILE_ID = _LPK_COLLISION_ID
 _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
-    "sdk_fingerprint_sha256": "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
+    "sdk_fingerprint_sha256": "153870e2a461b346aeba87bbd1e64aaf6e03e9e53a47146b329bcd08631067dc",
     # FORKED 2026-08-24: a git-locked dependency has NO wheel and NO sdist, so
     # the two hashes that used to live here cannot exist and their absence is
     # not a gap to paper over. `git_commit` is the substitute and it is a
     # STRONGER identity — a wheel hash names a built artifact, a resolved
     # commit names the source tree it was built from. Reverts to the wheel/sdist
     # pair when #2981 merges and the pin returns to PyPI.
-    "git_commit": "157a957e89a16246bba3a078de2777711ee85e31",
+    "git_commit": "3c9b930f386f80c393fe658e1afb685030828c6a",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="157a957e89a16246bba3a078de2777711ee85e31",
-    source_tree="707bdb5074beb3743e1c77f38db31c23a04f9497",
-    catalog_sha256="2a1f353a5d6ee0f087744197e56d07a8f2bcbf84bb048cfd6c8b281821bf5ac0",
-    source_manifest_sha256="b1c4aebb1f17dc9b473925797c1d9a8980d83fe18fbce3be419d7db11653d523",
+    source_commit="3c9b930f386f80c393fe658e1afb685030828c6a",
+    # RE-DERIVED 2026-09-10 from the pinned commit, not carried forward. The
+    # 0.9.57 pin move advanced `source_commit` and left BOTH of these describing
+    # `157a957e`, and all eight gates passed over it — `mise run
+    # kb-graphify-catalog` exists because of exactly that, and re-derives them.
+    #
+    # `catalog_sha256` is ORDER-DEPENDENT and was the value nobody noticed: it
+    # digests the catalog's canonical encoding, so fixing a stale catalog entry
+    # changes it again. Measured across this fix: `a52e4f6e…` before the entry
+    # was corrected, `0444f055…` after. Derive it LAST.
+    source_tree="8fae076d840491419ab39fc05f0860007c0dcffe",
+    catalog_sha256="0444f055bbfb4d4e68015accb90ab284553b96ddc90cf6764be29ea0a67b0ca8",
+    # RE-DERIVED 2026-09-10, and it was the SIXTH stranded value — found only
+    # after `kb-graphify-catalog`'s first version reported five and called that
+    # the whole set. 880 members at the pinned commit.
+    #
+    # It was skippable for one removable reason, not a structural one: deriving it
+    # runs `source_manifest`, which refuses a dirty worktree, and the clone had
+    # been dirty since 2026-08-25 from a stray `graph_first` state file OUR OWN
+    # guard wrote inside it. Deleting that file made the value derivable offline.
+    # Reasoning from a true premise ("source_manifest refuses a dirty worktree")
+    # to "cannot be checked" is `probes-need-a-control-arm.md` rule 9 exactly.
+    #
+    # Corroborated: an independent derivation in the previous session produced
+    # this same digest and the same 880-member count.
+    source_manifest_sha256="440c88c28053ddd5a42371fdac8970b4781c48a9294f8addb494c24ee37e43d1",
     # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
     # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
     # RE-DERIVED by a real build against the installed 0.9.47, never carried
@@ -376,6 +398,20 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # thing that note says it exists to prevent, and it worked.
     extracted_count=463,
 )
+
+
+def accepted_authority() -> BaselineAuthority:
+    """The one accepted trust root, readable from outside this module.
+
+    `kb_setup.graphify_catalog` checks this literal's `source_commit` and
+    `source_tree` against the commit `sources/graphify.manifest` actually pins.
+    Reaching for the private name across a module boundary would work and would
+    also make that check invisible to anyone reading only this file; an
+    accessor puts the dependency in the public surface where it is reviewed.
+    """
+    return _ACCEPTED_AUTHORITY
+
+
 # The ignored-path control's fixture: an UNTRACKED file under a directory the
 # pinned source's own `.gitignore` matches. Untracked is load-bearing.
 #
@@ -1385,10 +1421,51 @@ def verify_catalog_bytes(root: Path, catalog: DispositionCatalog) -> Disposition
     )
 
 
+def _canonical_json(value: object) -> bytes:
+    r"""The ONE encoding a candidate input and its recorded digest agree on.
+
+    Extracted so `catalog_digest` cannot drift from what `_write_json` actually
+    writes. Two copies of `msgspec.json.encode(value) + b"\\n"` would agree today
+    and silently disagree the first time either grew an option — and the whole
+    class of defect this file guards is a recorded digest that stopped
+    describing the thing it names.
+    """
+    return msgspec.json.encode(value) + b"\n"
+
+
 def _write_json(path: Path, value: object) -> bytes:
-    raw = msgspec.json.encode(value) + b"\n"
+    raw = _canonical_json(value)
     path.write_bytes(raw)
     return raw
+
+
+def catalog_digest(catalog: DispositionCatalog) -> str:
+    """`catalog_sha256` as the authority records it: over the CANONICAL encoding.
+
+    Not over `sources/graphify.dispositions.json`'s bytes. The build writes a
+    re-encoded `dispositions.json` into the candidate and hashes THAT, so
+    whitespace or key order in the tracked file never reaches the digest — which
+    is right, and is also why the digest cannot be checked with a plain
+    `sha256sum` of the tracked file.
+    """
+    return hashlib.sha256(_canonical_json(catalog)).hexdigest()
+
+
+def source_manifest_digest(root: Path, *, commit: str, tree: str) -> str:
+    """`source_manifest_sha256` as the authority records it.
+
+    The build writes `source-manifest.json` with `_write_json` (`:1989`) and then
+    hashes THAT FILE'S BYTES into an `ArtifactMember` (`:1996`), so the digest is
+    `sha256(_canonical_json(manifest))` — the same two steps, in one place, so a
+    checker cannot approximate it with a third spelling.
+
+    It carries `source_manifest`'s worktree contract, deliberately: that function
+    refuses a clone whose bytes differ from the blobs, and a digest derived from
+    a drifted worktree would be a confident wrong number rather than a refusal.
+    """
+    return hashlib.sha256(
+        _canonical_json(source_manifest(root, commit=commit, tree=tree))
+    ).hexdigest()
 
 
 def _write_candidate_inputs(

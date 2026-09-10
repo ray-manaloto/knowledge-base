@@ -10,6 +10,8 @@ from pathlib import PurePosixPath
 
 import msgspec
 
+from kb_setup.generated.reviewed_classification import ReviewedClassification
+
 APPROVED_METADATA_ZERO_NODE_WARNING = "approved-reviewed-metadata-zero-node"
 APPROVED_PARTIAL_EXTRACTION_WARNING = "approved-reviewed-partial-extraction"
 #: A SAME-FILE id collision: one entity the extractor labelled twice, one label
@@ -234,7 +236,16 @@ class ExpectedUnclassifiedFile(msgspec.Struct, frozen=True, forbid_unknown_field
     #: `sources/<source_name>.manifest`'s `commit` this entry was derived at.
     #: See `ExpectedMetadataOnly.pinned_commit` — same field, same check.
     pinned_commit: str
-    classification: str
+    #: WAS a bare `str` until 2026-09-09, and that cost two full `kb-build` runs.
+    #: `graphify_sdk.source_detection_policy` dispatches on this value and had no
+    #: else-branch, so an unrecognised string was SILENTLY DROPPED: the entry sat
+    #: in the registry looking reviewed and absorbed nothing. Note the asymmetry
+    #: that made it invisible — this struct already sets `forbid_unknown_fields`,
+    #: so a typo'd FIELD NAME raised loudly while a typo'd VALUE said nothing.
+    #: The enum is generated from `schemas/reviewed-classification.schema.json`
+    #: (Ray's standing call that the generator owns every model type), so the
+    #: closed set exists once and both consumers read the same definition.
+    classification: ReviewedClassification
 
 
 class IncompleteGraphifyOperationError(RuntimeError):

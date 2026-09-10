@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from kb_setup import tool_sync
-from kb_setup.currency import config, skill
+from kb_setup.currency import config, skill, sync
 from kb_setup.currency.skill import SkillResult
 
 if TYPE_CHECKING:
@@ -259,7 +259,18 @@ def test_real_ffmpeg_selection_uses_declared_version_flag(monkeypatch) -> None:
     trip through `_observed`, and the full argv.
     """
     repo_root = Path(__file__).parents[1]
-    spec, pinned = tool_sync._selection(repo_root, ["ffmpeg"])
+    # NOT `_selection`, as of 2026-09-09, and the reason is this test's own
+    # subject. `_selection` decides ELIGIBILITY as well as reading the spec, so
+    # routing through it coupled a PARSING test to a POLICY it does not own —
+    # the same coupling the docstring above records against the literal pin.
+    #
+    # It went red the moment `[tool.ffmpeg]` gained a `manifest =` row, because
+    # `tool_sync.py:221` refuses every manifest-bearing tool. Nothing about the
+    # version flag, the argv or the parse changed. Reading the spec directly
+    # keeps the subject and drops the borrowed policy; the refusal itself stays
+    # covered by its own dedicated test.
+    spec = next(s for s in config.load(repo_root) if s.name == "ffmpeg")
+    pinned, _extras = sync.pinned_version(repo_root, spec)
     assert spec.version_args == ("-version",)
     # Not a tautology against `_selection`: this asserts the pin was READABLE and
     # is version-shaped. An unreadable pin yields "" and still fails here.
@@ -277,73 +288,37 @@ def test_real_ffmpeg_selection_uses_declared_version_flag(monkeypatch) -> None:
     assert seen == [["mise", "exec", "--", "ffmpeg", "-version"]]
 
 
-def test_live_eligibility_census_is_exactly_the_two_mise_only_pins() -> None:
-    """The census is asserted EXACTLY, so an accidental widening still fails.
+def test_legacy_tool_sync_eligibility_census() -> None:
+    """CHARACTERIZES what `kb-tool-sync` can touch today. Not a target.
 
-    It was `("ffmpeg",)` until 2026-08-19 and grew when `[tool.antigravity-cli]`
-    was added to `currency.toml` — a mise-only pin with a binary and a version
-    pattern, which is precisely what this deliberately narrow command CAN
-    truthfully synchronize. So the growth is #314's direction (`kb-tool-sync`
-    covering more than one of twelve tools), not a regression, and the test was
-    renamed rather than relaxed: freezing the count at one would have made the
-    next legitimate addition look like a defect.
+    Renamed and rewritten 2026-09-09. The old name promised "the two mise-only
+    pins" and the old docstring was a four-entry changelog of the tuple growing
+    and shrinking. Both read as if the census were a feature being tracked. It
+    is a LIMITATION being recorded, and the distinction now matters because the
+    number is small and falling for a reason nobody designed.
 
-    What keeps this honest is that it stays an exact tuple. A tool that becomes
-    eligible without anyone intending it still turns this red.
+    THE LIMITATION. `_selection` (`tool_sync.py:220-221`) refuses every tool
+    carrying a `manifest =` key — "manifest-bearing tools require the separate
+    provenance workflow". So declaring that a tool HAS a source to check also
+    removes it from the only automated sync there is, and the workflow it defers
+    to does not exist as a command. Measured: 2 of 20 eligible today; 12 of 20 if
+    that one refusal were lifted, the other 8 being blocked for reasons genuinely
+    their own (self-managed, python-owned, generated-skill).
 
-    **It did exactly that on 2026-08-24, and this is what the update looks like.**
-    Pinning `npm:ctx7` and `npm:firecrawl-cli` — both exact, both mise-only, neither
-    python-package-owned nor manifest-bearing — took the census from two to four, and
-    this assertion is what caught it. That is the docstring above working as designed:
-    the growth is intended, so the tuple moves and stays exact rather than being
-    loosened to a count or a subset check.
+    THIS IS THE THIRD TIME THAT COUPLING HAS MOVED THIS TUPLE, which is why it is
+    recorded as a defect rather than as history. `antigravity-cli` left on
+    2026-09-03 when commit `575fb5be` gave it a manifest row; `ctx7` and `ffmpeg`
+    left on 2026-09-09 the same way, when three manifest rows were added so their
+    pins would finally be checked at all — one of which (`firecrawl-cli`) was
+    already silently drifting.
 
-    Worth knowing WHY both qualify, since it is not obvious from `currency.toml`:
-    eligibility turns on `_selection`'s refusals, not on whether upstream can be
-    checked. `ctx7` deliberately carries no `github` key — its repo publishes the
-    plugin and the CLI under different version series, so an upstream comparison
-    there would be wrong rather than merely absent — and that omission does not
-    disqualify it here.
-
-    **It grew again on 2026-08-26**, the same way: `[tool.coreutils]` was added
-    to `currency.toml` alongside `"conda:coreutils"` in `mise.toml` (a project
-    pin closing the macOS-BSD-vs-GNU gap, see
-    `.claude/rules/long-running-command-hangs.md` rule 3a), and it is a
-    mise-only, presence-only pin exactly like `ffmpeg` — no `python_package`,
-    no `manifest`, no `skill_dir`, an exact numeric pin. It qualifies for the
-    same reason `ffmpeg` does, and the tuple moves again rather than loosening.
-
-    **And again on 2026-08-27**: `[tool.lychee]` joined `currency.toml` beside
-    `lychee = "0.24.2"` in `mise.toml` (the link checker behind the hk `lychee`
-    steps and `mise run kb-links`) — mise-only, exact, no `python_package`, no
-    `manifest`. Six now. Same rule: the tuple moves, the assertion stays exact.
-
-    **It SHRANK on 2026-09-03** — the first entry to LEAVE rather than join.
-    `antigravity-cli` had qualified since 2026-08-19 as a mise-only pin with no
-    `manifest`, no `python_package`, no `skill_dir`. Commit `575fb5be` (the
-    1.1.23->1.1.25 pin bump) gave `[tool.antigravity-cli]` a
-    `manifest = "sources/antigravity-cli.manifest"` key, and `_selection`
-    (`tool_sync.py:220`) refuses any tool that carries one — "manifest-bearing
-    tools require the separate provenance workflow" — so that commit already
-    disqualified it; this test's own suite was not run against it before merge.
-    The round-2 cold review of `575fb5be` separately found the row's currency
-    check was comparing the `mise.toml` pin against itself rather than the
-    running `agy` binary (`self_managed` is `bool(self.expected)`, and a row
-    with no `expected` never reaches `_check_self_managed`), and the fix added
-    `expected = "1.1.25"` — which disqualifies it a second, independent way
-    (`_selection` also refuses on `spec.self_managed`). Either edit alone would
-    have shrunk this census; both are now true. Correct shrink, not a
-    loosening: the tuple is still asserted exact, and the tool left because it
-    grew a real currency check, not because the test relaxed.
+    Keeping the tuple EXACT is still the point: a tool becoming eligible, or
+    leaving, without anyone intending it must turn this red. What changed is that
+    a shrink is no longer written up as correct. Tracked in #314; the relationship
+    model that resolves it belongs to #730.
     """
     repo_root = Path(__file__).parents[1]
-    assert tool_sync.eligible_tools(repo_root) == (
-        "coreutils",
-        "ctx7",
-        "ffmpeg",
-        "firecrawl-cli",
-        "lychee",
-    )
+    assert tool_sync.eligible_tools(repo_root) == ("coreutils", "lychee")
 
 
 def test_unexpected_exception_is_redacted_after_rollback(tmp_path, monkeypatch, capsys) -> None:
