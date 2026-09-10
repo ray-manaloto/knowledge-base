@@ -456,11 +456,15 @@ def _review_argv(spec: ReviewSpec) -> list[str]:
     that does nothing is worse than a rejected one.
 
     There IS no flag to forward. Read from the pinned source at `sources/codex/`
-    (`rust-v0.153.4`, the version we run): `ReviewArgs`
+    (`rust-v0.154.0`, the version we run): `ReviewArgs`
     (`codex-rs/exec/src/cli.rs:270-303`) declares exactly `--uncommitted`,
     `--base`, `--commit`, `--title` and `[PROMPT]` — no `-m`, no `-o`, no
-    `--sandbox`. Live-confirmed against `codex review --help` on 0.153.4, which
-    lists only those plus `-c`, `--strict-config`, `--enable`, `--disable`.
+    `--sandbox`. Live-confirmed against `codex review --help` on **0.154.0**,
+    which lists only those plus `-c/--config`, `--strict-config`, `--enable`,
+    `--disable` and `-h/--help` — the full unfiltered option set, unchanged from
+    0.153.4. The version in this paragraph is a DERIVED value that the
+    0.153.4 → 0.154.0 pin move stranded, and re-reading the surface rather than
+    just retyping the number is what a pin move owes each one.
     `-m/--model` is real on `codex exec` and on the NESTED `codex exec review`,
     which is a different surface than the one this builder uses.
 
