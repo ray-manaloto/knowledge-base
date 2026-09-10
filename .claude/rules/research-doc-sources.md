@@ -77,6 +77,64 @@ next session's too:
 At minimum, append the repo to `sources/REGISTRY.md` — see
 `research-repo-enumeration.md`.
 
+## When you need EXAMPLES rather than docs, SEARCH GITHUB — all four indexes
+
+The chain above answers *"what do the docs say"*. It does not answer *"how does
+anyone actually use this"*, and for an undocumented or experimental feature that
+is the only answerable question. **GitHub is a first-class source here, not a
+fallback.**
+
+**Ray has asked for this FOUR times** — `docs/direction/2026-08-26:62`,
+`2026-09-03:55`, and twice on 2026-09-10, the last verbatim: *"we need to start
+actually using github as a source of information on how to find examples."* It
+was never written down, so it was never done. That is why it is a rule now
+rather than a preference.
+
+### The four indexes are four different answers
+
+Search **code**, **repositories**, **issues** and **discussions** separately.
+Measured 2026-09-10 on `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`: the code index alone
+would have found **20% of the dedicated projects and none of the issues** — 4 of
+5 dedicated repos appeared in no code result, and **the two most valuable
+artifacts of that day were issues**. A code-only sweep is not a GitHub search;
+it is one quarter of one.
+
+### `gh api`, never `gh search`
+
+```bash
+gh api -X GET search/code   -f q='<query>' --paginate
+gh api -X GET search/issues -f q='<query>'
+```
+
+`gh search` returns an **empty array rather than an error** on failure, so a rate
+limit, a bad scope or a missing token is indistinguishable from "no results".
+`gh api` surfaces the real status. A rate limit is **never** a zero — say which
+you got.
+
+### A bare query is mostly noise, and this is measurable
+
+GitHub's legacy code tokenizer splits on `-` and `.`, so `plugin-types` returns
+**288,256** junk hits and quoting does not help. `filename:`, `path:`, `repo:`
+and `language:` qualifiers are what make a query discriminating. A tool that
+takes a bare string and no qualifiers will mostly return noise.
+
+### Control-arm every zero, and pin every quote
+
+Before reporting a search found nothing, run the same shape against a term you
+KNOW has hits and say which arm you ran — `probes-need-a-control-arm.md` rule 1,
+and code search is where it bites hardest because so many zeros are real.
+
+Permalinks go to a **commit SHA**, never a branch: a branch link rots silently
+and takes your quoted bytes with it. Note that a commit-pinned link still does
+not prove the bytes you quoted are at that commit — only a blob fetch does.
+
+### Then route it into the corpus
+
+Same obligation as the rest of this file: a repo worth reading is a candidate
+source. Append it to `sources/REGISTRY.md` at minimum
+(`research-repo-enumeration.md`), and prefer a `sources/<name>.manifest` when the
+examples are worth querying later.
+
 ## Why per-repo mintlify MCP URLs are NOT in the chain
 
 `https://mintlify.com/<owner>/<repo>/mcp` URLs are **GET-only preview

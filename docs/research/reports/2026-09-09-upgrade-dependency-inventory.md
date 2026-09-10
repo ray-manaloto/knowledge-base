@@ -515,4 +515,10 @@ numbers were not re-measured and remain as originally written):
 maintainers' own — their live docs say Postgres is recommended for production —
 plus the unconditional psycopg pair. Neither blocks an offline single-laptop CLI.
 
-Full re-research: `.agent/kb/reports/agents/dbos-research.md`.
+Full re-research: `docs/research/reports/2026-09-09-dbos-re-research.md`.
+
+> **Promoted 2026-09-10.** This line cited `.agent/kb/reports/agents/dbos-research.md`
+> — a **gitignored** path — and shipped that way in `6b3ab427`. A tracked report
+> citing an untracked one is a citation nobody but this machine can follow, and
+> `agent-report-persistence.md` §1b says a report becomes load-bearing the moment
+> something tracked cites it. Found by a loss audit, not by any gate.
