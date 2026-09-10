@@ -105,7 +105,13 @@ def _authority(commit: str, tree: str, repo_root: Path) -> BaselineAuthority:
         source_commit=commit,
         source_tree=tree,
         catalog_sha256=graphify_baseline.catalog_digest(catalog),
-        source_manifest_sha256="b" * 64,
+        # Derived, never a placeholder. A constant here would make the
+        # `source_manifest_sha256` row fire on every fixture and the PASS arm
+        # would be unreachable — a suite that can only fail proves as little as
+        # one that can only pass.
+        source_manifest_sha256=graphify_baseline.source_manifest_digest(
+            repo_root / "sources" / "graphify", commit=commit, tree=tree
+        ),
         detected_count=1,
         extracted_count=1,
     )
@@ -225,6 +231,44 @@ def test_editing_the_catalog_invalidates_the_authority_digest(
     assert whats == {"authority catalog_sha256"}, (
         "a reason-only edit must move the digest and nothing else"
     )
+
+
+def test_a_stale_source_manifest_digest_is_reported(
+    agreeing: tuple[Path, BaselineAuthority],
+) -> None:
+    """The SIXTH stranded value — the one the module's first version could not see."""
+    root, authority = agreeing
+    stale = msgspec.structs.replace(authority, source_manifest_sha256="0" * 64)
+    whats = {row.what for row in gc.check(root, authority=stale).drift}
+    assert "authority source_manifest_sha256" in whats
+
+
+def test_a_dirty_clone_is_unchecked_and_never_a_pass(
+    agreeing: tuple[Path, BaselineAuthority],
+) -> None:
+    """A worktree that differs from its blobs cannot answer the digest question.
+
+    The row must say so — `unchecked` is a THIRD state — and `main` must exit
+    `Rc.NOT_RUN` rather than reporting a clean run over a question it never asked.
+    """
+    root, authority = agreeing
+    (root / "sources" / "graphify" / "stray.txt").write_text("untracked\n", encoding="utf-8")
+
+    drift = gc.check(root, authority=authority).drift
+    rows = [r for r in drift if r.kind == "unchecked"]
+    assert [r.what for r in rows] == ["authority source_manifest_sha256"]
+    # `main` resolves the REAL authority, so it cannot be asserted against a
+    # fixture's rows. `verdict` is the mapping, and it is what a gate reads.
+    assert gc.verdict(drift) == Rc.NOT_RUN
+
+
+def test_drift_outranks_unchecked_in_the_exit_code() -> None:
+    """A run with both must report FINDINGS: it is the more actionable answer."""
+    stale = gc.Drift("x", "a", "b", "stale")
+    unchecked = gc.Drift("y", "a", "why", "unchecked")
+    assert gc.verdict([unchecked]) == Rc.NOT_RUN
+    assert gc.verdict([stale, unchecked]) == Rc.FINDINGS
+    assert gc.verdict([]) == Rc.OK
 
 
 # --- the states that are NOT findings ----------------------------------------

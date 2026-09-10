@@ -312,7 +312,20 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # was corrected, `0444f055…` after. Derive it LAST.
     source_tree="8fae076d840491419ab39fc05f0860007c0dcffe",
     catalog_sha256="0444f055bbfb4d4e68015accb90ab284553b96ddc90cf6764be29ea0a67b0ca8",
-    source_manifest_sha256="b1c4aebb1f17dc9b473925797c1d9a8980d83fe18fbce3be419d7db11653d523",
+    # RE-DERIVED 2026-09-10, and it was the SIXTH stranded value — found only
+    # after `kb-graphify-catalog`'s first version reported five and called that
+    # the whole set. 880 members at the pinned commit.
+    #
+    # It was skippable for one removable reason, not a structural one: deriving it
+    # runs `source_manifest`, which refuses a dirty worktree, and the clone had
+    # been dirty since 2026-08-25 from a stray `graph_first` state file OUR OWN
+    # guard wrote inside it. Deleting that file made the value derivable offline.
+    # Reasoning from a true premise ("source_manifest refuses a dirty worktree")
+    # to "cannot be checked" is `probes-need-a-control-arm.md` rule 9 exactly.
+    #
+    # Corroborated: an independent derivation in the previous session produced
+    # this same digest and the same 880-member count.
+    source_manifest_sha256="440c88c28053ddd5a42371fdac8970b4781c48a9294f8addb494c24ee37e43d1",
     # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
     # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
     # RE-DERIVED by a real build against the installed 0.9.47, never carried
@@ -1436,6 +1449,23 @@ def catalog_digest(catalog: DispositionCatalog) -> str:
     `sha256sum` of the tracked file.
     """
     return hashlib.sha256(_canonical_json(catalog)).hexdigest()
+
+
+def source_manifest_digest(root: Path, *, commit: str, tree: str) -> str:
+    """`source_manifest_sha256` as the authority records it.
+
+    The build writes `source-manifest.json` with `_write_json` (`:1989`) and then
+    hashes THAT FILE'S BYTES into an `ArtifactMember` (`:1996`), so the digest is
+    `sha256(_canonical_json(manifest))` — the same two steps, in one place, so a
+    checker cannot approximate it with a third spelling.
+
+    It carries `source_manifest`'s worktree contract, deliberately: that function
+    refuses a clone whose bytes differ from the blobs, and a digest derived from
+    a drifted worktree would be a confident wrong number rather than a refusal.
+    """
+    return hashlib.sha256(
+        _canonical_json(source_manifest(root, commit=commit, tree=tree))
+    ).hexdigest()
 
 
 def _write_candidate_inputs(

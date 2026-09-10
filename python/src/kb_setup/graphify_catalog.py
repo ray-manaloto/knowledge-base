@@ -17,13 +17,18 @@ a same-versus-same comparison reads clean forever; that is the exact failure
 `kb_setup.currency.views` was built to escape
 (`.claude/rules/tool-currency-and-native-first.md`).
 
-IT READS THE COMMIT, NEVER THE WORKTREE. `git cat-file <commit>:<path>` answers
-*what does the pin say*, which is the question the catalog claims to answer. The
-clone's worktree may legitimately be dirty — this repo's own `graph_first` guard
-left a stray state file inside `sources/graphify/` on 2026-08-25, and it sat
-there for weeks — and that must not change this answer. `graphify_baseline`'s
-`source_manifest` deliberately asks the *other* question (does the worktree
-still equal the blobs) and refuses on drift; the two are complements.
+MOSTLY IT READS THE COMMIT, NEVER THE WORKTREE. `git cat-file <commit>:<path>`
+answers *what does the pin say*, which is the question the catalog claims to
+answer, and a dirty clone must not change it — this repo's own `graph_first`
+guard left a stray state file inside `sources/graphify/` on 2026-08-25 and it sat
+there for two weeks.
+
+ONE ROW IS THE EXCEPTION, and it is marked as such: `source_manifest_sha256`
+digests `graphify_baseline.source_manifest`, which deliberately asks the OTHER
+question — does the worktree still equal the blobs — and refuses on drift. That
+refusal is right (a digest taken over drifted bytes is a confident wrong number),
+so the row reports `unchecked` rather than guessing, and the run exits
+`Rc.NOT_RUN` when that is the only thing outstanding.
 
 A MISSING PATH IS A DRIFT ROW, NOT AN EXCEPTION. A catalog can name a file the
 new commit does not have. That is not hypothetical: it is precisely how the mise
@@ -40,11 +45,18 @@ WHAT THIS CANNOT SEE, stated because a check that does not declare its blind
 spot gets read as covering everything (`.claude/skills/kb-review` § *a check you
 add must declare what it cannot see*):
 
-- **`BaselineAuthority.source_manifest_sha256`.** Deriving it means rebuilding
-  the whole `SourceManifest`, which `graphify_baseline.source_manifest`
-  deliberately refuses against a dirty worktree — so checking it here would make
-  this gate fail for a reason that has nothing to do with the pin. It is still
-  verified, later and more expensively, by `_verify_candidate` at build time.
+- **`BaselineAuthority.detected_count` and `.extracted_count`.** Both are counts
+  a real detection run produces; nothing offline can derive them. They were 471
+  and 463 at v0.9.53, and the added/removed file census across the pin predicts
+  490 and 482 — a PREDICTION, not a measurement, and this gate does not assert
+  it. A build does.
+
+  🔴 This is the honest residue of a set that has been miscounted **three**
+  times: #728 called it 2 values, round f found 6, round g found 7, and this
+  module's first version checked 5 and its author reported that as the whole set.
+  The lesson each time is the same — DERIVE the set, never read a list — so the
+  two rows above are named individually rather than left as "and some counts".
+
 - **Whether a disposition's REASON is still true.** A file can keep its bytes
   and stop being unsupported because a new extractor shipped. That is a
   judgement, and only a real detection run answers it.
@@ -108,12 +120,15 @@ class Drift:
     recorded: str
     derived: str
     kind: str
-    """`stale` (both known and different) or `absent` (the pin has no such path)."""
+    """`stale` (compared and different), `absent` (the pin has no such path), or
+    `unchecked` (the comparison could not be made — never a pass)."""
 
     def line(self) -> str:
         """The human row, rendered once so the report and the JSONL sink agree."""
         if self.kind == "absent":
             return f"{self.what}: recorded {self.recorded}, but the pinned commit has no such path"
+        if self.kind == "unchecked":
+            return f"{self.what}: NOT CHECKED — {self.derived}"
         return f"{self.what}: recorded {self.recorded}, derived {self.derived}"
 
 
@@ -281,7 +296,39 @@ def _authority_drift(
     digest = graphify_baseline.catalog_digest(catalog)
     if authority_digest != digest:
         rows.append(Drift("authority catalog_sha256", authority_digest, digest, "stale"))
+    rows.extend(
+        _manifest_digest_drift(repo_root, root.source_manifest_sha256, commit, derived_tree)
+    )
     return rows
+
+
+def _manifest_digest_drift(
+    repo_root: Path, recorded: str, commit: str, derived_tree: str
+) -> list[Drift]:
+    """`source_manifest_sha256` — checkable, but only against a CLEAN clone.
+
+    This module's docstring listed it as unreachable until 2026-09-10, on the
+    reasoning that `source_manifest` refuses a dirty worktree. That was true and
+    the conclusion was wrong: the clone was dirty for one removable reason — a
+    stray `graph_first` state file our own guard left inside it on 2026-08-25 —
+    not for any structural one. Reasoning from a true premise to "cannot" is what
+    `probes-need-a-control-arm.md` rule 9 is about; the fix was `rm`.
+
+    A dirty clone is now reported as `unchecked`, which is a THIRD state. It is
+    not drift (nothing was compared) and it is emphatically not a pass — the run
+    downgrades to `Rc.NOT_RUN` when it is the only thing outstanding.
+    """
+    from kb_setup import graphify_baseline
+
+    try:
+        derived = graphify_baseline.source_manifest_digest(
+            repo_root / CLONE_PATH, commit=commit, tree=derived_tree
+        )
+    except (ValueError, OSError) as exc:
+        return [Drift("authority source_manifest_sha256", recorded, f"({exc})", "unchecked")]
+    if recorded != derived:
+        return [Drift("authority source_manifest_sha256", recorded, derived, "stale")]
+    return []
 
 
 def _report(report: Report) -> None:
@@ -338,12 +385,38 @@ def main(repo_root: Path, args: Sequence[str] | None = None) -> int:
         return Rc.NOT_RUN
 
     _report(report)
-    if report.drift:
+    return verdict(report.drift)
+
+
+def verdict(drift: Sequence[Drift]) -> int:
+    """Map rows to an exit code, and emit the closing line. Pure but for the emit.
+
+    Split out of `main` so the mapping is testable without a real repository:
+    `main` resolves the REAL `_ACCEPTED_AUTHORITY`, so a fixture repo can never
+    exercise this on its own rows — which made the first version of the
+    unchecked-state test assert `main`'s rc against a report it had not produced.
+    """
+    stale = [row for row in drift if row.kind != "unchecked"]
+    unchecked = [row for row in drift if row.kind == "unchecked"]
+    if stale:
+        # Real drift outranks an unchecked row: it is the more actionable answer,
+        # and both are printed either way.
         events.fail(
             "graphify_catalog.findings",
-            f"[graphify-catalog] {len(report.drift)} value(s) do not describe the pinned commit",
-            findings=len(report.drift),
+            f"[graphify-catalog] {len(stale)} value(s) do not describe the pinned commit",
+            findings=len(stale),
+            unchecked=len(unchecked),
         )
         return Rc.FINDINGS
+    if unchecked:
+        # "Could not check" is never rendered as green here, on this repo's own
+        # currency-engine precedent. It is the third state, and it has its own rc.
+        events.fail(
+            "graphify_catalog.not_run",
+            f"[graphify-catalog] {len(unchecked)} value(s) could not be checked — "
+            f"nothing drifted, but the question was not fully asked",
+            unchecked=len(unchecked),
+        )
+        return Rc.NOT_RUN
     events.say("graphify_catalog.clean", "[graphify-catalog] every recorded value matches the pin")
     return Rc.OK
