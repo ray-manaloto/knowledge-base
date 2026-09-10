@@ -106,10 +106,21 @@ gh api -X GET search/code   -f q='<query>' --paginate
 gh api -X GET search/issues -f q='<query>'
 ```
 
-`gh search` returns an **empty array rather than an error** on failure, so a rate
-limit, a bad scope or a missing token is indistinguishable from "no results".
-`gh api` surfaces the real status. A rate limit is **never** a zero — say which
-you got.
+Still prefer `gh api` — but this rule's REASON was refuted, armed on gh 2.98.0
+by a cold review of `7b28f460`. It claimed `gh search` "returns an empty array
+rather than an error", making a missing token look like no results:
+
+| failure | `gh search code` | `gh api search/code` |
+|---|---|---|
+| missing token | **rc 4**, auth error | **rc 4**, same error |
+| bad `repo:` scope | rc 0, `[]` | rc 0, `incomplete_results: true` |
+
+Missing-token is false, and false SYMMETRICALLY — no reason to prefer either.
+Bad-scope holds, and what rescues it is a field this rule never named:
+**`incomplete_results`**, carried by the raw body and dropped by `--json`/`--jq`.
+That is the discriminator; the exit code is not. **Unarmed, so open:** whether a
+rate limit reaches you as a zero. Never report one as a zero — this rule just no
+longer claims to know how you would tell.
 
 ### A bare query is mostly noise, and this is measurable
 

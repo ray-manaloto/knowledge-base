@@ -64,7 +64,7 @@ spawning anything:
 
 ```bash
 git rev-parse <fixed-point>
-git diff --stat <fixed-point>...HEAD -- . ':(exclude)docs/research/**'
+git diff --stat <fixed-point>...HEAD -- . ':(exclude)docs/research/**' ':(exclude)mise.lock' ':(exclude)uv.lock'
 git log <fixed-point>..HEAD --oneline
 ```
 
@@ -139,7 +139,7 @@ and the session's declared lane before choosing.
 Review it **by ref and COLD** — hand it the SHA and nothing about what the change
 was *supposed* to do. Design context primes happy-path confirmation, which is the
 one thing a second lens exists not to do. Hand it the same
-`':(exclude)docs/research/**'` scope from step 1.
+`':(exclude)docs/research/**' ':(exclude)mise.lock' ':(exclude)uv.lock'` scope from step 1.
 
 If the chosen CLI is missing or unauthenticated it returns a structured error
 rather than substituting itself. Fall back **loudly, never silently**, to any
