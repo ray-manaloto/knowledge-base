@@ -188,6 +188,13 @@ GATE_TASKS = (
     # OUT of `CONCURRENT_SAFE` on `kb-manifest-audit`'s own fail-closed
     # precedent.
     "kb-graphify-catalog",
+    # Added 2026-09-10, the day the defect it catches SHIPPED past the gate
+    # directly above it. `kb-graphify-catalog` checks one source's derived
+    # values; this checks the lockfile, which is a derived value of every pin in
+    # `mise.toml` and was carried by nothing. Reaches the network via
+    # `mise lock --dry-run`, so it stays OUT of `CONCURRENT_SAFE` on the
+    # fail-closed default.
+    "kb-lock-drift",
 )
 #: `kb-corpus-integrity` WAS here, gating the semantic-corpus layer's staged
 #: evidence tree. It left with that layer's removal (2026-08-24) — see

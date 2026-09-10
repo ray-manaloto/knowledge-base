@@ -1073,6 +1073,25 @@ run = "uv run kb-setup manifest-audit"
 # happen to be present. Nowhere near the outer 1800s `gates._GATE_TIMEOUT`.
 timeout = "120s"
 
+[tasks.kb-lock-drift]
+description = "Gate: mise.lock still describes what mise.toml pins (runs mise's own lock --dry-run)"
+# Built because the defect SHIPPED. `6b3ab427` merged with `mise.toml` at
+# `antigravity-cli = "1.2.0"` and `mise.lock` at `1.1.25` — one commit after
+# `kb-graphify-catalog` landed, whose whole subject is "a pin move leaves its
+# derived values behind", and with all nine gates green over it. A second,
+# weeks-old instance was sitting beside it: a `[[tools.codex]]` entry on the
+# `aqua:` backend that `mise.toml` had moved to `npm:` (#539).
+#
+# NATIVE: it runs `mise lock --dry-run`, which previews without writing. It does
+# NOT reimplement resolution. What it adds is the exit code — armed 2026-09-10,
+# mise returns **rc 0 whether the lock is in sync or five versions stale**, so
+# the report is the answer and the rc is not.
+run = "uv run kb-setup lock-drift"
+# `--dry-run` re-resolves every platform and reaches the network. The module
+# carries its own 180s bound so a wedge is named rather than killed anonymously;
+# this is the outer one.
+timeout = "300s"
+
 [tasks.kb-graphify-catalog]
 description = "Gate: sources/graphify.dispositions.json + the baseline authority still describe the PINNED commit"
 # Built because the 0.9.57 pin move advanced `source_commit` and left FIVE
