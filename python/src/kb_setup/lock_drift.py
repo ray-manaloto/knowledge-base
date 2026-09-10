@@ -17,11 +17,35 @@ A SECOND drift was already there and had been for weeks: `mise.toml` pins
 from the backend change Ray ruled in #539, not merely a stale version. One
 mechanism, two instances, zero gates.
 
-NATIVE FIRST, AND IT IS NATIVE. `mise lock --dry-run` "writes lockfiles without
-installing tools" and previews what it would change (`mise lock --help`,
-2026.9.4). This module does not re-implement resolution; it runs that and reads
-what it says. `use-tool-builtins.md` is satisfied by asking mise, and the custom
-part is only the part mise does not do.
+NATIVE FIRST, AND IT IS NATIVE — **`--json`, not the human report.** `mise lock
+--dry-run` "writes lockfiles without installing tools" and previews what it would
+change (`mise lock --help`, 2026.9.4); `--json` returns that preview as one
+object per tool with `old_versions` and `new_versions`. This module does not
+re-implement resolution; it runs that and reads what it says.
+
+🔴 IT PARSED THE HUMAN REPORT UNTIL 2026-09-10 AND WAS BLIND TO AN ADDED TOOL.
+A tool newly pinned in `mise.toml` and absent from `mise.lock` makes mise print
+the `→ Dry run - would update:` HEADER plus per-platform `✓ node@24.0.0 for
+linux-arm64` rows — and **nothing else**. Those rows are byte-identical in shape
+to the resolution progress a fully-in-sync run prints, so the parser skipped them
+(correctly, on the evidence it had) and reported `mise.lock agrees`. Armed three
+ways against the real repo, cold review of `7b28f460`:
+
+    clean                              -> "agrees"            rc=0   correct
+    changed version (uv 0.12.8->.12)   -> "does not describe"  rc=1   correct
+    ADDED tool (MISE_NODE_VERSION)     -> "agrees"            rc=0   *** WRONG ***
+
+`mise lock --dry-run --json` answers all three unambiguously — `[]`,
+`uv ['0.12.8'] -> ['0.12.12']`, `node [] -> ['24.0.0']` — because an addition is
+`old_versions == []`, a fact the prose never states. The lesson is this module's
+own subject one layer down: **the text report is a DERIVED VIEW, and a derived
+view can drop a distinction the structured source keeps.** `use-tool-builtins.md`
+does not stop at "ask the tool"; it means ask it for the answer, not the prose.
+
+`--json` is present in `src/cli/lock.rs` at every `v2026.9.x` tag from **2026.9.0**
+— this repo's `min_version.hard` floor — through 2026.9.4, checked against
+GitHub with a bogus-tag 404 control arm. On a mise too old to know the flag the
+run exits non-zero and this gate reports NOT_RUN, never a pass.
 
 🔴 THE PART MISE DOES NOT DO IS THE EXIT CODE. Armed both directions on
 2026-09-10 against the real repo:
@@ -35,11 +59,11 @@ exits 0 — and it is why a gate here reads the report rather than the rc. A
 version of this check that trusted `mise lock --dry-run`'s exit status would be
 green on the exact commit that motivated it.
 
-WHAT COUNTS AS DRIFT. Any previewed change to a tool ENTRY: a stale version, a
-stale tool, an added one. A `--dry-run` line that mentions no tool is narration
-and is ignored — mise prints per-platform resolution progress for every tool on
-every run, and treating that as a finding would make the gate fire always, which
-is how a gate loses its readers.
+WHAT COUNTS AS DRIFT. Any tool whose previewed `old_versions` differ from its
+`new_versions`: a stale version, a stale tool entry, an added one. mise emits an
+entry only for a tool it would change, so a clean repo returns `[]` and there is
+no narration left to filter — the whole class of "is this line a finding or is it
+progress?" disappears with the text parse that raised it.
 
 WHAT THIS CANNOT SEE, because a check that does not declare its blind spot gets
 read as covering everything:
@@ -55,7 +79,7 @@ read as covering everything:
 
 from __future__ import annotations
 
-import re
+import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -70,20 +94,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 #: The preview invocation. `--dry-run` is load-bearing: without it this WRITES
 #: the lockfile, which would make the gate fix its own finding and report clean —
 #: a check that repairs what it measures has measured nothing.
-_ARGV = ("mise", "lock", "--dry-run")
-
-#: A previewed change names a tool; narration does not. `prune` covers a stale
-#: version and a stale tool, `add`/`update` the other direction.
-#:
-#: ANCHORED AT LINE START, after mise's `→ ` bullet. The first version said it was
-#: "anchored on mise's own prefix" and used a bare `.search()` — true of the
-#: STRING, false of the REGEX, so any line merely CONTAINING `Dry run - would`
-#: matched. A cold review of `7f4035cd` read the comment against the line beneath
-#: it and found they disagreed, which is the defect class this repo flags in
-#: everyone else's code.
-_CHANGE = re.compile(
-    r"^\s*(?:→\s*)?Dry run - would (prune|add|update|remove)\b(?P<rest>.*)", re.IGNORECASE
-)
+#: `--json` is the second load-bearing flag, and the one a cold review of
+#: `7b28f460` had to add: the human report cannot express "this tool has no lock
+#: entry at all", so the check that read it was blind to an added pin. See the
+#: module docstring's three arms.
+_ARGV = ("mise", "lock", "--dry-run", "--json")
 
 #: `--dry-run` is not bounded by mise itself and re-resolves every platform, so
 #: it reaches the network. The task carries a `timeout` too; this is the inner
@@ -93,14 +108,25 @@ _TIMEOUT_S = 180
 
 @dataclass(frozen=True, slots=True)
 class Drift:
-    """One previewed change to a tool entry."""
+    """One tool whose lock entry mise would change."""
 
-    verb: str
-    detail: str
+    name: str
+    old: tuple[str, ...]
+    new: tuple[str, ...]
+
+    @property
+    def verb(self) -> str:
+        """`add` when the lock has no entry, `remove` when the config has none."""
+        if not self.old:
+            return "add"
+        if not self.new:
+            return "remove"
+        return "update"
 
     def line(self) -> str:
         """The human row, rendered once so the report and the JSONL sink agree."""
-        return f"would {self.verb} {self.detail}"
+        shown = " -> ".join(", ".join(v) or "(none)" for v in (self.old, self.new))
+        return f"would {self.verb} {self.name}: {shown}"
 
 
 class LockUnavailableError(Exception):
@@ -145,28 +171,48 @@ def preview(repo_root: Path) -> str:
         raise LockUnavailableError(
             f"`{' '.join(_ARGV)}` exited {proc.returncode} — its report cannot be trusted: {tail}"
         )
-    # stdout AND stderr: mise puts the dry-run report on one and its warnings on
-    # the other, and which is which is not a contract worth depending on.
-    return f"{proc.stdout}\n{proc.stderr}"
+    # STDOUT ONLY, now that the answer is JSON. The text version merged both
+    # streams because it did not know which one carried the report; a JSON
+    # document cannot survive having mise's warnings interleaved into it, and
+    # merging them would turn every warning into a parse failure — i.e. into a
+    # NOT_RUN on a run that answered perfectly well.
+    return proc.stdout
 
 
 def drift(output: str) -> list[Drift]:
-    """Every previewed tool-entry change in mise's report."""
+    """Every tool whose lock entry mise's preview would change.
+
+    Raises :class:`LockUnavailableError` when ``output`` is not the report. A
+    run that printed something unparsable did not answer the question, and the
+    empty list it would otherwise decay to is indistinguishable from a clean
+    lockfile — the same collapse the exit code made before `36069fb0`, arriving
+    by a different road.
+    """
+    try:
+        entries = json.loads(output or "[]")
+    except json.JSONDecodeError as exc:
+        raise LockUnavailableError(
+            f"`{' '.join(_ARGV)}` printed something that is not its JSON report: {exc}"
+        ) from exc
+    if not isinstance(entries, list):
+        raise LockUnavailableError(
+            f"`{' '.join(_ARGV)}` returned {type(entries).__name__}, not the expected list"
+        )
     rows: list[Drift] = []
-    for raw in output.splitlines():
-        found = _CHANGE.search(raw)
-        if not found:
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise LockUnavailableError(
+                f"`{' '.join(_ARGV)}` returned a non-object entry: {entry!r}"
+            )
+        old = tuple(entry.get("old_versions") or ())
+        new = tuple(entry.get("new_versions") or ())
+        if old == new:
+            # mise emits an entry only for a tool it would change, so this is
+            # belt-and-braces — but a no-op entry reported as drift is how a
+            # gate that fires always loses its readers, and the text parser this
+            # replaced shipped exactly that bug once.
             continue
-        detail = found.group("rest").strip().removesuffix(":").strip()
-        if not detail:
-            # `→ Dry run - would update:` is a HEADER mise prints on every run,
-            # followed by per-platform `✓ tool@version for <platform>` lines that
-            # are resolution progress, not changes. Measured 2026-09-10: it
-            # appears with the lockfile fully in sync. Counting it would make
-            # this gate fire always, which is how a gate loses its readers — and
-            # the first version of this parser did exactly that.
-            continue
-        rows.append(Drift(found.group(1).lower(), detail))
+        rows.append(Drift(str(entry.get("name") or "?"), old, new))
     return rows
 
 
@@ -182,12 +228,15 @@ def main(repo_root: Path, args: Sequence[str] | None = None) -> int:
         return Rc.BAD_REQUEST
 
     try:
-        output = preview(repo_root)
+        # drift() is INSIDE the try on purpose: an unparsable report is a
+        # "could not ask", exactly like a crashed mise. Leaving it outside would
+        # let a malformed answer raise past the handler and die as a traceback,
+        # which in a gate run reads as the gate itself being broken.
+        rows = drift(preview(repo_root))
     except LockUnavailableError as exc:
         events.warn("lock_drift.not_run", f"[lock-drift] COULD NOT ASK: {exc}", reason=str(exc))
         return Rc.NOT_RUN
 
-    rows = drift(output)
     events.say(
         "lock_drift.examined",
         f"[lock-drift] mise previewed the lockfile — {len(rows)} tool entr(ies) would change",
