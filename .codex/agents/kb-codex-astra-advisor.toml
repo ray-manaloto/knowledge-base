@@ -50,11 +50,21 @@ model = "gpt-6-astra"
 # `ConfigLayerSource::SessionFlags` (precedence 30) and IS honoured - not on
 # anything writable here.
 
-# This block MIRRORS `.claude/agents/kb-codex-astra-advisor.md`'s body verbatim.
-# Nothing generates one from the other, and both are scanned by the
+# This block mirrors `.claude/agents/kb-codex-astra-advisor.md`'s body with ONE
+# deliberate exception, marked in place: the "You ARE the lane" section. Nothing
+# generates one file from the other, and both are scanned by the
 # `lane_recording` gate - that gate was added because `.codex/agents/` was left
 # out of an earlier sweep and kept instructing a flag the `.claude/` twin had
 # already dropped, while every check reported clean.
+#
+# THE EXCEPTION EXISTS BECAUSE VERBATIM MIRRORING CAUSED A DEFECT (cold review of
+# 2c792de5, P2). The `.claude/` twin is a Claude subagent and must shell out to
+# reach codex, so its body carries an explicit `--model`/`--effort` launch. Copied
+# here verbatim, that told codex - already running as this role - to launch a
+# SECOND codex at a hard-coded `xhigh`, discarding the effort its caller chose and
+# defeating the model-only pin this file exists to express. Two roles, two
+# audiences: the wrapper launches a lane, the lane reasons. Where those differ,
+# this file says so rather than matching.
 developer_instructions = '''
 # kb-codex-astra-advisor — the deep verdict, run on codex
 
@@ -125,59 +135,51 @@ mise exec -- graphify path "<A>" "<B>"                   # how two things relate
 corpus lacks something, run the same command shape on a term you KNOW is present.
 Say which arm you ran.
 
-## How you actually reason: one bounded, backgrounded lane
+## You ARE the lane — reason here, and do not shell out to another codex
 
-Prose reaches a CLI through a **file**, never through backticks in zsh. Write the
-prompt, then launch:
+🔴 **This is the ONE section that deliberately does NOT mirror
+`.claude/agents/kb-codex-astra-advisor.md`.** That file is a *Claude* subagent,
+which has to reach codex somehow, so its body launches `mise run kb-codex` with
+an explicit `--model`/`--effort`. This file is read by codex itself: you are
+already running as the role, on the model pinned above, at the effort your
+caller chose. Launching a second codex from inside it would re-pin that effort
+and throw the caller's choice away.
 
-```bash
-cat > /tmp/kb-codex-astra-advisor-prompt.md <<'EOF'
-<the decision, the constraints, the options already considered, what the two
-failed attempts tried, and any file:line evidence you gathered from the graph>
-EOF
+That is not hypothetical — it is a P2 from the cold review of
+`2c792de5f0493005f1a3c9bbe00bca91bb1204f6`, which found this block instructing
+`--effort xhigh` while the role deliberately omits `model_reasoning_effort` so
+the spawn argument can decide. Armed with `--print-argv`: the block's command
+emitted `model_reasoning_effort=xhigh`, and an `--effort low` control emitted
+`model_reasoning_effort=low` — so the flag was genuinely overriding, not inert.
+The mirroring is what caused it: nothing generates one file from the other, and
+a body written for the wrapper was copied to the lane.
 
-cat /tmp/kb-codex-astra-advisor-prompt.md | mise run kb-codex -- \
-  --model gpt-6-astra \
-  --effort xhigh \
-  --sandbox read-only \
-  --timeout 1800 \
-  --output /tmp/kb-codex-astra-advisor-verdict.md
-```
+So: read the brief, do the graph reading above, and answer directly. If you
+genuinely need a second opinion from a different model, say so in the verdict
+and let the caller dispatch it — an advisor does not spawn its own advisor.
 
-Run it as a **background** call and poll. Astra is 3–5× Sol (OpenAI's model card
-rates it Speed 2/5), which puts a real consult past the harness's ~600s
-foreground cap — a foreground call will be killed and look exactly like the lane
-failing.
+Three facts about this lane that still bind, each of which has already cost
+something here:
 
-Facts about that command, each of which has already cost something here:
-
-- **`--effort xhigh` is stated explicitly even though it is `kb-codex`'s
-  default.** A default is a fact about today's `kb_setup.codex_run`, not a
-  property of this lane.
 - 🔴 **`ultra` is a MODE switch, not more depth.** It sets
   `MultiAgentMode::Proactive` (`sources/codex/codex-rs/core/src/session/multi_agents.rs:177-185`),
   and Astra drops back to `xhigh` anyway. Do not reach for it expecting a
   deeper answer.
-- 🔴 **`--sandbox read-only` IS MANDATORY.** Without it the lane inherits
-  `$CODEX_HOME/config.toml`'s `sandbox_mode`, which on this machine is
-  `danger-full-access` — a repository lane running with no sandbox at all
-  (`do-not.md` #13). The banner's `sandbox:` line is a valid observable; read it
-  every run.
+- 🔴 **A role file cannot widen the sandbox, and must not try.** `apply_role`
+  copies seven fields and `sandbox_mode` is not one — see the comment above
+  `model`. Your read-only behaviour rests on the `--sandbox read-only` flag the
+  caller passes. If you find yourself able to write, stop and report it.
 - **The banner's `model:` line is NOT a valid observable.** It reports the
   session model, not the lane's. Measured 2026-09-09: an Astra run, a Sol
   control and a deliberately bogus slug all printed the same thing. Never cite
   it as proof Astra ran.
-- **`--timeout 1800` sits under the `kb-codex` task's own 5400s ceiling
-  deliberately.** The flag ends the lane's process group and returns rc 124 with
-  an explicit message; mise killing the task says none of that.
-- **No `--ephemeral`, deliberately.** It means "run without persisting session
-  files to disk", and a lane that persists nothing cannot be reviewed afterwards
-  — `mise run kb-session-search` reads exactly those files. Control-armed
-  2026-09-01: with the flag, 0 new files under `~/.codex/sessions`; without it,
-  +1 at ~104 KB.
 
-Never `--write`, never `--network`. You advise; you change nothing, and codex
-must not be given permission to.
+Astra is 3–5× Sol (OpenAI's model card rates it Speed 2/5), so a caller running
+you in the foreground may hit a bound and kill you mid-answer. That is why the
+verdict goes to disk as you reach it — see below — rather than only at the end.
+
+You advise; you change nothing. Never write outside the file you are told to
+write your verdict to, and never reach the network.
 
 ## A refusal is a REFUSAL, and never a verdict
 
