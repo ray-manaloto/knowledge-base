@@ -239,6 +239,23 @@ runtime-evaluated-base-classes = ["msgspec.Struct"]
 # through to the next source. A resolver built on layered fallback cannot let
 # one source's exception become the run's exception.
 "python/src/kb_setup/model_limits.py" = ["S310", "BLE001"]
+# `capture_and_persist` is a Phase 1 (#750) provenance SIDE CHANNEL: an
+# unexpected failure in it must never turn a working `codex review` lane into
+# a broken one. Every anticipated failure already returns a typed
+# `Unavailable`/`Error` (see the module docstring's "Result contract"); this
+# one catch-all is only for what those did not anticipate, and it is reported
+# to stderr rather than silently absorbed.
+# PLR0913: `capture_attempt`/`capture_and_persist` each take one kwarg per
+# independent collection-time fact (requested model, requested effort, base
+# ref, subprocess rc, timed-out, output path) — the same "FIXED interface,
+# each field independent" shape as `currency/decide.py`'s `decide()` above,
+# not a bundling opportunity.
+"python/src/kb_setup/codex_review_evidence.py" = ["BLE001", "PLR0913"]
+# `_run_review`'s own outermost guard around evidence capture (#750 Phase 1):
+# a provenance side channel must never cost the caller the review lane's own
+# exit code, including an import-time failure in `codex_review_evidence`
+# itself — not just the failures that module's own inner guard anticipates.
+"python/src/kb_setup/codex_run.py" = ["BLE001"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -383,6 +400,12 @@ input = "schemas/reviewed-classification.schema.json"
 output = "python/src/kb_setup/generated/reviewed_classification.py"
 custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
 """Generated reviewed-classification enum; edit the schema and rerun the generator."""'''
+
+[tool.datamodel-codegen.jobs.codex-review-evidence]
+input = "schemas/codex-review-evidence.schema.json"
+output = "python/src/kb_setup/generated/codex_review_evidence.py"
+custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
+"""Generated codex-review-evidence models; edit the schema and rerun the generator."""'''
 
 [tool.datamodel-codegen.jobs.packages]
 input = "schemas/deps-dev-api-v3.proto"

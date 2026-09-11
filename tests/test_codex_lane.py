@@ -728,3 +728,112 @@ def test_the_bound_kills_the_group_on_a_non_tee_run(tmp_path: Path) -> None:
         with contextlib.suppress(ProcessLookupError):
             os.kill(pid, signal.SIGKILL)
         pytest.fail(f"descendant {pid} survived the bound; _spawn returned after {elapsed:.2f}s")
+
+
+# ---------------------------------------------------------------------------
+# `_run_review` wiring to `codex_review_evidence` — #750 Phase 1.
+# ---------------------------------------------------------------------------
+
+
+def test_run_review_forwards_the_right_facts_to_evidence_capture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The PASS arm.
+
+    Every collection-time fact `_run_review` owns reaches
+    `capture_and_persist` unchanged — nothing substituted, nothing dropped.
+    """
+    from kb_setup import codex_review_evidence
+
+    seen: dict[str, object] = {}
+
+    def _fake_capture_and_persist(repo_root: Path, **kwargs: object) -> None:
+        seen["repo_root"] = repo_root
+        seen.update(kwargs)
+
+    monkeypatch.setattr(codex_run, "_spawn", lambda *_a, **_kw: 0)
+    monkeypatch.setattr(codex_run.shutil, "which", lambda _name: "/usr/bin/codex")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    monkeypatch.setattr(codex_review_evidence, "capture_and_persist", _fake_capture_and_persist)
+    monkeypatch.chdir(tmp_path)
+
+    report = tmp_path / "review-abc123456789-cold.md"
+    rc = codex_run.run(
+        [
+            "--review",
+            "--base",
+            "HEAD~1",
+            "--model",
+            "gpt-5.6-sol",
+            "--effort",
+            "xhigh",
+            "--output",
+            str(report),
+        ]
+    )
+
+    assert rc == 0
+    assert seen["repo_root"] == tmp_path
+    assert seen["requested_model"] == "gpt-5.6-sol"
+    assert seen["requested_effort"] == "xhigh"
+    assert seen["base_ref"] == "HEAD~1"
+    assert seen["subprocess_rc"] == 0
+    assert seen["timed_out"] is False
+    assert seen["output_path"] == report
+
+
+def test_run_review_returns_the_lanes_own_rc_even_when_evidence_capture_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """THE OUTAGE ARM — #750 Phase 1's central invariant.
+
+    A provenance side channel must never turn a working review into a broken
+    one, or block a ship/land. Even if `capture_and_persist` itself
+    misbehaves and raises — breaking its OWN stated contract of never
+    raising — `_run_review`'s outermost guard still returns the lane's real
+    rc rather than propagating the exception. Two guards, deliberately:
+    `capture_and_persist`'s own inner one (tested in
+    `test_codex_review_evidence.py`) covers what it anticipates; this one
+    covers what it does not, including an import-time failure.
+    """
+    from kb_setup import codex_review_evidence
+
+    def _boom(_repo_root: Path, **_kwargs: object) -> None:
+        raise RuntimeError("simulated: evidence capture broke")
+
+    monkeypatch.setattr(codex_run, "_spawn", lambda *_a, **_kw: 7)
+    monkeypatch.setattr(codex_run.shutil, "which", lambda _name: "/usr/bin/codex")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    monkeypatch.setattr(codex_review_evidence, "capture_and_persist", _boom)
+    monkeypatch.chdir(tmp_path)
+
+    rc = codex_run.run(["--review", "--output", str(tmp_path / "r.md")])
+
+    assert rc == 7, "the lane's own rc must survive a broken evidence side channel"
+    assert "evidence capture unavailable" in capsys.readouterr().err
+
+
+def test_run_review_does_not_touch_evidence_when_output_is_omitted(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`--output` omitted is still forwarded as `output_path=None`.
+
+    The collection point does not special-case it away; `capture_and_persist`
+    (and `resolve_reviewer_model` beneath it) is what turns `None` into the
+    honest `Unavailable(no-output-flag)`.
+    """
+    from kb_setup import codex_review_evidence
+
+    seen: dict[str, object] = {}
+
+    def _fake_capture_and_persist(_repo_root: Path, **kwargs: object) -> None:
+        seen.update(kwargs)
+
+    monkeypatch.setattr(codex_run, "_spawn", lambda *_a, **_kw: 0)
+    monkeypatch.setattr(codex_run.shutil, "which", lambda _name: "/usr/bin/codex")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    monkeypatch.setattr(codex_review_evidence, "capture_and_persist", _fake_capture_and_persist)
+    monkeypatch.chdir(tmp_path)
+
+    assert codex_run.run(["--review"]) == 0
+    assert seen["output_path"] is None

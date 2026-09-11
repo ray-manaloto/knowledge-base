@@ -1445,3 +1445,83 @@ def test_canonical_lane_report_needs_the_report_directory():
     `-cold` lane suffix, so only the directory test refuses it.
     """
     assert review.canonical_lane_report("docs/review-abc-cold:x.md") == "docs/review-abc-cold:x.md"
+
+
+# ---------------------------------------------------------------------------
+# `codex_evidence` — #750 Phase 1. RECORDED, never gated.
+# ---------------------------------------------------------------------------
+
+
+def test_codex_evidence_defaults_to_empty_tuple() -> None:
+    """Every receipt minted before this field existed simply has none."""
+    receipt = review.Receipt(
+        sha=_SHA,
+        fixed_point="main",
+        fixed_point_sha="a" * 40,
+        lanes_ran=("standards", "spec", "cold:codex", "silent-failure"),
+        lanes_skipped=(),
+        findings=0,
+        blocking=0,
+    )
+    assert receipt.codex_evidence == ()
+    assert receipt.as_payload()["codex_evidence"] == []
+
+
+def test_a_receipt_with_no_codex_evidence_field_at_all_still_passes(tmp_path: Path) -> None:
+    """THE OUTAGE ARM.
+
+    A receipt written before this field existed — the key is genuinely
+    ABSENT, not an empty list — must pass exactly as before. #750 Phase 1's
+    entire point is that this ticket cannot make an existing, honest receipt
+    unshippable.
+    """
+    ok, _summary = review.receipt_state(_write(tmp_path, codex_evidence=_ABSENT), _SHA)
+    assert ok
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    [
+        [],
+        ["cold:codex-astra=deadbeef-1234"],
+        ["cold:codex=model-unverified"],
+        # Malformed shapes — Phase 1 never validates this field's contents.
+        ["not-even-a-kv-pair"],
+        [None],
+        [1, 2, 3],
+        "not-a-list-at-all",
+        {"lane": "codex"},
+    ],
+)
+def test_no_shape_of_codex_evidence_is_ever_refused(tmp_path: Path, evidence: object) -> None:
+    """`_all_reasons` composes `_reject_reason or _evidence_gap` only.
+
+    `codex_evidence` is not a third term, by design (see `_all_reasons`'s own
+    docstring). Every shape here — well-formed, malformed, even the wrong JSON
+    type entirely — must pass, because Phase 1 adds no refusal path.
+    """
+    ok, _summary = review.receipt_state(_write(tmp_path, codex_evidence=evidence), _SHA)
+    assert ok
+
+
+def test_codex_evidence_survives_a_write_read_roundtrip(tmp_path: Path) -> None:
+    for lane in ("standards", "spec"):
+        _write_report(tmp_path, lane)
+    review.write_receipt(
+        tmp_path,
+        review.Receipt(
+            sha=_SHA,
+            fixed_point="main",
+            fixed_point_sha="a" * 40,
+            lanes_ran=("standards", "spec"),
+            lanes_skipped=(
+                "cold:not-applicable-solo-contributor",
+                "silent-failure:not-applicable-x",
+            ),
+            findings=0,
+            blocking=0,
+            codex_evidence=("cold:codex-astra=attempt-42",),
+        ),
+    )
+    data = json.loads(review.receipt_path(tmp_path, _SHA).read_text(encoding="utf-8"))
+    assert data["codex_evidence"] == ["cold:codex-astra=attempt-42"]

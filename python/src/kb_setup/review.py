@@ -268,12 +268,22 @@ class Receipt:
     written_at: str = field(
         default_factory=lambda: datetime.now(tz=UTC).isoformat(timespec="seconds")
     )
+    #: #750 Phase 1 — RECORDED, never gated. Zero or more `lane=reference`
+    #: strings, one per cold lane the caller can produce evidence for.
+    #: `reference` is either a `codex_review_evidence` attempt id (resolvable
+    #: via `kb_setup.codex_review_evidence.evidence_path`) or the honest label
+    #: `model-unverified`. Defaults to `()`: every receipt minted before this
+    #: field existed, and every non-codex lane, simply has none — `_all_reasons`
+    #: never refuses on its absence or its shape (see that function's own
+    #: docstring for where Phase 2 gating will eventually read it).
+    codex_evidence: tuple[str, ...] = ()
 
     def as_payload(self) -> dict[str, Any]:
         """Return the JSON form written to disk."""
         return {
             "sha": self.sha,
             "written_at": self.written_at,
+            "codex_evidence": list(self.codex_evidence),
             "fixed_point": self.fixed_point,
             "fixed_point_sha": self.fixed_point_sha,
             "lanes_ran": list(self.lanes_ran),
@@ -416,6 +426,19 @@ def _all_reasons(repo_root: Path, data: dict[str, Any], sha: str) -> str | None:
     Composing `_reject_reason or _evidence_gap` independently in two places is
     how the writer and the reader drift back apart, which is the gap this
     module exists to close.
+
+    **#750 Phase 1 deliberately adds NO third term here.** `data["codex_evidence"]`
+    (see `Receipt.codex_evidence`) is recorded on the payload but never read by
+    this function: the premise-verifier refused the wider design (binding a
+    receipt to an OBSERVED model) before any code shipped, because its proposed
+    enforcement point was exactly this function, and `_run_review` — the only
+    place evidence can be collected — is reached by ONE of the four cold review
+    lanes (`codex review`, via `cold:codex-astra`), never the DEFAULT one
+    (`codex exec review`, via the `fable-orchestrator` plugin's `cold:codex`).
+    Adding a refusal here today would refuse three of four cold lanes,
+    including the default. Phase 2 (gating) is a separate, later ticket, and
+    when it lands its check belongs HERE, beside `_evidence_gap` — not in
+    `_CHECKS`, which is called `check(data, sha)` with no `repo_root`.
     """
     return _reject_reason(data, sha) or _evidence_gap(repo_root, data, sha)
 

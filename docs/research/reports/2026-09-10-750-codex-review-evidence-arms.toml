@@ -1,0 +1,299 @@
+# Mutation arms for #750 Phase 1 — `kb_setup.codex_review_evidence`.
+#
+# Every arm targets a claim the resolver's docstring or the tagged-union
+# contract makes explicit: "join is BOTH parent AND source", "require exactly
+# one child", "every turn, not just the first", "never default a missing
+# model", "model-observed and review-happened are independent facts", "a
+# permission failure is Error, never a guessed Unavailable", "no shape of
+# codex_evidence refuses the receipt", and "evidence capture can never cost
+# the lane its own rc". Each is the realistic production mutation from
+# `docs/research/reports/2026-09-10-codex-model-provenance-advisor.md`'s own
+# FAIL-arms table, not a renamed definition.
+
+suites = [
+  "tests/test_codex_review_evidence.py",
+  "tests/test_codex_lane.py",
+  "tests/test_review.py",
+]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''ADAPTER_VERSION = 1'''
+new = '''ADAPTER_VERSION = 1  # control'''
+
+# A1 — home+parent binding. Dropping the parent-thread_id equality would let
+# ANY rollout under sessions/ match, not just the one bound to this attempt's
+# own banner — the exact "hardcode / drop the parent equality" mutation the
+# advisor's table names.
+[[arm]]
+id = "A1"
+test = "test_zero_matching_children_is_unavailable"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''    return payload.get("parent_thread_id") == parent_session_id and payload.get("source") == {
+        "subagent": "review"
+    }'''
+new = '''    return payload.get("source") == {
+        "subagent": "review"
+    }'''
+
+# A2 — the other half of the same binding: source == {"subagent": "review"}.
+# Without it, an ordinary `exec` child sharing the parent would be read as the
+# reviewer sub-agent.
+[[arm]]
+id = "A2"
+test = "test_a_matching_child_with_the_wrong_source_does_not_count"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''    return payload.get("parent_thread_id") == parent_session_id and payload.get("source") == {
+        "subagent": "review"
+    }'''
+new = '''    return payload.get("parent_thread_id") == parent_session_id'''
+
+# A3 — complete, unique discovery. "Accept first hit" on an ambiguous match is
+# the advisor's own named production mutation: silently picking `hits[0]`
+# instead of refusing turns a genuine ambiguity into a confident wrong answer.
+[[arm]]
+id = "A3"
+test = "test_two_matching_children_is_ambiguous_not_a_guess"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        if len(scan.hits) > 1:
+            named = ", ".join(str(h) for h in scan.hits)'''
+new = '''        if len(scan.hits) > 99:
+            named = ", ".join(str(h) for h in scan.hits)'''
+
+# A4 — lane/model agreement: "read only the first turn". `turn_models` and
+# `resolved_model` both depend on scanning every turn_context record.
+[[arm]]
+id = "A4"
+test = "test_a_later_turn_changing_model_is_recorded_not_dropped"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        model = payload.get("model")
+        if isinstance(model, str) and model:
+            models.append(model)
+    return models'''
+new = '''        model = payload.get("model")
+        if isinstance(model, str) and model:
+            models.append(model)
+    return models[:1]'''
+
+# A5 — required schema: "default a missing model to the requested one". A
+# turn_context record with no `model` key must be Unavailable, never
+# silently filled in from what the caller asked for.
+[[arm]]
+id = "A5"
+test = "test_a_turn_context_with_no_model_field_is_unavailable"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        return Unavailable(
+            UnavailableReason.missing_model_field,
+            f"{child_path}'s turn_context record(s) carry no model field"[:_MAX_DIAGNOSTICS],
+        )'''
+new = '''        return Resolved(
+            CodexReviewEvidence(
+                schema_version=SCHEMA_VERSION,
+                adapter_version=ADAPTER_VERSION,
+                attempt_id=attempt.attempt_id,
+                codex_home=attempt.codex_home,
+                cli_version=attempt.cli_version,
+                requested_model=attempt.requested_model,
+                requested_effort=attempt.requested_effort,
+                base_ref=attempt.base_ref,
+                subprocess_rc=attempt.subprocess_rc,
+                timed_out=attempt.timed_out,
+                output_path=str(attempt.output_path) if attempt.output_path else None,
+                outcome=OutcomeKind.resolved,
+                parent_session_id=parent_session_id,
+                child_rollout_path=str(child_path),
+                turn_models=[],
+                resolved_model=attempt.requested_model,
+                review_completion=ReviewCompletion.unknown,
+                unavailable_reason=None,
+                error_kind=None,
+                diagnostics=None,
+            )
+        )'''
+
+# A6 — review completion: "ignore exit/terminal outcome because a model was
+# observed". Model-observed and review-happened are two independent facts
+# (the advisor's own sharpest catch, from its own bogus-slug arm) — collapsing
+# an aborted review to `complete` loses exactly that distinction.
+[[arm]]
+id = "A6"
+test = "test_an_api_rejected_review_is_recorded_aborted"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        outcome = (
+            ReviewCompletion.aborted if has_error or not has_message else ReviewCompletion.complete
+        )'''
+new = '''        outcome = ReviewCompletion.complete'''
+
+# A7 — resolver failure: "catch-and-return-success" for a genuine permission
+# error. This is a regression arm for the fix in this same change — without
+# the `os.scandir` preflight, `Path.rglob` silently SKIPS an unreadable
+# directory rather than raising, so a real permission failure reads as
+# "nothing found" (Unavailable) instead of "could not look" (Error). Measured
+# live on this host before the preflight was added.
+[[arm]]
+id = "A7"
+test = "test_an_unreadable_sessions_dir_is_a_typed_error"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''    def _note_dir(exc: OSError) -> None:
+        unreadable.append(f"{getattr(exc, 'filename', sessions_root)}: {exc}")'''
+new = '''    def _note_dir(exc: OSError) -> None:
+        return'''
+
+# A8 — receipt binding: "make evidence optional" the OTHER way — a resolved
+# outcome silently degrading to the honest label anyway would hide real
+# evidence that exists. `receipt_reference` must return the attempt id
+# whenever (and ONLY whenever) the outcome is actually `resolved`.
+[[arm]]
+id = "A8"
+test = "test_receipt_reference_is_model_unverified_otherwise"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''    if record.outcome is OutcomeKind.resolved:
+        return record.attempt_id
+    return "model-unverified"'''
+new = '''    return record.attempt_id'''
+
+# A9 — the diagnostics bound (#750's own explicit ask: "bound the diagnostics
+# field"). Dropping the truncation lets an unbounded string — a full
+# traceback, a long path list — reach disk.
+[[arm]]
+id = "A9"
+test = "test_diagnostics_are_bounded"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        diagnostics=result.diagnostics[:_MAX_DIAGNOSTICS],
+    )'''
+new = '''        diagnostics=result.diagnostics,
+    )'''
+
+# A10 — the receipt actually carries the field at all. Phase 1's headline
+# requirement ("the receipt carries the evidence OR model-unverified") is
+# worth nothing if the payload silently drops the key.
+[[arm]]
+id = "A10"
+test = "test_codex_evidence_survives_a_write_read_roundtrip"
+file = "python/src/kb_setup/review.py"
+old = '''            "codex_evidence": list(self.codex_evidence),'''
+new = '''            # "codex_evidence": list(self.codex_evidence),'''
+
+# A11 — THE OUTAGE ARM's own regression guard: removing `_run_review`'s outer
+# try/except must break the test that exists specifically to prove evidence
+# capture can never cost the lane its own exit code.
+[[arm]]
+id = "A11"
+test = "test_run_review_returns_the_lanes_own_rc_even_when_evidence_capture_raises"
+file = "python/src/kb_setup/codex_run.py"
+old = '''    try:
+        from kb_setup import codex_review_evidence as evidence
+
+        evidence.capture_and_persist(
+            Path.cwd(),
+            requested_model=args.model,
+            requested_effort=args.effort,
+            base_ref=args.base,
+            subprocess_rc=rc,
+            timed_out=rc == _RC_TIMED_OUT,
+            output_path=output_path,
+        )
+    except Exception as exc:
+        print(
+            f"kb-codex --review: evidence capture unavailable (outer guard): {exc}",
+            file=sys.stderr,
+        )'''
+new = '''    from kb_setup import codex_review_evidence as evidence
+
+    evidence.capture_and_persist(
+        Path.cwd(),
+        requested_model=args.model,
+        requested_effort=args.effort,
+        base_ref=args.base,
+        subprocess_rc=rc,
+        timed_out=rc == _RC_TIMED_OUT,
+        output_path=output_path,
+    )'''
+# rather than having traded one conflation for its mirror.
+[[arm]]
+id = "D4"
+test = "test_a_readable_tee_with_no_session_id_is_still_unavailable"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        return Unavailable(
+            UnavailableReason.banner_session_id_unavailable,'''
+new = '''        return Error(
+            ErrorKind.resolver_io_error,'''
+
+# ---------------------------------------------------------------------------
+# ROUND 2 of the cold antigravity review — of the ROUND 1 FIXES.
+#
+# It found seven things, and the first was MY OVER-CORRECTION: D3 above made an
+# unreadable candidate `raise`, which in a real `$CODEX_HOME/sessions` carrying
+# years of rollouts meant ONE stale unreadable file aborted every scan forever.
+# The fix for a false absence opened a permanent outage. "Trades one failure for
+# its mirror" is a fix shape this repo lists, and it was named in the very
+# commit message that shipped it.
+#
+# That is the whole argument for the two-round bound: round 1's fixes are the
+# least-reviewed code in the diff, and no arm of mine caught this because my
+# arms controlled the TEE path and not the CANDIDATE path.
+#
+# D1/D2/D3 above are now superseded by the _Scan contract and have been removed
+# rather than left broken beside their replacements.
+# ---------------------------------------------------------------------------
+
+# E1 — THE OVER-CORRECTION ITSELF. Restore the raise. A real match with one
+# unreadable NEIGHBOUR must still resolve; this makes it Error instead.
+[[arm]]
+id = "E1"
+test = "test_an_unrelated_unreadable_rollout_does_not_block_the_real_match"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''            unreadable.append(f"{path}: {exc}")
+            continue'''
+new = '''            raise OSError(f"could not read candidate rollout {path}: {exc}") from exc'''
+
+# E2 — the other half: stop RECORDING the miss, so zero hits plus an unreadable
+# path reads as an ordinary absence again. This is round 1's original defect,
+# re-armed at the new contract.
+[[arm]]
+id = "E2"
+test = "test_zero_hits_with_an_unreadable_path_is_error_not_absence"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''    if not scan.complete():'''
+new = '''    if False:'''
+
+# E3 — CONTROL FOR THE FIX, not a no-op. If `complete()` were wrong in the other
+# direction — every scan "incomplete" — the two arms above would still pass while
+# a genuinely empty scan wrongly returned Error. Forcing that must break the
+# ordinary-absence test.
+[[arm]]
+id = "E3"
+test = "test_a_genuinely_empty_scan_is_still_an_ordinary_absence"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        return not self.unreadable'''
+new = '''        return False'''
+
+# E4 — the nested directory. `os.walk(onerror=...)` replaced a `scandir`
+# preflight that only ever covered `sessions_root` ITSELF, so an unreadable
+# `sessions/2026/09/` vanished silently. Dropping onerror restores that.
+[[arm]]
+id = "E4"
+test = "test_an_unreadable_sessions_dir_is_a_typed_error"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''    for dirpath, _dirnames, filenames in os.walk(sessions_root, onerror=_note_dir):'''
+new = '''    for dirpath, _dirnames, filenames in os.walk(sessions_root):'''
+
+# E5 — the empty error object. `bool({})` is False, so an empty error read as
+# "no error": a failure wearing a success shape.
+[[arm]]
+id = "E5"
+test = "test_an_empty_error_object_is_not_read_as_success"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        has_error = payload.get("error") is not None'''
+new = '''        has_error = bool(payload.get("error"))'''
+
+# E6 — its mirror, so the pair cannot both be satisfied by a constant. `bool("")`
+# is False, so a completed review with an empty message read as aborted.
+[[arm]]
+id = "E6"
+test = "test_a_completed_review_with_an_empty_message_is_not_aborted"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        has_message = payload.get("last_agent_message") is not None'''
+new = '''        has_message = bool(payload.get("last_agent_message"))'''
