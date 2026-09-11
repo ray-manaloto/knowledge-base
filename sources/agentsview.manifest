@@ -1,0 +1,33 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Re-clone at build time; the working tree under sources/agentsview/ is gitignored.
+#
+# TOOLCHAIN SOURCE — a tool this repo actually RUNS.
+#
+# ⚠️ INVARIANT: this pin MUST track the version we actually run.
+#   version source: the agentsview binary itself (`agentsview --version`)
+#   pinned here:    0.42.0
+#
+# WHY THIS EXISTS NOW. `mise.toml` refused a manifest on 2026-09-01 with a
+# stated, conditional reason: "`kb-build` is currently FAILING and `graph-size`
+# sits at 736 MiB of 1,024". BOTH CONDITIONS HAVE MOVED — measured 2026-09-11:
+# kb-build is green at 472,069 nodes, and graph-size is 721.2 MiB of 1,024
+# (70%, 303 MiB headroom, rc 0). A refusal that carried its condition is a
+# refusal that can be re-decided when the condition changes, which is the whole
+# reason the original note wrote the numbers down.
+#
+# ⚠️ THE PIN IS A RELEASE BEHIND THE FEATURE WE WANT. `effort` capture for
+# Claude Code AND Codex sessions is upstream PR #1677, merged 2026-09-10 and in
+# NO RELEASE YET. v0.42.0 (2026-09-01) does not carry it. When the release that
+# does lands — do NOT assume it is v0.43.0 — bumping triggers a documented FULL
+# SESSION RESYNC to populate effort from source transcripts, which against a
+# ~5 GB archive is a real cost, not a formality.
+#
+# The tag is ANNOTATED, so `commit` below is the PEELED commit, not the tag
+# object `94b3676f3cfcb32d95ff07547db727e3c95564ba`. Recording the tag object
+# would pin a thing that is not a tree.
+
+url = https://github.com/kenn-io/agentsview
+ref = v0.42.0
+commit = ff8fb4e84823b9583eba417afc243140caabdcb0
+kind = code
+added = 2026-09-11

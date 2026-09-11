@@ -88,13 +88,20 @@ gitleaks = "8.30.1"
 # while gitleaks/taplo BOTH resolve), which is why the `github:` prefix is
 # explicit rather than a bare name.
 #
-# NO `sources/agentsview.manifest` ON PURPOSE (advisor, 2026-09-01): `kb-build`
-# is currently FAILING and `graph-size` sits at 736 MiB of 1,024, so making an
-# already-red, capacity-bound graph responsible for an unmeasured new source is
-# strictly negative. Registered in `sources/REGISTRY.md` instead. `build = skip`
-# was considered and REJECTED — #417 measured that exact shape producing a stale
-# clone three readers then cited from the wrong version.
-"github:kenn-io/agentsview" = "0.41.1"
+# `sources/agentsview.manifest` NOW EXISTS (2026-09-11). It was refused on
+# 2026-09-01 with a CONDITIONAL reason — "`kb-build` is currently FAILING and
+# `graph-size` sits at 736 MiB of 1,024" — and both conditions have since moved:
+# kb-build is green at 472,069 nodes and graph-size is 721.2 MiB of 1,024 (70%,
+# 303 MiB headroom, rc 0). That is the value of writing the numbers into a
+# refusal: it can be re-decided rather than re-argued. `build = skip` remains
+# REJECTED — #417 measured that shape producing a stale clone three readers then
+# cited from the wrong version.
+#
+# ⚠️ 0.42.0 does NOT carry the feature we want. `effort` capture for Claude Code
+# AND Codex sessions is upstream PR #1677, merged 2026-09-10, in no release yet.
+# When the release carrying it lands — do not assume it is 0.43.0 — the bump
+# triggers a documented FULL SESSION RESYNC against a ~5 GB archive.
+"github:kenn-io/agentsview" = "0.42.0"
 # agnix: agent-documentation validator (CLAUDE.md / .claude/** / settings.json).
 # Same pin as dotfiles' shared set. Run with --strict everywhere — agnix exits 0
 # on warnings-only, so without it every warning is invisible (dotfiles #250).
