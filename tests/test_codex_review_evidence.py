@@ -682,3 +682,117 @@ def test_an_unreadable_candidate_is_an_error_not_zero_children(tmp_path: Path) -
         assert result.kind is ev.ErrorKind.resolver_io_error
     finally:
         child.chmod(stat.S_IMODE(original_mode) | stat.S_IRUSR | stat.S_IWUSR)
+
+
+# --- round 2 of the cold review: the fixes from round 1 reviewed as new code ---
+
+
+def test_an_unrelated_unreadable_rollout_does_not_block_the_real_match(
+    tmp_path: Path,
+) -> None:
+    """🔴 THE OVER-CORRECTION. Round 1's fix raised on ANY unreadable candidate.
+
+    `$CODEX_HOME/sessions/` accumulates years of rollouts. One stale unreadable
+    file anywhere under it aborted every scan forever — so the fix that closed a
+    false absence opened a permanent outage. "Trades one failure for its mirror" is
+    a fix shape this repo lists, and it was named in the very commit that
+    shipped it, which is what makes this the most important test in the file.
+
+    A genuine match plus an unrelated unreadable neighbour must still resolve.
+    """
+    sessions_root = tmp_path / "codex-home" / "sessions"
+    _write_child(
+        sessions_root,
+        "rollout-child-1.jsonl",
+        [
+            _session_meta_line(parent=_PARENT, source={"subagent": "review"}),
+            _turn_context_line("gpt-5.6-sol"),
+        ],
+    )
+    _write_child(sessions_root, "rollout-stale-old.jsonl", ['{"type":"session_meta"}'])
+    stale = sessions_root.rglob("rollout-stale-old.jsonl").__next__()
+    original_mode = stale.stat().st_mode
+    stale.chmod(0)
+    try:
+        banner = tmp_path / "banner.txt"
+        _banner(banner)
+        attempt = _attempt(tmp_path, output_path=banner, requested_model="gpt-5.6-sol")
+        result = ev.resolve_reviewer_model(attempt, attempts=2, delay=0)
+        assert isinstance(result, ev.Resolved), (
+            f"one unreadable NEIGHBOUR must not block a real match, got {type(result).__name__}"
+        )
+        assert result.record.resolved_model == "gpt-5.6-sol"
+    finally:
+        stale.chmod(stat.S_IMODE(original_mode) | stat.S_IRUSR | stat.S_IWUSR)
+
+
+def test_zero_hits_with_an_unreadable_path_is_error_not_absence(tmp_path: Path) -> None:
+    """The other half: absence is only absence when nothing was skipped.
+
+    Zero matches AND something unreadable means the scan did not establish
+    absence — it may have skipped the very file it was looking for. That is
+    `Error`, never the `Unavailable` that asserts "we looked and found nothing".
+    """
+    sessions_root = tmp_path / "codex-home" / "sessions"
+    _write_child(sessions_root, "rollout-other.jsonl", ['{"type":"session_meta"}'])
+    other = sessions_root.rglob("rollout-other.jsonl").__next__()
+    original_mode = other.stat().st_mode
+    other.chmod(0)
+    try:
+        banner = tmp_path / "banner.txt"
+        _banner(banner)
+        attempt = _attempt(tmp_path, output_path=banner)
+        result = ev.resolve_reviewer_model(attempt, attempts=2, delay=0)
+        assert isinstance(result, ev.Error), f"expected Error, got {type(result).__name__}"
+        assert result.kind is ev.ErrorKind.resolver_io_error
+    finally:
+        other.chmod(stat.S_IMODE(original_mode) | stat.S_IRUSR | stat.S_IWUSR)
+
+
+def test_a_genuinely_empty_scan_is_still_an_ordinary_absence(tmp_path: Path) -> None:
+    """CONTROL for the two arms above — without it neither can discriminate.
+
+    Zero matches with NOTHING unreadable is a real `Unavailable`. If this also
+    returned `Error`, the fix would have traded the old conflation for its
+    mirror a second time.
+    """
+    sessions_root = tmp_path / "codex-home" / "sessions"
+    _write_child(sessions_root, "rollout-other.jsonl", ['{"type":"session_meta"}'])
+    banner = tmp_path / "banner.txt"
+    _banner(banner)
+    attempt = _attempt(tmp_path, output_path=banner)
+    result = ev.resolve_reviewer_model(attempt, attempts=2, delay=0)
+    assert isinstance(result, ev.Unavailable), f"expected Unavailable, got {type(result).__name__}"
+    assert result.reason is ev.UnavailableReason.no_matching_child_rollout
+
+
+def test_an_empty_error_object_is_not_read_as_success() -> None:
+    """`bool({})` is False, so an empty error object read as "no error".
+
+    A failure wearing a success shape — the one direction completion must never
+    get wrong. Round 1 raised only the empty-MESSAGE half of this and I judged
+    it minor; the empty-ERROR half is the dangerous one and round 2 found it.
+    """
+    records = [
+        {
+            "type": "event_msg",
+            "payload": {"type": "task_complete", "last_agent_message": "done", "error": {}},
+        }
+    ]
+    assert ev._completion(records) is ev.ReviewCompletion.aborted
+
+
+def test_a_completed_review_with_an_empty_message_is_not_aborted() -> None:
+    """The mirror, and the control: `bool("")` is False too.
+
+    A review that completed and returned an empty message must not read as
+    `aborted`. Testing only the arm above would let `has_message = False`
+    unconditionally pass.
+    """
+    records = [
+        {
+            "type": "event_msg",
+            "payload": {"type": "task_complete", "last_agent_message": "", "error": None},
+        }
+    ]
+    assert ev._completion(records) is ev.ReviewCompletion.complete

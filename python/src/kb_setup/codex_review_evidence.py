@@ -64,7 +64,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import msgspec
 
@@ -246,7 +246,12 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]] | None:
     is None, which the caller distinguishes from "read fine, found nothing".
     """
     try:
-        raw = path.read_text(encoding="utf-8")
+        # `errors="replace"` — invalid UTF-8 raises `UnicodeDecodeError`, which
+        # is a ValueError and therefore NOT caught by the `except OSError` just
+        # below. It would escape the typed contract entirely and be swallowed by
+        # the outermost guard, so a single bad byte in one rollout would erase
+        # the whole attempt's evidence. Round 2 of the cold review.
+        raw = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
     records: list[dict[str, Any]] = []
@@ -263,7 +268,22 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]] | None:
     return records
 
 
-def _candidate_children(sessions_root: Path, parent_session_id: str) -> list[Path]:
+class _Scan(NamedTuple):
+    """What one pass over `sessions/` found, AND what it could not look at.
+
+    A pair rather than a list because "zero hits" only MEANS "no matching child"
+    when nothing was skipped — see :func:`_candidate_children`'s three-way note.
+    """
+
+    hits: list[Path]
+    unreadable: list[str]
+
+    def complete(self) -> bool:
+        """Whether this pass actually saw everything it needed to."""
+        return not self.unreadable
+
+
+def _candidate_children(sessions_root: Path, parent_session_id: str) -> _Scan:
     """Every rollout under `sessions_root` whose FIRST line binds to `parent_session_id`.
 
     Binding is BOTH `payload.parent_thread_id == parent_session_id` AND
@@ -281,40 +301,97 @@ def _candidate_children(sessions_root: Path, parent_session_id: str) -> list[Pat
     explicit `os.scandir` preflight is what makes that distinction real.
     """
     if not sessions_root.is_dir():
-        return []
-    with os.scandir(sessions_root) as _preflight:
-        next(_preflight, None)
+        return _Scan([], [])
     hits: list[Path] = []
-    for path in sorted(sessions_root.rglob("rollout-*.jsonl")):
+    unreadable: list[str] = []
+
+    def _note_dir(exc: OSError) -> None:
+        unreadable.append(f"{getattr(exc, 'filename', sessions_root)}: {exc}")
+
+    # `os.walk` with `onerror`, NOT `Path.rglob` and NOT a `scandir` preflight.
+    # rglob silently skips any directory it cannot list, and the preflight that
+    # replaced it only ever covered `sessions_root` ITSELF — so an unreadable
+    # nested `sessions/2026/09/` still vanished without a trace, which is the
+    # very failure the preflight was added to prevent, one level down. Round 2
+    # of the cold review. `onerror` makes every level report instead of one.
+    found: list[Path] = []
+    for dirpath, _dirnames, filenames in os.walk(sessions_root, onerror=_note_dir):
+        found.extend(
+            Path(dirpath) / name
+            for name in filenames
+            if name.startswith("rollout-") and name.endswith(".jsonl")
+        )
+
+    for path in sorted(found):
         try:
-            with path.open("r", encoding="utf-8") as handle:
+            # `errors="replace"`: invalid UTF-8 raises `UnicodeDecodeError`, a
+            # ValueError that `except OSError` does NOT catch — it would escape
+            # the typed contract entirely and be swallowed by the outermost
+            # guard. Round 2 again.
+            with path.open("r", encoding="utf-8", errors="replace") as handle:
                 first_line = handle.readline()
         except OSError as exc:
-            # 🔴 NOT `continue`. A candidate we cannot READ is not a candidate
-            # that failed to MATCH, and skipping it turns "the one matching child
-            # is unreadable" into "zero children found" — an environment fault
-            # reported as an ordinary absence. Same class as the `rglob` hazard
-            # this function's own preflight exists for. Found by a cold
-            # antigravity review of `3cc9c93a`.
-            raise OSError(f"could not read candidate rollout {path}: {exc}") from exc
-        first_line = first_line.strip()
-        if not first_line:
+            # 🔴 RECORD the miss and keep scanning. Three versions got this one
+            # question wrong in three directions:
+            #
+            #   1. `continue` — the miss vanished, so "the one matching child is
+            #      unreadable" read as "zero children found": a fault as an
+            #      ordinary absence. Found by round 1 of the cold review.
+            #   2. `raise` — the OVER-CORRECTION. `$CODEX_HOME/sessions`
+            #      accumulates years of rollouts, so ONE stale unreadable file
+            #      anywhere under it aborted every scan forever. The fix for a
+            #      false absence opened a permanent outage. Found by round 2 — and
+            #      "trades one failure for its mirror" was named in the very
+            #      commit message that shipped it.
+            #   3. This. A caller with one hit does not care what else was
+            #      unreadable; a caller with ZERO hits and a non-empty
+            #      `unreadable` has not established absence and must say `Error`.
+            unreadable.append(f"{path}: {exc}")
             continue
-        try:
-            record = json.loads(first_line)
-        except json.JSONDecodeError:
-            continue
-        if record.get("type") != "session_meta":
-            continue
-        payload = record.get("payload")
-        if not isinstance(payload, dict):
-            continue
-        if payload.get("parent_thread_id") != parent_session_id:
-            continue
-        if payload.get("source") != {"subagent": "review"}:
-            continue
-        hits.append(path)
-    return hits
+        if _binds_to(first_line, parent_session_id):
+            hits.append(path)
+    return _Scan(hits, unreadable)
+
+
+def _binds_to(first_line: str, parent_session_id: str) -> bool:
+    """Whether a rollout's FIRST line binds it to `parent_session_id`.
+
+    Split out of :func:`_candidate_children` because that function now carries
+    the walk, the miss-recording AND this predicate, which ruff rightly called
+    too complex (C901). Splitting is the fix. An inline suppression would not
+    have been: this repo keeps every one in the root `pyproject.toml` with a
+    written reason, and `no_lint_skip` rejects the inline form outright.
+
+    (That gate is a substring scan, so naming the inline marker in this very
+    docstring failed it — prose about not suppressing read as a suppression.
+    Reworded rather than weakening a guard to accommodate a comment.)
+
+    BOTH conditions, never one: `parent_thread_id` equality AND
+    `source == {"subagent": "review"}` — measured live, not inferred
+    (`docs/research/reports/2026-09-10-codex-model-provenance-advisor.md` F4).
+    A parent id alone would also match the parent's own session file, which for
+    `codex review` takes no model turn at all.
+
+    Every "no" here is an ordinary non-match, never an environment fault: a
+    blank line, a line that is not JSON, a record that is not `session_meta`.
+    The caller separately tracks what it could not READ, which is the
+    distinction the whole `_Scan` pair exists to keep.
+    """
+    stripped = first_line.strip()
+    if not stripped:
+        return False
+    try:
+        record = json.loads(stripped)
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(record, dict) or record.get("type") != "session_meta":
+        return False
+    payload = record.get("payload")
+    if not isinstance(payload, dict):
+        return False
+    return payload.get("parent_thread_id") == parent_session_id and payload.get("source") == {
+        "subagent": "review"
+    }
 
 
 def _turn_models(records: list[dict[str, Any]]) -> list[str]:
@@ -359,8 +436,14 @@ def _completion(records: list[dict[str, Any]]) -> ReviewCompletion:
         payload = record.get("payload")
         if not isinstance(payload, dict) or payload.get("type") != "task_complete":
             continue
-        has_error = bool(payload.get("error"))
-        has_message = bool(payload.get("last_agent_message"))
+        # PRESENCE, not truthiness. `bool({})` is False, so an empty error
+        # object read as "no error" — a failure wearing a success shape, which
+        # is the one direction this must never get wrong. And `bool("")` is
+        # False, so a review that completed and returned an empty message read
+        # as `aborted`. Round 2 of the cold review; round 1 raised the second
+        # half only and I judged it minor, which missed the first half entirely.
+        has_error = payload.get("error") is not None
+        has_message = payload.get("last_agent_message") is not None
         outcome = (
             ReviewCompletion.aborted if has_error or not has_message else ReviewCompletion.complete
         )
@@ -465,28 +548,38 @@ def _await_single_child(
     (no `--output`, no banner, no `$CODEX_HOME`) stay countable separately from
     this loop's three possible endings (resolved, ambiguous, exhausted).
     """
-    last_io_error: str | None = None
+    # 🔴 RE-DERIVED EVERY ITERATION, never carried across. The previous version
+    # held `last_io_error` for the whole loop, so a transient failure on attempt
+    # 1 followed by a clean, genuinely-empty attempt 2 still returned `Error` —
+    # a stale fault outliving the evidence for it. Round 2 of the cold review.
+    scan = _Scan([], [])
     for attempt_index in range(max(1, attempts)):
-        try:
-            hits = _candidate_children(sessions_root, parent_session_id)
-        except OSError as exc:
-            last_io_error = str(exc)
-            hits = []
-        if len(hits) == 1:
-            return _resolve_child(attempt, parent_session_id, hits[0])
-        if len(hits) > 1:
-            named = ", ".join(str(h) for h in hits)
+        scan = _candidate_children(sessions_root, parent_session_id)
+        if len(scan.hits) == 1:
+            # One hit settles it. Whatever else was unreadable is irrelevant —
+            # the child being looked for was found.
+            return _resolve_child(attempt, parent_session_id, scan.hits[0])
+        if len(scan.hits) > 1:
+            named = ", ".join(str(h) for h in scan.hits)
             return Unavailable(
                 UnavailableReason.ambiguous_child_rollout,
-                f"{len(hits)} rollouts bind to parent {parent_session_id}: {named}"[
+                f"{len(scan.hits)} rollouts bind to parent {parent_session_id}: {named}"[
                     :_MAX_DIAGNOSTICS
                 ],
             )
         if attempt_index < attempts - 1:
             time.sleep(delay)
 
-    if last_io_error is not None:
-        return Error(ErrorKind.resolver_io_error, last_io_error[:_MAX_DIAGNOSTICS])
+    if not scan.complete():
+        # Zero hits, and the LAST pass could not see everything under
+        # `sessions/`. Absence has NOT been established, so this is `Error` —
+        # never the `Unavailable` below, which asserts we looked and found
+        # nothing. That assertion is exactly what an unreadable file invalidates.
+        return Error(
+            ErrorKind.resolver_io_error,
+            f"scan incomplete, {len(scan.unreadable)} path(s) unreadable: "
+            f"{'; '.join(scan.unreadable)}"[:_MAX_DIAGNOSTICS],
+        )
     return Unavailable(
         UnavailableReason.no_matching_child_rollout,
         (
