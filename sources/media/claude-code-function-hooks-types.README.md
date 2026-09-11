@@ -8,8 +8,16 @@ way.** The provenance below was first prepended INTO the `.d.ts` as a comment
 header. That shifted every line in the file, so every `claude-code.d.ts:NNNN`
 citation already written in our reports — and in the dotfiles issue draft the
 vendoring existed to support — landed in the wrong place. A reviewing lane caught
-it and published the offset as **+31**; by then the header had been extended and
-the true offset was **+59**, so the correction was stale before it was read.
+it and published the offset as **+31** — correct for the untracked worktree copy
+it had read, and wrong for the committed one, which was **+60**. My own reply
+then asserted **+59**, an off-by-one that described no state at all, and would
+have corrupted citations that were already right had the lane not refused it.
+Four numbers for one file in one afternoon: +31, +60, +59 and 0.
+
+**An offset is a fact about WHICH COPY YOU READ, and it does not transfer between
+readers even inside one session.** Two people each measured a real copy correctly
+and still disagreed. That is a stronger argument for a byte-pristine artifact
+than the original defect was.
 
 Two lessons, and the second is the reason for this layout:
 
@@ -38,9 +46,10 @@ day and gone the next, and a reader outside this machine could never check one
 at all.
 
 🔴 THREE VERSIONS ARE IN PLAY, and any claim from this file inherits the skew:
-this file says 2.1.267, the running CLI was 2.1.269, and `mise.toml` pins
-2.1.251. Line numbers shift between versions, so cite a SYMBOL with its line
-rather than a line alone.
+this file says 2.1.267 and the running CLI was 2.1.269. (A 2.1.251 install also
+exists on this machine; it is an ORPHAN and nothing pins it — see the block below,
+which corrects what this paragraph used to claim.) Line numbers shift between
+versions, so cite a SYMBOL with its line rather than a line alone.
 
 🔴 NEGATIVE CONCLUSIONS FROM THIS FILE ARE UNSAFE. `anthropics/claude-code#92469`
 reports the generated declarations OMITTING events the runtime carries
@@ -73,8 +82,8 @@ probe shows that array; all three "missing" events are in it, and the array is
 SET-IDENTICAL (33 vs 33, empty diff) to `HookInput` in this file. Measured
 2026-09-11 against 2.1.269.
 
-⚠️ **THE 2.1.251 INSTALL ON THIS MACHINE IS AN ORPHAN — DECLARED NOWHERE, AND
-NOT WHAT RUNS.** This section said *"`mise.toml` PINS claude-code 2.1.251"* until
+⚠️ **THE 2.1.251 INSTALL ON THIS MACHINE IS AN ORPHAN, NOTHING PINS IT, AND IT
+IS NOT WHAT RUNS.** This section said *"`mise.toml` PINS claude-code 2.1.251"* until
 2026-09-11. That was false, and the first correction offered for it (that the pin
 lives in the user-global mise config) was false too. Measured, each with a
 control arm:
