@@ -1,0 +1,232 @@
+# Mutation arms for #750 Phase 1 — `kb_setup.codex_review_evidence`.
+#
+# Every arm targets a claim the resolver's docstring or the tagged-union
+# contract makes explicit: "join is BOTH parent AND source", "require exactly
+# one child", "every turn, not just the first", "never default a missing
+# model", "model-observed and review-happened are independent facts", "a
+# permission failure is Error, never a guessed Unavailable", "no shape of
+# codex_evidence refuses the receipt", and "evidence capture can never cost
+# the lane its own rc". Each is the realistic production mutation from
+# `docs/research/reports/2026-09-10-codex-model-provenance-advisor.md`'s own
+# FAIL-arms table, not a renamed definition.
+
+suites = [
+  "tests/test_codex_review_evidence.py",
+  "tests/test_codex_lane.py",
+  "tests/test_review.py",
+]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''ADAPTER_VERSION = 1'''
+new = '''ADAPTER_VERSION = 1  # control'''
+
+# A1 — home+parent binding. Dropping the parent-thread_id equality would let
+# ANY rollout under sessions/ match, not just the one bound to this attempt's
+# own banner — the exact "hardcode / drop the parent equality" mutation the
+# advisor's table names.
+[[arm]]
+id = "A1"
+test = "test_zero_matching_children_is_unavailable"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        if payload.get("parent_thread_id") != parent_session_id:
+            continue'''
+new = '''        if False:
+            continue'''
+
+# A2 — the other half of the same binding: source == {"subagent": "review"}.
+# Without it, an ordinary `exec` child sharing the parent would be read as the
+# reviewer sub-agent.
+[[arm]]
+id = "A2"
+test = "test_a_matching_child_with_the_wrong_source_does_not_count"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        if payload.get("source") != {"subagent": "review"}:
+            continue'''
+new = '''        if False:
+            continue'''
+
+# A3 — complete, unique discovery. "Accept first hit" on an ambiguous match is
+# the advisor's own named production mutation: silently picking `hits[0]`
+# instead of refusing turns a genuine ambiguity into a confident wrong answer.
+[[arm]]
+id = "A3"
+test = "test_two_matching_children_is_ambiguous_not_a_guess"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        if len(hits) > 1:
+            named = ", ".join(str(h) for h in hits)
+            return Unavailable(
+                UnavailableReason.ambiguous_child_rollout,
+                f"{len(hits)} rollouts bind to parent {parent_session_id}: {named}"[
+                    :_MAX_DIAGNOSTICS
+                ],
+            )'''
+new = '''        if len(hits) > 1:
+            return _resolve_child(attempt, parent_session_id, hits[0])'''
+
+# A4 — lane/model agreement: "read only the first turn". `turn_models` and
+# `resolved_model` both depend on scanning every turn_context record.
+[[arm]]
+id = "A4"
+test = "test_a_later_turn_changing_model_is_recorded_not_dropped"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        model = payload.get("model")
+        if isinstance(model, str) and model:
+            models.append(model)
+    return models'''
+new = '''        model = payload.get("model")
+        if isinstance(model, str) and model:
+            models.append(model)
+    return models[:1]'''
+
+# A5 — required schema: "default a missing model to the requested one". A
+# turn_context record with no `model` key must be Unavailable, never
+# silently filled in from what the caller asked for.
+[[arm]]
+id = "A5"
+test = "test_a_turn_context_with_no_model_field_is_unavailable"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        return Unavailable(
+            UnavailableReason.missing_model_field,
+            f"{child_path}'s turn_context record(s) carry no model field"[:_MAX_DIAGNOSTICS],
+        )'''
+new = '''        return Resolved(
+            CodexReviewEvidence(
+                schema_version=SCHEMA_VERSION,
+                adapter_version=ADAPTER_VERSION,
+                attempt_id=attempt.attempt_id,
+                codex_home=attempt.codex_home,
+                cli_version=attempt.cli_version,
+                requested_model=attempt.requested_model,
+                requested_effort=attempt.requested_effort,
+                base_ref=attempt.base_ref,
+                subprocess_rc=attempt.subprocess_rc,
+                timed_out=attempt.timed_out,
+                output_path=str(attempt.output_path) if attempt.output_path else None,
+                outcome=OutcomeKind.resolved,
+                parent_session_id=parent_session_id,
+                child_rollout_path=str(child_path),
+                turn_models=[],
+                resolved_model=attempt.requested_model,
+                review_completion=ReviewCompletion.unknown,
+                unavailable_reason=None,
+                error_kind=None,
+                diagnostics=None,
+            )
+        )'''
+
+# A6 — review completion: "ignore exit/terminal outcome because a model was
+# observed". Model-observed and review-happened are two independent facts
+# (the advisor's own sharpest catch, from its own bogus-slug arm) — collapsing
+# an aborted review to `complete` loses exactly that distinction.
+[[arm]]
+id = "A6"
+test = "test_an_api_rejected_review_is_recorded_aborted"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        outcome = (
+            ReviewCompletion.aborted if has_error or not has_message else ReviewCompletion.complete
+        )'''
+new = '''        outcome = ReviewCompletion.complete'''
+
+# A7 — resolver failure: "catch-and-return-success" for a genuine permission
+# error. This is a regression arm for the fix in this same change — without
+# the `os.scandir` preflight, `Path.rglob` silently SKIPS an unreadable
+# directory rather than raising, so a real permission failure reads as
+# "nothing found" (Unavailable) instead of "could not look" (Error). Measured
+# live on this host before the preflight was added.
+[[arm]]
+id = "A7"
+test = "test_an_unreadable_sessions_dir_is_a_typed_error"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''    with os.scandir(sessions_root) as _preflight:
+        next(_preflight, None)
+    hits: list[Path] = []'''
+new = '''    hits: list[Path] = []'''
+
+# A8 — receipt binding: "make evidence optional" the OTHER way — a resolved
+# outcome silently degrading to the honest label anyway would hide real
+# evidence that exists. `receipt_reference` must return the attempt id
+# whenever (and ONLY whenever) the outcome is actually `resolved`.
+[[arm]]
+id = "A8"
+test = "test_receipt_reference_is_model_unverified_otherwise"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''    if record.outcome is OutcomeKind.resolved:
+        return record.attempt_id
+    return "model-unverified"'''
+new = '''    return record.attempt_id'''
+
+# A9 — the diagnostics bound (#750's own explicit ask: "bound the diagnostics
+# field"). Dropping the truncation lets an unbounded string — a full
+# traceback, a long path list — reach disk.
+[[arm]]
+id = "A9"
+test = "test_diagnostics_are_bounded"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        diagnostics=result.diagnostics[:_MAX_DIAGNOSTICS],
+    )'''
+new = '''        diagnostics=result.diagnostics,
+    )'''
+
+# A10 — the receipt actually carries the field at all. Phase 1's headline
+# requirement ("the receipt carries the evidence OR model-unverified") is
+# worth nothing if the payload silently drops the key.
+[[arm]]
+id = "A10"
+test = "test_codex_evidence_survives_a_write_read_roundtrip"
+file = "python/src/kb_setup/review.py"
+old = '''            "codex_evidence": list(self.codex_evidence),'''
+new = '''            # "codex_evidence": list(self.codex_evidence),'''
+
+# A11 — THE OUTAGE ARM's own regression guard: removing `_run_review`'s outer
+# try/except must break the test that exists specifically to prove evidence
+# capture can never cost the lane its own exit code.
+[[arm]]
+id = "A11"
+test = "test_run_review_returns_the_lanes_own_rc_even_when_evidence_capture_raises"
+file = "python/src/kb_setup/codex_run.py"
+old = '''    try:
+        from kb_setup import codex_review_evidence as evidence
+
+        evidence.capture_and_persist(
+            Path.cwd(),
+            requested_model=args.model,
+            requested_effort=args.effort,
+            base_ref=args.base,
+            subprocess_rc=rc,
+            timed_out=rc == _RC_TIMED_OUT,
+            output_path=output_path,
+        )
+    except Exception as exc:
+        print(
+            f"kb-codex --review: evidence capture unavailable (outer guard): {exc}",
+            file=sys.stderr,
+        )'''
+new = '''    from kb_setup import codex_review_evidence as evidence
+
+    evidence.capture_and_persist(
+        Path.cwd(),
+        requested_model=args.model,
+        requested_effort=args.effort,
+        base_ref=args.base,
+        subprocess_rc=rc,
+        timed_out=rc == _RC_TIMED_OUT,
+        output_path=output_path,
+    )'''
+
+# NOT ARMED, stated rather than assumed covered:
+#
+#   1. `capture_and_persist`'s OWN inner `except Exception` (the module's one
+#      BLE001 exemption). `test_capture_and_persist_never_raises_on_an_
+#      unanticipated_failure` already exercises it directly via monkeypatch —
+#      a source-level mutation would just be deleting a try/except, which
+#      `kb-arms`' `old`/`new` string match handles no more informatively than
+#      that existing test already proves.
+#   2. The retry/backoff timing (`_RETRY_ATTEMPTS`/`_RETRY_DELAY_SECONDS`).
+#      `test_a_delayed_child_resolves_within_the_retry_budget` already proves
+#      the PASS direction with a real thread and a real sleep; there is no
+#      single-line mutation that isolates "retries too few times" from
+#      "retries work at all" without reintroducing timing flakiness into the
+#      arms suite itself.

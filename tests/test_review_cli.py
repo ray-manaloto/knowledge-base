@@ -379,3 +379,79 @@ def test_reviewer_pin_check_is_open_with_no_currency_config(repo: Path) -> None:
     """
     _reports(repo, "standards", "spec", "cold", "silent-failure")
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0
+
+
+# ---------------------------------------------------------------------------
+# `--evidence` — #750 Phase 1. RECORDED, never gated: no shape here refuses.
+# ---------------------------------------------------------------------------
+
+
+def test_evidence_flag_is_recorded_on_the_receipt(repo: Path) -> None:
+    """The PASS arm: `--evidence` lands verbatim in the written receipt."""
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    assert (
+        _run(
+            repo,
+            "--lanes",
+            _ALL_LANES,
+            "--blocking",
+            "0",
+            "--evidence",
+            "cold:codex-astra=attempt-123",
+        )
+        == 0
+    )
+    data = json.loads(review.receipt_path(repo, "a" * 40).read_text(encoding="utf-8"))
+    assert data["codex_evidence"] == ["cold:codex-astra=attempt-123"]
+
+
+def test_omitted_evidence_defaults_to_empty(repo: Path) -> None:
+    """CONTROL ARM: every receipt minted before this flag existed has none."""
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0
+    data = json.loads(review.receipt_path(repo, "a" * 40).read_text(encoding="utf-8"))
+    assert data["codex_evidence"] == []
+
+
+def test_repeated_evidence_flag_is_refused_like_its_neighbours(repo: Path) -> None:
+    """`--evidence` joined `_RECEIPT_FLAGS` — a repeated one must refuse too."""
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    assert (
+        _run(
+            repo,
+            "--lanes",
+            _ALL_LANES,
+            "--blocking",
+            "0",
+            "--evidence",
+            "a=1",
+            "--evidence",
+            "b=2",
+        )
+        == 2
+    )
+    assert not review.receipt_path(repo, "a" * 40).exists()
+
+
+def test_malformed_evidence_shape_still_passes_phase_1(repo: Path) -> None:
+    """A malformed value must not refuse the receipt.
+
+    Neither a value with no `=` nor the honest `model-unverified` label is
+    refused — Phase 1 records whatever string arrives, never validates its
+    shape. Gating (a later ticket) is what would add that.
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    assert (
+        _run(
+            repo,
+            "--lanes",
+            _ALL_LANES,
+            "--blocking",
+            "0",
+            "--evidence",
+            "not-a-kv-pair,cold:codex=model-unverified",
+        )
+        == 0
+    )
+    data = json.loads(review.receipt_path(repo, "a" * 40).read_text(encoding="utf-8"))
+    assert data["codex_evidence"] == ["not-a-kv-pair", "cold:codex=model-unverified"]
