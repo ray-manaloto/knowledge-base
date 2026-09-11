@@ -89,9 +89,27 @@ control arm:
   **exists on disk**, and `mise which claude` reports it *"is not currently
   active"*.
 
-So it is an **orphaned install declared by no config** — the same shape as the
-orphaned `conda:git` that once shimmed `git` on this machine, and a reason
-`mise prune` is worth running.
+So it is an orphaned install declared by no **live** config — and its provenance
+is now known, which the first two attempts at this paragraph both missed by
+naming a plausible file instead of probing. The only file on this machine that
+declares it is a BACKUP:
+
+    ~/.config/mise/config.toml.bak.20260309235830:105
+        claude = "npm:@anthropic-ai/claude-code"
+
+dated 2026-03-09. Control arm for that search: the same `grep` finds `codex` 7
+times in the LIVE `~/.config/mise/config.toml` and `claude-code` 0 times, so it
+discriminates. A tool dropped from the live config in March whose install was
+never pruned — the same shape as the orphaned `conda:git` that once shimmed
+`git` here, and a standing argument for running `mise prune`.
+
+🔴 **The method is the transferable part.** Three readings of this one paragraph
+were wrong in the same way — "the project pins it", "the user config pins it",
+"no config declares it" — and each was a plausible file named without a probe.
+What settled it was not a better reading of the same route but a probe down a
+DIFFERENT one: config-read, then filesystem-walk, then a recursive grep that
+included backups. When a claim about where something is declared surprises you,
+change the route, not the care.
 
 **What actually runs is 2.1.269**, self-updating, via
 `~/.local/bin/claude -> ~/.local/share/claude/versions/2.1.269`. Resolve the real
