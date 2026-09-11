@@ -601,3 +601,84 @@ def test_capture_and_persist_writes_a_record_on_the_ordinary_path(tmp_path: Path
     assert result is not None
     assert result.outcome is ev.OutcomeKind.unavailable
     assert ev.evidence_path(tmp_path, result.attempt_id).exists()
+
+
+# --- cold antigravity review of 3cc9c93a: two folds of "unreadable" into "absent"
+
+
+def test_an_unreadable_tee_is_an_error_not_an_absent_flag(tmp_path: Path) -> None:
+    """🔴 A tee we were told to read and could not is NOT `--output` being omitted.
+
+    The first version folded them and defended the fold in its docstring:
+    *"an unreadable tee is `Unavailable`, not `Error`"*. Two different facts:
+
+        --output never passed    -> we did not ASK. Nothing is wrong.
+        --output passed, EACCES  -> we asked and the environment refused.
+
+    Phase 1's whole job is to record accurately so Phase 2 can decide what to
+    gate on, and an `Unavailable` count poisoned with environment faults is
+    exactly what would make that later decision wrong.
+
+    A REAL `chmod 0`, not a mocked raise — the mock would only prove the mock.
+    """
+    banner = tmp_path / "banner.txt"
+    _banner(banner)
+    original_mode = banner.stat().st_mode
+    banner.chmod(0)
+    try:
+        attempt = _attempt(tmp_path, output_path=banner)
+        result = ev.resolve_reviewer_model(attempt, attempts=2, delay=0)
+        assert isinstance(result, ev.Error), f"expected Error, got {type(result).__name__}"
+        assert result.kind is ev.ErrorKind.resolver_io_error
+        assert "could not read the tee" in result.diagnostics
+    finally:
+        banner.chmod(stat.S_IMODE(original_mode) | stat.S_IRUSR | stat.S_IWUSR)
+
+
+def test_a_readable_tee_with_no_session_id_is_still_unavailable(tmp_path: Path) -> None:
+    """The CONTROL for the arm above — without it, that test cannot discriminate.
+
+    A tee that reads fine and simply holds no `session id:` line is a genuine
+    `Unavailable`. If this also returned `Error` the distinction would be
+    cosmetic, and the fix would have traded one conflation for its mirror.
+    """
+    banner = tmp_path / "banner.txt"
+    banner.write_text("OpenAI Codex v0.154.0\nno session line here\n", encoding="utf-8")
+    attempt = _attempt(tmp_path, output_path=banner)
+    result = ev.resolve_reviewer_model(attempt, attempts=2, delay=0)
+    assert isinstance(result, ev.Unavailable), f"expected Unavailable, got {type(result).__name__}"
+    assert result.reason is ev.UnavailableReason.banner_session_id_unavailable
+
+
+def test_an_unreadable_candidate_is_an_error_not_zero_children(tmp_path: Path) -> None:
+    """🔴 Skipping an unreadable candidate turns a fault into an ordinary absence.
+
+    `except OSError: continue` meant that if the ONE matching child could not be
+    read, the scan reported "zero children found" — indistinguishable from a
+    review that genuinely never wrote one. Same class as the `rglob` hazard the
+    preflight in this very function exists for.
+
+    A real `chmod 0` on the child file, with the directory left readable so the
+    scan reaches it and fails at the OPEN rather than at the listing.
+    """
+    sessions_root = tmp_path / "codex-home" / "sessions"
+    _write_child(
+        sessions_root,
+        "rollout-child-1.jsonl",
+        [
+            _session_meta_line(parent=_PARENT, source={"subagent": "review"}),
+            _turn_context_line("gpt-5.6-sol"),
+        ],
+    )
+    child = next(sessions_root.rglob("rollout-*.jsonl"))
+    original_mode = child.stat().st_mode
+    child.chmod(0)
+    try:
+        banner = tmp_path / "banner.txt"
+        _banner(banner)
+        attempt = _attempt(tmp_path, output_path=banner)
+        result = ev.resolve_reviewer_model(attempt, attempts=2, delay=0)
+        assert isinstance(result, ev.Error), f"expected Error, got {type(result).__name__}"
+        assert result.kind is ev.ErrorKind.resolver_io_error
+    finally:
+        child.chmod(stat.S_IMODE(original_mode) | stat.S_IRUSR | stat.S_IWUSR)

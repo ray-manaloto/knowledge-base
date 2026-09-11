@@ -205,15 +205,29 @@ ReviewEvidenceResult = Resolved | Unavailable | Error
 def _parse_banner_session_id(output_path: Path) -> str | None:
     """Return the banner's `session id:` value from a `--output` tee, or None.
 
-    Returns None on ANY read failure or a missing line — never raises, because
-    an unreadable tee is `Unavailable`, not `Error`: the tee file existing (or
-    not) is exactly the fact `--output` being omitted also produces, and the
-    caller collapses both to the same reason.
+    None means "the tee was READ and held no session id". **A read FAILURE
+    raises `OSError`**, so the caller reports it as `Error` rather than folding
+    it into `Unavailable`.
+
+    🔴 THE FIRST VERSION FOLDED THEM and called the fold deliberate: *"an
+    unreadable tee is `Unavailable`, not `Error`: the tee file existing (or not)
+    is exactly the fact `--output` being omitted also produces"*. A cold
+    antigravity review of `3cc9c93a` rejected that and was right — those are two
+    different facts:
+
+        --output never passed    -> we did not ASK. Nothing is wrong.
+        --output passed, EACCES  -> we asked and the environment refused.
+
+    Collapsing them records an environment fault as a non-fault, and Phase 1
+    exists to record ACCURATELY so Phase 2 can decide what to gate on. A
+    poisoned `Unavailable` count is exactly what makes that later decision wrong.
+
+    The module already knew better sixty lines down: `_candidate_children` has an
+    `os.scandir` preflight precisely so a permission failure at `sessions_root`
+    cannot masquerade as "no children found". One module, one class, two answers
+    — the comment defending the weaker one is what stopped it being re-read.
     """
-    try:
-        text = output_path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return None
+    text = output_path.read_text(encoding="utf-8", errors="replace")
     text = _ANSI_RE.sub("", text)
     match = _SESSION_ID_RE.search(text)
     return match.group(1) if match else None
@@ -275,8 +289,14 @@ def _candidate_children(sessions_root: Path, parent_session_id: str) -> list[Pat
         try:
             with path.open("r", encoding="utf-8") as handle:
                 first_line = handle.readline()
-        except OSError:
-            continue
+        except OSError as exc:
+            # 🔴 NOT `continue`. A candidate we cannot READ is not a candidate
+            # that failed to MATCH, and skipping it turns "the one matching child
+            # is unreadable" into "zero children found" — an environment fault
+            # reported as an ordinary absence. Same class as the `rglob` hazard
+            # this function's own preflight exists for. Found by a cold
+            # antigravity review of `3cc9c93a`.
+            raise OSError(f"could not read candidate rollout {path}: {exc}") from exc
         first_line = first_line.strip()
         if not first_line:
             continue
@@ -409,7 +429,15 @@ def resolve_reviewer_model(
             UnavailableReason.no_output_flag,
             "no --output flag; the banner (and its session id) was never captured",
         )
-    parent_session_id = _parse_banner_session_id(attempt.output_path)
+    try:
+        parent_session_id = _parse_banner_session_id(attempt.output_path)
+    except OSError as exc:
+        # A tee we were TOLD to read and could not is the environment refusing,
+        # not `--output` being omitted. See the function's docstring.
+        return Error(
+            ErrorKind.resolver_io_error,
+            f"could not read the tee at {attempt.output_path}: {exc}"[:_MAX_DIAGNOSTICS],
+        )
     if not parent_session_id:
         return Unavailable(
             UnavailableReason.banner_session_id_unavailable,

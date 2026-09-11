@@ -230,3 +230,76 @@ new = '''    from kb_setup import codex_review_evidence as evidence
 #      single-line mutation that isolates "retries too few times" from
 #      "retries work at all" without reintroducing timing flakiness into the
 #      arms suite itself.
+
+# ---------------------------------------------------------------------------
+# ROUND 1 of the cold antigravity review of `3cc9c93a`, and the arms for the
+# ORCHESTRATOR's own fixes to it — the least-reviewed code in the diff.
+#
+# Two of agy's six findings survived reconciliation. Both are one class, and it
+# is the class this module already solved once: an environment fault folded into
+# an ordinary absence. `_candidate_children` carries an `os.scandir` preflight
+# for exactly that reason, and the same lesson was NOT applied at the two sites
+# below — one module, one class, two answers.
+#
+# Three of the six were rejected as false positives, with reasons: reading
+# `$CODEX_HOME/sessions` is the design rather than an escape from the repo, and
+# the two broad `except Exception` guards are deliberate, pyproject-exempted,
+# and are the ticket's central invariant (A11 exists to prove one holds).
+# A fourth is real-but-minor and deliberately unfixed: `_completion`'s
+# `bool(last_agent_message)` conflates None with "", but errs toward `aborted`,
+# never toward a false `complete`.
+#
+# ⚠️ Every `old` pattern below was re-derived AFTER the fixes landed, because
+# a previous edit to this same file was silently reverted by a concurrent
+# `kb-arms` run (#751). Arms and edits do not overlap; check `pgrep` first.
+
+# D1 — the tee read. Restore the fold agy rejected: swallow the OSError and
+# return None, so an EACCES tee reads as "no session id" and the caller reports
+# `Unavailable`. The realistic break, because it is the literal pre-fix code.
+[[arm]]
+id = "D1"
+test = "test_an_unreadable_tee_is_an_error_not_an_absent_flag"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''    text = output_path.read_text(encoding="utf-8", errors="replace")
+    text = _ANSI_RE.sub("", text)'''
+new = '''    try:
+        text = output_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    text = _ANSI_RE.sub("", text)'''
+
+# D2 — the caller. Keep the raise but drop the handler, so the OSError escapes
+# `resolve_reviewer_model` instead of becoming a typed Error. This is the
+# SEPARATE half: D1 proves the raise exists, D2 proves it is CLASSIFIED.
+[[arm]]
+id = "D2"
+test = "test_an_unreadable_tee_is_an_error_not_an_absent_flag"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        return Error(
+            ErrorKind.resolver_io_error,
+            f"could not read the tee at {attempt.output_path}: {exc}"[:_MAX_DIAGNOSTICS],
+        )'''
+new = '''        raise'''
+
+# D3 — the candidate open. Restore `continue`, so an unreadable matching child
+# vanishes and the scan reports "zero children" — a fault as an absence.
+[[arm]]
+id = "D3"
+test = "test_an_unreadable_candidate_is_an_error_not_zero_children"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''            raise OSError(f"could not read candidate rollout {path}: {exc}") from exc'''
+new = '''            continue'''
+
+# D4 — the CONTROL FOR THE FIX ITSELF, not a no-op. If the fix over-corrected and
+# made every unreadable-ish case an Error, the "read fine, no session id" test
+# would also demand Error and this mutation could not kill it. Making that path
+# return Error too must break the control test — proving the fix discriminates
+# rather than having traded one conflation for its mirror.
+[[arm]]
+id = "D4"
+test = "test_a_readable_tee_with_no_session_id_is_still_unavailable"
+file = "python/src/kb_setup/codex_review_evidence.py"
+old = '''        return Unavailable(
+            UnavailableReason.banner_session_id_unavailable,'''
+new = '''        return Error(
+            ErrorKind.resolver_io_error,'''
