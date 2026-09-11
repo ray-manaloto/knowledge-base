@@ -1,0 +1,135 @@
+# Mutation arms for the G00 (#753) guard-inventory reconciler.
+#
+# WHAT THIS SUITE IS ACTUALLY ABOUT. The ticket names two FAIL directions —
+# "remove an invariant mapping, or add an unclassified hook registration, either
+# must fail". Those are covered by named tests, so the interesting question is
+# not whether the gate CAN fail; it is whether the gate is still measuring the
+# thing its tests claim. These arms break the reconciler's own machinery and
+# require the suite to notice.
+#
+# 🔴 THE ARM THAT MATTERS MOST IS A1, and it is not one of the ticket's two.
+# The reconciler's ancestor — an earlier draft of this same module, deleted
+# 2026-09-11 — declared `SETTINGS_PATH`, modelled a `registrations` array,
+# populated it in the TOML, and then never read the file. `reconcile()` called
+# only the module and invariant halves while its docstring said "Both directions
+# are checked", and `render()` printed "reconciliation: OK — every row matches
+# live repo state" over a settings.json with an arbitrary hook in it. A cold
+# advisor lane found it by reading the call graph. That is this repo's own
+# green-and-useless failure #1 landing inside the ticket built to prevent it, so
+# A1 severs exactly that wire and the suite must die.
+#
+# WHY THE EXPECTED DIAGNOSTIC IS NAMED PER ARM. A suite that accepts any nonzero
+# rc passes when the reconciler dies for an unrelated reason — an import error, a
+# decode failure, a typo in a path. Each arm below names the test that must go
+# red, so a death is attributable rather than merely present.
+#
+# CONTROL DISCIPLINE. A0 is a comment-only edit that must SURVIVE. If A0 dies,
+# every other row is void: the suite is failing for a reason that has nothing to
+# do with the mutation, and its kills prove nothing.
+
+suites = ["tests/test_guard_inventory.py"]
+
+# A0 — the control. A comment-only edit that must change nothing. If this arm
+# dies, the suite is unstable and no kill below can be trusted.
+[[arm]]
+id = "A0"
+control = true
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    names: set[str] = set()'''
+new = '''    names: set[str] = set()  # (control)'''
+
+# A1 — SEVER THE REGISTRATION RECONCILIATION. The exact defect the deleted
+# ancestor shipped: the axis stays modelled and populated, and nothing compares
+# it. The gate then prints OK over an unclassified hook.
+[[arm]]
+id = "A1"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    findings = _reconcile_registrations(inventory, live)'''
+new = '''    findings: list[Finding] = []'''
+test = "test_an_unclassified_live_hook_fails_with_that_verdict"
+
+# A2 — reachability narrowed to MODULE SCOPE only, which is the pre-AST bug in
+# its most believable form: it looks like a reasonable simplification, and
+# `hook_guard` imports only 2 of its 9 guards at module scope.
+[[arm]]
+id = "A2"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    for node in ast.walk(tree):'''
+new = '''    for node in tree.body:'''
+test = "test_reachability_finds_the_four_modules_a_name_pattern_misses"
+
+# A3 — an unparseable `if` condition silently WIDENED instead of reported. This
+# is the dangerous direction: it GROWS claimed coverage, so the gate reports more
+# protection than exists and every downstream comparison inherits the lie.
+[[arm]]
+id = "A3"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        parsed = _IF_CONDITION.match(if_condition)
+        if parsed is None:
+            return None'''
+new = '''        parsed = _IF_CONDITION.match(if_condition)
+        if parsed is None:
+            return [("*", "")]'''
+test = "test_an_unparsable_if_condition_is_never_silently_widened"
+
+# A4 — an unreadable authority read as CLEAN rather than NOT_RUN. "Could not ask"
+# becoming "nothing to report" is the failure this repo's Rc contract exists for,
+# and it is one line.
+[[arm]]
+id = "A4"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    live = live_registrations(root)
+    if live is None:'''
+new = '''    live = live_registrations(root)
+    if False:'''
+test = "test_an_unreadable_authority_is_not_run_not_a_pass"
+
+# A5 — the ordinal no longer compared, so renumbering an invariant silently
+# follows the number instead of reporting LOCATOR_DRIFT. The anchor still
+# matches, so nothing else notices; this is precisely how a disposition gets
+# transferred to a different rule while the gate stays green.
+[[arm]]
+id = "A5"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        if reviewed_ordinal != ordinal:'''
+new = '''        if False:'''
+test = "test_renumbering_an_invariant_fails_with_locator_drift"
+
+# A6 — SKIP VALIDATION ENTIRELY, returning the decoded TOML unconverted. The
+# believable "simplification": the caller only reads attributes, so why pay for a
+# conversion? Because the conversion IS the closed-set enforcement.
+#
+# 🔴 THIS ROW REPLACES A MUTATION THAT SURVIVED, and the reason is worth keeping.
+# A6 was first written as `strict=True` -> `strict=False`, reasoning that it
+# "opens the closed set". It SURVIVED, and the arm score sent me to look. Probed
+# both ways: msgspec rejects `Invalid enum value` under strict=False exactly as
+# under strict=True, and accepts a valid value under both — `strict` governs type
+# COERCION (str->int and such), never enum membership. So the original mutation
+# never destroyed what the test looks for, which makes it an unrealistic break
+# and its survival evidence of nothing.
+#
+# Note what this bounds: the closed set is enforced by the GENERATED model, and a
+# schema-level mutation would not reach the committed generated file at all —
+# that drift is `mise run kb-codegen-check`'s job, a different gate. This arm can
+# only prove the module still routes through the validator.
+[[arm]]
+id = "A6"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        return msgspec.convert(raw, GuardInventory, strict=True)'''
+new = '''        return raw  # type: ignore[return-value]'''
+test = "test_an_unrecognised_disposition_is_rejected_at_decode"
+
+# A7 — EXPECTED NO-OP, and therefore the row owing the MOST evidence. Renaming a
+# local binding changes nothing observable. A predicted survival that is
+# confirmed twice has tested nothing, so if this one dies the suite is coupled to
+# an implementation detail rather than to behaviour — which is a finding about
+# the TESTS, not about the mutation.
+[[arm]]
+id = "A7"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    names: set[str] = set()
+    for node in ast.walk(tree):'''
+new = '''    reached: set[str] = set()
+    names = reached
+    for node in ast.walk(tree):'''
+test = "test_reachability_finds_the_four_modules_a_name_pattern_misses"

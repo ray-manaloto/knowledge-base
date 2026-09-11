@@ -78,7 +78,8 @@ def _print_usage() -> int:
         "model-limits [--write] [--observed-at DATE] [model...] | "
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | skill-refresh | "
-        "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
+        "guard-inventory-check | handoff-check [path] | "
+        "gates [task...] [--stop] | check <path...> | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
         "research-links <URL...> [--out PATH] | "
@@ -496,6 +497,10 @@ def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
     the goal was and how it went, and what was learned. `remember` is the newest
     member and the reason the group exists.
     """
+    if cmd == "guard-inventory-check":
+        from kb_setup import guard_inventory
+
+        return guard_inventory.main(repo_root)
     if cmd == "handoff-check":
         from kb_setup import handoff
 
@@ -692,7 +697,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | "
-        "handoff-check [path] | gates [task...] [--stop] | check <path...> | funnel | "
+        "guard-inventory-check | handoff-check [path] | gates [task...] [--stop] | "
+        "check <path...> | funnel | "
         "graphify-catalog | lock-drift | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "

@@ -109,6 +109,34 @@ is wired in tracked config" are different claims, and only the first is
 evidenced on disk. **This is exactly this repo's recurring defect shape:
 written is not running.**
 
+> 🔴 **CORRECTION, 2026-09-11 (session `kb-20260911.002`, ticket #753/G00).**
+> **M5 and M6 below are WRONG — 11 modules / 4,024 lines, not 7 / 2,859.**
+> M5's figure came from `ls python/src/kb_setup/ | grep -Ei
+> 'guard|hook|check_first|absent|stage|instruction'`, which bounds the NAME.
+> Four guard modules contain none of those tokens and were invisible to it while
+> sitting in the LIVE dispatch tuple at `hook_guard.py:295-309`:
+> `graph_first.py` (460 lines, added **2026-08-08 — a month before this report**),
+> `destructive_git.py` (347, 2026-09-03), `codex_lane.py` (203, 2026-09-03),
+> `inplace_edit.py` (155, 2026-09-02). **Wrong when written, not stale.**
+>
+> Two further corrections from the same round:
+> **M7's arithmetic is `3+3+1+6`, not `3+2+1+7`** — its own table gives #4, #7
+> and #9 non-hook mechanisms, so the bounded target is **6 new enforcements**
+> plus #7 as a *timing upgrade*. Recording #7 as prose-only would erase
+> `pr.py:405-411`.
+> **18 registrations is not the coverage denominator — 28 effective cases is**,
+> once each matcher alternative is expanded and `Edit|Write` refined through its
+> `if`. A migration graded against 18 can drop 10 cases and read complete.
+>
+> **M1 and M2 have also gone stale** (both fixed after this report was written):
+> the flag IS set (`.claude/settings.json:4`) and `.claude/mods/` IS tracked
+> (4 files). M2's "registered nowhere" half still stands, control-armed.
+>
+> The live, reconciled figures now live in `docs/guards/inventory.toml`, checked
+> by `mise run kb-guard-inventory-check`. **The originals are left below
+> unedited** — a number that changed with no trace is how the first wrong one
+> survived a month.
+
 ### M3. There are 12 PreToolUse entries — and 18 hook entries in total
 
 Enumerated from `.claude/settings.json` (`uv run python`, not a bare
@@ -637,7 +665,7 @@ counts as a behavioral mutation being caught."*
 
 | # | Delivers | Deps | Proving command | FAIL arm | Size |
 |---|---|---|---|---|---|
-| **G00** | Inventory + reuse decision: stable IDs mapping all 18 registrations, 7 modules, 13 invariants + 2 subsections to owners/scopes/evidence/dispositions | — | `mise run kb-guard-programme-check -- --phase inventory --arms` | Remove an invariant mapping, or add an unclassified hook registration | M 1–2d |
+| **G00** | Inventory + reuse decision: stable IDs mapping all 21 registrations (28 effective cases), **11** modules, 13 invariants + 2 subsections — *corrected; the row published 18/7, see the CORRECTION above M3* to owners/scopes/evidence/dispositions | — | `mise run kb-guard-programme-check -- --phase inventory --arms` | Remove an invariant mapping, or add an unclassified hook registration | M 1–2d |
 | **G01** | Runtime contract: locally regenerated declarations + live probes for event fields, imports, `$`, **process access**, fs, namespace bridging, tiers, the worktree bug | G00 | `mise run kb-mod-runtime-check -- --arms` | **Read `agent_id`** in the adapter → the real delegated-call assertion fails. Separately add a JSON import + illegal `$` binding → load failures must be **visible and fatal** | M 2–3d |
 | **G02** | Genuine codegen: schema-owned policy data, generated models/enums + TS literals, **truthful provenance headers**, drift gate | G00 | `mise run kb-guard-codegen-check -- --arms` | Change a generated path, delete an output, change schema input without regenerating | M 1–2d |
 | **G03** | Settings reference behaviour on generated policy + verified adapters | G01,G02 | `mise run kb-settings-guard-check -- --live --arms` | Replace DENY with continuation → prohibited delegated edits execute. Remove the worktree exception → authorized worktree edits fail their positive control | M 2–3d |

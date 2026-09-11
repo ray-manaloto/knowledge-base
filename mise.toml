@@ -1080,6 +1080,18 @@ run = "uv run kb-setup manifest-audit"
 # happen to be present. Nowhere near the outer 1800s `gates._GATE_TIMEOUT`.
 timeout = "120s"
 
+[tasks.kb-guard-inventory-check]
+description = "Gate: the G00 guard inventory still describes the live enforcement surface"
+# Built because the programme report this inventory replaces derived its own
+# guard-module list from a NAME PATTERN (`grep -Ei 'guard|hook|check_first|...'`).
+# Four guard modules contain none of those tokens and were invisible to it while
+# sitting in the live dispatch tuple — `graph_first.py` for a MONTH. It published
+# 7 modules / 2,859 lines; the truth is 11 / 4,024. Prose cannot be reconciled
+# against a repo, so it drifted. This reads the four committed authorities
+# (settings.json, the guard dispatch tuple, do-not.md's anchors, the inventory)
+# and re-derives every count rather than comparing two stored snapshots.
+run = "uv run --project {{config_root}} kb-setup guard-inventory-check"
+
 [tasks.kb-lock-drift]
 description = "Gate: mise.lock still describes what mise.toml pins (runs mise's own lock --dry-run)"
 # Built because the defect SHIPPED. `6b3ab427` merged with `mise.toml` at

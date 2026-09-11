@@ -1,0 +1,352 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ray-manaloto/knowledge-base/schemas/guard-inventory.schema.json",
+  "title": "GuardInventory",
+  "description": "The G00 (#753) inventory of this repo's enforcement surface: every hook registration, every guard module, and every `do-not.md` invariant, each carrying a SEMANTIC id, an owner, its current surface, its target disposition and its evidence. Everything in the G00-G12 function-hooks programme rests on this. WHY THE CLOSED SETS ARE GENERATED: the report this inventory replaces derived its guard-module list from `ls python/src/kb_setup/ | grep -Ei 'guard|hook|check_first|absent|stage|instruction'`, which bounds the NAME \u2014 four guard modules contain none of those tokens (`graph_first`, `destructive_git`, `codex_lane`, `inplace_edit`) and were invisible while sitting in the live dispatch tuple at `hook_guard.py:295-309`, one of them for a month. It published 7 modules / 2,859 lines; the true figures are 11 / 4,024. An inventory whose membership rule is a name pattern reproduces exactly that defect, so `reconcile` enumerates by REACHABILITY. NO COUNTS ARE STORED HERE \u2014 21, 11, 15 and the 28-case denominator are always derived, because a stored census drifts in lockstep with itself and reads green forever.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "registrations",
+    "modules",
+    "invariants"
+  ],
+  "properties": {
+    "registrations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Registration"
+      }
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/GuardModule"
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Invariant"
+      }
+    }
+  },
+  "$defs": {
+    "SemanticId": {
+      "title": "SemanticId",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)+$",
+      "description": "A readable, dotted, semantic identity \u2014 \u2026",
+      "$comment": "A readable, dotted, semantic identity \u2014 `hook.pretool.instruction-edit.claude-md.edit`, `module.graph-first`, `do-not.default-branch`. NEVER an array index and NEVER a hash. An index changes when anything is inserted above it, silently re-pointing an approved disposition at a different rule; a hash changes when the object is legitimately edited, forcing re-review of something that did not change meaning. This pattern rejects both: `R00` fails it (no dot), and a hex digest fails it (leading digit in a segment is allowed but a bare 64-char hex has no dots)."
+    },
+    "OwnerKind": {
+      "title": "OwnerKind",
+      "description": "Who can change the thing \u2014 which decides whether a disposition is \u2026",
+      "enum": [
+        "repository",
+        "external-tool",
+        "claude-code-runtime"
+      ],
+      "$comment": "Who can change the thing \u2014 which decides whether a disposition is even actionable from this repo. external-tool and claude-code-runtime items cannot be migrated by editing `python/src/kb_setup/`, so a `function-hook` disposition on one is a contradiction the reconciler rejects rather than a plan. Kept SEPARATE from Disposition deliberately: folding ownership into the target enum is what made the first cut of this schema unable to distinguish 'outside our control' from 'already done'."
+    },
+    "CurrentSurface": {
+      "title": "CurrentSurface",
+      "description": "Where enforcement lives TODAY. Separate from Disposition, which is \u2026",
+      "enum": [
+        "classic-hook",
+        "function-hook",
+        "non-hook-control",
+        "prose-only",
+        "support-module"
+      ],
+      "$comment": "Where enforcement lives TODAY. Separate from Disposition, which is where it is going. This axis exists because 'must add' versus 'must retain' is DERIVED from current_surface vs disposition, and encoding that derivation as extra enum values is redundant and ambiguous. A single enum carrying current state AND target AND ownership leaves downstream code unable to tell 'already there' from 'must migrate' from 'not ours' \u2014 the inventory then looks exhaustive while giving an executor no unambiguous action. non-hook-control: a build/stage/runtime/ship control (an hk step, `clean_env()`, `pr.py`'s ship preflight). prose-only: written down, nothing enforces it."
+    },
+    "Disposition": {
+      "title": "Disposition",
+      "description": "The intended FINAL enforcement carrier.",
+      "enum": [
+        "function-hook",
+        "classic-hook",
+        "external-classic-hook",
+        "non-hook-control",
+        "prose-only",
+        "support-module"
+      ],
+      "$comment": "Ray, 2026-09-11: 'would like to move as much out of do-not.md into function hooks so it is enforce vs just suggested' \u2014 these are the honest answers to 'and what happens to this one?', including the answers that are not 'migrate'. Generated rather than a bare `str` because THIS REPO HAS ALREADY PAID FOR THAT: `ReviewedClassification` was a bare `str`, its consumer dispatched with `if`s and no `else`, and an unrecognised value was silently dropped while the entry still looked reviewed \u2014 two full `kb-build` runs to find. A seventh target must fail schema validation until the schema, the generated enum and every consumer are deliberately updated, which is that lesson working in the right direction. VALUES. function-hook: intended to be enforced by an in-process function hook; for a classic registration this INCLUDES eventually removing that registration. \ud83d\udd34 A function-hook row is an INTENT, never a claim the runtime supports it \u2014 G01 proves that. classic-hook: a repo-owned classic hook deliberately RETAINED because its event semantics have no function-hook equivalent (a SessionStart/SessionEnd lifecycle hook has no tool call to intercept); requires a rationale. external-classic-hook: invokes externally-owned hook machinery this repo retains rather than ports \u2014 the two `.venv/bin/graphify hook-guard` registrations; omitting this value silently drops 2 of the 12 PreToolUse entries. non-hook-control: the right carrier is a build/stage/runtime/ship control, not an agent hook. prose-only: no reliable mechanical decision exists; REQUIRES an explanation of why intent cannot be inferred from a call. support-module: a python module stays supporting implementation rather than becoming an enforcement registration \u2014 the honest home for a shared tokenizer."
+    },
+    "EvidenceKind": {
+      "title": "EvidenceKind",
+      "description": "What KIND of evidence backs this row, so a reader can tell a measured \u2026",
+      "enum": [
+        "measured-this-session",
+        "read-from-source",
+        "inherited-unverified"
+      ],
+      "$comment": "What KIND of evidence backs this row, so a reader can tell a measured claim from a read one without re-deriving it. inherited-unverified lets an un-re-derived figure be CARRIED rather than silently promoted to a measurement (`probes-need-a-control-arm.md` rule 6). The reconciler does not reject it; it reports the count, so the inventory's own confidence is visible."
+    },
+    "ReachedBy": {
+      "title": "ReachedBy",
+      "description": "HOW a registration reaches a module \u2014 the membership test itself.",
+      "enum": [
+        "direct-registration",
+        "hook-guard-dispatch"
+      ]
+    },
+    "InvariantKind": {
+      "title": "InvariantKind",
+      "enum": [
+        "numbered",
+        "subsection"
+      ],
+      "description": "The numbered `do-not.md` entries, and the non-'See also' `##` \u2026",
+      "$comment": "The numbered `do-not.md` entries, and the non-'See also' `##` subsections."
+    },
+    "ScopeCase": {
+      "title": "ScopeCase",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool"
+      ],
+      "description": "ONE effective enforcement case: a single tool, optionally narrowed to \u2026",
+      "properties": {
+        "tool": {
+          "type": "string"
+        },
+        "path_scope": {
+          "type": "string"
+        }
+      },
+      "$comment": "ONE effective enforcement case: a single tool, optionally narrowed to a path scope. This is the real coverage denominator. Expanding every matcher alternative and refining `Edit|Write` through its `if` gives 28 effective cases across 18 registrations \u2014 so a migration graded against 18 can drop 10 cases and still read complete. That is the programme's own failure mode #8, 'raw registration counts are not the denominator', as an arithmetic fact."
+    },
+    "RegistrationSource": {
+      "title": "RegistrationSource",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "event"
+      ],
+      "description": "The LIVE identity this row binds to.",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "`.claude/settings.json`, or the mod's register.ts."
+        },
+        "event": {
+          "type": "string"
+        },
+        "matcher": {
+          "type": "string"
+        },
+        "if_condition": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "reviewed_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "$comment": "The reconciler matches on (event, matcher, condition, command) and NOT on the row's id, so renumbering or reordering cannot re-point a disposition. `reviewed_timeout_seconds` is deliberately OUTSIDE that key: including it would make a timeout change fabricate an ORPHAN plus an UNCLASSIFIED for what is one hook, so it is compared as a reviewed ATTRIBUTE instead."
+    },
+    "Registration": {
+      "title": "Registration",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "current_surface",
+        "disposition",
+        "owner_kind",
+        "state",
+        "evidence",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/SemanticId"
+        },
+        "current_surface": {
+          "$ref": "#/$defs/CurrentSurface"
+        },
+        "disposition": {
+          "$ref": "#/$defs/Disposition"
+        },
+        "owner_kind": {
+          "$ref": "#/$defs/OwnerKind"
+        },
+        "owner_ref": {
+          "type": "string",
+          "description": "The module or binary that actually implements it."
+        },
+        "module_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SemanticId"
+          },
+          "description": "Guard modules this registration reaches.",
+          "$comment": "MANY, not one: `kb-setup hookguard` is a single registration dispatching to nine modules. A 1:1 assumption here cannot express the real surface."
+        },
+        "reviewed_scope_cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ScopeCase"
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/RegistrationSource"
+        },
+        "evidence": {
+          "$ref": "#/$defs/EvidenceKind"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "REQUIRED in spirit for classic-hook and prose-only dispositions: a \u2026",
+          "$comment": "REQUIRED in spirit for classic-hook and prose-only dispositions: a retained hook or an unenforceable rule without a stated reason is an assertion, \u2026 REQUIRED in spirit for classic-hook and prose-only dispositions: a retained hook or an unenforceable rule without a stated reason is an assertion, not a decision."
+        },
+        "note": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/RegistrationState"
+        }
+      }
+    },
+    "GuardModule": {
+      "title": "GuardModule",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "reached_by",
+        "current_surface",
+        "disposition",
+        "owner_kind",
+        "evidence"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/SemanticId"
+        },
+        "path": {
+          "type": "string"
+        },
+        "reached_by": {
+          "$ref": "#/$defs/ReachedBy"
+        },
+        "current_surface": {
+          "$ref": "#/$defs/CurrentSurface"
+        },
+        "disposition": {
+          "$ref": "#/$defs/Disposition"
+        },
+        "owner_kind": {
+          "$ref": "#/$defs/OwnerKind"
+        },
+        "invariant_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SemanticId"
+          },
+          "description": "Invariants this module enforces.",
+          "$comment": "LEGITIMATELY EMPTY for a guard enforcing a rule never written down as an invariant \u2014 `destructive_git` and `inplace_edit` are both that case \u2014 so empty must never be read as 'enforces nothing'."
+        },
+        "evidence": {
+          "$ref": "#/$defs/EvidenceKind"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "InvariantLocator": {
+      "title": "InvariantLocator",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor"
+      ],
+      "description": "Three-part identity, and the split is the point.",
+      "properties": {
+        "anchor": {
+          "type": "string",
+          "description": "The `<!-- guard-programme: <id> -->` comment's id."
+        },
+        "reviewed_ordinal": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reviewed_digest": {
+          "type": "string",
+          "description": "sha256 of the normalised invariant body, first 16 hex chars."
+        }
+      },
+      "$comment": "The ANCHOR (an HTML comment in `do-not.md`) is the semantic identity and survives both renumbering and rewording. The ORDINAL is stored and compared SEPARATELY, so renumbering 7 -> 8 reports LOCATOR_DRIFT rather than silently stealing #8's disposition or following the number. The DIGEST of normalised content forces re-review when the meaning changes. Anchoring was Ray's explicit choice (2026-09-11) over a cheaper heading+hash scheme, accepting that 15 anchor lines spend 15 of do-not.md's 32 remaining budget lines."
+    },
+    "Invariant": {
+      "title": "Invariant",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "headline",
+        "current_surface",
+        "disposition",
+        "evidence",
+        "locator"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/SemanticId"
+        },
+        "kind": {
+          "$ref": "#/$defs/InvariantKind"
+        },
+        "headline": {
+          "type": "string"
+        },
+        "enforced_by": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SemanticId"
+          },
+          "description": "Guard modules enforcing it.",
+          "$comment": "EMPTY is the programme's target list and a real, common answer: measured 2026-09-11 with a control arm, four invariants have zero enforcing modules. Never a gate failure \u2014 failing on it would redden the gate for the exact condition the programme exists to fix."
+        },
+        "current_surface": {
+          "$ref": "#/$defs/CurrentSurface"
+        },
+        "disposition": {
+          "$ref": "#/$defs/Disposition"
+        },
+        "locator": {
+          "$ref": "#/$defs/InvariantLocator"
+        },
+        "evidence": {
+          "$ref": "#/$defs/EvidenceKind"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "RegistrationState": {
+      "title": "RegistrationState",
+      "description": "How far a registration has got toward actually running.",
+      "enum": [
+        "declared",
+        "enabled",
+        "installed",
+        "exercised"
+      ],
+      "$comment": "FOUR states, not a boolean \u2014 because since Claude Code v2.1.195 'enabled' and 'installed' are genuinely different facts, and a boolean collapses them into 'not live' while losing WHICH wall was hit. G00 can determine the first two STATICALLY from committed files and owns them. The last two are G04's (#757) and cannot be established by reading a tree at all. VALUES, each strictly implying the ones before it. declared: the registration exists in a committed file. For a classic hook that is an entry in `.claude/settings.json`; for a function-hook mod it is an `on(...)` call in a tracked `.ts` module. enabled: the configuration that would load it is present \u2014 the flag set, and for a mod the plugin named in `extraKnownMarketplaces` + `enabledPlugins`. installed: each machine has run `claude plugin install`; since v2.1.195 an external-source plugin enabled only by PROJECT settings does NOT load without this, so `git clone` alone never arms it. NOT statically determinable. exercised: a real matching event was observed reaching the hook and its verdict attributed to it \u2014 the only state that is evidence the thing works, and the only one a dispatched lane can establish. Today `kb-settings-guard` is at `declared`: tracked, complete, and running nothing."
+    }
+  }
+}

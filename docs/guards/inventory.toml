@@ -1,0 +1,811 @@
+# The G00 (#753) guard inventory - this repo's whole enforcement surface.
+#
+# Validated and RECONCILED by `mise run kb-guard-inventory-check`. A row that no
+# longer describes the repo is a gate failure, not a stale comment.
+#
+# NO COUNTS LIVE HERE. Every mechanical field below (line counts, digests,
+# ordinals, matchers, scope cases) was DERIVED from live state when this file was
+# written, and is re-derived on every run. Only disposition, rationale and notes
+# are authored. That split is the defence against the failure that produced this
+# ticket: the programme report stored a census that drifted in lockstep with
+# itself and read correct for a month.
+#
+# THE MEMBERSHIP RULE IS REACHABILITY. The report derived its module list from
+# `ls python/src/kb_setup/ | grep -Ei 'guard|hook|check_first|absent|stage|instruction'`,
+# which bounds the NAME; four guard modules contain none of those tokens and were
+# invisible while sitting in the live dispatch tuple. It published 7 modules /
+# 2,859 lines. The truth is 11 / 4,024.
+
+# --- MODULES ----------------------------------------------------------------
+[[modules]]
+id = "module.check-first"
+path = "python/src/kb_setup/check_first.py"
+reached_by = "hook-guard-dispatch"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "Largest guard. Redirects a hand-chained ruff/ty to kb-check. Enforces a mise-tasks-only.md rule carrying no do-not.md number."
+[[modules]]
+id = "module.hook-guard"
+path = "python/src/kb_setup/hook_guard.py"
+reached_by = "direct-registration"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = [
+  "do-not.graphify-install",
+  "do-not.graphify-global",
+  "do-not.graphify-by-hand",
+]
+evidence = "measured-this-session"
+note = "The dispatcher. ONE registration reaches it and it fans out to nine modules (hook_guard.py:295-309), which is why module_ids is a list."
+[[modules]]
+id = "module.graph-first"
+path = "python/src/kb_setup/graph_first.py"
+reached_by = "hook-guard-dispatch"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "MISSED BY THE REPORT'S NAME PATTERN and added 2026-08-08, a MONTH before it. Not stale: wrong when published. Dispatched at hook_guard.py:309, after the tuple."
+[[modules]]
+id = "module.secret-guard"
+path = "python/src/kb_setup/secret_guard.py"
+reached_by = "hook-guard-dispatch"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "Runs FIRST and is the one exception to narrowest-remedy-wins: a leaked credential is irreversible while every other guard only offers better advice."
+[[modules]]
+id = "module.instruction-shell-write"
+path = "python/src/kb_setup/instruction_shell_write.py"
+reached_by = "direct-registration"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "The shell parser Q9 ruled must stay Python until a replacement proves equivalent behaviour."
+[[modules]]
+id = "module.absent-binary"
+path = "python/src/kb_setup/absent_binary.py"
+reached_by = "hook-guard-dispatch"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "Host-conditional via shutil.which, so it falls silent where a binary resolves. Runs LAST because it makes the weakest claim."
+[[modules]]
+id = "module.destructive-git"
+path = "python/src/kb_setup/destructive_git.py"
+reached_by = "hook-guard-dispatch"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "MISSED BY THE NAME PATTERN. Enforces a rule with NO do-not.md number, so empty invariant_ids is correct here, not a gap."
+[[modules]]
+id = "module.instruction-edit-guard"
+path = "python/src/kb_setup/instruction_edit_guard.py"
+reached_by = "direct-registration"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "Reached by the 8 scoped registrations. Entry points are evaluate/render/main, never decide() - which is why the behavioural probe misses it."
+[[modules]]
+id = "module.codex-lane"
+path = "python/src/kb_setup/codex_lane.py"
+reached_by = "hook-guard-dispatch"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "MISSED BY THE NAME PATTERN. Denies raw codex exec. Touches the sandbox invariants only INDIRECTLY: it makes the flags reachable, it asserts no sandbox value."
+[[modules]]
+id = "module.inplace-edit"
+path = "python/src/kb_setup/inplace_edit.py"
+reached_by = "hook-guard-dispatch"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "MISSED BY THE NAME PATTERN. Like destructive-git, enforces a rule with no invariant number."
+[[modules]]
+id = "module.stage-explicitly"
+path = "python/src/kb_setup/stage_explicitly.py"
+reached_by = "hook-guard-dispatch"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "Smallest guard. CITES the graphify-out invariant as motivation but does not enforce it: it refuses a blanket add without inspecting what is staged."
+
+# --- INVARIANTS -------------------------------------------------------------
+[[invariants]]
+id = "do-not.graphify-install"
+kind = "numbered"
+headline = "Do NOT run `graphify install` by hand — not even with `--project`, and not"
+enforced_by = ["module.hook-guard"]
+current_surface = "classic-hook"
+disposition = "function-hook"
+evidence = "measured-this-session"
+[invariants.locator]
+anchor = "do-not.graphify-install"
+reviewed_ordinal = 1
+reviewed_digest = "dee8a7f9f9d430c9"
+
+[[invariants]]
+id = "do-not.graphify-global"
+kind = "numbered"
+headline = "Do NOT run `graphify hook install`, `graphify extract --global`, or"
+enforced_by = ["module.hook-guard"]
+current_surface = "classic-hook"
+disposition = "function-hook"
+evidence = "measured-this-session"
+[invariants.locator]
+anchor = "do-not.graphify-global"
+reviewed_ordinal = 2
+reviewed_digest = "a018ff63007330de"
+
+[[invariants]]
+id = "do-not.graphify-by-hand"
+kind = "numbered"
+headline = "Do NOT run graphify by hand at all — drive it through a `kb-*` mise task."
+enforced_by = ["module.hook-guard"]
+current_surface = "classic-hook"
+disposition = "function-hook"
+evidence = "measured-this-session"
+[invariants.locator]
+anchor = "do-not.graphify-by-hand"
+reviewed_ordinal = 3
+reviewed_digest = "f7c364cf5e4b9e34"
+
+[[invariants]]
+id = "do-not.non-anthropic-backend"
+kind = "numbered"
+headline = "Do NOT let any NON-ANTHROPIC key-detected LLM backend touch the corpus —"
+enforced_by = []
+current_surface = "non-hook-control"
+disposition = "non-hook-control"
+evidence = "measured-this-session"
+rationale = "clean_env() strips the triggers at runtime, not at a tool call. WEAKER THAN IT READS: do-not.md records that the compensating control it cites (scrub_route_overrides) no longer exists (#686)."
+[invariants.locator]
+anchor = "do-not.non-anthropic-backend"
+reviewed_ordinal = 4
+reviewed_digest = "6eb135526faf2662"
+
+[[invariants]]
+id = "do-not.commit-graphify-out"
+kind = "numbered"
+headline = "Do NOT commit `graphify-out/` beyond `memory/` and"
+enforced_by = []
+current_surface = "prose-only"
+disposition = "function-hook"
+evidence = "measured-this-session"
+[invariants.locator]
+anchor = "do-not.commit-graphify-out"
+reviewed_ordinal = 5
+reviewed_digest = "9ff7b47255bb8f9a"
+
+[[invariants]]
+id = "do-not.sources-contract"
+kind = "numbered"
+headline = "Do NOT ingest a source outside the `sources/` contract. Every"
+enforced_by = []
+current_surface = "prose-only"
+disposition = "prose-only"
+evidence = "measured-this-session"
+rationale = "THE HONEST TERMINAL STATE. This expresses INTENT, not a call - no hook can see whether a fetch was 'ingestion'. A programme planning 13 migrations is planning one it cannot deliver."
+[invariants.locator]
+anchor = "do-not.sources-contract"
+reviewed_ordinal = 6
+reviewed_digest = "3d18e3c2667a14f8"
+
+[[invariants]]
+id = "do-not.default-branch"
+kind = "numbered"
+headline = "Do NOT commit onto the default branch — branch FIRST. Create the branch"
+enforced_by = []
+current_surface = "non-hook-control"
+disposition = "function-hook"
+evidence = "measured-this-session"
+rationale = "ALREADY ENFORCED at ship time (pr.py:405-411) - recording it as prose-only would erase a real mechanism. The ONE entry where a function hook is a genuine capability UPGRADE rather than a port: it moves enforcement from 'when you push' to 'when you commit'."
+[invariants.locator]
+anchor = "do-not.default-branch"
+reviewed_ordinal = 7
+reviewed_digest = "481afdebdbf02736"
+
+[[invariants]]
+id = "do-not.shell-logic"
+kind = "numbered"
+headline = "Do NOT add a `.sh` script or inline decision logic to `hk.pkl`/"
+enforced_by = []
+current_surface = "prose-only"
+disposition = "function-hook"
+evidence = "measured-this-session"
+[invariants.locator]
+anchor = "do-not.shell-logic"
+reviewed_ordinal = 8
+reviewed_digest = "04c90c3e13932666"
+
+[[invariants]]
+id = "do-not.inline-suppression"
+kind = "numbered"
+headline = "Do NOT add an inline lint suppression. `noqa` / `type: ignore` /"
+enforced_by = []
+current_surface = "non-hook-control"
+disposition = "non-hook-control"
+evidence = "measured-this-session"
+rationale = "The no_lint_skip hk step, scoped to python/src/ and tests/ only - so the enforcement is NARROWER than the invariant."
+[invariants.locator]
+anchor = "do-not.inline-suppression"
+reviewed_ordinal = 9
+reviewed_digest = "4a912b134b6fe605"
+
+[[invariants]]
+id = "do-not.gh-run-watch"
+kind = "numbered"
+headline = "Do NOT trust `gh run watch --exit-status`. It has reported 0"
+enforced_by = []
+current_surface = "prose-only"
+disposition = "function-hook"
+evidence = "measured-this-session"
+[invariants.locator]
+anchor = "do-not.gh-run-watch"
+reviewed_ordinal = 10
+reviewed_digest = "c9f29e96ac9cbc27"
+
+[[invariants]]
+id = "do-not.user-global-config"
+kind = "numbered"
+headline = "Do NOT intentionally MUTATE user, global, or system configuration as"
+enforced_by = []
+current_surface = "prose-only"
+disposition = "function-hook"
+evidence = "measured-this-session"
+rationale = "Control-armed zero across all 11 modules. The kb-settings-guard mod guards THIS REPO'S settings, not ~/.claude or ~/.codex/config.toml, so it does not cover this."
+[invariants.locator]
+anchor = "do-not.user-global-config"
+reviewed_ordinal = 11
+reviewed_digest = "7a75dc0dfac6ab9f"
+
+[[invariants]]
+id = "do-not.mcp-registration"
+kind = "subsection"
+headline = "On MCP"
+enforced_by = []
+current_surface = "prose-only"
+disposition = "prose-only"
+evidence = "measured-this-session"
+rationale = "A conditional permission with a human check-before-registering step, not a prohibition. Nothing to deny."
+[invariants.locator]
+anchor = "do-not.mcp-registration"
+reviewed_digest = "24cd6aec4b499a89"
+
+[[invariants]]
+id = "do-not.codex-sandbox-section"
+kind = "subsection"
+headline = "Two codex-sandbox invariants (missing until this round)"
+enforced_by = []
+current_surface = "prose-only"
+disposition = "prose-only"
+evidence = "measured-this-session"
+rationale = "The subsection HEADING carrying the two sandbox invariants. Counted because the ticket counts it; its obligation lives in the two numbered entries, so it is not double-counted."
+[invariants.locator]
+anchor = "do-not.codex-sandbox-section"
+reviewed_digest = "40b2af564ae5cfe6"
+
+[[invariants]]
+id = "do-not.sandbox-flag-pair"
+kind = "numbered"
+headline = "Do NOT combine `--sandbox <value>` with"
+enforced_by = []
+current_surface = "prose-only"
+disposition = "function-hook"
+evidence = "measured-this-session"
+[invariants.locator]
+anchor = "do-not.sandbox-flag-pair"
+reviewed_ordinal = 12
+reviewed_digest = "842d8c09d608e24c"
+
+[[invariants]]
+id = "do-not.danger-full-access"
+kind = "numbered"
+headline = "Do NOT run a repository lane at `--sandbox danger-full-access`."
+enforced_by = []
+current_surface = "prose-only"
+disposition = "function-hook"
+evidence = "measured-this-session"
+rationale = "Control-armed zero - and #767 records 13 codex sessions that DID run at danger-full-access. The violation is measured, the enforcement absent, and codex-lane existing does not close it."
+[invariants.locator]
+anchor = "do-not.danger-full-access"
+reviewed_ordinal = 13
+reviewed_digest = "ae5405077906b0e5"
+
+
+# --- REGISTRATIONS ---------------------------------------------------------
+#
+# Identity is (event, matcher, if_condition, command) - NOT the id and NOT the
+# position. `reviewed_timeout_seconds` is deliberately OUTSIDE that key: folding
+# it in would make a timeout change fabricate an ORPHAN plus an UNCLASSIFIED for
+# what is one hook, so it is compared as a reviewed ATTRIBUTE instead.
+#
+# reviewed_scope_cases is the REAL coverage denominator. Expanding every matcher
+# alternative and refining Edit|Write through its `if` gives 28 effective cases
+# across these 18 registrations, so a migration graded against 18 can drop 10
+# cases and still read complete.
+[[registrations]]
+id = "hook.pretool.graphify-search"
+current_surface = "classic-hook"
+disposition = "external-classic-hook"
+owner_kind = "external-tool"
+owner_ref = ".venv/bin/graphify"
+module_ids = []
+state = "enabled"
+evidence = "measured-this-session"
+note = "graphify's own binary. Cannot be migrated by editing this repo's python; omitting this disposition silently drops 2 of the 12 PreToolUse entries."
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Bash|Grep"
+command = "\"${CLAUDE_PROJECT_DIR:-.}/.venv/bin/graphify\" hook-guard search"
+reviewed_timeout_seconds = 15
+
+[[registrations.reviewed_scope_cases]]
+tool = "Bash"
+
+[[registrations.reviewed_scope_cases]]
+tool = "Grep"
+
+[[registrations]]
+id = "hook.pretool.hookguard"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = "kb_setup.hook_guard"
+module_ids = [
+  "module.hook-guard",
+  "module.check-first",
+  "module.graph-first",
+  "module.secret-guard",
+  "module.destructive-git",
+  "module.absent-binary",
+  "module.codex-lane",
+  "module.inplace-edit",
+  "module.stage-explicitly",
+]
+state = "enabled"
+evidence = "measured-this-session"
+note = "THE LOAD-BEARING REGISTRATION: one entry reaching NINE modules. A plan sized by registration count reads this as 1 of 18 (6%) while it carries 9 of 11 modules (82%)."
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Bash|Grep"
+command = "uv run --project \"${CLAUDE_PROJECT_DIR:-.}/python\" kb-setup hookguard"
+reviewed_timeout_seconds = 20
+
+[[registrations.reviewed_scope_cases]]
+tool = "Bash"
+
+[[registrations.reviewed_scope_cases]]
+tool = "Grep"
+
+[[registrations]]
+id = "hook.pretool.graphify-read"
+current_surface = "classic-hook"
+disposition = "external-classic-hook"
+owner_kind = "external-tool"
+owner_ref = ".venv/bin/graphify"
+module_ids = []
+state = "enabled"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Read|Glob"
+command = "\"${CLAUDE_PROJECT_DIR:-.}/.venv/bin/graphify\" hook-guard read"
+reviewed_timeout_seconds = 15
+
+[[registrations.reviewed_scope_cases]]
+tool = "Read"
+
+[[registrations.reviewed_scope_cases]]
+tool = "Glob"
+
+[[registrations]]
+id = "hook.pretool.instruction-edit.claudemd.edit"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = "kb_setup.instruction_edit_guard"
+module_ids = ["module.instruction-edit-guard"]
+state = "enabled"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Edit|Write"
+if_condition = "Edit(CLAUDE.md)"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "Edit"
+path_scope = "CLAUDE.md"
+
+[[registrations]]
+id = "hook.pretool.instruction-edit.claudemd.write"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = "kb_setup.instruction_edit_guard"
+module_ids = ["module.instruction-edit-guard"]
+state = "enabled"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Edit|Write"
+if_condition = "Write(CLAUDE.md)"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "Write"
+path_scope = "CLAUDE.md"
+
+[[registrations]]
+id = "hook.pretool.instruction-edit.claude-rules.edit"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = "kb_setup.instruction_edit_guard"
+module_ids = ["module.instruction-edit-guard"]
+state = "enabled"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Edit|Write"
+if_condition = "Edit(.claude/rules/**)"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "Edit"
+path_scope = ".claude/rules/**"
+
+[[registrations]]
+id = "hook.pretool.instruction-edit.claude-rules.write"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = "kb_setup.instruction_edit_guard"
+module_ids = ["module.instruction-edit-guard"]
+state = "enabled"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Edit|Write"
+if_condition = "Write(.claude/rules/**)"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "Write"
+path_scope = ".claude/rules/**"
+
+[[registrations]]
+id = "hook.pretool.instruction-edit.claude-skills.edit"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = "kb_setup.instruction_edit_guard"
+module_ids = ["module.instruction-edit-guard"]
+state = "enabled"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Edit|Write"
+if_condition = "Edit(.claude/skills/**)"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "Edit"
+path_scope = ".claude/skills/**"
+
+[[registrations]]
+id = "hook.pretool.instruction-edit.claude-skills.write"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = "kb_setup.instruction_edit_guard"
+module_ids = ["module.instruction-edit-guard"]
+state = "enabled"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Edit|Write"
+if_condition = "Write(.claude/skills/**)"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "Write"
+path_scope = ".claude/skills/**"
+
+[[registrations]]
+id = "hook.pretool.instruction-edit.agents-skills.edit"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = "kb_setup.instruction_edit_guard"
+module_ids = ["module.instruction-edit-guard"]
+state = "enabled"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Edit|Write"
+if_condition = "Edit(.agents/skills/**)"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "Edit"
+path_scope = ".agents/skills/**"
+
+[[registrations]]
+id = "hook.pretool.instruction-edit.agents-skills.write"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = "kb_setup.instruction_edit_guard"
+module_ids = ["module.instruction-edit-guard"]
+state = "enabled"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Edit|Write"
+if_condition = "Write(.agents/skills/**)"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-edit-guard"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "Write"
+path_scope = ".agents/skills/**"
+
+[[registrations]]
+id = "hook.pretool.instruction-shell-write"
+current_surface = "classic-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = "kb_setup.instruction_shell_write"
+module_ids = ["module.instruction-shell-write"]
+state = "enabled"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/settings.json"
+event = "PreToolUse"
+matcher = "Bash"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-instruction-shell-write"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "Bash"
+
+[[registrations]]
+id = "hook.sessionstart.kb-currency-check"
+current_surface = "classic-hook"
+disposition = "classic-hook"
+owner_kind = "repository"
+owner_ref = "kb-currency-check"
+module_ids = []
+state = "enabled"
+evidence = "measured-this-session"
+note = "A lifecycle hook has no function-hook equivalent: there is no tool call to intercept."
+[registrations.source]
+path = ".claude/settings.json"
+event = "SessionStart"
+matcher = "startup|resume"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-currency-check"
+reviewed_timeout_seconds = 30
+
+[[registrations.reviewed_scope_cases]]
+tool = "startup"
+
+[[registrations.reviewed_scope_cases]]
+tool = "resume"
+
+[[registrations]]
+id = "hook.sessionstart.kb-telemetry-prune"
+current_surface = "classic-hook"
+disposition = "classic-hook"
+owner_kind = "repository"
+owner_ref = "kb-telemetry-prune"
+module_ids = []
+state = "enabled"
+evidence = "measured-this-session"
+note = "A lifecycle hook has no function-hook equivalent: there is no tool call to intercept."
+[registrations.source]
+path = ".claude/settings.json"
+event = "SessionStart"
+matcher = "startup|resume"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-telemetry-prune"
+reviewed_timeout_seconds = 30
+
+[[registrations.reviewed_scope_cases]]
+tool = "startup"
+
+[[registrations.reviewed_scope_cases]]
+tool = "resume"
+
+[[registrations]]
+id = "hook.sessionstart.kb-codex-config-check"
+current_surface = "classic-hook"
+disposition = "classic-hook"
+owner_kind = "repository"
+owner_ref = "kb-codex-config-check"
+module_ids = []
+state = "enabled"
+evidence = "measured-this-session"
+note = "A lifecycle hook has no function-hook equivalent: there is no tool call to intercept."
+[registrations.source]
+path = ".claude/settings.json"
+event = "SessionStart"
+matcher = "startup|resume"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-codex-config-check"
+reviewed_timeout_seconds = 30
+
+[[registrations.reviewed_scope_cases]]
+tool = "startup"
+
+[[registrations.reviewed_scope_cases]]
+tool = "resume"
+
+[[registrations]]
+id = "hook.sessionstart.kb-env-refresh"
+current_surface = "classic-hook"
+disposition = "classic-hook"
+owner_kind = "repository"
+owner_ref = "kb-env-refresh"
+module_ids = []
+state = "enabled"
+evidence = "measured-this-session"
+note = "A lifecycle hook has no function-hook equivalent: there is no tool call to intercept."
+[registrations.source]
+path = ".claude/settings.json"
+event = "SessionStart"
+matcher = "startup|resume|clear|compact|fork"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-env-refresh"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "startup"
+
+[[registrations.reviewed_scope_cases]]
+tool = "resume"
+
+[[registrations.reviewed_scope_cases]]
+tool = "clear"
+
+[[registrations.reviewed_scope_cases]]
+tool = "compact"
+
+[[registrations.reviewed_scope_cases]]
+tool = "fork"
+
+[[registrations]]
+id = "hook.sessionend.brain-transcript-audit"
+current_surface = "classic-hook"
+disposition = "classic-hook"
+owner_kind = "repository"
+owner_ref = "brain-transcript-audit"
+module_ids = []
+state = "enabled"
+evidence = "measured-this-session"
+note = "A lifecycle hook has no function-hook equivalent: there is no tool call to intercept."
+[registrations.source]
+path = ".claude/settings.json"
+event = "SessionEnd"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" brain-transcript-audit -- --output .agent/brain-audit.md"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "*"
+
+[[registrations]]
+id = "hook.sessionend.kb-session-reflect"
+current_surface = "classic-hook"
+disposition = "classic-hook"
+owner_kind = "repository"
+owner_ref = "kb-session-reflect"
+module_ids = []
+state = "enabled"
+evidence = "measured-this-session"
+note = "A lifecycle hook has no function-hook equivalent: there is no tool call to intercept."
+[registrations.source]
+path = ".claude/settings.json"
+event = "SessionEnd"
+command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-session-reflect -- --quiet"
+reviewed_timeout_seconds = 60
+
+[[registrations.reviewed_scope_cases]]
+tool = "*"
+
+[[registrations]]
+id = "hook.toolcall.kb-settings-guard.edit"
+current_surface = "function-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = ".claude/mods/kb-settings-guard"
+module_ids = []
+state = "declared"
+evidence = "measured-this-session"
+rationale = "INERT. Tracked and complete, but in neither extraKnownMarketplaces nor enabledPlugins, so nothing runs - control-armed (0 hits in either settings file; hookguard returns 1, so the probe discriminates). G04 (#757) owns registration. Present-in-tree is NOT coverage."
+
+[registrations.source]
+path = ".claude/mods/kb-settings-guard/hooks/register.ts"
+event = "tool.call"
+matcher = "{ tool: \"Edit\" }"
+command = "on(\"tool.call\", Edit, handler)"
+
+[[registrations.reviewed_scope_cases]]
+tool = "Edit"
+
+[[registrations]]
+id = "hook.toolcall.kb-settings-guard.write"
+current_surface = "function-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = ".claude/mods/kb-settings-guard"
+module_ids = []
+state = "declared"
+evidence = "measured-this-session"
+rationale = "INERT. Tracked and complete, but in neither extraKnownMarketplaces nor enabledPlugins, so nothing runs - control-armed (0 hits in either settings file; hookguard returns 1, so the probe discriminates). G04 (#757) owns registration. Present-in-tree is NOT coverage."
+
+[registrations.source]
+path = ".claude/mods/kb-settings-guard/hooks/register.ts"
+event = "tool.call"
+matcher = "{ tool: \"Write\" }"
+command = "on(\"tool.call\", Write, handler)"
+
+[[registrations.reviewed_scope_cases]]
+tool = "Write"
+
+[[registrations]]
+id = "hook.toolcall.kb-settings-guard.notebookedit"
+current_surface = "function-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = ".claude/mods/kb-settings-guard"
+module_ids = []
+state = "declared"
+evidence = "measured-this-session"
+rationale = "INERT. Tracked and complete, but in neither extraKnownMarketplaces nor enabledPlugins, so nothing runs - control-armed (0 hits in either settings file; hookguard returns 1, so the probe discriminates). G04 (#757) owns registration. Present-in-tree is NOT coverage. (COVERS A TOOL NO CLASSIC REGISTRATION COVERS - the 8 edit-guard entries are Edit|Write only, so the two surfaces are non-congruent)"
+
+[registrations.source]
+path = ".claude/mods/kb-settings-guard/hooks/register.ts"
+event = "tool.call"
+matcher = "{ tool: \"NotebookEdit\" }"
+command = "on(\"tool.call\", NotebookEdit, handler)"
+
+[[registrations.reviewed_scope_cases]]
+tool = "NotebookEdit"
