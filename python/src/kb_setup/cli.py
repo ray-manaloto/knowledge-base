@@ -943,6 +943,29 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
         if not arg.startswith("-"):
             positional.append(arg)
     mode = positional[0] if positional else "check"
+    # 🔴 REFUSE a stray second positional rather than ignoring it. Both skill copies
+    # documented `mise run kb-currency -- --tool <name> apply`, and `[tasks.kb-currency]`
+    # hardcodes `currency run`; mise APPENDS task args, so that expanded to
+    # `currency run --tool <name> apply`, this loop collected `["run", "apply"]`, and
+    # the line above took `positional[0]` = "run". The `apply` the operator typed was
+    # discarded, the command exited 0, and a run page was written that looked like
+    # success. Two sessions read that as an apply having happened.
+    #
+    # Ignoring an argument nobody can see being ignored is the defect; erroring is the
+    # fix. Naming the working invocation matters as much as the refusal, because
+    # `mise-tasks-only.md` steers agents toward a `mise run` form and NO mise task
+    # reaches `currency apply` (grep: 0 hits).
+    if len(positional) > 1:
+        extra = " ".join(positional[1:])
+        print(
+            f"[currency] REFUSING an ambiguous invocation: mode '{mode}' with trailing "
+            f"positional(s) '{extra}'.\n"
+            f"[currency] If you meant to run '{positional[1]}', invoke it directly:\n"
+            f"[currency]   uv run kb-setup currency {positional[1]}"
+            + (f" --tool {only}" if only else ""),
+            file=sys.stderr,
+        )
+        return 2
     if mode == "check":
         return currency_run.check(repo_root, only=only, quiet="--verbose" not in rest)
     if mode == "run":

@@ -161,7 +161,29 @@ class Verdict:
         page read "current" through exactly the drift this engine exists to find.
         """
         if self.auto_apply:
-            return f"{self.tool} {self.current} → {self.latest}: auto-applying (6/6 gates)"
+            # 🔴 "auto-applying" was a LIE, and a durable one — `docs/currency/README.md`
+            # calls itself a run log and forbids hand-editing rows, so a present
+            # participle there reads as a record of something that happened.
+            # `auto_apply` (`:580`) means ELIGIBLE and nothing more: `run()`
+            # (`run.py:301-368`) contains no call to the apply module at all, and the
+            # only production call site is `run.py:617` inside the separate
+            # `run.py:594 def apply(...)`. Armed: real `run()` -> 0 apply calls with the
+            # pin untouched, against a control `run.apply()` -> 1 with the pin moved.
+            #
+            # Three rows shipped with the old wording on 2026-09-11 claiming `uv`,
+            # `ruff` and `antigravity-cli` were applied while `mise.toml` still pinned
+            # the old versions. The risk is not cosmetic: a future agent skips an
+            # upgrade the repo records as done.
+            #
+            # So the line states the disposition and names the command that would
+            # actually perform it — deliberately NOT a `mise run` form, because no
+            # mise task reaches `currency apply` (grep: 0) and the one the skills
+            # documented silently dispatched back to `run`.
+            return (
+                f"{self.tool} {self.current} → {self.latest}: "
+                "ELIGIBLE for auto-apply (6/6 gates) — NOT applied; run "
+                f"`uv run kb-setup currency apply --tool {self.tool}`"
+            )
         if self.has_upgrade:
             version = f"{self.current} → {self.latest}"
         elif self.latest:

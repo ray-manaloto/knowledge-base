@@ -90,8 +90,18 @@ breaking/removal/deprecation marker.
 2. Let the engine edit the committable files:
 
    ```bash
-   mise run kb-currency -- --tool <name> apply
+   uv run kb-setup currency apply --tool <name>
    ```
+
+   🔴 **NOT `mise run kb-currency -- --tool <name> apply`**, which this file
+   documented until 2026-09-11 and which silently did nothing. `[tasks.kb-currency]`
+   hardcodes `currency run` and mise APPENDS task args, so it expanded to
+   `currency run --tool <name> apply`; the dispatcher took the FIRST positional
+   (`run`) and discarded the `apply`, exiting 0 and reprinting the report. Two
+   sessions read that as an apply having happened. No mise task reaches
+   `currency apply` at all, which is why this is a direct `uv run` — the one place
+   `mise-tasks-only.md`'s preference cannot be honoured. That invocation is now
+   REFUSED with rc 2 rather than silently misread.
 
    `apply` re-checks the six gates and **refuses** an unauthorized verdict, then
    moves the `mise.toml` pin **and** re-pins `sources/<name>.manifest` (`ref` →

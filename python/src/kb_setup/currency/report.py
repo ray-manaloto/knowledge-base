@@ -75,6 +75,24 @@ class RunRecord:
     #: all must keep working, and "nothing recorded" is the correct empty state
     #: here (every local item renders as un-reviewed), not a sentinel for "unknown".
     reviewed: dict[str, Reviewed] = field(default_factory=dict)
+    #: What this run OBSERVABLY DID about the upgrade — never what it was eligible
+    #: to do. Before this field the record had no execution outcome at all (tool,
+    #: sync, upstream, observations, moved, verdict, views, answers, reviewed), so a
+    #: successful `currency apply` only printed its `ApplyResult` and never reached
+    #: the committed report: history could not distinguish APPLIED from ELIGIBLE.
+    #:
+    #: 🔴 That gap is what made the old `auto-applying` wording durable rather than
+    #: merely sloppy. `docs/currency/README.md` gained three rows on 2026-09-11
+    #: claiming `uv`, `ruff` and `antigravity-cli` were applied while `mise.toml`
+    #: still pinned the old versions, in a file that calls itself a run log and
+    #: forbids hand-editing rows.
+    #:
+    #: Defaults to `"not-applied"` rather than `""` or `"unknown"`, deliberately: a
+    #: report run NEVER applies (`run.py:301-368` calls the apply module nowhere), so
+    #: not-applied is the TRUE answer for every record this engine writes today, not
+    #: a sentinel standing in for one. `"applied"` may only be set by a path that
+    #: actually moved a pin and can say so.
+    disposition: str = "not-applied"
 
     @property
     def has_content(self) -> bool:

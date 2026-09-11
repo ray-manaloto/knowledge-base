@@ -929,3 +929,43 @@ def test_a_local_watch_item_is_reachable_by_ref_through_toolspec(tmp_path: Path)
     local_items = [item for item in spec.watch if item.kind != "issue"]
     assert [item.ref for item in local_items] == ["schema-gap"]
     assert local_items[0].key == "local:schema-gap"
+
+
+def test_a_trailing_positional_is_refused_not_silently_discarded(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The exact shape both skill copies documented, which silently did nothing.
+
+    `.claude/skills/tool-currency/SKILL.md:92` (and its `.agents/` mirror) said
+    `mise run kb-currency -- --tool <name> apply`. `[tasks.kb-currency]` hardcodes
+    `currency run` and mise APPENDS task args, so the dispatcher received
+    `["run", "--tool", <name>, "apply"]`, took `positional[0]` == "run", and threw
+    the `apply` away — exiting 0 and reprinting the report. Two sessions read that
+    as an apply having happened, and three false "auto-applying" rows reached a
+    committed run log as a result.
+
+    Ignoring an argument nobody can see being ignored is the defect.
+    """
+    rc = cli._currency(tmp_path, ["run", "--tool", "uv", "apply"])
+
+    assert rc == 2
+    stderr = capsys.readouterr().err
+    assert "REFUSING" in stderr
+    # Naming the working invocation is half the fix: no mise task reaches
+    # `currency apply`, so a reader following `mise-tasks-only.md` has nowhere to go.
+    assert "uv run kb-setup currency apply" in stderr
+
+
+def test_a_single_mode_invocation_is_not_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """CONTROL ARM, and it guards a real regression, not symmetry.
+
+    A refusal keyed on anything looser than "more than one positional" would break
+    every ordinary invocation. Without this arm, `return 2` unconditionally passes
+    the assertions above.
+    """
+    rc = cli._currency(tmp_path, ["check", "--tool", "uv"])
+
+    assert rc != 2
+    assert "REFUSING" not in capsys.readouterr().err
