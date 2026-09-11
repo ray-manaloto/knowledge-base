@@ -73,9 +73,30 @@ probe shows that array; all three "missing" events are in it, and the array is
 SET-IDENTICAL (33 vs 33, empty diff) to `HookInput` in this file. Measured
 2026-09-11 against 2.1.269.
 
-⚠️ AND `mise.toml` PINS claude-code 2.1.251, WHICH IS NOT WHAT RUNS. The host
-self-updates: `~/.local/bin/claude -> ~/.local/share/claude/versions/2.1.269`.
-2.1.251 carries NO `classic.*` bridge at all — it predates this feature — so a
-probe run against the mise copy answers about a binary that cannot exhibit the
-behaviour. Resolve the real binary with `readlink -f` as above, never `mise
-which`.
+⚠️ **THE 2.1.251 INSTALL ON THIS MACHINE IS AN ORPHAN — DECLARED NOWHERE, AND
+NOT WHAT RUNS.** This section said *"`mise.toml` PINS claude-code 2.1.251"* until
+2026-09-11. That was false, and the first correction offered for it (that the pin
+lives in the user-global mise config) was false too. Measured, each with a
+control arm:
+
+- the project `mise.toml` has **no** claude-code entry — control: `python =
+  "3.14.7"` at `:44` IS found, so the grep discriminates;
+- `currency.toml`'s `[tool.claude-code]` says so outright: *"Tracked NOT for a
+  mise pin — Claude Code manages its own updates and is not in `[tools]`"*;
+- the user-global `~/.config/mise/config.toml` has no claude-code entry either —
+  control: the file is 675 lines with a `[tools]` section at `:121`;
+- yet `~/.local/share/mise/installs/npm-anthropic-ai-claude-code/2.1.251/`
+  **exists on disk**, and `mise which claude` reports it *"is not currently
+  active"*.
+
+So it is an **orphaned install declared by no config** — the same shape as the
+orphaned `conda:git` that once shimmed `git` on this machine, and a reason
+`mise prune` is worth running.
+
+**What actually runs is 2.1.269**, self-updating, via
+`~/.local/bin/claude -> ~/.local/share/claude/versions/2.1.269`. Resolve the real
+binary with `readlink -f "$(command -v claude)"`; do not use `mise which`, and do
+not assume a version from any config file. The orphan matters because **2.1.251
+carries no `classic.*` bridge at all** — it predates this feature — so a probe
+that happens to reach it answers about a binary that cannot exhibit the
+behaviour.
