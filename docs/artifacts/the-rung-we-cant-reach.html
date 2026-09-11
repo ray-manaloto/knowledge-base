@@ -1,0 +1,170 @@
+<title>The Rung We Can't Reach</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #ECEFF1;
+    --surface: #FFFFFF;
+    --ink: #1A1F23;
+    --muted: #58636B;
+    --rule: #D3DADF;
+    --locked: #8A939A;
+    --locked-wash: #F1F3F5;
+    --have: #196B4D;
+    --have-wash: #EFF7F3;
+    --display: "DM Serif Display", Georgia, serif;
+    --body: "DM Sans", "Helvetica Neue", Arial, sans-serif;
+    --data: "Roboto Mono", ui-monospace, Menlo, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15.5px;
+    line-height: 1.45;
+    padding: 20px 16px 30px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    max-width: 650px;
+    width: 100%;
+    padding: 22px 24px 20px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: 30px;
+    line-height: 1.1;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lead {
+    font-size: 15px;
+    color: var(--muted);
+    margin: 8px 0 0;
+    max-width: 58ch;
+  }
+
+  figure { margin: 16px 0 0; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin-top: 7px;
+    text-align: center;
+  }
+
+  .yes {
+    margin-top: 16px;
+    border-top: 1px solid var(--rule);
+    padding-top: 13px;
+  }
+  .yes h2 {
+    font-family: var(--data);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+  .yes ul { margin: 0; padding-left: 19px; }
+  .yes li { margin-bottom: 4px; font-size: 14.8px; }
+
+  .ask {
+    margin-top: 14px;
+    background: var(--have-wash);
+    border-left: 3px solid var(--have);
+    padding: 11px 13px;
+    font-size: 15.5px;
+  }
+  .ask b { font-weight: 700; }
+</style>
+
+<main class="sheet">
+  <h1>The rung we can't reach</h1>
+  <p class="lead">
+    You asked to use function hooks wherever possible. The advisor says: for four
+    small things, yes — but <strong>not</strong> for the guards. Here's why, and it's
+    a hard blocker rather than a preference.
+  </p>
+
+  <figure>
+    <svg viewBox="0 0 600 226" role="img"
+         aria-label="Function hooks only stop something for good on the top rung, which requires administrator settings this project is forbidden to write. Our hooks would land on the lower rung, where they can be skipped. The guard we already use blocks even when checks are switched off.">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <polygon points="0,0 10,5 0,10" fill="#58636B"/>
+        </marker>
+      </defs>
+
+      <text x="14" y="18" font-size="11" font-family="Roboto Mono, monospace"
+            fill="#58636B" letter-spacing="1">FUNCTION HOOKS</text>
+
+      <rect x="14" y="30" width="330" height="52" rx="3"
+            fill="#F1F3F5" stroke="#8A939A" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <text x="34" y="52" font-size="14" font-weight="700" fill="#8A939A"
+            font-family="DM Sans, sans-serif">Top rung — can't be skipped</text>
+      <text x="34" y="70" font-size="12.5" fill="#8A939A">needs administrator settings we're forbidden to write</text>
+      <g transform="translate(310,44)">
+        <rect x="0" y="7" width="16" height="13" rx="2" fill="none" stroke="#8A939A" stroke-width="1.8"/>
+        <path d="M3.5 7 V4 a4.5 4.5 0 0 1 9 0 V7" fill="none" stroke="#8A939A" stroke-width="1.8"/>
+      </g>
+
+      <rect x="14" y="92" width="330" height="52" rx="3"
+            fill="#FFFFFF" stroke="#1A1F23" stroke-width="1.5"/>
+      <text x="34" y="114" font-size="14" font-weight="700" fill="#1A1F23"
+            font-family="DM Sans, sans-serif">Our rung — can be skipped</text>
+      <text x="34" y="132" font-size="12.5" fill="#58636B">a bug in the hook quietly opens the gate</text>
+
+      <line x1="179" y1="82" x2="179" y2="90" stroke="#8A939A" stroke-width="1.4"
+            stroke-dasharray="3 3"/>
+
+      <text x="14" y="172" font-size="12.5" fill="#58636B" font-style="italic">
+        Everything written about "seat it on the top rung" doesn't apply to us.
+      </text>
+
+      <line x1="366" y1="30" x2="366" y2="196" stroke="#D3DADF" stroke-width="1.4"/>
+
+      <text x="386" y="18" font-size="11" font-family="Roboto Mono, monospace"
+            fill="#196B4D" letter-spacing="1">WHAT WE ALREADY USE</text>
+
+      <rect x="386" y="30" width="200" height="114" rx="3"
+            fill="#EFF7F3" stroke="#196B4D" stroke-width="1.5"/>
+      <text x="406" y="54" font-size="14" font-weight="700" fill="#196B4D"
+            font-family="DM Sans, sans-serif">The guard that says no</text>
+      <text x="406" y="76" font-size="12.5" fill="#1A1F23">blocks the command —</text>
+      <text x="406" y="94" font-size="12.5" fill="#1A1F23">and it still blocks</text>
+      <text x="406" y="112" font-size="12.5" fill="#1A1F23">when checks are</text>
+      <text x="406" y="130" font-size="12.5" fill="#1A1F23">switched off.</text>
+
+      <line x1="486" y1="148" x2="486" y2="168" stroke="#58636B" stroke-width="1.5"
+            marker-end="url(#a1)"/>
+      <text x="486" y="186" text-anchor="middle" font-size="13.5" font-weight="700"
+            fill="#196B4D" font-family="DM Sans, sans-serif">stronger, today</text>
+      <text x="486" y="204" text-anchor="middle" font-size="12" fill="#58636B">nothing to migrate</text>
+    </svg>
+    <figcaption>The stronger lock is the one we already own.</figcaption>
+  </figure>
+
+  <div class="yes">
+    <h2>Where it still says yes — four, all small, none a guard</h2>
+    <ul>
+      <li><b>One real gap:</b> when a plugin calls another plugin directly, that never
+        looks like a command, so nothing we have today can see it.</li>
+      <li><b>Watch what's being fed to the model</b> — start by observing only.</li>
+      <li><b>Policy on what tools get registered</b> — only once we define the rule.</li>
+      <li><b>An audit log.</b> Good as evidence. Not a gate.</li>
+    </ul>
+  </div>
+
+  <p class="ask">
+    <b>What I need from you:</b> accept the narrowed scope, or push back. Twenty-four
+    other places it looked at came back "no — what you have is better".
+  </p>
+</main>

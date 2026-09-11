@@ -492,7 +492,13 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
         result = subprocess.run(
             cmd,
             cwd=repo_root,
-            env=clean_env(),
+            # `hide_claude_cli` is the PATH strip that keeps this task's advertised
+            # "deterministic, no-LLM" contract true on graphify >= 0.9.58, which
+            # selects claude-cli implicitly whenever the CLI is merely INSTALLED
+            # (`llm.py:3513`) and `cmd` here passes no `--backend`. Scoped to the
+            # NOT-opted-in case, so `--claude-cli` still reaches the backend it
+            # exists to re-probe. See `graphify_env._path_without_claude_cli`.
+            env=clean_env(hide_claude_cli=not claude_cli),
             check=False,
             capture_output=True,
         )

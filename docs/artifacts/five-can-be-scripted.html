@@ -1,0 +1,210 @@
+<title>Five Can Be Scripted</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=Public+Sans:wght@400;500;600&family=Roboto+Mono:wght@400;500;700&display=swap">
+<style>
+  :root {
+    --ground: #EFF1F5;
+    --surface: #FFFFFF;
+    --ink: #16191F;
+    --muted: #5A6472;
+    --rule: #D6DBE3;
+    --auto: #33417E;
+    --auto-wash: #ECEFF9;
+    --human: #A4562A;
+    --human-wash: #FAF0E8;
+    --display: "Bitter", Georgia, serif;
+    --body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+    --data: "Roboto Mono", ui-monospace, Menlo, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15.5px;
+    line-height: 1.45;
+    padding: 20px 16px 30px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    max-width: 640px;
+    width: 100%;
+    padding: 24px 26px 22px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .sub {
+    font-size: 15px;
+    color: var(--muted);
+    margin: 8px 0 0;
+    max-width: 56ch;
+  }
+
+  .sub b { color: var(--ink); font-weight: 600; }
+
+  ol.steps {
+    list-style: none;
+    margin: 20px 0 0;
+    padding: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  ol.steps li {
+    display: grid;
+    grid-template-columns: 26px 1fr auto;
+    gap: 0 11px;
+    align-items: baseline;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .n {
+    font-family: var(--data);
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+
+  .what { font-size: 15px; }
+  .what .fig {
+    font-family: var(--data);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tag {
+    font-family: var(--data);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+
+  .t-auto  { color: var(--auto);  background: var(--auto-wash); }
+  .t-human { color: var(--human); background: var(--human-wash); }
+
+  li.human .what { font-weight: 500; }
+
+  .verdict {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .box { padding: 12px 14px; }
+  .box.a { background: var(--auto-wash); border-left: 3px solid var(--auto); }
+  .box.h { background: var(--human-wash); border-left: 3px solid var(--human); }
+
+  .box h2 {
+    font-family: var(--data);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    margin: 0 0 5px;
+  }
+  .box.a h2 { color: var(--auto); }
+  .box.h h2 { color: var(--human); }
+  .box p { margin: 0; font-size: 14.5px; line-height: 1.4; }
+
+  .ask {
+    margin-top: 16px;
+    border-top: 2px solid var(--ink);
+    padding-top: 12px;
+    font-size: 15.5px;
+  }
+  .ask b { font-weight: 600; }
+
+  @media (max-width: 520px) {
+    .verdict { grid-template-columns: 1fr; }
+    ol.steps li { grid-template-columns: 22px 1fr; }
+    .tag { grid-column: 2; justify-self: start; margin-top: 4px; }
+  }
+</style>
+
+<main class="sheet">
+  <h1>Five can be scripted</h1>
+  <p class="sub">
+    You asked why there's no one-command rebase. Here is <b>every step the last one
+    actually took</b>, in order, read out of its own commit record. Five a script could
+    do today. One needs a part that was never built. One will always need you.
+  </p>
+
+  <ol class="steps">
+    <li>
+      <span class="n">1</span>
+      <span class="what">Pick which release to move onto. Sorting the version numbers
+        picks the wrong one — it's <span class="fig">1,672</span> commits stale.</span>
+      <span class="tag t-auto">scriptable</span>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <span class="what">Replay our <span class="fig">8</span> patches onto it. One clash,
+        in the changelog — the same clash all three times we've done this.</span>
+      <span class="tag t-auto">scriptable</span>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <span class="what">Update the <span class="fig">8</span> places the version number
+        is written down.</span>
+      <span class="tag t-auto">scriptable</span>
+    </li>
+    <li class="human">
+      <span class="n">4</span>
+      <span class="what">Recompute the <span class="fig">6</span> fingerprints that go
+        stale when the pin moves. <b>Nothing can do this yet</b> — the piece that would
+        read them back doesn't exist.</span>
+      <span class="tag t-human">must build</span>
+    </li>
+    <li>
+      <span class="n">5</span>
+      <span class="what">Run both test suites and prove the rebase broke nothing new.</span>
+      <span class="tag t-auto">scriptable</span>
+    </li>
+    <li class="human">
+      <span class="n">6</span>
+      <span class="what">Last time, they'd changed a function we call. Someone had to read
+        why and decide not to use the new argument.</span>
+      <span class="tag t-human">needs you</span>
+    </li>
+    <li>
+      <span class="n">7</span>
+      <span class="what">Refresh the two version stamps in the skill folders.</span>
+      <span class="tag t-auto">scriptable</span>
+    </li>
+  </ol>
+
+  <div class="verdict">
+    <div class="box a">
+      <h2>Already answered</h2>
+      <p>A prior round asked exactly this and got the same verdict: build step 4's missing
+        piece first, then let the one command drive the rest.</p>
+    </div>
+    <div class="box h">
+      <h2>The honest limit</h2>
+      <p>Step 6 can't be automated away. The best it can do is <em>stop</em> and tell you,
+        instead of guessing.</p>
+    </div>
+  </div>
+
+  <p class="ask">
+    <b>What I need from you:</b> answers to the four questions beside this page. The first
+    one decides everything after it.
+  </p>
+</main>

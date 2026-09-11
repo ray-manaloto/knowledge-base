@@ -1,0 +1,180 @@
+<title>Three Pushbacks</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@500&display=swap">
+<style>
+  :root {
+    --ground: #EEEDF3;
+    --surface: #FFFFFF;
+    --ink: #1C1A22;
+    --muted: #5C5766;
+    --rule: #DAD7E2;
+    --said: #4A3A7B;
+    --found: #A03828;
+    --ok: #1F6B4A;
+    --display: "Lora", Georgia, serif;
+    --body: "Karla", "Helvetica Neue", Arial, sans-serif;
+    --data: "Roboto Mono", ui-monospace, Menlo, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15.5px;
+    line-height: 1.45;
+    padding: 20px 16px 30px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    max-width: 660px;
+    width: 100%;
+    padding: 24px 26px 20px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 27px;
+    line-height: 1.14;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lead {
+    font-size: 15px;
+    color: var(--muted);
+    margin: 7px 0 0;
+    max-width: 58ch;
+  }
+
+  .rows { margin-top: 18px; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 0 12px;
+    padding: 13px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .row:last-of-type { border-bottom: 1px solid var(--rule); }
+
+  .n {
+    font-family: var(--data);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    padding-top: 3px;
+  }
+
+  .said, .found {
+    display: grid;
+    grid-template-columns: 78px 1fr;
+    gap: 0 10px;
+    align-items: baseline;
+  }
+  .found { margin-top: 6px; }
+
+  .tag {
+    font-family: var(--data);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    text-align: right;
+    padding-top: 2px;
+  }
+  .said .tag  { color: var(--said); }
+  .found .tag { color: var(--found); }
+
+  .said .txt  { font-weight: 500; }
+  .found .txt { color: var(--ink); }
+  .found .txt b { font-weight: 700; color: var(--found); }
+
+  .agreed {
+    margin-top: 16px;
+    background: #F1F7F4;
+    border-left: 3px solid var(--ok);
+    padding: 11px 13px;
+    font-size: 14.5px;
+  }
+  .agreed b { color: var(--ok); font-weight: 700; }
+
+  .ask {
+    margin-top: 14px;
+    border-top: 2px solid var(--ink);
+    padding-top: 12px;
+    font-size: 15.5px;
+  }
+  .ask b { font-weight: 700; }
+
+  @media (max-width: 460px) {
+    .said, .found { grid-template-columns: 1fr; }
+    .tag { text-align: left; }
+    h1 { font-size: 23px; }
+  }
+</style>
+
+<main class="sheet">
+  <h1>Three pushbacks</h1>
+  <p class="lead">
+    The advisor you asked for has reported. It agrees with most of what you decided
+    and argues with three parts. Each one is a real finding, not an opinion — so
+    each one is yours to overrule or accept.
+  </p>
+
+  <div class="rows">
+    <div class="row">
+      <span class="n">1</span>
+      <div>
+        <div class="said"><span class="tag">you said</span>
+          <span class="txt">Run the logging work in parallel with the rebase.</span></div>
+        <div class="found"><span class="tag">it found</span>
+          <span class="txt"><b>They have to take turns.</b> Both jobs rewrite the same
+            version numbers and rebuild the same outputs. The existing safety check
+            already refuses when one moves under the other.</span></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <span class="n">2</span>
+      <div>
+        <div class="said"><span class="tag">you said</span>
+          <span class="txt">Do the whole logging changeover in one pass, this round.</span></div>
+        <div class="found"><span class="tag">it found</span>
+          <span class="txt"><b>Set the rule this round; do the sweep as its own job.</b>
+            The changeover touches what commands print, how two services talk, and what
+            every test reads. Burying that inside a rebase is how it half-lands.</span></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <span class="n">3</span>
+      <div>
+        <div class="said"><span class="tag">you said</span>
+          <span class="txt">Use mise's logging settings to stop output being dropped.</span></div>
+        <div class="found"><span class="tag">it found</span>
+          <span class="txt"><b>That setting captures none of it.</b> Our own earlier test
+            measured zero bytes of command output saved, even on a failure. It logs
+            mise talking about itself. The universal logger is the answer, not a helper
+            to it.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="agreed">
+    <b>Agreed with you on everything else</b> — and it found the thing that most likely
+    sinks this: a tool that checks its own work by comparing its output to its own
+    output. Every light goes green and nothing was checked. It designed a cheap test
+    for exactly that, which we can run before any of this starts.
+  </p>
+
+  <p class="ask">
+    <b>What I need from you:</b> three calls — take turns or overrule, rule-now or
+    all-now, and whether dropping the mise-settings idea is fine. Then I stop asking
+    and start building.
+  </p>
+</main>

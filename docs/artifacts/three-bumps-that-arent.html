@@ -1,0 +1,145 @@
+<title>Three Bumps That Aren't</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600;6..72,700&family=Figtree:wght@400;500;700&family=Azeret+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #EDEEEA;
+    --surface: #FFFFFF;
+    --ink: #1A1C19;
+    --muted: #5C6159;
+    --rule: #D6D9D1;
+    --stop: #9C2F22;
+    --stop-wash: #FAF0EE;
+    --go: #2C5F3F;
+    --go-wash: #F0F5F1;
+    --display: "Newsreader", Georgia, serif;
+    --body: "Figtree", "Helvetica Neue", Arial, sans-serif;
+    --data: "Azeret Mono", ui-monospace, Menlo, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15.5px;
+    line-height: 1.45;
+    padding: 20px 16px 30px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    max-width: 660px;
+    width: 100%;
+    padding: 22px 24px 18px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 30px;
+    line-height: 1.1;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lead { font-size: 15px; color: var(--muted); margin: 7px 0 0; max-width: 58ch; }
+
+  .rows { margin-top: 16px; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 82px 1fr;
+    gap: 0 14px;
+    padding: 12px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .row:last-of-type { border-bottom: 1px solid var(--rule); }
+
+  .who {
+    font-family: var(--data);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--stop);
+    padding-top: 2px;
+  }
+
+  .what { font-size: 15px; }
+  .what .hdr { font-weight: 700; display: block; margin-bottom: 3px; }
+  .what .fig { font-family: var(--data); font-size: 13px; }
+
+  .rec {
+    margin-top: 6px;
+    background: var(--go-wash);
+    border-left: 3px solid var(--go);
+    padding: 7px 10px;
+    font-size: 14.3px;
+  }
+  .rec b { color: var(--go); font-weight: 700; }
+
+  .foot {
+    margin-top: 14px;
+    font-size: 15px;
+    border-top: 2px solid var(--ink);
+    padding-top: 11px;
+  }
+  .foot b { font-weight: 700; }
+
+  @media (max-width: 470px) {
+    .row { grid-template-columns: 1fr; }
+    .who { padding-bottom: 3px; }
+    h1 { font-size: 25px; }
+  }
+</style>
+
+<main class="sheet">
+  <h1>Three bumps that aren't</h1>
+  <p class="lead">
+    Beyond the labelling one you already ruled on, three more version updates can't
+    just be applied. Each looks like a routine bump and is something else underneath.
+    I checked all three myself.
+  </p>
+
+  <div class="rows">
+    <div class="row">
+      <span class="who">skillopt</span>
+      <div class="what">
+        <span class="hdr">It goes backwards six weeks.</span>
+        The "newer" version is dated <span class="fig">2 Jul</span>; what we have is
+        dated <span class="fig">13 Aug</span>. Taking it would remove two features we
+        specifically pinned this version to get.
+        <div class="rec"><b>Don't take it.</b> Record that the newest tag is older
+          than our pin, so it stops being offered as an upgrade every run.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <span class="who">mise</span>
+      <div class="what">
+        <span class="hdr">Three different answers before we start.</span>
+        Our floor says <span class="fig">9.0</span>, our source record says
+        <span class="fig">9.4</span>, the program actually running is
+        <span class="fig">9.5</span> — and the config file claims all three agree.
+        <div class="rec"><b>Fix the disagreement first, then bump.</b> Four places
+          have to move together, and one of them is a claim that's simply false today.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <span class="who">hk</span>
+      <div class="what">
+        <span class="hdr">Eight places say the version. Two must not change.</span>
+        Six are real settings. <b>Two are sentences about history</b> — "this landed
+        in v1.57.0" — that become lies if updated. A find-and-replace corrupts both.
+        <div class="rec"><b>Bump by hand, not by count.</b> The recorded method for
+          this one would itself break it — fix the method in the same change.</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="foot">
+    <b>What I need from you:</b> yes to all three, or tell me which to do differently.
+    None of them is urgent enough to rush.
+  </p>
+</main>

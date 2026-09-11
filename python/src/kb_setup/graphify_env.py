@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -89,7 +90,59 @@ _STRIP_BACKEND_ENV = (
 _STRIP_MISE_ENV_PREFIX = "__MISE_"
 
 
-def clean_env(extra: dict[str, str] | None = None) -> dict[str, str]:
+def _path_without_claude_cli(path_value: str) -> str:
+    """``path_value`` with every entry that can launch the Claude CLI removed.
+
+    WHY THIS EXISTS (graphify 0.9.58, upstream #3475). `graphify/llm.py:3513`
+    added, purely additively, ``if not backend and _claude_cli_available():
+    backend = "claude-cli"`` — where ``_claude_cli_available()`` is just
+    ``shutil.which("claude")``. `kb-label` runs `graphify label .` with NO
+    `--backend`, so on any host with the Claude CLI installed a task this repo
+    advertises as *"deterministic, no-LLM"* silently acquires an LLM call and
+    spends tokens, against `do-not.md` #4's `--backend`-explicit rule.
+
+    GET THE MECHANISM RIGHT, because the obvious reading is wrong:
+    `graphify/cli.py:2237-2268` computes `label_communities_by_hub` FIRST and
+    unconditionally, then lets the LLM *override* only where it returns a real
+    name. The deterministic base is never lost — 0.9.58 ADDS an unrequested call
+    on top of it. This is a cost regression, not a loss of determinism.
+
+    WHY PATH AND NOT A FLAG: there is no opt-out. Probed at v0.9.58 —
+    `--no-llm` / `--hub` / `--deterministic` / `--offline` all absent, control arm
+    `--backend`/`--missing-only`/`--resolution` all present. And `--backend ""`
+    does not work either: ``not ""`` is True, so an empty value still takes the
+    claude-cli branch. Only a truthy-but-unresolvable value suppresses the call,
+    and only by forcing an ``except Exception``. PATH is the one honest lever we
+    own, and it is a WORKAROUND — upstream is asked for a real flag.
+
+    WHY THIS IS SAFE FOR THE LABEL PATH SPECIFICALLY, measured at v0.9.58:
+    `graphify/cluster.py` — which owns the deterministic hub labeler — contains
+    ZERO `subprocess` and ZERO `shutil.which` references, so it needs nothing
+    from PATH; and every one of `llm.py`'s nine `shutil.which` call sites looks
+    for `claude`/`claude.cmd`. Removing those directories therefore removes the
+    implicit backend and nothing else the labeler uses.
+
+    🔴 WHY IT IS OPT-IN RATHER THAN ALWAYS-ON: `clean_env()` is used by EVERY
+    graphify subprocess, and `claude-cli` is one of the two SANCTIONED extraction
+    backends (`do-not.md` #4). Stripping it globally would break the extraction
+    path this repo deliberately depends on. Only the labeler asks for it, and
+    only when the caller has not explicitly opted into `--claude-cli`.
+    """
+    kept: list[str] = []
+    for entry in path_value.split(os.pathsep):
+        if not entry:
+            continue
+        # `shutil.which` scoped to ONE directory answers "could claude launch from
+        # here", including the executable-bit check, without re-implementing it.
+        if shutil.which("claude", path=entry) or shutil.which("claude.cmd", path=entry):
+            continue
+        kept.append(entry)
+    return os.pathsep.join(kept)
+
+
+def clean_env(
+    extra: dict[str, str] | None = None, *, hide_claude_cli: bool = False
+) -> dict[str, str]:
     """A copy of os.environ with backend triggers AND mise's secret blob removed.
 
     Use for EVERY graphify subprocess. Two independent strips, for two unrelated
@@ -99,12 +152,23 @@ def clean_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     `_STRIP_MISE_ENV_PREFIX` stops mise's `__MISE_DIFF` carrying the *values* of
     the credentials the first list removes by *name* into a process that writes
     the corpus. Pass ``extra`` to set additional vars.
+
+    ``hide_claude_cli`` adds a THIRD strip, of a different kind: the other two
+    remove environment variables by NAME, while this one rewrites `PATH` so
+    graphify cannot FIND the Claude CLI. It is off by default because the
+    sanctioned extraction backend needs to find it; see
+    `_path_without_claude_cli` for the full reasoning and its measurements.
     """
     env = {
         k: v
         for k, v in os.environ.items()
         if k not in _STRIP_BACKEND_ENV and not k.startswith(_STRIP_MISE_ENV_PREFIX)
     }
+    if hide_claude_cli and env.get("PATH"):
+        env["PATH"] = _path_without_claude_cli(env["PATH"])
+    # `extra` is applied LAST so an explicit override still wins, matching the
+    # behaviour `test_graphify_env.py::test_extra_still_wins` pins for the
+    # name-based strips. A caller handing PATH back deliberately is honoured.
     if extra:
         env.update(extra)
     return env
@@ -181,7 +245,6 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
             f"(pin={pinned or 'UNKNOWN'}, running={running or 'UNKNOWN'}, exe={exe}). "
             "Run `mise deps` to restore the locked uv environment."
         )
-        return
     if pinned != running:
         raise SystemExit(
             f"[graphify] REFUSING to write the graph with graphify {running} ({exe}) "

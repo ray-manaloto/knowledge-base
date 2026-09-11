@@ -219,3 +219,74 @@ def test_gate_refuses_public_sdk_signature_drift(
     monkeypatch.setattr(graphify_sdk, "assert_public_sdk", drift)
     with pytest.raises(RuntimeError, match="signature changed"):
         graphify_env.assert_pinned_graphify(tmp_path)
+
+
+def _fake_claude_dir(tmp_path: Path, name: str) -> Path:
+    """A directory holding an EXECUTABLE `claude`, as `shutil.which` requires.
+
+    The executable bit is the whole point: `_path_without_claude_cli` delegates to
+    `shutil.which`, which checks `os.access(..., os.X_OK)`. A non-executable file
+    named `claude` would NOT be found, so a fixture that forgot `chmod` would make
+    the strip look like it worked while testing nothing.
+    """
+    directory = tmp_path / name
+    directory.mkdir()
+    binary = directory / "claude"
+    binary.write_text("#!/bin/sh\nexit 0\n")
+    binary.chmod(0o755)
+    return directory
+
+
+def test_hide_claude_cli_removes_the_directory_that_can_launch_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Graphify >= 0.9.58 picks claude-cli whenever the CLI is merely INSTALLED.
+
+    `llm.py:3513` — `if not backend and _claude_cli_available(): backend =
+    "claude-cli"`, where availability is `shutil.which("claude")`. `kb-label` runs
+    `graphify label .` with no `--backend`, so without this strip a task advertised
+    as "deterministic, no-LLM" acquires an LLM call and spends tokens.
+    """
+    has_claude = _fake_claude_dir(tmp_path, "with-claude")
+    no_claude = tmp_path / "without-claude"
+    no_claude.mkdir()
+    monkeypatch.setenv("PATH", os.pathsep.join([str(has_claude), str(no_claude)]))
+
+    env = graphify_env.clean_env(hide_claude_cli=True)
+
+    entries = env["PATH"].split(os.pathsep)
+    assert str(has_claude) not in entries
+    # The strip must be SURGICAL. Dropping PATH wholesale would also pass the
+    # assertion above while breaking every other tool the subprocess resolves.
+    assert str(no_claude) in entries
+
+
+def test_clean_env_keeps_claude_on_path_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM, and it guards a REAL dependency, not just symmetry.
+
+    `clean_env()` is used by EVERY graphify subprocess, and `claude-cli` is one of
+    the two sanctioned extraction backends (`do-not.md` #4). If the strip were
+    always-on it would break extraction — so the default MUST keep the directory,
+    and this arm is what would catch someone "simplifying" the flag away.
+    """
+    has_claude = _fake_claude_dir(tmp_path, "with-claude")
+    monkeypatch.setenv("PATH", str(has_claude))
+
+    assert str(has_claude) in graphify_env.clean_env()["PATH"].split(os.pathsep)
+
+
+def test_hide_claude_cli_is_a_no_op_when_the_cli_is_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A host without the CLI keeps every PATH entry — the strip is not a blanket.
+
+    Without this, a `_path_without_claude_cli` that returned "" for everything
+    would still pass the two arms above.
+    """
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    monkeypatch.setenv("PATH", str(plain))
+
+    assert graphify_env.clean_env(hide_claude_cli=True)["PATH"] == str(plain)

@@ -1,0 +1,200 @@
+<title>Five Asks, No Rule</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@600;700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --ground: #EDF0EE;
+    --surface: #FFFFFF;
+    --ink: #191D1B;
+    --muted: #5B665F;
+    --rule: #D3DAD5;
+    --ask: #9B2C2C;
+    --built: #46586B;
+    --built-wash: #EEF2F6;
+    --display: "Spectral", Georgia, serif;
+    --body: "Work Sans", "Helvetica Neue", Arial, sans-serif;
+    --data: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15.5px;
+    line-height: 1.45;
+    padding: 20px 16px 30px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    max-width: 620px;
+    width: 100%;
+    padding: 24px 26px 20px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 27px;
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .sub {
+    font-size: 14.5px;
+    color: var(--muted);
+    margin: 7px 0 0;
+    max-width: 56ch;
+  }
+
+  ol.rail {
+    list-style: none;
+    margin: 20px 0 0;
+    padding: 0 0 0 2px;
+  }
+
+  ol.rail li {
+    display: grid;
+    grid-template-columns: 52px 14px 1fr;
+    gap: 0 10px;
+    align-items: start;
+    position: relative;
+    padding-bottom: 13px;
+  }
+
+  ol.rail li:last-child { padding-bottom: 4px; }
+
+  .when {
+    font-family: var(--data);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    padding-top: 2px;
+    text-align: right;
+  }
+
+  .dot {
+    width: 14px;
+    height: 14px;
+    position: relative;
+    margin-top: 3px;
+  }
+  .dot::before {
+    content: "";
+    position: absolute;
+    left: 3px; top: 2px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+  li.ask   .dot::before { background: var(--ask); }
+  li.built .dot::before { background: var(--surface); border: 2px solid var(--built); width: 6px; height: 6px; }
+
+  ol.rail li:not(:last-child) .dot::after {
+    content: "";
+    position: absolute;
+    left: 6px; top: 13px;
+    width: 2px;
+    height: calc(100% + 13px);
+    background: var(--rule);
+  }
+
+  .what { font-size: 15px; padding-top: 0; }
+  li.ask .what { font-weight: 500; }
+  li.ask .what q { color: var(--ask); font-style: normal; }
+  li.built .what { color: var(--built); }
+
+  .tally {
+    margin-top: 16px;
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+  .tally div { flex: 1 1 120px; }
+  .tally .num {
+    font-family: var(--data);
+    font-weight: 700;
+    font-size: 25px;
+    font-variant-numeric: tabular-nums;
+    display: block;
+    line-height: 1.1;
+  }
+  .tally .lbl { font-size: 12.5px; color: var(--muted); }
+  .tally .zero .num { color: var(--ask); }
+
+  .punch {
+    margin-top: 16px;
+    background: var(--built-wash);
+    border-left: 3px solid var(--ask);
+    padding: 12px 14px;
+    font-size: 15.5px;
+    line-height: 1.45;
+  }
+  .punch b { font-weight: 600; }
+
+  @media (max-width: 460px) {
+    ol.rail li { grid-template-columns: 46px 14px 1fr; }
+    h1 { font-size: 23px; }
+  }
+</style>
+
+<main class="sheet">
+  <h1>Five asks, no rule</h1>
+  <p class="sub">
+    You told me to search the old sessions for the history of the logging complaint.
+    Here it is, oldest first. Filled dots are you asking. Hollow dots are something
+    being built about it.
+  </p>
+
+  <ol class="rail">
+    <li class="built">
+      <span class="when">Aug 18</span><span class="dot"></span>
+      <span class="what">A ticket is opened for exactly this — capture every command's
+        output so nothing is silently dropped. <b>It is still open today.</b></span>
+    </li>
+    <li class="ask">
+      <span class="when">Aug 19</span><span class="dot"></span>
+      <span class="what">You: <q>this is not following my requirements</q>.</span>
+    </li>
+    <li class="ask">
+      <span class="when">Aug 23</span><span class="dot"></span>
+      <span class="what">You ask again — this time bundled with the same
+        skill&nbsp;→&nbsp;task&nbsp;→&nbsp;module rule you repeated today.</span>
+    </li>
+    <li class="ask">
+      <span class="when">Aug 30</span><span class="dot"></span>
+      <span class="what">You: <q>the mandate i keep asking for</q>. So by then it was
+        already old.</span>
+    </li>
+    <li class="built">
+      <span class="when">Sep 2</span><span class="dot"></span>
+      <span class="what">The plumbing to do it gets built — and then reaches only
+        14 of 112 places.</span>
+    </li>
+    <li class="built">
+      <span class="when">Sep 10</span><span class="dot"></span>
+      <span class="what">A 501-line design is written for how to enforce it.</span>
+    </li>
+    <li class="ask">
+      <span class="when">Sep 11</span><span class="dot"></span>
+      <span class="what">You ask again. Today.</span>
+    </li>
+  </ol>
+
+  <div class="tally">
+    <div><span class="num">5</span><span class="lbl">times you asked</span></div>
+    <div><span class="num">24</span><span class="lbl">days the ticket has been open</span></div>
+    <div class="zero"><span class="num">0</span><span class="lbl">rules that say it</span></div>
+  </div>
+
+  <p class="punch">
+    <b>The gap isn't the design — it's that nothing an agent reads every session says
+    this.</b> I checked all 22 rule files: none mentions it. Every session has to be
+    told by you. That is why it keeps coming back.
+  </p>
+</main>
