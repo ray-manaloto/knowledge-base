@@ -43,11 +43,26 @@ import { PROTECTED_SUFFIXES } from "./protected-paths";
  * Registered as ONE LITERAL MATCHER PER TOOL, never as a bare `on("tool.call",
  * hook)`.
  *
- * 🔴 This is the `anthropics/claude-code#92533` mitigation and it is not
- * optional. Registering ANY hook that reaches the Bash dispatch breaks every
- * Bash call inside an `Agent(isolation: "worktree")` subagent — a pure
- * passthrough is enough to trigger it. A bare registration sees every tool,
- * Bash included.
+ * 🔴 THE REAL `anthropics/claude-code#92533` INVARIANT IS "NEVER BASH", NOT
+ * "use literal matchers". This comment said the latter until 2026-09-11, when
+ * the upstream issue was read directly rather than relayed: its minimal
+ * reproducer IS a literal matcher —
+ *
+ *     on("tool.call", { tool: "Bash" }, async ($, e, next) => next(e));
+ *
+ * — a pure passthrough on one literal tool, and it still breaks EVERY Bash call
+ * inside an `Agent(isolation: "worktree")` subagent, `pwd` and `true` included,
+ * with no retry that helps. So literalness mitigates nothing on its own.
+ *
+ * This module is safe because `WRITE_TOOLS` below never names Bash. Adding
+ * "Bash" to that array would satisfy the old wording exactly and break worktree
+ * subagents repo-wide — which is why the invariant is restated as a prohibition
+ * on the TOOL rather than a recommendation about matcher shape.
+ *
+ * One literal matcher per tool is still how this registers, for the separate and
+ * lesser reason below: the covered inventory stays reviewable and each entry is
+ * independently armable. A bare `on("tool.call", hook)` would additionally see
+ * Bash, which is what makes it forbidden here.
  *
  * Measured on 2.1.268: `on(event, matcher, hook)` is real, the matcher is a
  * partial of the event, and `{ tool: "Edit" }` fired on Edit ONLY while an
