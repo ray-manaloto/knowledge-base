@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ray-manaloto/knowledge-base/schemas/codex-review-evidence.schema.json",
+  "title": "CodexReviewEvidence",
+  "description": "One `codex review` attempt's provenance record (#750 Phase 1). Flattened rather than a JSON-Schema oneOf/discriminator: msgspec.Struct codegen has no clean discriminated-union output here, and this repo's own Receipt (review.py) already validates a flat dict by hand rather than requiring every composite type to round-trip through a generated union. `outcome` is the tag; the branch-specific fields (resolved_model/review_completion for `resolved`, unavailable_reason for `unavailable`, error_kind for `error`) are present and null when their branch does not apply. Every closed set here (outcome, review_completion, unavailable_reason, error_kind) is still generated, per this repo's standing rule that a closed set typed as a bare str fails silently. Phase 1 is record-only: this schema has no bearing on kb-ship/kb-land, which do not read it yet.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "adapter_version",
+    "attempt_id",
+    "codex_home",
+    "cli_version",
+    "requested_model",
+    "requested_effort",
+    "base_ref",
+    "subprocess_rc",
+    "timed_out",
+    "output_path",
+    "outcome",
+    "parent_session_id",
+    "child_rollout_path",
+    "turn_models",
+    "resolved_model",
+    "review_completion",
+    "unavailable_reason",
+    "error_kind",
+    "diagnostics"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "adapter_version": {"const": 1},
+    "attempt_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "codex_home": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "cli_version": {"type": "string", "maxLength": 64},
+    "requested_model": {"type": ["string", "null"], "maxLength": 128},
+    "requested_effort": {"type": ["string", "null"], "maxLength": 64},
+    "base_ref": {"type": "string", "minLength": 1, "maxLength": 256},
+    "subprocess_rc": {"type": "integer"},
+    "timed_out": {"type": "boolean"},
+    "output_path": {"type": ["string", "null"], "maxLength": 4096},
+    "outcome": {"$ref": "#/$defs/OutcomeKind"},
+    "parent_session_id": {"type": ["string", "null"], "maxLength": 64},
+    "child_rollout_path": {"type": ["string", "null"], "maxLength": 4096},
+    "turn_models": {
+      "type": "array",
+      "items": {"type": "string", "maxLength": 128}
+    },
+    "resolved_model": {"type": ["string", "null"], "maxLength": 128},
+    "review_completion": {"anyOf": [{"$ref": "#/$defs/ReviewCompletion"}, {"type": "null"}]},
+    "unavailable_reason": {"anyOf": [{"$ref": "#/$defs/UnavailableReason"}, {"type": "null"}]},
+    "error_kind": {"anyOf": [{"$ref": "#/$defs/ErrorKind"}, {"type": "null"}]},
+    "diagnostics": {"type": ["string", "null"], "maxLength": 4096}
+  },
+  "$defs": {
+    "OutcomeKind": {
+      "description": "The tag. resolved: a unique reviewer turn was found and its model read. unavailable: looked properly and the evidence was not there (a data gap, not a bug). error: the resolver itself failed (I/O, a crash) while trying to look.",
+      "enum": ["resolved", "unavailable", "error"]
+    },
+    "ReviewCompletion": {
+      "description": "Measured 2026-09-10 against real rollouts on this host: a completed AND an aborted review both write one event_msg of type task_complete to the CHILD rollout (last_agent_message + no error vs last_agent_message=null + an error object); a review still mid-flight or whose task_complete has not yet been flushed to disk leaves none, which is 'unknown', never silently read as complete.",
+      "enum": ["complete", "aborted", "unknown"]
+    },
+    "UnavailableReason": {
+      "description": "Closed set of reasons collection or resolution could not produce evidence, none of them a resolver bug.",
+      "enum": [
+        "no-output-flag",
+        "banner-session-id-unavailable",
+        "codex-home-unresolvable",
+        "no-matching-child-rollout",
+        "ambiguous-child-rollout",
+        "no-turn-context",
+        "missing-model-field",
+        "unsupported-schema-version"
+      ]
+    },
+    "ErrorKind": {
+      "description": "Closed set of resolver-side failures — the resolver itself broke, distinct from an honest UnavailableReason.",
+      "enum": ["resolver-io-error", "resolver-crashed"]
+    }
+  }
+}

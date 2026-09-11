@@ -533,6 +533,13 @@ def _run_review(args: argparse.Namespace) -> int:
     holds only the final message, while this holds everything the lane printed.
     For a review report that is the better artifact, but it is not the same
     artifact, and a caller diffing the two should know why.
+
+    **#750 Phase 1**: after the lane returns, this also captures and persists a
+    `codex_review_evidence` record — best-effort, and it NEVER changes the
+    return value below. See `kb_setup.codex_review_evidence`'s module
+    docstring for the full design; the one-line version is that `--output`
+    being omitted (the collection point's own load-bearing dependency, #750
+    M2) makes evidence `Unavailable`, never a crash and never a refusal.
     """
     # Instructions come from the positional prompt or stdin, and are delivered
     # through `-c developer_instructions=` rather than as `[PROMPT]`, which the
@@ -578,11 +585,37 @@ def _run_review(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
-    return _spawn(
-        built,
-        timeout=args.timeout,
-        tee=Path(args.output) if args.output else None,
-    )
+    output_path = Path(args.output) if args.output else None
+    rc = _spawn(built, timeout=args.timeout, tee=output_path)
+
+    # Evidence capture is a side channel: it runs after the lane's own rc is
+    # already decided and can never alter it (see the docstring above).
+    # `capture_and_persist`'s own contract is to never raise — every
+    # anticipated failure is a typed `Unavailable`/`Error` it catches itself
+    # — but this SECOND, outermost guard is what makes that a guarantee
+    # rather than a hope: even an import failure in `codex_review_evidence`
+    # itself (a broken generated file, a bad merge) must not cost the caller
+    # the review's own exit code. Anything caught here is reported, never
+    # silently absorbed — see pyproject.toml's BLE001 exemption for this file.
+    try:
+        from kb_setup import codex_review_evidence as evidence
+
+        evidence.capture_and_persist(
+            Path.cwd(),
+            requested_model=args.model,
+            requested_effort=args.effort,
+            base_ref=args.base,
+            subprocess_rc=rc,
+            timed_out=rc == _RC_TIMED_OUT,
+            output_path=output_path,
+        )
+    except Exception as exc:
+        print(
+            f"kb-codex --review: evidence capture unavailable (outer guard): {exc}",
+            file=sys.stderr,
+        )
+
+    return rc
 
 
 def run(argv: list[str] | None = None) -> int:

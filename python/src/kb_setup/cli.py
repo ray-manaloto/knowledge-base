@@ -754,7 +754,10 @@ def _build_checked(repo_root: Path) -> int:
 
 #: Every flag `kb-setup review-receipt` reads. Stating one twice is refused
 #: rather than silently resolved to whichever `_opt` happens to find first.
-_RECEIPT_FLAGS = ("--lanes", "--skipped", "--findings", "--blocking", "--fixed-point")
+#: `--evidence` joined 2026-09-10 (#750 Phase 1) — a repeated `--evidence`
+#: inherits the exact defect its neighbours already guard against
+#: (`_opt` returning the FIRST occurrence) if it is not named here too.
+_RECEIPT_FLAGS = ("--lanes", "--skipped", "--findings", "--blocking", "--fixed-point", "--evidence")
 
 #: Digit bound on `--findings` / `--blocking`. Well under CPython's
 #: `sys.int_info.str_digits_check_threshold` (4300), past which `int()` itself
@@ -798,6 +801,12 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
         )
         return 2
     skipped = [s.strip() for s in (_opt(rest, "--skipped") or "").split(",") if s.strip()]
+    # #750 Phase 1 — RECORDED, never gated: no shape is refused here. Comma-
+    # separated `lane=reference` strings; `reference` is a `codex_review_evidence`
+    # attempt id or the honest label `model-unverified`. Omitting `--evidence`
+    # entirely is the ordinary case for every non-codex lane and every receipt
+    # minted before this flag existed.
+    evidence = [s.strip() for s in (_opt(rest, "--evidence") or "").split(",") if s.strip()]
 
     # `--blocking` is REQUIRED and has no default. `review.receipt_state` rejects
     # a missing blocking count as ambiguity rather than consent — defaulting it to
@@ -862,6 +871,7 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
         lanes_skipped=tuple(skipped),
         findings=counts["--findings"],
         blocking=counts["--blocking"],
+        codex_evidence=tuple(evidence),
     )
 
     # Validated BEFORE the write. Writing first and reporting REJECTED after
