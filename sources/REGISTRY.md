@@ -529,3 +529,29 @@ sources: `tarqd/skills`, `nq-rdl/agent-extensions`, `a5c-ai/babysitter`,
 - <https://github.com/firecrawl/firecrawl-claude-plugin> · <https://github.com/upstash/context7> —
   the two plugins dissected as the pattern (and the ctx7 CLI's upstream). firecrawl already
   registered above (T2); context7 T2 `pending`.
+
+### 2026-09-11 — the function-hooks enforcement programme (`docs/research/reports/2026-09-11-function-hooks-{enforcement-programme,astra-verdict-raw}.md`)
+
+- <https://github.com/anthropics/claude-code> — the `mods/` folder (`README.md`,
+  `sec-default/{README.md,hooks/*}`) is the ONLY primary source for the function-hooks
+  surface, and its CHANGELOG through 2.1.268 carries **zero** function-hook entries, so
+  the feature is unreleased and the repo is the spec. **Issue #92533** (a Bash
+  `tool.call` hook breaking `Agent(isolation:"worktree")`) was read in full and is a
+  live constraint on this repo's migration. T1 `pending` — a manifest is warranted; this
+  is the surface the whole G00–G12 chain is built on and it moves weekly.
+- <https://github.com/lossless-claude/lcm> — the one project that has ALREADY completed
+  a function-hooks migration and hit the no-Node wall, keeping a daemon to do the work
+  the module cannot. Named by the advisor lane; **not fetched by me**. T2 `pending` —
+  the only known prior art for the exact migration we just planned.
+- <https://github.com/ljharb/shell-quote> · <https://github.com/vorpaljs/bash-parser> ·
+  <https://github.com/tree-sitter/tree-sitter-bash> · <https://github.com/mvdan/sh> —
+  shell-parser candidates for G06 (#759) if the python-bridge route is ever rejected.
+  Named by the advisor; **not fetched**. T3 `deferred` — leads only, and the ruled design
+  is a thin shell over the existing python parser, so none may be needed.
+- <https://github.com/anthropics/claude-agent-sdk-typescript> — named by the advisor as a
+  possible live-test driver for G01's runtime contract. Not fetched. T3 `deferred`.
+- **Docs pages read live** (not repos, recorded so the next session does not re-fetch):
+  `code.claude.com/docs/en/{hooks,sub-agents,settings-reference,plugin-marketplaces}.md`.
+  `hooks.md:767` is the `agent_id` definition the whole caller-aware design turns on, and
+  the (a) handoff already records that `hooks.md` CHANGED and has not been re-ingested —
+  still true, and now load-bearing.

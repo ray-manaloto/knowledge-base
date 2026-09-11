@@ -1,0 +1,4 @@
+{
+  "description": "Deny a delegated lane any Edit/Write to .claude/settings*.json",
+  "modules": ["./register.ts"]
+}

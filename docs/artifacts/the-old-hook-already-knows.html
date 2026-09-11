@@ -1,0 +1,160 @@
+<title>The Old Hook Already Knows</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#FAFAF8;
+    --surface:#FFFFFF;
+    --ink:#1A1B18;
+    --muted:#63665F;
+    --rule:#E0E1DC;
+    --now:#0F5E5A;
+    --exp:#5B4B8A;
+    --deny:#9C2A3E;
+    --display:"Archivo",system-ui,sans-serif;
+    --body:"Source Serif 4",Georgia,serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);color:var(--ink);
+    font-family:var(--body);font-size:15.5px;line-height:1.5;
+    margin:0;padding-block:26px 32px;padding-left:20px;padding-right:20px;
+  }
+  .wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+  h1{
+    font-family:var(--display);font-weight:700;
+    font-size:clamp(27px,4.2vw,38px);line-height:1.05;
+    margin:0 0 6px;letter-spacing:-0.02em;text-wrap:balance;
+  }
+  .sub{margin:0;color:var(--muted);font-size:16px;max-width:62ch}
+
+  figure{margin:0;background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:12px 10px 8px;overflow-x:auto}
+  figure svg{display:block;max-width:100%;height:auto;margin:0 auto;color:var(--ink)}
+  figcaption{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;margin-top:6px}
+
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--rule);border-radius:5px}
+  caption{
+    font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--muted);text-align:left;padding:0 0 7px;
+  }
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  thead th{
+    font-family:var(--display);font-weight:600;font-size:12.5px;
+    letter-spacing:.01em;border-bottom:1.5px solid var(--rule);
+  }
+  th.q{font-family:var(--mono);font-weight:400;font-size:11.5px;color:var(--muted);width:31%;text-transform:none;letter-spacing:0}
+  .now{color:var(--now)}
+  .exp{color:var(--exp)}
+  .bad{color:var(--deny)}
+  td b{font-weight:600}
+  code{font-family:var(--mono);font-size:12.5px;background:#F0F1ED;padding:1px 4px;border-radius:3px}
+  .hdr-now{color:var(--now)}
+  .hdr-exp{color:var(--exp)}
+
+  .ask{
+    font-family:var(--display);font-weight:600;font-size:18px;line-height:1.35;
+    padding:14px 17px;background:var(--surface);border:1px solid var(--rule);
+    border-left:4px solid var(--ink);border-radius:5px;
+  }
+  footer{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:right}
+
+  @media (max-width:620px){
+    th.q{width:auto}
+    table,thead,tbody,th,td,tr{display:block}
+    thead{display:none}
+    td{border-bottom:0;padding:3px 14px}
+    tr{border-bottom:1px solid var(--rule);padding:9px 0}
+    td::before{content:attr(data-l);font-family:var(--mono);font-size:10.5px;color:var(--muted);display:block}
+  }
+</style>
+
+<div class="wrap">
+
+  <h1>The old hook already knows who's calling</h1>
+  <p class="sub">The one thing we thought needed the new experimental feature — telling <em>your</em> edit apart from <em>an agent's</em> — the hooks we already run have been able to do all along.</p>
+
+  <figure>
+    <svg viewBox="0 0 780 148" role="img" aria-label="Two tool calls arrive at the same existing guard. The one from the main thread carries no agent id; the one from a subagent carries an agent id and agent type, which the guard reads to allow or deny.">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="currentColor"></polygon>
+        </marker>
+      </defs>
+
+      <text x="8" y="18" font-size="10.5" fill="#63665F" font-family="IBM Plex Mono, monospace">measured, one run, both arms</text>
+
+      <!-- lane 1: you -->
+      <rect x="8" y="32" width="150" height="38" rx="4" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+      <text x="83" y="49" text-anchor="middle" font-size="12.5" fill="currentColor" font-family="Archivo, sans-serif">you, in the session</text>
+      <text x="83" y="63" text-anchor="middle" font-size="11" fill="#0F5E5A" font-family="IBM Plex Mono, monospace">no badge</text>
+
+      <!-- lane 2: agent -->
+      <rect x="8" y="86" width="150" height="38" rx="4" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+      <text x="83" y="103" text-anchor="middle" font-size="12.5" fill="currentColor" font-family="Archivo, sans-serif">a delegated lane</text>
+      <text x="83" y="117" text-anchor="middle" font-size="11" fill="#9C2A3E" font-family="IBM Plex Mono, monospace">carries a badge</text>
+
+      <line x1="160" y1="51" x2="286" y2="65" stroke="currentColor" stroke-width="1.2" marker-end="url(#a2)"></line>
+      <line x1="160" y1="105" x2="286" y2="91" stroke="currentColor" stroke-width="1.2" marker-end="url(#a2)"></line>
+
+      <text x="176" y="44" font-size="10.5" fill="#63665F" font-family="IBM Plex Mono, monospace">agent_id absent</text>
+      <text x="176" y="124" font-size="10.5" fill="#63665F" font-family="IBM Plex Mono, monospace">agent_id = a30b478…</text>
+
+      <!-- the guard -->
+      <rect x="292" y="52" width="166" height="52" rx="4" fill="none" stroke="currentColor" stroke-width="2"></rect>
+      <text x="375" y="72" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor" font-family="Archivo, sans-serif">the guard we already run</text>
+      <text x="375" y="88" text-anchor="middle" font-size="11" fill="#63665F" font-family="IBM Plex Mono, monospace">reads the badge, decides</text>
+
+      <line x1="460" y1="66" x2="556" y2="52" stroke="#0F5E5A" stroke-width="1.4" marker-end="url(#a2)" color="#0F5E5A"></line>
+      <line x1="460" y1="90" x2="556" y2="104" stroke="#9C2A3E" stroke-width="1.4" marker-end="url(#a2)" color="#9C2A3E"></line>
+
+      <rect x="560" y="30" width="140" height="38" rx="4" fill="none" stroke="#0F5E5A" stroke-width="1.4"></rect>
+      <text x="630" y="54" text-anchor="middle" font-size="12.5" font-weight="600" fill="#0F5E5A" font-family="Archivo, sans-serif">your edit goes through</text>
+
+      <rect x="560" y="88" width="140" height="38" rx="4" fill="none" stroke="#9C2A3E" stroke-width="1.4"></rect>
+      <text x="630" y="112" text-anchor="middle" font-size="12.5" font-weight="600" fill="#9C2A3E" font-family="Archivo, sans-serif">the lane is refused</text>
+    </svg>
+    <figcaption>Same command, two callers. Only one arrives with a name on it.</figcaption>
+  </figure>
+
+  <table>
+    <caption>the choice, on the four things that decide it</caption>
+    <thead>
+      <tr>
+        <th class="q"></th>
+        <th class="hdr-now">The hook we already run</th>
+        <th class="hdr-exp">The new function hook</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="q" data-l="">Can it tell a lane from you?</td>
+        <td data-l="already run"><b class="now">Yes — proven today.</b> One run, both arms.</td>
+        <td data-l="function hook"><b class="exp">Yes</b>, with more detail about the caller.</td>
+      </tr>
+      <tr>
+        <td class="q" data-l="">Does it work right now?</td>
+        <td data-l="already run"><b class="now">Yes, in every session.</b> Twelve of them run here already.</td>
+        <td data-l="function hook"><b class="bad">Only with a switch on</b> — unreleased, and moving week to week.</td>
+      </tr>
+      <tr>
+        <td class="q" data-l="">What turns it off quietly?</td>
+        <td data-l="already run">One known setting, in one known place.</td>
+        <td data-l="function hook"><b class="bad">Four different latches</b>, three of which we don't control.</td>
+      </tr>
+      <tr>
+        <td class="q" data-l="">Anything known broken?</td>
+        <td data-l="already run">Nothing open against it.</td>
+        <td data-l="function hook"><b class="bad">Yes</b> — a reported bug where this kind of hook breaks commands inside isolated agent workspaces.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="ask">
+    → You ruled the new one after seven rounds, and it <em>does</em> work — I proved it this morning. But the reason to reach for it may have just evaporated. <b>Which do I build?</b>
+  </div>
+
+  <footer>measured on the installed build, 2026-09-11 · commands, arms and citations in the terminal reply</footer>
+
+</div>

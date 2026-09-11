@@ -1,0 +1,164 @@
+<title>Why the Hook Never Fired</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#F4F6F9;
+    --surface:#FFFFFF;
+    --ink:#141922;
+    --muted:#5B6472;
+    --rule:#D9E0E8;
+    --deny:#A3243B;
+    --pass:#1D6F4B;
+    --mark:#B4530A;
+    --display:"Newsreader",Georgia,serif;
+    --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:15px;
+    line-height:1.5;
+    margin:0;
+    padding-block:28px 34px;
+    padding-left:20px;
+    padding-right:20px;
+  }
+  .wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+
+  header h1{
+    font-family:var(--display);
+    font-weight:600;
+    font-size:clamp(28px,4.4vw,40px);
+    line-height:1.1;
+    margin:0 0 6px;
+    text-wrap:balance;
+    letter-spacing:-0.01em;
+  }
+  header p{margin:0;color:var(--muted);font-size:16px;max-width:60ch}
+
+  figure{margin:0;background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:14px 12px 10px;overflow-x:auto}
+  figure svg{display:block;max-width:100%;height:auto;margin:0 auto;color:var(--ink)}
+  figcaption{
+    font-family:var(--mono);font-size:11.5px;color:var(--muted);
+    text-align:center;margin-top:8px;letter-spacing:.01em;
+  }
+
+  .rows{display:flex;flex-direction:column;gap:0;background:var(--surface);border:1px solid var(--rule);border-radius:6px}
+  .row{display:grid;grid-template-columns:132px 1fr;gap:16px;padding:13px 16px;border-bottom:1px solid var(--rule)}
+  .row:last-child{border-bottom:0}
+  .key{
+    font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.09em;
+    color:var(--muted);padding-top:3px;
+  }
+  .val{margin:0}
+  .val strong{font-weight:600}
+  code{font-family:var(--mono);font-size:13px;background:#EEF1F5;padding:1px 5px;border-radius:3px}
+  .deny{color:var(--deny);font-weight:600}
+  .pass{color:var(--pass);font-weight:600}
+
+  .watch{
+    background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--mark);
+    border-radius:6px;padding:13px 16px;
+  }
+  .watch .key{color:var(--mark)}
+  .watch p{margin:4px 0 0;max-width:72ch}
+
+  .ask{
+    font-family:var(--display);font-size:19px;font-weight:500;
+    padding:14px 18px;background:var(--surface);border:1px solid var(--rule);border-radius:6px;
+  }
+  footer{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right}
+
+  @media (max-width:560px){
+    .row{grid-template-columns:1fr;gap:4px}
+    .key{padding-top:0}
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <h1>Why the hook never fired</h1>
+    <p>It was never skipped. It <em>refused to load</em> — and said so out loud, in a place nothing was listening.</p>
+  </header>
+
+  <figure>
+    <svg viewBox="0 0 820 150" role="img" aria-label="A hook passes through two gates in series: a switch that is off by default, then an import allowlist that refused node:fs. The run died at the second gate.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="currentColor"></polygon>
+        </marker>
+        <marker id="arR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="#A3243B"></polygon>
+        </marker>
+      </defs>
+
+      <!-- boxes -->
+      <rect x="6"   y="44" width="126" height="44" rx="4" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+      <text x="69"  y="63" text-anchor="middle" font-size="12.5" fill="currentColor" font-family="IBM Plex Sans, sans-serif">plugin found</text>
+      <text x="69"  y="78" text-anchor="middle" font-size="11" fill="#5B6472" font-family="IBM Plex Mono, monospace">hooks.json read</text>
+
+      <rect x="196" y="38" width="150" height="56" rx="4" fill="none" stroke="currentColor" stroke-width="2"></rect>
+      <text x="271" y="58" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor" font-family="IBM Plex Sans, sans-serif">GATE 1 — the switch</text>
+      <text x="271" y="73" text-anchor="middle" font-size="11" fill="#5B6472" font-family="IBM Plex Mono, monospace">off unless you say so</text>
+      <text x="271" y="87" text-anchor="middle" font-size="11" fill="#1D6F4B" font-family="IBM Plex Mono, monospace">we passed this</text>
+
+      <rect x="410" y="38" width="164" height="56" rx="4" fill="none" stroke="#A3243B" stroke-width="2"></rect>
+      <text x="492" y="58" text-anchor="middle" font-size="12.5" font-weight="600" fill="#A3243B" font-family="IBM Plex Sans, sans-serif">GATE 2 — imports</text>
+      <text x="492" y="73" text-anchor="middle" font-size="11" fill="#5B6472" font-family="IBM Plex Mono, monospace">own files + claude-code</text>
+      <text x="492" y="87" text-anchor="middle" font-size="11" fill="#A3243B" font-family="IBM Plex Mono, monospace">we died here</text>
+
+      <rect x="640" y="44" width="174" height="44" rx="4" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+      <text x="727" y="63" text-anchor="middle" font-size="12.5" fill="currentColor" font-family="IBM Plex Sans, sans-serif">hook runs on every event</text>
+      <text x="727" y="78" text-anchor="middle" font-size="11" fill="#5B6472" font-family="IBM Plex Mono, monospace">and can say no</text>
+
+      <!-- arrows -->
+      <line x1="134" y1="66" x2="192" y2="66" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"></line>
+      <line x1="348" y1="66" x2="406" y2="66" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"></line>
+      <line x1="576" y1="66" x2="636" y2="66" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"></line>
+
+      <!-- the failure exit -->
+      <line x1="492" y1="98" x2="492" y2="124" stroke="#A3243B" stroke-width="1.6" marker-end="url(#arR)"></line>
+      <text x="502" y="128" font-size="11.5" fill="#A3243B" font-family="IBM Plex Mono, monospace">refused — logged, but only to the debug file</text>
+
+      <text x="69" y="26" text-anchor="middle" font-size="10.5" fill="#5B6472" font-family="IBM Plex Mono, monospace">this part always worked</text>
+    </svg>
+    <figcaption>Two gates in series. We only knew about the first one.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <div class="key">What broke</div>
+      <p class="val">The hook file imported <code>node:fs</code>. A hook module may import <strong>only its own files and <code>claude-code</code></strong> — nothing else. One line, and the whole module was <span class="deny">turned away</span>.</p>
+    </div>
+    <div class="row">
+      <div class="key">Why it looked silent</div>
+      <p class="val">It wasn't. The engine wrote a real error — it just goes to the debug file, and last round didn't ask for one. Add <code>--debug-file</code> and the reason is right there in plain English.</p>
+    </div>
+    <div class="row">
+      <div class="key">Proof it works</div>
+      <p class="val">Same command, one thing changed. Switch on → <span class="pass">39 hook events</span>. Switch off → <span class="deny">0</span>. The log even prints which of the two states you're in.</p>
+    </div>
+    <div class="row">
+      <div class="key">Switch can live here</div>
+      <p class="val">Put it in the repo's own settings file and it works — checked with the switch removed from the environment entirely, and the hooks still ran. <strong>The plan you chose is buildable as you chose it.</strong></p>
+    </div>
+    <div class="row">
+      <div class="key">It can say no</div>
+      <p class="val">A hook can block a command outright, and the block holds <strong>even when permission checks are turned off</strong>. That is exactly the power the settings-file guard needs.</p>
+    </div>
+  </div>
+
+  <div class="watch">
+    <div class="key">One thing to watch</div>
+    <p>The same hook also sees <strong>the assistant's own replies</strong>, not just commands. My first test matched on the whole message and accidentally blocked Claude from telling me it had been blocked. The guard has to look at the one field it cares about, never the whole blob — the same mistake that would block <code>git commit -m "…"</code> for mentioning a forbidden word.</p>
+  </div>
+
+  <div class="ask">→ Nothing needed from you to fix this. Say go and I'll build the guard.</div>
+
+  <footer>measured on the installed build, 2026-09-11 · arms, log paths and line-level citations are in the terminal reply</footer>
+
+</div>
