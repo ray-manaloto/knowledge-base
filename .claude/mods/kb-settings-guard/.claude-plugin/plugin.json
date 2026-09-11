@@ -1,6 +1,8 @@
 {
   "name": "kb-settings-guard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Denies a delegated agent lane any write to this repo's Claude settings files.",
-  "author": { "name": "knowledge-base" }
+  "author": {
+    "name": "knowledge-base"
+  }
 }

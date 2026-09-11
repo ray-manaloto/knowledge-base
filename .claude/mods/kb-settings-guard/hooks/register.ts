@@ -7,58 +7,65 @@
 //   - deny when the call comes from a subagent, allow otherwise;
 //   - WORKTREE-SCOPED: "codex should be able to work on any task as we want".
 //     A lane has full authority inside its own worktree and is gated at merge.
-//     The guard bites only in the MAIN checkout, where a change to the guard
-//     config affects every future session instead of one merge-gated branch.
 //
-// THREE LOADER CONSTRAINTS, each measured on Claude Code 2.1.268. Violating any
-// makes this module fail to load, and that is SILENT unless the session was
-// started with `--debug-file`:
+// ⚠️ NOT YET REGISTERED. This plugin is in neither `extraKnownMarketplaces` nor
+// `enabledPlugins`, so nothing here runs. Registration, readiness and liveness
+// are ticket G04 (#757) — and note that since Claude Code v2.1.195 an
+// external-source plugin enabled only by PROJECT settings does not load until
+// each user runs `claude plugin install`, so a `git clone` alone never arms it.
 //
-//   1. Imports are limited to relative paths and "claude-code". No node
-//      builtins. A `.json` import also fails — the loader compiles every import
-//      as TypeScript, so `./x.json` dies with `does not parse: Unexpected token`.
-//      A relative `./x.ts` import works; that is how the generated path list
-//      below is delivered.
-//   2. `$` may not be READ as a value. `Object.keys($ ?? {})` fails the load
-//      with `$ itself is used in a LogicalExpression (bound, passed, spread,
-//      returned or read); $ is always spelled $.noun.event(...)`.
-//      ⚠️ That message OVERSTATES the real check, measured: `inLinkedWorktree($, cwd)`
-//      below PASSES `$` to a local function and loads and runs fine. So the
-//      enforced rule is narrower than the error text claims — treat the text as
-//      the safe envelope, not as the specification, and re-probe before relying
-//      on any particular shape it appears to forbid.
-//   3. `on` is always `on("<event>", hook)` and `next.to` always
-//      `next.to(e, "<tier>")`.
+// LOADER CONSTRAINTS, each measured on 2.1.268. Violating one makes the module
+// fail to load, and that is SILENT unless the session was started with
+// `--debug-file`:
+//
+//   1. Imports are relative paths and "claude-code" only. No node builtins. A
+//      `.json` import also fails — the loader compiles every import as
+//      TypeScript — while a relative `.ts` import works, which is how the
+//      generated path list below arrives.
+//   2. `$` may not be READ as a value. `Object.keys($ ?? {})` fails the load.
+//      The error text also says "bound, passed, spread, returned" but that
+//      OVERSTATES the enforced check: passing `$` to a local function works and
+//      is measured. Treat the text as the safe envelope, not the specification.
+//   3. `next.to` is always `next.to(e, "<tier>")`.
 //
 // 🔴 THE SPELLING TRAP. The lane marker on a FUNCTION-hook event is `agentId`
-// (camelCase). The CLASSIC settings.json hook spells the same concept
-// `agent_id` (snake_case), and snake_case is what the public hooks docs show.
-// A guard written from those docs reads `e.agent_id`, gets `undefined` on every
-// call, concludes "main thread", and ALLOWS EVERYTHING — silently, forever.
-// Absence is the ALLOW signal, so this guard CANNOT fail closed on a renamed
-// field. The only real protection is the end-to-end arm that dispatches a live
-// lane and asserts the deny. A green unit test over this file proves nothing
-// about the live wiring.
-//
-// 🔴 #92533 (open upstream): registering ANY Bash `tool.call` hook breaks every
-// Bash call inside an `Agent(isolation: "worktree")` subagent — a pure
-// passthrough is enough to trigger it. This module registers `tool.call`, so it
-// is exposed. Nothing in this repo uses that isolation today (grepped
-// `.claude/` and `.agents/`), but the first use will break, and the failure
-// presents as "worktree isolation was lost", not as this guard.
+// (camelCase). The CLASSIC hook — and the public docs — spell the same concept
+// `agent_id` (snake_case). A guard written from those docs reads `e.agent_id`,
+// gets `undefined` on every call, concludes "main thread", and ALLOWS
+// EVERYTHING, silently, forever. Absence is the ALLOW signal, so this guard
+// CANNOT fail closed on a renamed field; only an end-to-end arm that dispatches
+// a real lane and asserts the deny can catch it. A green unit test over this
+// file proves nothing about the live wiring.
 
 import { PROTECTED_SUFFIXES } from "./protected-paths";
 
-/** Tools whose payload carries a `file_path` this guard cares about. */
-const WRITE_TOOLS: ReadonlySet<string> = new Set(["Edit", "Write", "NotebookEdit"]);
+/**
+ * Registered as ONE LITERAL MATCHER PER TOOL, never as a bare `on("tool.call",
+ * hook)`.
+ *
+ * 🔴 This is the `anthropics/claude-code#92533` mitigation and it is not
+ * optional. Registering ANY hook that reaches the Bash dispatch breaks every
+ * Bash call inside an `Agent(isolation: "worktree")` subagent — a pure
+ * passthrough is enough to trigger it. A bare registration sees every tool,
+ * Bash included.
+ *
+ * Measured on 2.1.268: `on(event, matcher, hook)` is real, the matcher is a
+ * partial of the event, and `{ tool: "Edit" }` fired on Edit ONLY while an
+ * unmatched control registration in the same module saw Bash, Read, Edit and
+ * SendUserMessage. Literals rather than one anchored RegExp so the covered
+ * inventory is reviewable and each entry is independently armable.
+ */
+const WRITE_TOOLS: readonly string[] = ["Edit", "Write", "NotebookEdit"];
 
 /**
  * Match on path SEGMENTS, never a substring of the serialized event.
  *
  * The substring form is the measured false positive: `tool.call` also fires for
  * the assistant's own outgoing message, so a pattern tested against the whole
- * event blocked Claude's reply because the reply QUOTED the path. Same class as
- * a guard that denies `git commit -m "…settings.json…"`.
+ * event blocked Claude's reply because the reply QUOTED the path.
+ *
+ * ⚠️ Known limit: this is an exact suffix test, so a case-insensitive alias or a
+ * symlinked path reaching the same file is not matched.
  */
 export function isProtectedPath(filePath: string): boolean {
   if (typeof filePath !== "string" || filePath.length === 0) return false;
@@ -69,39 +76,62 @@ export function isProtectedPath(filePath: string): boolean {
 }
 
 /**
- * The lane marker, isolated so the spelling exists exactly once in the codebase.
- * Returns the lane id, or null for the main thread.
+ * The lane marker, isolated so the spelling exists exactly once in this module.
  */
 export function laneOf(event: { agentId?: unknown }): string | null {
   const id = event?.agentId;
   return typeof id === "string" && id.length > 0 ? id : null;
 }
 
-/**
- * A linked git worktree has `.git` as a FILE (containing `gitdir: …`); a main
- * checkout has it as a DIRECTORY. Measured, both arms, on real repos.
- *
- * FAIL DIRECTION, stated because it is a real trade: if the listing throws we
- * return false, i.e. "treat this as the main checkout", i.e. the guard stays
- * ACTIVE. A false deny costs a lane one round trip; a false allow costs the
- * guard entirely. `$.fs.stat` and `$.fs.read` both threw when probed, so only
- * `list` is relied on here.
- */
-async function inLinkedWorktree($: any, root: string): Promise<boolean> {
-  try {
-    const entries = await $.fs.list(root);
-    if (!Array.isArray(entries)) return false;
-    const dotGit = entries.find((entry: any) => entry?.name === ".git");
-    return dotGit?.kind === "file";
-  } catch {
-    return false;
-  }
+/** Every ancestor directory of a path, nearest first. */
+export function ancestorsOf(filePath: string): string[] {
+  const parts = filePath.split("/");
+  const out: string[] = [];
+  for (let i = parts.length - 1; i > 1; i--) out.push(parts.slice(0, i).join("/"));
+  return out;
 }
 
-export function register(on: any): void {
-  on("tool.call", async ($: any, e: any, next: any) => {
+/**
+ * Is the TARGET FILE inside a linked git worktree?
+ *
+ * 🔴 This asks about `e.file_path`, NOT about `$.session.cwd()`. An earlier
+ * version of this module derived the verdict from the session's cwd alone, so a
+ * lane whose session sat in a worktree could write an ABSOLUTE path into the
+ * main checkout and be allowed. Worktree authority belongs to the DESTINATION,
+ * not to the caller's location.
+ *
+ * A linked worktree's `.git` is a FILE (holding `gitdir: …`); a main checkout's
+ * is a DIRECTORY. Measured both ways on real repos.
+ *
+ * Returns null when no repo root is found. FAIL DIRECTION: the caller treats
+ * null as "main checkout", i.e. the guard stays ACTIVE. A false deny costs a
+ * lane one round trip; a false allow costs the guard entirely.
+ */
+async function targetInLinkedWorktree($: any, filePath: string): Promise<boolean | null> {
+  for (const dir of ancestorsOf(filePath)) {
+    try {
+      const entries = await $.fs.list(dir);
+      if (!Array.isArray(entries)) continue;
+      const dotGit = entries.find((entry: any) => entry?.name === ".git");
+      if (dotGit) return dotGit.kind === "file";
+    } catch {
+      // unreadable directory — keep walking upward
+    }
+  }
+  return null;
+}
+
+/**
+ * The hook body, declared at MODULE TOP LEVEL.
+ *
+ * 🔴 Required by the loader, measured: a hook defined as a local `const`
+ * inside `register()` is refused with `the hook "handler" is not a function
+ * declared at the top of this file (a function declaration, or a const bound
+ * to a function), nor imported from one of the module's own files`.
+ */
+async function handler($: any, e: any, next: any): Promise<any> {
+  try {
     if (e === null || typeof e !== "object") return next(e);
-    if (!WRITE_TOOLS.has(e.tool)) return next(e);
 
     const lane = laneOf(e);
     if (lane === null) return next(e); // the main thread — Ray's own edits pass
@@ -109,14 +139,20 @@ export function register(on: any): void {
     const filePath = typeof e.file_path === "string" ? e.file_path : "";
     if (!isProtectedPath(filePath)) return next(e);
 
-    const cwd = await $.session.cwd();
-    if (await inLinkedWorktree($, cwd)) {
-      $.ui.log(`kb-settings-guard: allowing ${e.tool} on ${filePath} — lane ${lane} is in a linked worktree`);
-      return next(e); // full authority inside its own worktree; gated at merge
+    const inWorktree = await targetInLinkedWorktree($, filePath);
+    if (inWorktree === true) {
+      // full authority inside its own worktree; gated at merge
+      try {
+        $.ui.log(`kb-settings-guard: allowing ${e.tool} on ${filePath} — target is in a linked worktree`);
+      } catch {
+        // logging must never decide the outcome
+      }
+      return next(e);
     }
 
-    $.ui.log(`kb-settings-guard: denied ${e.tool} on ${filePath} from lane ${lane} in the main checkout`);
-    return {
+    // Compute the refusal BEFORE logging: an exception thrown by $.ui.log on
+    // the critical path would return no denial at all.
+    const refusal = {
       deny:
         `kb-settings-guard: a delegated lane may not write ${filePath} in the main checkout. ` +
         `This file switches the guard stack off, so a lane that can edit it can disable ` +
@@ -124,5 +160,30 @@ export function register(on: any): void {
         `your own worktree, where you have full authority and the change is gated at ` +
         `merge; or report the change you need and let the main session make it.`,
     };
-  });
+    try {
+      $.ui.log(`kb-settings-guard: denied ${e.tool} on ${filePath} from lane ${lane}`);
+    } catch {
+      // logging must never decide the outcome
+    }
+    return refusal;
+  } catch (err) {
+    // Fail closed on our own error for a protected target, never open. An
+    // exception here must not read as permission to proceed.
+    try {
+      $.ui.log(`kb-settings-guard: internal error, failing closed: ${String(err)}`);
+    } catch {
+      // nothing left to do
+    }
+    return {
+      deny:
+        "kb-settings-guard: the guard errored while deciding this write and is failing " +
+        "closed. Report this rather than retrying.",
+    };
+  }
+}
+
+export function register(on: any): void {
+  for (const tool of WRITE_TOOLS) {
+    on("tool.call", { tool }, handler);
+  }
 }

@@ -1,9 +1,12 @@
-// GENERATED — do not edit by hand.
+// HAND-MAINTAINED TODAY; GENERATED LATER.
 //
-// Source of truth: `kb_setup.settings_guard.PROTECTED_SUFFIXES`.
-// Regenerate with `mise run kb-guard-codegen`; `mise run kb-guard-codegen-check`
-// is the drift gate. Hand edits are reverted by the next regeneration and fail
-// the gate in the meantime.
+// Intended source of truth: `kb_setup.settings_guard.PROTECTED_SUFFIXES`.
+// 🔴 NOT GENERATED YET. This header describes `kb-guard-codegen` and
+// `kb-guard-codegen-check`, NEITHER OF WHICH EXISTS — ticket G02 (#755) builds
+// them, and the schema becomes the authority generating both this file and the
+// python classifier. Until then this list is maintained BY HAND and the drift
+// gate it names is absent, which is exactly the 'generated output with no
+// generator' failure mode the programme is meant to close.
 //
 // A `.json` file cannot be used here: the hooks-module loader compiles every
 // import as TypeScript, so importing `./protected-paths.json` fails with
