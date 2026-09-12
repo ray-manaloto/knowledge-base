@@ -1,0 +1,171 @@
+<title>Function Hooks Work Order</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #FAFAF8;
+    --panel: #FFFFFF;
+    --ink: #1A1D1E;
+    --muted: #5C6870;
+    --rule: #DFE3E0;
+    --slate: #3D5A6C;
+    --amber: #9A6B08;
+    --green: #2D6A4F;
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    margin: 0;
+    padding-block: 40px 48px;
+    padding-left: 20px;
+    padding-right: 20px;
+    line-height: 1.5;
+  }
+
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  h1 {
+    font-size: 27px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0 0 4px;
+    text-wrap: balance;
+  }
+
+  .sub { color: var(--muted); font-size: 15px; margin: 0 0 28px; }
+  .sub strong { color: var(--ink); font-weight: 500; }
+
+  ol.rounds { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+
+  li.round {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--slate);
+    padding: 16px 18px 15px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 14px;
+    row-gap: 8px;
+    align-items: start;
+  }
+  li.round.pending { border-left-color: var(--amber); }
+
+  .num {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--slate);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 2px 7px;
+    margin-top: 2px;
+  }
+  .pending .num { color: var(--amber); }
+
+  .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
+  .name { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    padding: 2px 7px;
+    border-radius: 2px;
+  }
+  .tag.wait { background: #FBF2DC; color: var(--amber); }
+  .tag.ready { background: #E3EFE8; color: var(--green); }
+
+  .body { grid-column: 2; }
+  .why { font-size: 14.5px; color: var(--muted); margin: 0 0 9px; }
+  .why b { color: var(--ink); font-weight: 500; }
+
+  ul.items { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 12.5px; display: grid; gap: 3px; }
+  ul.items li { color: var(--slate); }
+  ul.items li span { color: var(--muted); }
+
+  .ask {
+    margin-top: 26px;
+    padding: 15px 18px;
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--ink);
+    background: var(--panel);
+    font-size: 15px;
+  }
+  .ask b { font-weight: 600; }
+  .ask p { margin: 0; }
+  .ask p + p { margin-top: 7px; color: var(--muted); font-size: 14px; }
+
+  @media (max-width: 480px) {
+    li.round { grid-template-columns: 1fr; }
+    .body { grid-column: 1; }
+    h1 { font-size: 23px; }
+  }
+</style>
+
+<div class="wrap">
+  <h1>Function hooks: the work order</h1>
+  <p class="sub">36 decisions settled across six rounds. The order below is <strong>forced</strong>, not preferred — each round unblocks the next.</p>
+
+  <ol class="rounds">
+    <li class="round pending">
+      <span class="num">1</span>
+      <div class="head">
+        <span class="name">Ingest the sources</span>
+        <span class="tag wait">waiting on the lane</span>
+      </div>
+      <div class="body">
+        <p class="why">Your call: do this <b>first</b>, so everything after it reasons from a current corpus. We are eleven versions behind on the pin that carries the function-hooks source.</p>
+        <ul class="items">
+          <li>sources/claude-code.manifest <span>— v2.1.258 → newer, picks up mods/</span></li>
+          <li>the blog, every example page <span>— prose extraction</span></li>
+          <li>videos from #91870 <span>— kb-add, then kb-transcribe</span></li>
+          <li>the architecture PDF, the repo sweep</li>
+          <li>one kb-build <span>— ~1h, also clears two owed manifests</span></li>
+        </ul>
+      </div>
+    </li>
+
+    <li class="round">
+      <span class="num">2</span>
+      <div class="head">
+        <span class="name">Fix the guard (#772)</span>
+        <span class="tag ready">ready to build</span>
+      </div>
+      <div class="body">
+        <p class="why">Must come before round 3: the new gate <b>reds until this is fixed</b>. Closes an open P1 on its own.</p>
+        <ul class="items">
+          <li>per-tool path, fail closed <span>— NotebookEdit reads notebook_path</span></li>
+          <li>node pinned, first TypeScript tests <span>— node --test, zero deps</span></li>
+          <li>biome for hand-written files <span>— generators keep their own bytes</span></li>
+          <li>the reformat <span>— its own commit, 154 lines of whitespace</span></li>
+        </ul>
+      </div>
+    </li>
+
+    <li class="round">
+      <span class="num">3</span>
+      <div class="head">
+        <span class="name">Land the gate (#754)</span>
+        <span class="tag ready">partly committed</span>
+      </div>
+      <div class="body">
+        <p class="why">Lands <b>green</b> because round 2 already fixed the bug it would otherwise report.</p>
+        <ul class="items">
+          <li>the tsc layer <span>— contract derived from register.ts, not hand-written</span></li>
+          <li>a wrong probe every run <span>— proves tsc can still fail</span></li>
+          <li>typescript pinned, no tsc = refuses <span>— never a silent pass</span></li>
+          <li>housekeeping <span>— ticket, chain, residuals, this page</span></li>
+        </ul>
+      </div>
+    </li>
+  </ol>
+
+  <div class="ask">
+    <p><b>What I need from you: confirm this order, and I start.</b></p>
+    <p>Round 1 cannot be planned in detail until the research lane reports — its output is the ingestion list. Rounds 2 and 3 are fully specified and I can begin either the moment you say go.</p>
+  </div>
+</div>

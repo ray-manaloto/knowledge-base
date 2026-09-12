@@ -48,15 +48,17 @@ via stdin, always captured to a file so a killed or idle turn still leaves
 evidence:
 
 ```bash
-cat > /tmp/kb-codex-advisor-prompt.md <<'EOF'
+: "${KB_LANE:?your caller must pass an absolute per-instance scratch path}"
+mkdir -p "$KB_LANE"
+cat > "$KB_LANE/prompt.md" <<'EOF'
 <the decision, the constraints, the options already considered,
 and any file:line evidence you gathered from the graph or Read/Grep>
 EOF
 
-cat /tmp/kb-codex-advisor-prompt.md | mise run kb-codex -- \
+cat "$KB_LANE/prompt.md" | mise run kb-codex -- \
   --model gpt-5.6-sol \
   --effort xhigh \
-  --output /tmp/kb-codex-advisor-verdict.md
+  --output ".agent/kb/reports/agents/<your-agent-name>-verdict.md"
 ```
 
 **No `--ephemeral`.** It means "run without persisting session files to disk",

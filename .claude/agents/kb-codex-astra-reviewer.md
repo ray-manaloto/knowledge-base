@@ -67,7 +67,16 @@ Two questions, and getting either wrong makes the receipt a lie.
 Write the review instructions to a file — prose reaches a CLI through a file,
 never through backticks in zsh — then launch:
 
+> 🔴 **Make a per-launch scratch directory first** — `: "${KB_LANE:?your caller must pass an absolute per-instance scratch path}"
+mkdir -p "$KB_LANE"`.
+> Two reviewer lanes running at once against a fixed `/tmp/astra-*.txt` overwrite
+> each other's method file and tree fingerprint. That happened on 2026-09-12 with
+> the advisor lanes, and a corrupted fingerprint would silently turn the
+> tree-unchanged assertion below into a green that proves nothing.
+
 ```bash
+: "${KB_LANE:?your caller must pass an absolute per-instance scratch path}"
+mkdir -p "$KB_LANE"
 mise run kb-codex -- --review \
   --base <FIXED> \
   --model gpt-6-astra \
@@ -75,7 +84,7 @@ mise run kb-codex -- --review \
   --sandbox read-only \
   --timeout 3600 \
   --output .agent/kb/review/reports/review-<HEAD SHA>-cold.md \
-  < /tmp/astra-method.txt
+  < "$KB_LANE/method.txt"
 ```
 
 Run it as a **background** call and poll; 3–5× Sol puts a real review past the
@@ -171,9 +180,9 @@ astra_fingerprint() {                       # status + stash + tracked + untrack
     | xargs -0 -r shasum -a 256             # contents, not just names
 }
 
-astra_fingerprint > /tmp/astra-tree-before.txt
+astra_fingerprint > "$KB_LANE/tree-before.txt"
 # ... run the lane ...
-astra_fingerprint | diff /tmp/astra-tree-before.txt - && echo "TREE UNCHANGED"
+astra_fingerprint | diff "$KB_LANE/tree-before.txt" - && echo "TREE UNCHANGED"
 ```
 
 `--exclude-standard` keeps `.gitignore`d paths out, so `graphify-out/` and

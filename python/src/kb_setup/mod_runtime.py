@@ -99,6 +99,7 @@ at all. Residuals are filed, not hidden.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -136,6 +137,10 @@ EXPECTED_OUTPUTS = (
 #: bare `HOME`, so a token satisfied only there is satisfied by local MCP
 #: configuration rather than by the runtime contract.
 PRIMARY_DECLARATIONS = Path(".claude/types/claude-code.d.ts")
+
+#: Claude prints this and exits **0** when `/plugin-types` is not available —
+#: so the rc cannot discriminate and this string is what does.
+_UNKNOWN_COMMAND = "Unknown command"
 
 #: Seconds. The measured generation is ~4s; this bounds a wedge rather than
 #: predicting a duration (`.claude/rules/long-running-command-hangs.md`).
@@ -406,10 +411,22 @@ def generate_declarations(binary: Path, workdir: Path) -> subprocess.CompletedPr
 
     `stdin` is `DEVNULL` because an inherited TTY is what turns a headless run
     into a hang.
+
+    🔴 **`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set HERE, not inherited.** The
+    `/plugin-types` command does not exist without it. This repo declares it in
+    `.claude/settings.json`'s `env`, so a run from inside a Claude Code session
+    inherits it and passes — while the same command in a plain terminal or CI
+    silently gets a Claude that does not know the command. Armed 2026-09-12, same
+    binary, flag the only variable: absent -> the gate reported FINDINGS "expected
+    output not written"; present -> rc 0, clean. The gate was green only because
+    of where it was run, which is the class `probes-need-a-control-arm.md` exists
+    for.
     """
+    env = {**os.environ, "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1"}
     return subprocess.run(
         [str(binary), "-p", "/plugin-types", "--permission-mode", "bypassPermissions"],
         cwd=workdir,
+        env=env,
         capture_output=True,
         text=True,
         check=False,
@@ -521,6 +538,27 @@ def _generate_into_temp(binary: Path, version: str) -> str:
                 "— the runtime was not described, so nothing was checked:"
             )
             print(proc.stdout + proc.stderr)
+            raise _AbortError(Rc.NOT_RUN)
+
+        # 🔴 Claude exits **0** while printing `Unknown command: /plugin-types`
+        # when the feature flag is off or the command is gone. A zero rc is
+        # therefore NOT evidence the generator ran, and treating the resulting
+        # empty directory as missing OUTPUT misclassifies "we never asked" as
+        # "the contract regressed" — a red ship gate pointing at the wrong thing,
+        # with no mention of the cause. `Rc.NOT_RUN` is this repo's third state
+        # for exactly this, and the message names the flag.
+        combined = proc.stdout + proc.stderr
+        if _UNKNOWN_COMMAND in combined:
+            print(
+                f"[mod-runtime-check] `{binary}` does not know `/plugin-types` at {version} "
+                f"(it printed {_UNKNOWN_COMMAND!r} and still exited 0). The runtime was "
+                "never described, so nothing was checked"
+            )
+            print(
+                "[mod-runtime-check] the usual cause is the function-hooks feature flag: "
+                "this check sets CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 for its own subprocess, "
+                "so seeing this means the installed Claude Code no longer ships the command"
+            )
             raise _AbortError(Rc.NOT_RUN)
 
         produced = {p.relative_to(workdir) for p in workdir.rglob("*") if p.is_file()}

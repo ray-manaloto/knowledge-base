@@ -80,18 +80,56 @@ Say which arm you ran.
 Prose reaches a CLI through a **file**, never through backticks in zsh. Write the
 prompt, then launch:
 
+> 🔴 **Your CALLER allocates your scratch path and passes it as `KB_LANE`.** Use it
+> verbatim; the block below refuses to run without it. The convention is
+> `.agent/kb/lanes/<run-id>/<lane-instance-name>/`.
+>
+> **Do not compute one yourself — nothing you can read about yourself is unique per
+> instance.** Three attempts failed here on 2026-09-12, each looking correct:
+> a fixed `/tmp/<agent-name>.md` (five concurrent lanes, one file — the original
+> bug); `mktemp -d` (unguessable, so a killed lane's verdict cannot be found, which
+> defeats the one reason that file exists); and a path keyed on your own agent name
+> or `$CLAUDE_CODE_SESSION_ID` (your name is shared by every concurrent lane of your
+> type, and `context_usage.py:54` records a live fork whose session id was identical
+> to its parent's). `$TMPDIR` is per-USER, not per-lane.
+>
+> Only the caller knows how many lanes it is spawning, so only the caller can
+> allocate a distinct path. Durable output still goes to a FIXED, findable path
+> under `.agent/kb/reports/agents/` — scratch is for the prompt, not the verdict.>
+> **Measured 2026-09-12, with an echo control:** two concurrently-running teammates
+> reported the SAME scratchpad directory character for character, the same `tasks/`
+> namespace, and the same `$CLAUDE_CODE_SESSION_ID`. So **every harness-derived
+> identity a lane can read about itself is shared with its concurrent siblings** —
+> `$TMPDIR`, the scratchpad path, the session id. Nothing a lane reads about itself
+> distinguishes it from a sibling. Only the caller knows, which is why the caller
+> allocates. Never a fixed `/tmp/<agent-name>-prompt.md`. A lane reported a
+> prompt overwritten mid-flight on 2026-09-12; the **incident narrative is
+> UNVERIFIED** — the five lanes running then used five distinct scratch paths, and
+> the one fixed-path file found has a later mtime from another actor. What IS
+> measured is the hazard itself: a fixed path is one file for every concurrent
+> instance of a type, by construction. A fixed path is a shared mutable file the moment the
+> fan-out this agent exists for actually happens.
+>
+> **`mktemp -d` is the WRONG fix here** and was tried first: it is unguessable by
+> design, so a killed lane cannot tell anyone where its verdict went — which
+> defeats the one reason the verdict file exists. Derive the path, do not randomise
+> it, and send durable output to a FIXED, findable path under
+> `.agent/kb/reports/agents/`.
+
 ```bash
-cat > /tmp/kb-codex-astra-advisor-prompt.md <<'EOF'
+: "${KB_LANE:?your caller must pass an absolute per-instance scratch path}"
+mkdir -p "$KB_LANE"
+cat > "$KB_LANE/prompt.md" <<'EOF'
 <the decision, the constraints, the options already considered, what the two
 failed attempts tried, and any file:line evidence you gathered from the graph>
 EOF
 
-cat /tmp/kb-codex-astra-advisor-prompt.md | mise run kb-codex -- \
+cat "$KB_LANE/prompt.md" | mise run kb-codex -- \
   --model gpt-6-astra \
   --effort xhigh \
   --sandbox read-only \
   --timeout 1800 \
-  --output /tmp/kb-codex-astra-advisor-verdict.md
+  --output ".agent/kb/reports/agents/<your-agent-name>-verdict.md"
 ```
 
 Run it as a **background** call and poll. Astra is 3–5× Sol (OpenAI's model card
