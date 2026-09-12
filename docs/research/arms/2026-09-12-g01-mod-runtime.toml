@@ -30,7 +30,7 @@
 # marker `agentId` — those are premises, and a mutation sweep is structurally
 # blind to a wrong one.
 
-suites = ["tests/test_mod_runtime.py"]
+suites = ["tests/test_mod_runtime.py", "tests/test_mod_runtime_arms.py"]
 
 # A0 — the control. A comment-only edit that must change nothing.
 [[arm]]
@@ -125,11 +125,21 @@ test = "test_a_collapsed_extractor_result_is_not_a_passing_contract"
 [[arm]]
 id = "A7"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''    if "." in token:
-        return re.compile(re.escape(token))
-    return re.compile(rf"\b{re.escape(token)}\b")'''
+old = '''    return re.compile(rf"\b{re.escape(token)}\b")'''
 new = '''    return re.compile(re.escape(token))'''
 test = "test_a_longer_field_that_merely_ends_in_a_required_name_is_not_a_match"
+# 🔴 RE-DERIVED 2026-09-12 after this arm reported PROBE BROKEN — "`old` does not
+# occur ... a refactor moved it". The refactor was THIS ROUND'S OWN FIX: A20 gave
+# the dotted arm a real boundary, `(?<![\w$.])…(?![\w$])`, which rewrote the two
+# lines A7 had quoted as one block. A7 now names only the IDENTIFIER arm, which
+# is what it was always about; A20 owns the dotted one.
+#
+# This is the second recorded instance of the same class here: an arm whose
+# anchor a later fix moves reads as a broken probe, and an arm whose anchor a
+# later fix leaves intact can keep passing while measuring something its id no
+# longer names. `kb-arms` distinguishes the first case loudly (rc `--`, never a
+# silent pass) — which is the only reason this was caught rather than shipped as
+# "19/20, close enough".
 
 # A8 — SEVER THE CHECK'S OWN CONTROL ARM. A matcher that reported everything
 # present would pass `missing_tokens` over an empty file and the gate would go
@@ -192,3 +202,120 @@ new = '''        prop
         for prop in _PROPERTY_ACCESS.findall(no_strings)
         if prop not in _JS_BUILTIN_MEMBERS | {"agentId"}'''
 test = "test_an_event_field_read_off_a_binding_not_named_e_is_still_found"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A12-A20 — added 2026-09-12 by the session review of `3b921834`.
+#
+# WHY THEY EXIST. Two of the round's own findings converge here. First,
+# `c33a1fb5` shipped a P1 fix whose commit message says, verbatim, "The
+# `mod_runtime` fix is UNREVIEWED and UNARMED" — and reverting it left all 26
+# existing tests GREEN, because `generate_declarations` is monkeypatched in every
+# end-to-end test and the stub hardcodes its stdout. Second, the three P1s that
+# fix did not close were each measured invisible to the suite. So every row below
+# attacks code that, before this round, NO test in the tree could see change.
+#
+# 🔴 THE SAME CAVEAT AS A1-A11 APPLIES AND IS WORTH REPEATING. These arms are a
+# statement about `tests/test_mod_runtime_arms.py`, never about the premise. They
+# cannot tell you the extracted access forms are the RIGHT set of forms — only
+# that the three now extracted are noticed when severed. Computed access
+# (`e[key]`) and spreads remain unextracted BY DESIGN and are documented as such
+# in the module; no arm here covers them, and their absence from this list is not
+# evidence they are safe.
+
+# A12 — sever the "Unknown command" branch. Pre-`c33a1fb5` behaviour: a flag-off
+# run writes nothing, prints `Unknown command: /plugin-types` and exits **0**, so
+# rc cannot discriminate and the gate reported FINDINGS "expected output not
+# written" — a real-looking contract breach from a probe that never asked.
+[[arm]]
+id = "A12"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        if _UNKNOWN_COMMAND in combined:'''
+new = '''        if False:'''
+test = "test_an_unknown_plugin_types_command_is_not_run_rather_than_findings"
+
+# A13 — stop setting the flag explicitly and fall back to inheritance. This is
+# the realistic break: it looks like a simplification, and it PASSES inside any
+# Claude Code session, because `.claude/settings.json` exports the flag. It fails
+# only in a plain terminal or CI — which is exactly how the gate came to be green
+# "only because of where it ran". The test deletes the variable from its own env
+# for that reason; without that `delenv` the arm could not die.
+[[arm]]
+id = "A13"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",'''
+new = '''        "KB_ARM_A13_NOT_THE_FLAG": "1",'''
+test = "test_the_generator_subprocess_is_handed_the_function_hooks_flag"
+
+# A14 — stop isolating HOME. Measured before the fix: 13 directories named
+# `~/.claude/projects/-private-var-folders-…-kb-mod-runtime-<random>/`, each with
+# a session JSONL, accumulated in the real profile between 09:09 and 13:16 on one
+# day. Unbounded, never cleaned, one per gate run.
+[[arm]]
+id = "A14"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        "HOME": str(home),'''
+new = '''        "KB_ARM_A14_NOT_HOME": str(home),'''
+test = "test_the_generator_runs_under_an_isolated_home"
+
+# A15 — leave a caller's `CLAUDE_CONFIG_DIR` in place. Isolating HOME is not
+# enough on its own: that variable routes the writes straight back out of the
+# isolated home, so the pollution returns with the isolation still apparently in
+# effect. Severing it must be visible separately from A14.
+[[arm]]
+id = "A15"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    env.pop("CLAUDE_CONFIG_DIR", None)'''
+new = '''    pass  # arm A15: the caller's override survives'''
+test = "test_the_generator_runs_under_an_isolated_home"
+
+# A16 — stop extracting bracket access. `e["permissionMode"]` then leaves the
+# derived set at 11, unchanged, with nothing saying so.
+[[arm]]
+id = "A16"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    tokens.update(_BRACKET_ACCESS.findall(no_comments))'''
+new = '''    pass  # arm A16: bracket access goes back to invisible'''
+test = "test_ordinary_access_forms_join_the_contract"
+
+# A17 — stop extracting destructuring. `const { permissionMode } = e` is the form
+# most likely to be written by someone adding a guard condition, and it was the
+# one with the worst failure direction: a guard that reads `undefined` and allows.
+[[arm]]
+id = "A17"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    for group in _DESTRUCTURE.findall(no_strings):'''
+new = '''    for group in []:'''
+test = "test_destructuring_with_rename_keeps_the_key_not_the_alias"
+
+# A18 — stop extracting template-literal interpolations. Note this one is not
+# hypothetical: `e.tool` is read ONLY inside template literals in the committed
+# `register.ts`, so before this round `tool` was in the contract purely by
+# accident, via the shorthand matcher `{ tool }`.
+[[arm]]
+id = "A18"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''            for body in _TEMPLATE_INTERP.findall(literal.group()):'''
+new = '''            for body in []:'''
+test = "test_ordinary_access_forms_join_the_contract"
+
+# A19 — search the declarations WITH comments again. Measured against the real
+# vendored file: `agentId` appears in ~10 comments and 6 declarations, and the
+# `tool.call` payload is alias-composed, so a rename that removed the field would
+# still find the name and the gate would read clean.
+[[arm]]
+id = "A19"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    visible = _visible(declarations)'''
+new = '''    visible = declarations  # arm A19: comments count as declarations again'''
+test = "test_a_symbol_present_only_in_a_comment_is_missing"
+
+# A20 — drop the right boundary from the dotted-name pattern. `tool.callback`
+# then satisfies `tool.call`. The pre-existing test named for this boundary could
+# not catch it: its negative case differed in the SECOND segment (`tool.result`),
+# so it never exercised a longer name with the same prefix.
+[[arm]]
+id = "A20"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        return re.compile(rf"(?<![\w$.]){re.escape(token)}(?![\w$])")'''
+new = '''        return re.compile(re.escape(token))'''
+test = "test_a_longer_dotted_name_does_not_satisfy_the_event"

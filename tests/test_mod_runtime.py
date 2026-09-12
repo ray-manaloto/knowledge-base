@@ -249,7 +249,7 @@ def test_a_matcher_that_reports_everything_present_is_caught() -> None:
     """The check's own control arm: a guaranteed-absent symbol must read ABSENT."""
     assert mod_runtime.matcher_can_report_absence("interface E { file_path: string; }")
     assert not mod_runtime.matcher_can_report_absence(
-        f"// {mod_runtime._ABSENT_CONTROL_SYMBOL} leaked into the declarations"
+        f"declare const _c: {mod_runtime._ABSENT_CONTROL_SYMBOL};"
     )
 
 
@@ -343,7 +343,9 @@ def stub_runtime(monkeypatch: pytest.MonkeyPatch) -> _StubRuntime:
         monkeypatch.setattr(mod_runtime, "resolve_claude", lambda: Path("/stub/claude"))
         monkeypatch.setattr(mod_runtime, "claude_version", lambda _binary: "9.9.9 (stub)")
 
-        def fake_generate(_binary: Path, workdir: Path) -> subprocess.CompletedProcess[str]:
+        def fake_generate(
+            _binary: Path, workdir: Path, _home: Path | None = None
+        ) -> subprocess.CompletedProcess[str]:
             written = [p for p in mod_runtime.EXPECTED_OUTPUTS if p not in omit]
             for rel in [*written, *extra_outputs]:
                 target = workdir / rel

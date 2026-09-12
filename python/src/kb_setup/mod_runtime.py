@@ -47,8 +47,24 @@ subprocess whose contention with `test`'s xdist workers is uncharacterised, and
    hand-written contract encodes `agent_id` from the public docs while the
    function-hook event actually spells it **`agentId`**, and in that guard
    *absence is the ALLOW signal* — so a wrong contract fails open, silently,
-   forever. A derived set cannot drift from its consumer that way, and a new
-   field added to `register.ts` joins the contract with no edit here.
+   forever. A derived set cannot drift from its consumer that way.
+
+   🔴 **"A new field joins the contract with no edit here" is TRUE ONLY FOR THE
+   FORMS LISTED BELOW, and the unqualified claim that stood here until
+   2026-09-12 was false.** Measured, one variant at a time, against the
+   committed `register.ts`: dotted and optional-chained access grew the set,
+   while `e["permissionMode"]`, `const { permissionMode } = e` and
+   `` `${e.permissionMode}` `` inside a template literal each left it at 11 —
+   invisible, with no test able to fail. All three are now extracted
+   (:data:`_BRACKET_ACCESS`, :data:`_DESTRUCTURE`, :data:`_TEMPLATE_INTERP`),
+   each with its own FAIL-direction arm in `tests/test_mod_runtime_arms.py`.
+
+   What is still NOT extracted, stated so the next reader does not re-inherit an
+   unqualified promise: computed access (`e[key]`), a spread into another object,
+   and any field reached through a helper this module does not follow. The
+   committed contract is therefore ALSO pinned by name in that test file, so a
+   change to the derived set shows up as a diff a human reads rather than as a
+   silently different set.
 
 3. **The vendored delta** — INFORMATIONAL ONLY, never blocking. The vendored
    file keeps its bytes as immutable 2.1.267-labelled corpus evidence and is
@@ -177,6 +193,13 @@ _ON_MATCHER = re.compile(r'on\s*\(\s*"[^"]+"\s*,\s*\{(?P<matcher>[^}]*)\}')
 _OBJECT_KEY = re.compile(r"(?m)^\s*(?P<key>[A-Za-z_$][\w$]*)\s*:")
 
 _IDENTIFIER = re.compile(r"[A-Za-z_$][\w$]*")
+
+#: `e["permissionMode"]` — run over the source WITH strings intact.
+_BRACKET_ACCESS = re.compile(r'\[\s*"([A-Za-z_$][\w$]*)"\s*\]')
+#: `const { a, b: alias } = e` — keys only, never the alias.
+_DESTRUCTURE = re.compile(r"(?:const|let|var)\s*\{([^}]*)\}\s*=")
+#: `${e.x}` bodies, pulled out of each template literal BEFORE it is blanked.
+_TEMPLATE_INTERP = re.compile(r"\$\{([^}]*)\}")
 
 #: Standard-library members that are properties of JS values rather than of the
 #: Claude Code runtime. Subtracted from the derived set.
@@ -307,6 +330,18 @@ def required_runtime_tokens(register_source: str) -> frozenset[str] | None:
     for matcher in _ON_MATCHER.findall(no_comments):
         tokens.update(_IDENTIFIER.findall(matcher))
     tokens.update(_OBJECT_KEY.findall(no_strings))
+    tokens.update(_BRACKET_ACCESS.findall(no_comments))
+    for group in _DESTRUCTURE.findall(no_strings):
+        for part in group.split(","):
+            key = re.split(r"[:=]", part, maxsplit=1)[0].strip()
+            if _IDENTIFIER.fullmatch(key) and key not in _JS_BUILTIN_MEMBERS:
+                tokens.add(key)
+    for literal in _TS_STRING.finditer(no_comments):
+        if literal.group().startswith("`"):
+            for body in _TEMPLATE_INTERP.findall(literal.group()):
+                tokens.update(
+                    p for p in _PROPERTY_ACCESS.findall(body) if p not in _JS_BUILTIN_MEMBERS
+                )
 
     if len(tokens) < _MINIMUM_REQUIRED_TOKENS or _REQUIRED_ANCHOR not in tokens:
         return None
@@ -330,15 +365,19 @@ def _token_pattern(token: str) -> re.Pattern[str]:
     non-zero, stable) is identical under both, the digits are not.
     """
     if "." in token:
-        return re.compile(re.escape(token))
+        return re.compile(rf"(?<![\w$.]){re.escape(token)}(?![\w$])")
     return re.compile(rf"\b{re.escape(token)}\b")
+
+
+def _visible(declarations: str) -> str:
+    """The declarations minus comments: a symbol mentioned only in prose is not declared."""
+    return guard_inventory.strip_ts_comments(declarations)
 
 
 def missing_tokens(required: frozenset[str], declarations: str) -> frozenset[str]:
     """Which required tokens do NOT appear in the declarations at all."""
-    return frozenset(
-        token for token in required if _token_pattern(token).search(declarations) is None
-    )
+    visible = _visible(declarations)
+    return frozenset(token for token in required if _token_pattern(token).search(visible) is None)
 
 
 def matcher_can_report_absence(declarations: str) -> bool:
@@ -349,7 +388,7 @@ def matcher_can_report_absence(declarations: str) -> bool:
     ABSENT is what distinguishes "we looked and found them" from "we cannot
     look".
     """
-    return _token_pattern(_ABSENT_CONTROL_SYMBOL).search(declarations) is None
+    return _token_pattern(_ABSENT_CONTROL_SYMBOL).search(_visible(declarations)) is None
 
 
 def topology_findings(
@@ -399,7 +438,9 @@ def claude_version(binary: Path) -> str | None:
     return proc.stdout.strip() or None
 
 
-def generate_declarations(binary: Path, workdir: Path) -> subprocess.CompletedProcess[str]:
+def generate_declarations(
+    binary: Path, workdir: Path, home: Path
+) -> subprocess.CompletedProcess[str]:
     """Run `/plugin-types` in `workdir`, which MUST NOT be the repo.
 
     🔴 **The fresh temp CWD is a correctness requirement, not tidiness.**
@@ -422,7 +463,17 @@ def generate_declarations(binary: Path, workdir: Path) -> subprocess.CompletedPr
     of where it was run, which is the class `probes-need-a-control-arm.md` exists
     for.
     """
-    env = {**os.environ, "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1"}
+    # Annotated rather than inferred: `{**os.environ, …}` followed by a `pop`
+    # with a `None` default widens the value type enough that no `subprocess.run`
+    # overload matches, and ty says so at the CALL rather than here.
+    env: dict[str, str] = {
+        **os.environ,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+        "HOME": str(home),
+    }
+    # A caller-set `CLAUDE_CONFIG_DIR` routes the writes back out of the isolated
+    # HOME, which is the entire point of setting it.
+    env.pop("CLAUDE_CONFIG_DIR", None)
     return subprocess.run(
         [str(binary), "-p", "/plugin-types", "--permission-mode", "bypassPermissions"],
         cwd=workdir,
@@ -526,9 +577,12 @@ def _generate_into_temp(binary: Path, version: str) -> str:
     never touched.
     """
     with tempfile.TemporaryDirectory(prefix="kb-mod-runtime-") as tmp:
-        workdir = Path(tmp)
+        workdir = Path(tmp) / "work"
+        home = Path(tmp) / "home"
+        workdir.mkdir()
+        home.mkdir()
         try:
-            proc = generate_declarations(binary, workdir)
+            proc = generate_declarations(binary, workdir, home)
         except (OSError, subprocess.SubprocessError) as err:
             print(f"[mod-runtime-check] `/plugin-types` could not be run ({err}) — nothing probed")
             raise _AbortError(Rc.NOT_RUN) from err
