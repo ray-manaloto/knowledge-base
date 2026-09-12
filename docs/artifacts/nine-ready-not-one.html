@@ -1,0 +1,131 @@
+<title>Nine Ready, Not One</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper:   #F4F6F7;
+    --ink:     #15181C;
+    --ink-soft:#4C545B;
+    --rule:    #D3D9DE;
+    --accent:  #1E3A5C;
+    --go:      #2C6A4F;
+    --wait:    #8A6A2F;
+    --stop:    #A23829;
+    --card:    #FFFFFF;
+  }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, sans-serif;
+    font-size: 15px; line-height: 1.45;
+    padding-block: 30px 26px; padding-left: 20px; padding-right: 20px;
+  }
+  .sheet { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  h1 {
+    font-family: Archivo, sans-serif; font-weight: 700;
+    font-size: clamp(24px, 4.6vw, 32px); line-height: 1.1;
+    letter-spacing: -0.018em; margin: 0; text-wrap: balance;
+  }
+  .sub { margin: 6px 0 0; color: var(--ink-soft); max-width: 64ch; }
+
+  .lanes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
+  @media (max-width: 620px) { .lanes { grid-template-columns: 1fr; } }
+
+  .lane {
+    background: var(--card); border: 1px solid var(--rule);
+    border-top: 3px solid var(--go); border-radius: 3px;
+    padding: 13px 15px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .lane.wait { border-top-color: var(--wait); }
+  .lane h2 {
+    font-family: Archivo, sans-serif; font-weight: 500; font-size: 15px;
+    margin: 0; letter-spacing: -0.01em;
+  }
+  .tix { font-family: "IBM Plex Mono", monospace; font-size: 13px; display: flex; flex-wrap: wrap; gap: 5px; }
+  .tix b { font-weight: 500; background: #EDF1F3; border-radius: 2px; padding: 1px 5px; }
+  .lane p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+
+  .collide {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 3px;
+    padding: 15px 17px;
+  }
+  .collide h2 {
+    font-family: Archivo, sans-serif; font-weight: 500; font-size: 16px; margin: 0 0 10px;
+  }
+  dl { margin: 0; display: flex; flex-direction: column; gap: 9px; }
+  .row { display: grid; grid-template-columns: 168px 1fr; gap: 14px; align-items: baseline; }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr; gap: 2px; } }
+  dt { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--ink); }
+  dd { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+  .bad { color: var(--stop); font-weight: 600; }
+  .fine { color: var(--go); font-weight: 600; }
+
+  .correction {
+    border-left: 3px solid var(--stop); background: var(--card);
+    padding: 12px 15px; font-size: 13.5px;
+  }
+  .correction strong { color: var(--stop); }
+
+  .ask {
+    border-top: 2px solid var(--accent); padding-top: 14px;
+    font-family: Archivo, sans-serif; font-weight: 500; font-size: 16.5px;
+    display: flex; gap: 10px; align-items: baseline;
+  }
+  .ask span:first-child { color: var(--accent); }
+</style>
+
+<div class="sheet">
+
+  <div>
+    <h1>Nine tickets are ready. The tool names one.</h1>
+    <p class="sub">Nothing is blocking them — the list is just read top to bottom. Here is what can actually run at the same time, and the two places where two people would tread on each other.</p>
+  </div>
+
+  <div class="lanes">
+    <div class="lane">
+      <h2>Run these two together</h2>
+      <div class="tix"><b>#754</b><b>#755</b></div>
+      <p>The plan itself says these two go side by side. Strongest pairing on the board — but see the collision below, because their entries sit next to each other in the list.</p>
+    </div>
+    <div class="lane">
+      <h2>Each can go alone</h2>
+      <div class="tix"><b>#729</b><b>#731</b><b>#728</b></div>
+      <p>Separate work, separate files. All three need the big generated graph, so they stay in the main copy of the repo rather than a side copy.</p>
+    </div>
+    <div class="lane wait">
+      <h2>One lane, not three</h2>
+      <div class="tix"><b>#581</b><b>#583</b><b>#584</b></div>
+      <p>Nobody has shown these three are independent <em>of each other</em>. Treat as one thread until someone checks. <b>#616</b> is out — it touches the guard files.</p>
+    </div>
+  </div>
+
+  <div class="collide">
+    <h2>What actually collides</h2>
+    <dl>
+      <div class="row">
+        <dt>The ticket list</dt>
+        <dd><span class="fine">Only neighbours clash.</span> Two people removing their own entry conflict <em>only</em> if the entries sit next to each other. Every other pairing merged cleanly. <b>#754 and #755 are neighbours</b> — so settle that one before its review, never after.</dd>
+      </div>
+      <div class="row">
+        <dt>The hooks setting</dt>
+        <dd><span class="bad">This one merges badly.</span> It is a list of twelve where the <em>order</em> decides behaviour, so a merge can look perfectly fine and quietly put a guard in the wrong place. One person should own every edit to it.</dd>
+      </div>
+      <div class="row">
+        <dt>Task list, build config</dt>
+        <dd>Conflict noisily and resolve mechanically. Annoying, not dangerous.</dd>
+      </div>
+      <div class="row">
+        <dt>A side copy of the repo</dt>
+        <dd>Starts empty of the 5.9&nbsp;GB generated graph, so three of the nine cannot use one without a full rebuild first.</dd>
+      </div>
+    </dl>
+  </div>
+
+  <div class="correction">
+    <strong>I told you something false earlier.</strong> I said every parallel branch would conflict on the ticket list “by construction”. The advisor challenged it, and it is wrong — I re-tested it myself with real three-way merges and a control: only <em>adjacent</em> entries conflict. Six of seven pairings merged clean.
+  </div>
+
+  <div class="ask">
+    <span>&rarr;</span>
+    <span>One question below, about an order only you can settle.</span>
+  </div>
+
+</div>
