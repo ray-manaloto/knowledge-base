@@ -134,12 +134,41 @@ test = "test_an_unrecognised_disposition_is_rejected_at_decode"
 [[arm]]
 id = "A7"
 file = "python/src/kb_setup/guard_inventory.py"
-old = '''    names: set[str] = set()
-    for node in ast.walk(tree):'''
-new = '''    reached: set[str] = set()
-    names = reached
-    for node in ast.walk(tree):'''
-test = "test_reachability_finds_the_four_modules_a_name_pattern_misses"
+old = '''        elif isinstance(node, ast.Import):
+            names.update(
+                alias.name.split(".")[1]
+                for alias in node.names
+                if alias.name.startswith("kb_setup.")
+            )'''
+new = '''        elif isinstance(node, ast.Import):
+            pass'''
+test = "test_a_bare_import_of_a_submodule_reaches_a_brand_new_guard"
+meaning = "severs the `import kb_setup.X` node-type branch F3 added; A2 breaks the walk DEPTH, never the node-type handling"
+
+# A7 WAS AN INERT MUTANT until 2026-09-11 and SURVIVED TWICE while being counted
+# as an arm. Its old mutation renamed `names` to `reached` and then aliased
+# `names = reached` -- semantically identical, so nothing could fail and the
+# survival proved nothing in either direction. It was reported as `6/7 armed`
+# with this row as the sole survivor, which reads as a coverage gap rather than
+# as a no-op harness row. `probes-need-a-control-arm.md` rule 2 names this exact
+# shape: a mutation must actually DESTROY what the check looks for.
+
+[[arm]]
+id = "A8"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    if _has_unsupported_indirection(tree):
+        return frozenset()'''
+new = '''    if False:
+        return frozenset()'''
+test = "test_an_import_module_call_naming_kb_setup_fails_closed"
+meaning = "severs the fail-closed backstop, so dynamic indirection yields a silently short set instead of NOT_RUN"
+
+# A8 covers the most safety-critical of F3's new properties, which had no arm:
+# the enumeration going quiet is indistinguishable, in the gate's own output,
+# from a repository that genuinely has no unsupported indirection. Deleting the
+# line that CALLS the check is the realistic break -- renaming
+# `_has_unsupported_indirection` would leave the original as a substring and
+# prove nothing.
 
 # --------------------------------------------------------------------------- #
 # DATA arms (F1/F2, #753). Every arm above mutates the CODE

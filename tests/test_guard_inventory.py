@@ -149,26 +149,41 @@ def test_a_dotted_from_import_reaches_the_named_submodule(tmp_path: Path) -> Non
     assert "stage_explicitly" in dispatched_module_names(root)
 
 
+# Each fail-closed fixture below carries a RECOGNISABLE static import beside the
+# dynamic one, and that is load-bearing rather than incidental. Asserting
+# `== frozenset()` against a body holding ONLY dynamic indirection is
+# TAUTOLOGICAL: the walker finds nothing in that body either way, so the
+# assertion holds whether the backstop fired or never ran. Measured — arm `A8`
+# severs the backstop's call site and all three of these tests SURVIVED it.
+# With a static import present the two outcomes separate: backstop firing gives
+# `frozenset()`, backstop severed gives `{"brandnew_guard"}` — a silently short
+# set, which is the actual failure being guarded against.
 def test_an_import_module_call_naming_kb_setup_fails_closed(tmp_path: Path) -> None:
     """A dynamic `importlib.import_module` call must NOT be silently omitted."""
     root = _hook_guard_fixture(
         tmp_path,
-        'import importlib\nimportlib.import_module("kb_setup.brandnew_guard")\n',
-        ("brandnew_guard",),
+        "import importlib\n"
+        "from kb_setup import brandnew_guard\n"
+        'importlib.import_module("kb_setup.other_guard")\n',
+        ("brandnew_guard", "other_guard"),
     )
     assert dispatched_module_names(root) == frozenset()
 
 
 def test_a_bare_dunder_import_call_fails_closed(tmp_path: Path) -> None:
     root = _hook_guard_fixture(
-        tmp_path, '__import__("kb_setup.brandnew_guard")\n', ("brandnew_guard",)
+        tmp_path,
+        'from kb_setup import brandnew_guard\n__import__("kb_setup.other_guard")\n',
+        ("brandnew_guard", "other_guard"),
     )
     assert dispatched_module_names(root) == frozenset()
 
 
 def test_a_getattr_on_kb_setup_fails_closed(tmp_path: Path) -> None:
     root = _hook_guard_fixture(
-        tmp_path, "import kb_setup\ngetattr(kb_setup, 'brandnew_guard')\n", ("brandnew_guard",)
+        tmp_path,
+        "import kb_setup\nfrom kb_setup import brandnew_guard\ngetattr(kb_setup, 'other_guard')\n",
+        ("brandnew_guard", "other_guard"),
     )
     assert dispatched_module_names(root) == frozenset()
 
