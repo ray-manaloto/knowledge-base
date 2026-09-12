@@ -166,12 +166,62 @@ day**, each of research already on disk:
 **The usage rule that makes it work, and the defect that makes it necessary.**
 Keep topics to **2-3 words**. `kb-recall-work` ANDs its stems against the
 git-grep probes while `branches`/`memory` OR them, so a longer, more specific
-topic silently returns `examined 3427 / matched 0`. Measured the same day:
-`"function hooks"` → **410** tracked files; a six-word form of the same question
-→ **0**. It does not REFUSE in that case — it returns **wrong**, which its
-documented refusal guarantee structurally cannot catch. That is a real defect and
-needs a ticket.
+topic silently returns `examined 3427 / matched 0`. Measured the same day, and **the figure I first published was wrong** — the
+session audit re-measured rather than repeating it:
+
+| query | stems | tracked_files | memory |
+|---|---:|---:|---:|
+| `"function hooks"` | 2 | **410** | 78 |
+| six-word form | 6 | **69** | 176 |
+| seven-word form | 7 | **49** | 304 |
+
+I reported the six-word case as **→ 0**. It does not reproduce: the lowest
+observed was **49**, never zero, rc 0 throughout. **The mechanism is confirmed;
+the figure was an inherited number I repeated without re-deriving** — the exact
+failure the audit existed to find, committed by the person commissioning it.
+
+🔴 **And there is a sharper finding underneath it.** `tracked_files` NARROWS with
+more stems (410 → 69 → 49) while **`memory` WIDENS** (78 → 176 → 304). The probes
+inside one tool do not share semantics, so **the counts in a single run are not
+comparable to each other**, and neither the output nor the docs say so.
+
+The refusal guarantee is worth stating precisely because it reads as protection:
+it holds, and it is irrelevant. The list is never empty, merely wrong — so
+*"it REFUSES rather than returning an empty list"* is structurally incapable of
+catching this. Needs a ticket.
 
 **And read the report it writes** (`.agent/kb/recall/<slug>.md`), not the summary
 counts. Two of the three failures above were a probe that ran correctly and an
 output nobody opened.
+
+## 9. 🔴 STANDING — scope every codex-process search to THIS project
+
+> must only search for codex exec processes initiating from this project as
+> dotfiles and other projects are also running codex processes on this mac
+> ensure this is followed always going forward
+
+**Why a bare match is wrong, not merely imprecise.** `pgrep -f 'codex exec'` and
+`ps aux | grep codex` match every codex lane on the machine. The sibling
+`ray-manaloto/dotfiles` runs its own, concurrently — this session had a live
+`dotfiles-20260912.000` peer throughout. An unscoped search therefore:
+
+- **counts another project's lanes as ours**, so "3 lanes still running" can be
+  entirely false;
+- **kills another project's work** if the count feeds a `kill`/`pkill`, which is
+  unrecoverable and invisible from here;
+- **waits on a process that will never finish our work**, which reads as our lane
+  hanging.
+
+**Scope by the process's working directory, not by its command line.** The
+command line of a codex lane launched from dotfiles is textually identical to
+ours. `lsof -a -d cwd -p <pid>` (or `ps -o pid,command` cross-checked against
+each pid's cwd) is what discriminates; the pattern alone cannot.
+
+**Prefer not searching at all.** `ListAgents` reports this session's own lanes
+with their status and needs no process table — the repo's existing note is
+*liveness via ListAgents, never pgrep*. A process search is a fallback for
+something `ListAgents` cannot answer, and when used it must be cwd-scoped.
+
+**Control-arm it like any other probe** (`probes-need-a-control-arm.md`): a
+scoped search that returns 0 should be checked against a pid you know is ours
+before "no lanes running" is believed.
