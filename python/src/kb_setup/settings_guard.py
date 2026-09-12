@@ -1,0 +1,55 @@
+# Copyright (c) 2026 Raymond Manaloto
+r"""Python consumer of the guard-policy schema (ticket G02, #755).
+
+Re-exports the generated ``ProtectedPathSuffix`` enum's VALUES as
+``PROTECTED_SUFFIXES`` and mirrors the TypeScript `isProtectedPath` predicate
+(`.claude/mods/kb-settings-guard/hooks/register.ts`) as :func:`is_protected_path`:
+exact match, or a `/`-prefixed suffix match, on a `\\` -> `/` normalised path.
+
+🔴 **Iterates the enum's VALUES, never its member NAMES.** Measured this
+session: `datamodel-codegen` mangles member names for identifier safety — a
+leading dot becomes a `field_` prefix, so `.claude/settings.json` becomes
+`field_claude_settings_json` — and two names that collide are silently
+suffixed with no error and no warning. Values round-trip byte-exact and
+nothing is dropped (5 in, 5 out, all distinct), so the schema keeps authority
+over the *values*, which is the security-relevant half. A renamed member
+still fails LOUDLY at `ty check` (`error[unresolved-attribute]`), which is
+what makes the mangling survivable rather than dangerous — but there is no
+TypeScript type checker in this repo at all, so the generated `.ts` array's
+correctness rests entirely on `mise run kb-guard-codegen-check`.
+
+🔴 **THIS MODULE IS DELIBERATELY UNWIRED.** Nothing in `kb_setup.hook_guard`
+imports it, and nothing should, without also updating
+`docs/guards/inventory.toml` — `kb_setup.guard_inventory` computes guard
+membership by AST reachability from `hook_guard.py`, so importing this module
+from there silently turns it into an undeclared guard and reds a gate that
+shipped before this ticket. Wiring this module into an actual enforcement path
+is a later ticket's job, with its own inventory update.
+"""
+
+from __future__ import annotations
+
+from kb_setup.generated.guard_policy import ProtectedPathSuffix
+
+PROTECTED_SUFFIXES: tuple[str, ...] = tuple(member.value for member in ProtectedPathSuffix)
+"""The settings-guard's protected-path policy, in schema order.
+
+Built from `ProtectedPathSuffix.value`, never from a member's (mangled) name —
+see the module docstring.
+"""
+
+
+def is_protected_path(path: str) -> bool:
+    r"""Is `path` one of `PROTECTED_SUFFIXES`, exactly or as a path-segment suffix?
+
+    Mirrors `isProtectedPath` in `register.ts` byte-for-byte in behaviour: a
+    `\\` -> `/` normalised path matches a suffix either exactly, or when the
+    normalised path ends with `/` + that suffix. A bare substring match (no
+    leading `/` and no exact-path check) is deliberately excluded, the same
+    false-positive class `register.ts` already documents avoiding — matching
+    `tool.call`'s serialized event text rather than a real path segment.
+    """
+    normalized = path.replace("\\", "/")
+    return any(
+        normalized == suffix or normalized.endswith(f"/{suffix}") for suffix in PROTECTED_SUFFIXES
+    )

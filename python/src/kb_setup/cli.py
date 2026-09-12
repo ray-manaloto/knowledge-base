@@ -78,7 +78,7 @@ def _print_usage() -> int:
         "model-limits [--write] [--observed-at DATE] [model...] | "
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | skill-refresh | "
-        "guard-inventory-check | handoff-check [path] | "
+        "guard-inventory-check | guard-codegen | guard-codegen-check | handoff-check [path] | "
         "gates [task...] [--stop] | check <path...> | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
@@ -442,6 +442,14 @@ def _dispatch_lint(repo_root: Path, cmd: str) -> int | None:
         from kb_setup import hk_test
 
         return hk_test.hk_test_main(repo_root)
+    if cmd == "guard-codegen":
+        from kb_setup import guard_codegen
+
+        return guard_codegen.regenerate_main(repo_root)
+    if cmd == "guard-codegen-check":
+        from kb_setup import guard_codegen
+
+        return guard_codegen.check_main(repo_root)
     return None
 
 
@@ -697,7 +705,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | "
-        "guard-inventory-check | handoff-check [path] | gates [task...] [--stop] | "
+        "guard-inventory-check | guard-codegen | guard-codegen-check | "
+        "handoff-check [path] | gates [task...] [--stop] | "
         "check <path...> | funnel | "
         "graphify-catalog | lock-drift | "
         "plugin-validate <marketplace root> | "

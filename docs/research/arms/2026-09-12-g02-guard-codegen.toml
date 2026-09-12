@@ -1,0 +1,93 @@
+# Mutation arms for G02 (#755) — the guard-policy codegen module.
+#
+# WHAT THIS SUITE IS ACTUALLY ABOUT. The spec names three drift shapes
+# `kb-guard-codegen-check` must catch, and the native `datamodel-codegen
+# --check` provably misses one of them (a stale extra generated file). These
+# arms sever each of the three detection paths independently, plus the
+# cross-language values-not-names contract (`settings_guard.is_protected_path`)
+# and the C3 rule that expected outputs come from the job table rather than a
+# second hard-coded list. Each severs ONE line and requires the suite to
+# notice — a check verified only on clean input is decoration
+# (`.claude/rules/probes-need-a-control-arm.md` rule 2).
+#
+# CONTROL DISCIPLINE. A0 is a comment-only edit that must SURVIVE. If A0 dies,
+# every other row is void: the suite is failing for a reason that has nothing
+# to do with the mutation.
+
+suites = ["tests/test_guard_codegen.py", "tests/test_settings_guard.py"]
+
+# A0 — the control. A comment-only edit that must change nothing.
+[[arm]]
+id = "A0"
+control = true
+file = "python/src/kb_setup/guard_codegen.py"
+old = '''#: The one schema authority.'''
+new = '''#: The one schema authority (control).'''
+
+# A1 — SEVER THE NATIVE-CHECK DEFER. The native `datamodel-codegen --check`
+# call is what catches a deleted/differing generated Python file (spec §5, row
+# 1 and row 2); ignoring its return code makes this module blind to both.
+[[arm]]
+id = "A1"
+file = "python/src/kb_setup/guard_codegen.py"
+old = '''    native = _run_native(repo_root, ["--all-jobs", "--check"])
+    if native.returncode != 0:'''
+new = '''    native = _run_native(repo_root, ["--all-jobs", "--check"])
+    if False:'''
+test = "test_a_deleted_generated_python_file_is_caught_by_the_native_check"
+
+# A2 — SEVER THE STALE-EXTRA CHECK. This is the row native datamodel-codegen
+# provably cannot catch at all (measured three-armed against the real tree),
+# so if this module also stops catching it, the third drift shape has NO
+# detector anywhere.
+[[arm]]
+id = "A2"
+file = "python/src/kb_setup/guard_codegen.py"
+old = '''    stale = _stale_generated_files(repo_root)
+    if stale:'''
+new = '''    stale = _stale_generated_files(repo_root)
+    if False:'''
+test = "test_a_stale_extra_generated_file_is_caught_where_native_check_misses_it"
+
+# A3 — SEVER THE CROSS-LANGUAGE TS COMPARISON. This is the one check native
+# datamodel-codegen cannot do at all (it has no TypeScript target), so this
+# line is the WHOLE reason this module exists rather than the batch alone.
+[[arm]]
+id = "A3"
+file = "python/src/kb_setup/guard_codegen.py"
+old = '''    rendered = render_typescript(schema_path)
+    if rendered != committed:'''
+new = '''    rendered = render_typescript(schema_path)
+    if False:'''
+test = "test_a_modified_ts_artifact_is_detected"
+
+# A4 — REINTRODUCE THE C3 VIOLATION: a job's output silently never counted as
+# "expected", instead of deriving the set from `pyproject.toml`. The believable
+# "simplification" is dropping one line inside the loop; the effect is that
+# EVERY real generated file reads as an unclaimed stale extra, which the
+# control-arm test (the committed tree reconciling clean) is what notices.
+[[arm]]
+id = "A4"
+file = "python/src/kb_setup/guard_codegen.py"
+old = '''        output = job.get("output")
+        if isinstance(output, str):
+            outputs.add((repo_root / output).resolve())'''
+new = '''        output = job.get("output")
+        if isinstance(output, str):
+            continue'''
+test = "test_the_committed_tree_reconciles_clean"
+
+# A5 — REGRESS `is_protected_path` TO A BARE SUBSTRING CHECK. The exact false
+# positive `register.ts`'s own comment documents avoiding: matching a name that
+# merely CONTAINS a protected suffix, with no `/` boundary and no exact-path
+# check, rather than a real path segment.
+[[arm]]
+id = "A5"
+file = "python/src/kb_setup/settings_guard.py"
+old = '''    normalized = path.replace("\\", "/")
+    return any(
+        normalized == suffix or normalized.endswith(f"/{suffix}") for suffix in PROTECTED_SUFFIXES
+    )'''
+new = '''    normalized = path.replace("\\", "/")
+    return any(suffix in normalized for suffix in PROTECTED_SUFFIXES)'''
+test = "test_a_substring_that_is_not_a_path_segment_is_not_protected"

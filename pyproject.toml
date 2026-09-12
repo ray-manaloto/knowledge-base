@@ -407,6 +407,25 @@ output = "python/src/kb_setup/generated/reviewed_classification.py"
 custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
 """Generated reviewed-classification enum; edit the schema and rerun the generator."""'''
 
+[tool.datamodel-codegen.jobs.guard-policy]
+input = "schemas/guard-policy.schema.json"
+output = "python/src/kb_setup/generated/guard_policy.py"
+# `use-schema-description` is OFF at the top level (its default), so the
+# shared `Enum.jinja2` template would fall back to a static, WRONG docstring —
+# "Generated source-group enumeration." — on this schema's security policy
+# (`reviewed_classification.py:8` carries that exact fallback today for the
+# same reason). Scoped to THIS job only, paired with a job-local
+# `custom-template-dir` that actually wraps the schema's own description in
+# triple quotes (the shared template's `{{ description }}` line does not:
+# `DataModel._template_description` skips the built-in docstring-quoting path
+# for any custom-template model and hands the template the raw, escaped text).
+# Neither change touches `schemas/templates/Enum.jinja2`, so no other job's
+# generated docstring moves.
+use-schema-description = true
+custom-template-dir = "schemas/templates/guard-policy"
+custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
+"""Generated guard-policy enum; edit the schema and rerun the generator."""'''
+
 [tool.datamodel-codegen.jobs.codex-review-evidence]
 input = "schemas/codex-review-evidence.schema.json"
 output = "python/src/kb_setup/generated/codex_review_evidence.py"
