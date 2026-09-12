@@ -2,6 +2,7 @@
 
 The authoritative list of things agents (and humans) must not do in this repo.
 
+<!-- guard-programme: do-not.graphify-install -->
 1. **Do NOT run `graphify install` by hand — not even with `--project`, and not
    any platform subcommand** (`graphify antigravity install`, `graphify codex
    install`). `hook_guard.decide()` keys only on the SUBCOMMAND, never on flags
@@ -19,6 +20,7 @@ The authoritative list of things agents (and humans) must not do in this repo.
    tool, not the target directory. Detail + one corrected claim:
    `docs/invariant-provenance.md` § entry 1.
 
+<!-- guard-programme: do-not.graphify-global -->
 2. **Do NOT run `graphify hook install`, `graphify extract --global`, or
    `graphify global add`.** All three are hand-run graphify, already forbidden
    by entry 3 — but their REASONS differ:
@@ -37,6 +39,7 @@ The authoritative list of things agents (and humans) must not do in this repo.
    `python/` + `tests/`, merges, re-derives the prose graph, and restamps.
    Running `watch` by hand also still fails rule 3.
 
+<!-- guard-programme: do-not.graphify-by-hand -->
 3. **Do NOT run graphify by hand at all — drive it through a `kb-*` mise task.**
    Enforced by `kb_setup.hook_guard`, a PreToolUse deny — **best-effort, not
    a sandbox**: it FAILS OPEN on its own errors (`hook_guard.py:314`) and
@@ -47,6 +50,7 @@ The authoritative list of things agents (and humans) must not do in this repo.
    `affected` has its own `kb-affected` task and is still allowed direct,
    since the allowlist is a deliberate exception list. See `mise-tasks-only.md`.
 
+<!-- guard-programme: do-not.non-anthropic-backend -->
 4. **Do NOT let any NON-ANTHROPIC key-detected LLM backend touch the corpus —
    `ANTHROPIC_API_KEY` is the one deliberate, test-locked exception** (#685; the
    headline said "any key-detected backend" until 2026-09-03 and was wrong).
@@ -73,6 +77,7 @@ The authoritative list of things agents (and humans) must not do in this repo.
    module does not exist (removed 2026-08-24); no definition or call site
    survives in `python/`. Filed as #686 — do not assume this control runs.
 
+<!-- guard-programme: do-not.commit-graphify-out -->
 5. **Do NOT commit `graphify-out/` beyond `memory/` and
    `graphify-semantic-slice/`.** Everything else is DERIVED and rebuilt by
    `kb-build` / `kb-artifacts`; at aggregate scale the graph exceeds
@@ -87,6 +92,7 @@ The authoritative list of things agents (and humans) must not do in this repo.
    layer (`docs/archive/README.md`) — don't confuse the removed
    `-corpus-chunks/` with the still-tracked `-semantic-slice/`.
 
+<!-- guard-programme: do-not.sources-contract -->
 6. **Do NOT ingest a source outside the `sources/` contract.** Every
    graph-ingested source is either a `sources/<name>.manifest`, vendored
    under `sources/media/`, or a committed extraction chunk under
@@ -95,6 +101,7 @@ The authoritative list of things agents (and humans) must not do in this repo.
    (e.g. `sources/doppler-docs.pages.toml`) is a DIFFERENT thing — staged
    site-capture evidence, not yet an extraction.
 
+<!-- guard-programme: do-not.default-branch -->
 7. **Do NOT commit onto the default branch — branch FIRST.** Create the branch
    *before* the commit, then `mise run kb-ship`. Enforced at SHIP time, not
    commit time — `kb-ship`'s preflight refuses to push from `main`
@@ -102,12 +109,14 @@ The authoritative list of things agents (and humans) must not do in this repo.
    first. A sibling-repo session committed 34 files straight onto `main` and
    had to move them afterwards; recoverable only because nothing was pushed.
 
+<!-- guard-programme: do-not.shell-logic -->
 8. **Do NOT add a `.sh` script or inline decision logic to `hk.pkl`/
    `mise.toml`.** This repo has zero `.sh` files (`git ls-files '*.sh'` → 0);
    "inline shell logic" means multi-statement decision logic in those two
    files, not any string containing a shell command — a one-command task
    seam is fine. **Policy, not a hk gate today.** See `zero-bash-logic.md`.
 
+<!-- guard-programme: do-not.inline-suppression -->
 9. **Do NOT add an inline lint suppression.** `noqa` / `type: ignore` /
    `ty: ignore` / `nosec` are rejected by the `no_lint_skip` hk step — but
    only inside `python/src/` and `tests/` (`lint_checks.py:31`'s
@@ -116,16 +125,19 @@ The authoritative list of things agents (and humans) must not do in this repo.
    literally — is implemented at `:40-47`, not `:34`). All suppressions live
    in the ONE root `pyproject.toml`. See `zero-skip-policy.md`.
 
+<!-- guard-programme: do-not.gh-run-watch -->
 10. **Do NOT trust `gh run watch --exit-status`.** It has reported 0
     prematurely. Cross-verify with `gh pr checks <n> --json name,state,bucket`
     or `gh run view <id> --json conclusion` — bare `--json` is a usage error.
 
+<!-- guard-programme: do-not.user-global-config -->
 11. **Do NOT intentionally MUTATE user, global, or system configuration as
     part of repository work — from an agent session, ever.** No writing to
     `~/.claude`, `~/.gemini`, `~/.codex/config.toml`, or any other
     global/system/user config. This repo edits PROJECT settings only. (Entry
     1's other-platform advice applies only to a human outside this session.)
 
+<!-- guard-programme: do-not.mcp-registration -->
 ## On MCP
 
 Native MCP registration is **allowed** when a plugin/tool genuinely requires
@@ -135,11 +147,13 @@ the policy plus Ray's condition: a check-before-registering step (user-global
 or project config? same name elsewhere?), since `codex mcp add --url` once
 broke codex by writing a USER-GLOBAL entry over this repo's own (`.codex/config.toml:122`).
 
+<!-- guard-programme: do-not.codex-sandbox-section -->
 ## Two codex-sandbox invariants (missing until this round)
 
 Verified against `sources/codex.manifest`'s `openai/codex@rust-v0.152.1`
 (`5adb68a4`), agreeing with the installed `codex-cli` **0.152.1**.
 
+<!-- guard-programme: do-not.sandbox-flag-pair -->
 12. **Do NOT combine `--sandbox <value>` with
     `--dangerously-bypass-approvals-and-sandbox`.** The bypass flag carries
     no `conflicts_with` (`shared_options.rs:52-59`) — unlike its sibling
@@ -149,6 +163,7 @@ Verified against `sources/codex.manifest`'s `openai/codex@rust-v0.152.1`
     is accepted and silently runs at **danger-full-access**
     (`cli/src/main.rs:2217-2221`).
 
+<!-- guard-programme: do-not.danger-full-access -->
 13. **Do NOT run a repository lane at `--sandbox danger-full-access`.**
     `SandboxPolicy::DangerFullAccess` resolves to `unrestricted()`
     (`permissions.rs:1792`, `:580-586`) — an EMPTY filesystem-entries list —

@@ -395,6 +395,12 @@ output = "python/src/kb_setup/generated/recall_work.py"
 custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
 """Generated recall-work models; edit the schema and rerun the generator."""'''
 
+[tool.datamodel-codegen.jobs.guard-inventory]
+input = "schemas/guard-inventory.schema.json"
+output = "python/src/kb_setup/generated/guard_inventory.py"
+custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
+"""Generated guard-inventory models; edit the schema and rerun the generator."""'''
+
 [tool.datamodel-codegen.jobs.reviewed-classification]
 input = "schemas/reviewed-classification.schema.json"
 output = "python/src/kb_setup/generated/reviewed_classification.py"

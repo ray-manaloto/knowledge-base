@@ -1,0 +1,129 @@
+<title>Function Hooks Don't Reach Codex</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#F1F4F6;
+    --surface:#FFFFFF;
+    --ink:#12171C;
+    --muted:#5A6572;
+    --rule:#D7DEE4;
+    --claude:#0B6E6A;
+    --codex:#7A4BB0;
+    --warn:#A65B0A;
+    --deny:#96233A;
+    --display:"Bricolage Grotesque",system-ui,sans-serif;
+    --body:"IBM Plex Sans",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);color:var(--ink);
+    font-family:var(--body);font-size:15px;line-height:1.5;
+    margin:0;padding-block:26px 30px;padding-left:20px;padding-right:20px;
+  }
+  .wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:17px}
+  h1{
+    font-family:var(--display);font-weight:700;
+    font-size:clamp(27px,4.3vw,39px);line-height:1.02;
+    margin:0 0 6px;letter-spacing:-0.025em;text-wrap:balance;
+  }
+  .sub{margin:0;color:var(--muted);font-size:16px;max-width:62ch}
+  figure{margin:0;background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:13px 11px 9px;overflow-x:auto}
+  figure svg{display:block;max-width:100%;height:auto;margin:0 auto;color:var(--ink)}
+  figcaption{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;margin-top:7px}
+
+  .rows{background:var(--surface);border:1px solid var(--rule);border-radius:5px}
+  .row{display:grid;grid-template-columns:126px 1fr;gap:15px;padding:12px 16px;border-bottom:1px solid var(--rule)}
+  .row:last-child{border-bottom:0}
+  .k{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);padding-top:3px}
+  .row p{margin:0;max-width:70ch}
+  code{font-family:var(--mono);font-size:12.5px;background:#E9EDF1;padding:1px 5px;border-radius:3px}
+  b.deny{color:var(--deny)}
+  b.warn{color:var(--warn)}
+  b.ok{color:var(--claude)}
+
+  .ask{
+    font-family:var(--display);font-weight:600;font-size:18.5px;line-height:1.35;
+    padding:14px 17px;background:var(--surface);border:1px solid var(--rule);
+    border-left:4px solid var(--warn);border-radius:5px;
+  }
+  footer{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:right}
+  @media (max-width:600px){ .row{grid-template-columns:1fr;gap:3px} .k{padding-top:0} }
+</style>
+
+<div class="wrap">
+
+  <h1>Function hooks don't reach codex</h1>
+  <p class="sub">You asked that both families follow the new direction. Only one of them can run it — and the guards that bind both are the Python we'd be replacing.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 196" role="img" aria-label="Claude and codex each have their own classic hook stack, and both reach the same Python guard modules. Function hooks attach only to the Claude side, so a guard rewritten as a function hook stops covering codex.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="currentColor"></polygon>
+        </marker>
+      </defs>
+
+      <!-- claude lane -->
+      <rect x="6" y="30" width="150" height="40" rx="4" fill="none" stroke="#0B6E6A" stroke-width="1.6"></rect>
+      <text x="81" y="47" text-anchor="middle" font-size="13" font-weight="600" fill="#0B6E6A" font-family="Bricolage Grotesque, sans-serif">Claude</text>
+      <text x="81" y="62" text-anchor="middle" font-size="10.5" fill="#5A6572" font-family="IBM Plex Mono, monospace">.claude/settings.json</text>
+
+      <!-- codex lane -->
+      <rect x="6" y="124" width="150" height="40" rx="4" fill="none" stroke="#7A4BB0" stroke-width="1.6"></rect>
+      <text x="81" y="141" text-anchor="middle" font-size="13" font-weight="600" fill="#7A4BB0" font-family="Bricolage Grotesque, sans-serif">codex</text>
+      <text x="81" y="156" text-anchor="middle" font-size="10.5" fill="#5A6572" font-family="IBM Plex Mono, monospace">.codex/hooks.json</text>
+
+      <!-- shared python -->
+      <rect x="330" y="72" width="180" height="50" rx="4" fill="none" stroke="currentColor" stroke-width="2"></rect>
+      <text x="420" y="92" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor" font-family="Bricolage Grotesque, sans-serif">the Python guards</text>
+      <text x="420" y="108" text-anchor="middle" font-size="10.5" fill="#5A6572" font-family="IBM Plex Mono, monospace">both families run these today</text>
+
+      <line x1="158" y1="55" x2="326" y2="85" stroke="#0B6E6A" stroke-width="1.5" marker-end="url(#ah)" color="#0B6E6A"></line>
+      <line x1="158" y1="140" x2="326" y2="112" stroke="#7A4BB0" stroke-width="1.5" marker-end="url(#ah)" color="#7A4BB0"></line>
+
+      <!-- function hooks: claude only -->
+      <rect x="580" y="16" width="212" height="46" rx="4" fill="none" stroke="#A65B0A" stroke-width="1.8" stroke-dasharray="5 3"></rect>
+      <text x="686" y="35" text-anchor="middle" font-size="13" font-weight="600" fill="#A65B0A" font-family="Bricolage Grotesque, sans-serif">function hooks (new)</text>
+      <text x="686" y="51" text-anchor="middle" font-size="10.5" fill="#5A6572" font-family="IBM Plex Mono, monospace">TypeScript · Claude only</text>
+
+      <line x1="158" y1="42" x2="576" y2="38" stroke="#A65B0A" stroke-width="1.6" marker-end="url(#ah)" color="#A65B0A"></line>
+      <text x="300" y="30" font-size="11" fill="#A65B0A" font-family="IBM Plex Mono, monospace">reaches Claude</text>
+
+      <!-- the missing edge -->
+      <line x1="176" y1="150" x2="576" y2="66" stroke="#96233A" stroke-width="1.5" stroke-dasharray="3 5" opacity="0.65"></line>
+      <line x1="360" y1="120" x2="392" y2="96" stroke="#96233A" stroke-width="2.4"></line>
+      <line x1="392" y1="120" x2="360" y2="96" stroke="#96233A" stroke-width="2.4"></line>
+      <text x="404" y="150" font-size="11.5" font-weight="600" fill="#96233A" font-family="IBM Plex Mono, monospace">no path from codex — ever</text>
+
+      <text x="6" y="188" font-size="10.5" fill="#5A6572" font-family="IBM Plex Mono, monospace">rewrite a guard as a function hook and the lower lane loses it</text>
+    </svg>
+    <figcaption>Two families, one shared guard. The new mechanism only attaches to the top lane.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row">
+      <div class="k">What it means</div>
+      <p>Rewriting the 12 guards in TypeScript doesn't <em>move</em> them — it <b class="deny">duplicates</b> them. Codex still needs the Python, so we'd maintain the same rule twice, in two languages, with no shared test. And when a shell-command check drifts, it drifts <b class="deny">silently</b>: something slips through and nothing says so.</p>
+    </div>
+    <div class="row">
+      <div class="k">The way out</div>
+      <p>Keep one implementation. Make the new hook a <b class="ok">thin shell</b> that calls the Python you already have and trust. You still get everything the new mechanism buys — knowing who's calling, worktree awareness, refusals the model can read — without a second copy of the rules.</p>
+    </div>
+    <div class="row">
+      <div class="k">A count to fix</div>
+      <p>Of the 13 don't-do-this rules, <b class="ok">3</b> are already enforced, <b class="warn">1 can't be checked by any machine</b>, and <b>7</b> are the real target. A plan for 13 is a plan for 6 that can't be delivered.</p>
+    </div>
+    <div class="row">
+      <div class="k">One free win</div>
+      <p>"Don't commit to the main branch" is enforced today only when you <em>push</em> — its own text admits the commit still lands. Moving that one is a genuine upgrade, not a port.</p>
+    </div>
+  </div>
+
+  <div class="ask">
+    → This cuts against "migrate all twelve". <b>Do you want to adjust that, or hold it?</b> I'll build either — but not quietly.
+  </div>
+
+  <footer>measured 2026-09-11 · file:line citations and the advisor's full report are in the terminal reply</footer>
+
+</div>

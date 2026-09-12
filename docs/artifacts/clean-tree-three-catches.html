@@ -1,0 +1,183 @@
+<title>Clean Tree, Three Catches</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #F5F7F6;
+    --surface: #FFFFFF;
+    --ink: #1B2220;
+    --muted: #5E6A66;
+    --rule: #DCE3E0;
+    --ok: #1F6F5C;
+    --warn: #8F6410;
+    --warn-wash: #FBF4E4;
+    --go: #A8342A;
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    --data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+    padding: 20px 16px 32px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    max-width: 620px;
+    width: 100%;
+    padding: 26px 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .eyebrow {
+    font-family: var(--data);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ok);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 27px;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 4px 0 0;
+  }
+
+  .standing {
+    font-size: 15px;
+    color: var(--muted);
+    margin: 6px 0 0;
+  }
+
+  .standing b { color: var(--ink); font-weight: 500; }
+
+  .group-label {
+    font-family: var(--data);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+
+  .catches { display: flex; flex-direction: column; gap: 10px; }
+
+  .catch {
+    border-left: 3px solid var(--warn);
+    background: var(--warn-wash);
+    padding: 9px 12px;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .catch .num {
+    font-family: var(--data);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--warn);
+    margin-right: 7px;
+  }
+
+  .fig {
+    font-family: var(--data);
+    font-size: 13.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .next {
+    border-top: 1px solid var(--rule);
+    padding-top: 18px;
+  }
+
+  .next p { margin: 0; font-size: 16px; line-height: 1.5; }
+  .next .aside { margin-top: 7px; font-size: 14.5px; color: var(--muted); }
+
+  .ask {
+    background: var(--ink);
+    color: #F2F5F3;
+    border-radius: 3px;
+    padding: 14px 16px;
+    font-size: 15.5px;
+    line-height: 1.45;
+  }
+
+  .ask .lead {
+    font-family: var(--data);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8FC4B4;
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  @media (max-width: 430px) {
+    .card { padding: 20px 18px; }
+    h1 { font-size: 23px; }
+  }
+</style>
+
+<main class="card">
+  <header>
+    <p class="eyebrow">Nothing half-finished</p>
+    <h1>Clean tree, three catches</h1>
+    <p class="standing">
+      You're on the <b>main line</b>, nothing uncommitted, no pull request waiting.
+      Last night's two batches both went out. The written note checks out —
+      <span class="fig">32 of 32</span> of the things it points at are really there.
+    </p>
+  </header>
+
+  <section>
+    <p class="group-label">But three things moved after the note was written</p>
+    <div class="catches">
+      <div class="catch">
+        <span class="num">1</span>The graph tool released again overnight.
+        You're pinned at <span class="fig">0.9.57</span>; newest is
+        <span class="fig">0.9.58</span> — the same gap tonight's job was meant to close.
+      </div>
+      <div class="catch">
+        <span class="num">2</span>The "what did last round learn" command handed back
+        the <b>wrong session</b> — a <span class="fig">17-command</span> side run instead
+        of the <span class="fig">276-command</span> real one. I read the real one instead.
+      </div>
+      <div class="catch">
+        <span class="num">3</span><span class="fig">Ten</span> tools are behind their
+        newest version, and two updated themselves again while nobody was looking.
+      </div>
+    </div>
+  </section>
+
+  <section class="next">
+    <p><b>Next up:</b> move the graph tool onto its newest release, then build the
+      single command that does that move for you from now on.</p>
+    <p class="aside">That command genuinely doesn't exist yet. That's the work — not a
+      missing piece blocking it.</p>
+  </section>
+
+  <div class="ask">
+    <span class="lead">What I need from you</span>
+    Say go and I start it. Or tell me to clear the version drift first — it has now
+    grown two nights running.
+  </div>
+</main>

@@ -649,7 +649,9 @@ def test_a_genuine_upgrade_still_auto_applies() -> None:
     verdict = decide(sync=_sync(), upstream=_clean_upstream(latest="0.9.26"), moved=())
     assert verdict.has_upgrade
     assert verdict.auto_apply
-    assert "auto-applying" in verdict.summary()
+    # Wording changed 2026-09-11: the line states a DISPOSITION, not an action.
+    # The intent of this arm is unchanged — eligibility survives a real upgrade.
+    assert "ELIGIBLE for auto-apply" in verdict.summary()
 
 
 # --------------------------- feature review: the two honesty signals ------
@@ -678,3 +680,44 @@ def test_the_dropped_count_reaches_the_verdict() -> None:
     notes = "## Added\n" + "\n".join(f"- thing {i}" for i in range(20))
     verdict = decide(sync=_sync(), upstream=_clean_upstream(notes=notes), moved=())
     assert verdict.features_dropped == 8
+
+
+def test_eligible_verdict_does_not_claim_it_applied() -> None:
+    """The landing-page line must state a DISPOSITION, never an action.
+
+    `auto_apply` means ELIGIBLE (`decide.py:580`). `run()` contains no call to the
+    apply module, so a report run never applies anything — but the old wording read
+    `auto-applying (6/6 gates)` and landed in `docs/currency/README.md`, a file that
+    calls itself a run log and forbids hand-editing rows. Three such rows shipped on
+    2026-09-11 claiming uv/ruff/antigravity-cli were applied while `mise.toml` still
+    pinned the old versions.
+
+    The risk is durable false provenance: a future agent skipping an upgrade the
+    repo records as done.
+    """
+    verdict = decide(sync=_sync(), upstream=_clean_upstream(), moved=())
+
+    line = verdict.summary()
+
+    assert verdict.auto_apply, "fixture must be the auto-apply branch or this proves nothing"
+    # The present participle is the defect: it reports an action nothing performed.
+    assert "auto-applying" not in line
+    assert "NOT applied" in line
+    # And it must name the invocation that WOULD apply, because no mise task reaches
+    # it and `mise-tasks-only.md` otherwise steers the reader to a form that no-ops.
+    assert "uv run kb-setup currency apply" in line
+
+
+def test_eligible_verdict_still_reports_the_gate_score() -> None:
+    """CONTROL ARM: the rewrite must not throw away what the line did carry.
+
+    Without this, deleting the whole branch and returning a bare version string
+    passes the assertions above.
+    """
+    verdict = decide(sync=_sync(), upstream=_clean_upstream(), moved=())
+
+    line = verdict.summary()
+
+    assert "6/6 gates" in line
+    assert verdict.current in line
+    assert verdict.latest in line

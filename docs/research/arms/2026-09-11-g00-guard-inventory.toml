@@ -1,0 +1,341 @@
+# Mutation arms for the G00 (#753) guard-inventory reconciler.
+#
+# WHAT THIS SUITE IS ACTUALLY ABOUT. The ticket names two FAIL directions —
+# "remove an invariant mapping, or add an unclassified hook registration, either
+# must fail". Those are covered by named tests, so the interesting question is
+# not whether the gate CAN fail; it is whether the gate is still measuring the
+# thing its tests claim. These arms break the reconciler's own machinery and
+# require the suite to notice.
+#
+# 🔴 THE ARM THAT MATTERS MOST IS A1, and it is not one of the ticket's two.
+# The reconciler's ancestor — an earlier draft of this same module, deleted
+# 2026-09-11 — declared `SETTINGS_PATH`, modelled a `registrations` array,
+# populated it in the TOML, and then never read the file. `reconcile()` called
+# only the module and invariant halves while its docstring said "Both directions
+# are checked", and `render()` printed "reconciliation: OK — every row matches
+# live repo state" over a settings.json with an arbitrary hook in it. A cold
+# advisor lane found it by reading the call graph. That is this repo's own
+# green-and-useless failure #1 landing inside the ticket built to prevent it, so
+# A1 severs exactly that wire and the suite must die.
+#
+# WHY THE EXPECTED DIAGNOSTIC IS NAMED PER ARM. A suite that accepts any nonzero
+# rc passes when the reconciler dies for an unrelated reason — an import error, a
+# decode failure, a typo in a path. Each arm below names the test that must go
+# red, so a death is attributable rather than merely present.
+#
+# CONTROL DISCIPLINE. A0 is a comment-only edit that must SURVIVE. If A0 dies,
+# every other row is void: the suite is failing for a reason that has nothing to
+# do with the mutation, and its kills prove nothing.
+
+suites = ["tests/test_guard_inventory.py"]
+
+# A0 — the control. A comment-only edit that must change nothing. If this arm
+# dies, the suite is unstable and no kill below can be trusted.
+[[arm]]
+id = "A0"
+control = true
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    names: set[str] = set()'''
+new = '''    names: set[str] = set()  # (control)'''
+
+# A1 — SEVER THE REGISTRATION RECONCILIATION. The exact defect the deleted
+# ancestor shipped: the axis stays modelled and populated, and nothing compares
+# it. The gate then prints OK over an unclassified hook.
+[[arm]]
+id = "A1"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    findings = _reconcile_registrations(inventory, live)'''
+new = '''    findings: list[Finding] = []'''
+test = "test_an_unclassified_live_hook_fails_with_that_verdict"
+
+# A2 — reachability narrowed to MODULE SCOPE only, which is the pre-AST bug in
+# its most believable form: it looks like a reasonable simplification, and
+# `hook_guard` imports only 1 of its 8 guards at module scope.
+#
+# 🔴 The bare `for node in ast.walk(tree):` line is no longer unique in this
+# file (F3 added `_has_unsupported_indirection`'s own walk over the same
+# `tree`), so `old` now anchors on the two-line combination that is unique to
+# `dispatched_module_names`'s own reachability loop.
+[[arm]]
+id = "A2"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    names: set[str] = set()
+    for node in ast.walk(tree):'''
+new = '''    names: set[str] = set()
+    for node in tree.body:'''
+test = "test_reachability_finds_the_four_modules_a_name_pattern_misses"
+
+# A3 — an unparseable `if` condition silently WIDENED instead of reported. This
+# is the dangerous direction: it GROWS claimed coverage, so the gate reports more
+# protection than exists and every downstream comparison inherits the lie.
+[[arm]]
+id = "A3"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        parsed = _IF_CONDITION.match(if_condition)
+        if parsed is None:
+            return None'''
+new = '''        parsed = _IF_CONDITION.match(if_condition)
+        if parsed is None:
+            return [("*", "")]'''
+test = "test_an_unparsable_if_condition_is_never_silently_widened"
+
+# A4 — an unreadable authority read as CLEAN rather than NOT_RUN. "Could not ask"
+# becoming "nothing to report" is the failure this repo's Rc contract exists for,
+# and it is one line.
+[[arm]]
+id = "A4"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    live = live_registrations(root)
+    if live is None:'''
+new = '''    live = live_registrations(root)
+    if False:'''
+test = "test_an_unreadable_authority_is_not_run_not_a_pass"
+
+# A5 — the ordinal no longer compared, so renumbering an invariant silently
+# follows the number instead of reporting LOCATOR_DRIFT. The anchor still
+# matches, so nothing else notices; this is precisely how a disposition gets
+# transferred to a different rule while the gate stays green.
+[[arm]]
+id = "A5"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        if reviewed_ordinal != ordinal:'''
+new = '''        if False:'''
+test = "test_renumbering_an_invariant_fails_with_locator_drift"
+
+# A6 — SKIP VALIDATION ENTIRELY, returning the decoded TOML unconverted. The
+# believable "simplification": the caller only reads attributes, so why pay for a
+# conversion? Because the conversion IS the closed-set enforcement.
+#
+# 🔴 THIS ROW REPLACES A MUTATION THAT SURVIVED, and the reason is worth keeping.
+# A6 was first written as `strict=True` -> `strict=False`, reasoning that it
+# "opens the closed set". It SURVIVED, and the arm score sent me to look. Probed
+# both ways: msgspec rejects `Invalid enum value` under strict=False exactly as
+# under strict=True, and accepts a valid value under both — `strict` governs type
+# COERCION (str->int and such), never enum membership. So the original mutation
+# never destroyed what the test looks for, which makes it an unrealistic break
+# and its survival evidence of nothing.
+#
+# Note what this bounds: the closed set is enforced by the GENERATED model, and a
+# schema-level mutation would not reach the committed generated file at all —
+# that drift is `mise run kb-codegen-check`'s job, a different gate. This arm can
+# only prove the module still routes through the validator.
+[[arm]]
+id = "A6"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        return msgspec.convert(raw, GuardInventory, strict=True)'''
+new = '''        return raw  # type: ignore[return-value]'''
+test = "test_an_unrecognised_disposition_is_rejected_at_decode"
+
+# A7 — EXPECTED NO-OP, and therefore the row owing the MOST evidence. Renaming a
+# local binding changes nothing observable. A predicted survival that is
+# confirmed twice has tested nothing, so if this one dies the suite is coupled to
+# an implementation detail rather than to behaviour — which is a finding about
+# the TESTS, not about the mutation.
+[[arm]]
+id = "A7"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        elif isinstance(node, ast.Import):
+            names.update(
+                alias.name.split(".")[1]
+                for alias in node.names
+                if alias.name.startswith("kb_setup.")
+            )'''
+new = '''        elif isinstance(node, ast.Import):
+            pass'''
+test = "test_a_bare_import_of_a_submodule_reaches_a_brand_new_guard"
+meaning = "severs the `import kb_setup.X` node-type branch F3 added; A2 breaks the walk DEPTH, never the node-type handling"
+
+# A7 WAS AN INERT MUTANT until 2026-09-11 and SURVIVED TWICE while being counted
+# as an arm. Its old mutation renamed `names` to `reached` and then aliased
+# `names = reached` -- semantically identical, so nothing could fail and the
+# survival proved nothing in either direction. It was reported as `6/7 armed`
+# with this row as the sole survivor, which reads as a coverage gap rather than
+# as a no-op harness row. `probes-need-a-control-arm.md` rule 2 names this exact
+# shape: a mutation must actually DESTROY what the check looks for.
+
+[[arm]]
+id = "A8"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    if _has_unsupported_indirection(tree):
+        return frozenset()'''
+new = '''    if False:
+        return frozenset()'''
+test = "test_an_import_module_call_naming_kb_setup_fails_closed"
+meaning = "severs the fail-closed backstop, so dynamic indirection yields a silently short set instead of NOT_RUN"
+
+# A8 covers the most safety-critical of F3's new properties, which had no arm:
+# the enumeration going quiet is indistinguishable, in the gate's own output,
+# from a repository that genuinely has no unsupported indirection. Deleting the
+# line that CALLS the check is the realistic break -- renaming
+# `_has_unsupported_indirection` would leave the original as a substring and
+# prove nothing.
+
+# --------------------------------------------------------------------------- #
+# DATA arms (F1/F2, #753). Every arm above mutates the CODE
+# (`guard_inventory.py`); none mutates the DATA file it reconciles against,
+# which is precisely why F1 and F2 shipped undetected. These arms mutate the
+# committed `docs/guards/inventory.toml` directly, so the target the
+# `repo_copy` fixture copies is the mutated one; the named test is always
+# `test_the_committed_inventory_reconciles_clean` (`tests/test_guard_inventory.py:53`),
+# the one test that reads the COMMITTED file rather than a repo-relative
+# fixture path.
+# --------------------------------------------------------------------------- #
+
+# data.module-control — a comment-only edit to the inventory TOML's own header
+# comment (never to a field a test parses) that must change nothing
+# observable. If this dies, the suite is unstable and neither data arm below
+# can be trusted.
+#
+# 🔴 The FIRST version of this control edited a `[[modules]]` block's `id =`
+# line instead, and it BROKE: this suite's own F1 tests locate that exact
+# block by matching `id = "module.hook-guard"\n` verbatim
+# (`_drop_module_block` in `tests/test_guard_inventory.py`), so appending a
+# trailing comment there changed what THOSE tests could find -- an edit to a
+# field a test parses is not inert just because no schema rejects it.
+[[arm]]
+id = "data.module-control"
+control = true
+file = "docs/guards/inventory.toml"
+old = '''# Validated and RECONCILED by `mise run kb-guard-inventory-check`. A row that no'''
+new = '''# Validated and RECONCILED by `mise run kb-guard-inventory-check`. A row that no  (control)'''
+
+# data.direct-route-fiction — F1's own arm. Repoint `module.hook-guard`'s path
+# to another EXISTING file. Before F1, nothing checked a `direct-registration`
+# module's route at all, so this SURVIVED; F1 adds the ROUTE_DRIFT check that
+# must now catch it.
+[[arm]]
+id = "data.direct-route-fiction"
+file = "docs/guards/inventory.toml"
+old = '''path = "python/src/kb_setup/hook_guard.py"'''
+new = '''path = "python/src/kb_setup/check_first.py"'''
+test = "test_the_committed_inventory_reconciles_clean"
+
+# data.function-control — the sibling control, on the function-hook rows this
+# time. A comment-only edit that must change nothing.
+[[arm]]
+id = "data.function-control"
+control = true
+file = "docs/guards/inventory.toml"
+old = '''id = "hook.toolcall.kb-settings-guard.edit"'''
+new = '''id = "hook.toolcall.kb-settings-guard.edit"  # (control)'''
+
+# data.function-notebookedit-omitted — F2's first arm. Delete a REAL
+# function-hook row (`register.ts` still registers NotebookEdit). Before F2,
+# `_reconcile_registrations` filtered `classic = [r for r in
+# inventory.registrations if r.source.path == str(SETTINGS_PATH)]`, which
+# drops every `register.ts` row silently — nothing read them at all, so this
+# SURVIVED.
+[[arm]]
+id = "data.function-notebookedit-omitted"
+file = "docs/guards/inventory.toml"
+old = '''[[registrations]]
+id = "hook.toolcall.kb-settings-guard.notebookedit"'''
+new = '''[[registrations]]
+id = "hook.toolcall.kb-settings-guard.notebookedit-DELETED"'''
+test = "test_the_committed_inventory_reconciles_clean"
+
+# data.function-delete-fiction — F2's other arm, the direction the axis
+# currently accepts: ADD a fabricated row for a tool `register.ts` never
+# registers. A `str.replace` harness cannot literally insert a whole new TOML
+# table, so this appends the fabrication after the LAST existing function-hook
+# row's own final field (`tool = "NotebookEdit"`) — unique in the file, and the
+# only occurrence of that exact line.
+[[arm]]
+id = "data.function-delete-fiction"
+file = "docs/guards/inventory.toml"
+old = '''tool = "NotebookEdit"'''
+new = '''tool = "NotebookEdit"
+
+[[registrations]]
+id = "hook.toolcall.kb-settings-guard.bogus"
+current_surface = "function-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = ".claude/mods/kb-settings-guard"
+module_ids = []
+state = "declared"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/mods/kb-settings-guard/hooks/register.ts"
+event = "tool.call"
+matcher = "{ tool: \"Bogus\" }"
+command = "on(\"tool.call\", Bogus, handler)"
+
+[[registrations.reviewed_scope_cases]]
+tool = "Bogus"'''
+test = "test_the_committed_inventory_reconciles_clean"
+
+# --- round 2 of the cold review: arms for the five defects found IN THE FIX ---
+#
+# Every arm below severs a check the cold lane proved was missing, and each one
+# reproduces a path that reported CLEAN before it existed. They are listed in
+# the order the review found them.
+
+[[arm]]
+id = "A9"
+file = "python/src/kb_setup/guard_inventory.py"
+old = 'if str(getattr(row.source, "event", "") or "") != _FUNCTION_HOOK_EVENT'
+new = "if False"
+test = "test_a_function_hook_row_naming_a_non_tool_call_event_is_route_drift"
+meaning = "drops the event half of the (path, tool.call, tool) triple, so a row repointed at tool.result reads clean"
+
+[[arm]]
+id = "A10"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        if expected is not None and expected not in ids:'''
+new = '''        if False:'''
+test = "test_a_registration_whose_module_ids_omit_its_resolved_module_is_route_drift"
+meaning = "reverts module_ids to an existence-only check, where DELETING the field is invisible"
+
+[[arm]]
+id = "A11"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        tasks = tomllib.loads((root / "mise.toml").read_text(encoding="utf-8"))["tasks"]'''
+new = '''        tasks = {
+            "kb-instruction-edit-guard": {"run": "uv run kb-setup instruction-edit-guard"},
+            "kb-instruction-shell-write": {"run": "uv run kb-setup instruction-shell-write"},
+        }'''
+test = "test_a_repointed_mise_task_is_detected_rather_than_read_from_a_copy"
+meaning = "restores the hand-copied duplicate of mise.toml's run lines, so the real route can drift unseen"
+
+[[arm]]
+id = "A12"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        if isinstance(node, ast.ImportFrom) and node.module == "importlib":'''
+new = '''        if False:'''
+test = "test_an_aliased_dynamic_import_still_fails_closed"
+meaning = "stops recognising `import_module` under an alias, reopening the backstop bypass"
+
+[[arm]]
+id = "A13"
+file = "python/src/kb_setup/guard_inventory.py"
+old = "isinstance(marketplaces, dict) and bool(owners) and owners <= set(marketplaces)"
+new = '''isinstance(marketplaces, dict) and any(
+            key.split("@", 1)[0] == _FUNCTION_HOOK_PLUGIN_NAME for key in marketplaces
+        )'''
+test = "test_enabling_the_plugin_under_a_known_marketplace_satisfies_every_predicate"
+meaning = "restores comparing marketplace KEYS to the plugin NAME, which is unsatisfiable against all 11 live keys"
+
+# A13 is the one arm here whose mutation is the ORIGINAL CODE rather than a
+# no-op. That is deliberate: the defect was not a missing check but a check
+# comparing the wrong two things, and the only realistic break is putting the
+# wrong comparison back. Reverting it makes `enabled` unreachable again, which
+# is what the named test now refuses.
+
+[[arm]]
+id = "A14"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    function_hooks_enabled = isinstance(env, dict) and str(
+        env.get(_FUNCTION_HOOK_ENV_FLAG, "")
+    ).strip() not in ("", "0")'''
+new = '''    function_hooks_enabled = True'''
+test = "test_removing_the_function_hook_env_flag_falsifies_its_predicate"
+meaning = "hard-codes the feature-flag predicate true, the state it was in when the design named it and the code never read it"
+
+[[arm]]
+id = "A15"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        if str(entry["event"]) not in _BLOCKING_EVENTS:'''
+new = '''        if False:'''
+test = "test_the_committed_inventory_reconciles_clean"
+meaning = "admits the six lifecycle registrations, which cannot block a tool call and are not inventory members"

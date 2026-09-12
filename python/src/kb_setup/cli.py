@@ -78,7 +78,8 @@ def _print_usage() -> int:
         "model-limits [--write] [--observed-at DATE] [model...] | "
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | skill-refresh | "
-        "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
+        "guard-inventory-check | handoff-check [path] | "
+        "gates [task...] [--stop] | check <path...> | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
         "research-links <URL...> [--out PATH] | "
@@ -496,6 +497,10 @@ def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
     the goal was and how it went, and what was learned. `remember` is the newest
     member and the reason the group exists.
     """
+    if cmd == "guard-inventory-check":
+        from kb_setup import guard_inventory
+
+        return guard_inventory.main(repo_root)
     if cmd == "handoff-check":
         from kb_setup import handoff
 
@@ -692,7 +697,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | "
-        "handoff-check [path] | gates [task...] [--stop] | check <path...> | funnel | "
+        "guard-inventory-check | handoff-check [path] | gates [task...] [--stop] | "
+        "check <path...> | funnel | "
         "graphify-catalog | lock-drift | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
@@ -943,6 +949,29 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
         if not arg.startswith("-"):
             positional.append(arg)
     mode = positional[0] if positional else "check"
+    # 🔴 REFUSE a stray second positional rather than ignoring it. Both skill copies
+    # documented `mise run kb-currency -- --tool <name> apply`, and `[tasks.kb-currency]`
+    # hardcodes `currency run`; mise APPENDS task args, so that expanded to
+    # `currency run --tool <name> apply`, this loop collected `["run", "apply"]`, and
+    # the line above took `positional[0]` = "run". The `apply` the operator typed was
+    # discarded, the command exited 0, and a run page was written that looked like
+    # success. Two sessions read that as an apply having happened.
+    #
+    # Ignoring an argument nobody can see being ignored is the defect; erroring is the
+    # fix. Naming the working invocation matters as much as the refusal, because
+    # `mise-tasks-only.md` steers agents toward a `mise run` form and NO mise task
+    # reaches `currency apply` (grep: 0 hits).
+    if len(positional) > 1:
+        extra = " ".join(positional[1:])
+        print(
+            f"[currency] REFUSING an ambiguous invocation: mode '{mode}' with trailing "
+            f"positional(s) '{extra}'.\n"
+            f"[currency] If you meant to run '{positional[1]}', invoke it directly:\n"
+            f"[currency]   uv run kb-setup currency {positional[1]}"
+            + (f" --tool {only}" if only else ""),
+            file=sys.stderr,
+        )
+        return 2
     if mode == "check":
         return currency_run.check(repo_root, only=only, quiet="--verbose" not in rest)
     if mode == "run":

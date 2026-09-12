@@ -1,0 +1,138 @@
+<title>The Label Task Finds Claude</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Asap:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --ground: #F2EFEA;
+    --surface: #FFFFFF;
+    --ink: #1E1B18;
+    --muted: #625B54;
+    --rule: #DED8D0;
+    --safe: #2A6045;
+    --risk: #A33018;
+    --risk-wash: #FBF0EC;
+    --display: "Sora", "Helvetica Neue", Arial, sans-serif;
+    --body: "Asap", "Helvetica Neue", Arial, sans-serif;
+    --data: "Space Mono", ui-monospace, Menlo, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15.5px;
+    line-height: 1.45;
+    padding: 20px 16px 30px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    max-width: 640px;
+    width: 100%;
+    padding: 22px 24px 18px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lead { font-size: 15px; color: var(--muted); margin: 7px 0 0; max-width: 58ch; }
+
+  figure { margin: 15px 0 0; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; text-align: center; }
+
+  .says {
+    margin-top: 14px;
+    background: var(--risk-wash);
+    border-left: 3px solid var(--risk);
+    padding: 11px 13px;
+    font-size: 15px;
+  }
+  .says b { color: var(--risk); font-weight: 600; }
+
+  .lever {
+    margin-top: 13px;
+    border-top: 1px solid var(--rule);
+    padding-top: 12px;
+    font-size: 15px;
+  }
+  .lever b { font-weight: 600; }
+
+  .ask {
+    margin-top: 12px;
+    font-size: 15.5px;
+    border-top: 2px solid var(--ink);
+    padding-top: 11px;
+  }
+  .ask b { font-weight: 700; }
+</style>
+
+<main class="sheet">
+  <h1>The label task finds Claude</h1>
+  <p class="lead">
+    The version you picked as the rebase target changes one thing that matters to us:
+    a job we run as "no AI, costs nothing" will start quietly using AI.
+  </p>
+
+  <figure>
+    <svg viewBox="0 0 610 176" role="img"
+         aria-label="Our label command passes no choice of engine. The new version, finding the Claude tool installed on this machine, picks it automatically and spends tokens — where the old version stayed on the free built-in labeller.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <polygon points="0,0 10,5 0,10" fill="#1E1B18"/>
+        </marker>
+      </defs>
+
+      <rect x="10" y="56" width="128" height="46" rx="3" fill="#FFFFFF" stroke="#1E1B18" stroke-width="1.5"/>
+      <text x="74" y="75" text-anchor="middle" font-size="12.5" font-weight="600" font-family="Asap, sans-serif">our label job</text>
+      <text x="74" y="92" text-anchor="middle" font-size="11" font-family="Space Mono, monospace" fill="#625B54">names no engine</text>
+
+      <line x1="140" y1="79" x2="182" y2="79" stroke="#1E1B18" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="186" y="56" width="140" height="46" rx="3" fill="#FFFFFF" stroke="#1E1B18" stroke-width="1.5"/>
+      <text x="256" y="75" text-anchor="middle" font-size="12.5" font-weight="600" font-family="Asap, sans-serif">the new version</text>
+      <text x="256" y="92" text-anchor="middle" font-size="11" fill="#625B54">looks around the machine</text>
+
+      <line x1="328" y1="70" x2="372" y2="40" stroke="#2A6045" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="328" y1="90" x2="372" y2="122" stroke="#A33018" stroke-width="1.8" marker-end="url(#ar)"/>
+
+      <rect x="376" y="16" width="224" height="44" rx="3" fill="#F3F7F4" stroke="#2A6045" stroke-width="1.4" stroke-dasharray="5 4"/>
+      <text x="392" y="35" font-size="12.5" font-weight="600" fill="#2A6045" font-family="Asap, sans-serif">before: the free built-in</text>
+      <text x="392" y="51" font-size="11.5" fill="#625B54">no AI, no cost — what we advertise</text>
+
+      <rect x="376" y="100" width="224" height="44" rx="3" fill="#FBF0EC" stroke="#A33018" stroke-width="1.6"/>
+      <text x="392" y="119" font-size="12.5" font-weight="700" fill="#A33018" font-family="Asap, sans-serif">now: it finds Claude, uses it</text>
+      <text x="392" y="135" font-size="11.5" fill="#625B54">because the tool is on this machine</text>
+
+      <text x="352" y="164" text-anchor="middle" font-size="11.5" fill="#625B54" font-style="italic">
+        nothing we wrote changed — the machine decides
+      </text>
+    </svg>
+    <figcaption>Same command, same config. Different answer, because Claude is installed.</figcaption>
+  </figure>
+
+  <p class="says">
+    <b>Our own description of that job says "no AI, costs nothing".</b> After the bump
+    that sentence is false, and nothing would tell us — it just works, and bills.
+  </p>
+
+  <p class="lever">
+    <b>There is no switch for "stay free".</b> I checked: the new version has no option
+    meaning "don't use AI". The only thing that decides it is whether the Claude tool is
+    visible to that job — so the only lever we own is hiding it.
+  </p>
+
+  <p class="ask">
+    <b>What I need from you:</b> one call — hide the tool from that job, hold this
+    version back, or accept the cost. It blocks the upgrade either way.
+  </p>
+</main>

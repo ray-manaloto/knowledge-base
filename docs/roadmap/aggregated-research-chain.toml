@@ -45,6 +45,83 @@
 # recall, the roster (V5) after both the build and the resync, the full run (V6)
 # last. Remove each entry in the commit that closes it.
 #
+# PHASE F — the function-hooks enforcement programme (Ray, 2026-09-11; map #766).
+# Placed at the HEAD by Ray's ruling in session kb-20260911.001, after a four-round
+# /grilling settled the design and a kb-codex-astra-advisor lane planned the chain.
+# Ray, verbatim: "i want to start using function hooks whenever possible as it
+# provides more flexibility than conventional hooks and we can expand it
+# functionality easier instead of having to make the switch going forward / so
+# enforce that so the agents in both claude and codex know this is how we want to
+# move forward with everything".
+#
+# Phase V's #728 V1 resumes after the reference guard ships (through G04).
+# Plan + every measurement: docs/research/reports/2026-09-11-function-hooks-enforcement-programme.md
+
+[[ticket]]
+issue = 753
+title = "G00 — inventory every guard registration, module and invariant with a disposition"
+blockers = []
+
+[[ticket]]
+issue = 754
+title = "G01 — pin the runtime contract with live probes, not a checked-in d.ts"
+blockers = [753]
+
+[[ticket]]
+issue = 755
+title = "G02 — schema-owned policy data generating both the python and the TS literals"
+blockers = [753]
+
+[[ticket]]
+issue = 756
+title = "G03 — the settings reference guard on generated policy and verified adapters"
+blockers = [754, 755]
+
+[[ticket]]
+issue = 757
+title = "G04 — cold bootstrap, the tracked flag, and a readiness task that runs BEFORE work"
+blockers = [756]
+
+[[ticket]]
+issue = 758
+title = "G05 — enforce the direction itself: rule, AGENTS.md, and a structural lint"
+blockers = [753, 755]
+
+[[ticket]]
+issue = 759
+title = "G06 — decide and implement parser placement: python bridge vs vendored TS"
+blockers = [754, 755, 757]
+
+[[ticket]]
+issue = 760
+title = "G07 — migrate the repo-owned file-tool guards, preserving complete effective coverage"
+blockers = [757, 758]
+
+[[ticket]]
+issue = 761
+title = "G08 — migrate the repo-owned command guards; validate worktree-workflow compatibility"
+blockers = [758, 759]
+
+[[ticket]]
+issue = 762
+title = "G09 — turn the 7 mechanically-decidable do-not.md invariants into enforcement"
+blockers = [753, 755, 757, 758]
+
+[[ticket]]
+issue = 763
+title = "G10 — migrate the two graphify-owned hooks through the fork's own workflow"
+blockers = [754, 757]
+
+[[ticket]]
+issue = 764
+title = "G11 — the bounded self-improvement loop, with anti-gaming rules it cannot edit"
+blockers = [757, 760]
+
+[[ticket]]
+issue = 765
+title = "G12 — cutover: retire only proven replacements, verified on remote main"
+blockers = [758, 759, 760, 761, 762, 763, 764]
+
 [[ticket]]
 issue = 728
 title = "V1 — rebase the graphify fork onto the newest release; refresh both skill trees + stamps; kb-fork-rebase"

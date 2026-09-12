@@ -1,0 +1,147 @@
+<title>Three Ways Past the Guard Gate</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper:   #F5F7F8;
+    --ink:     #16191D;
+    --ink-soft:#4A5259;
+    --rule:    #D5DBE0;
+    --accent:  #1F3A5F;
+    --seen:    #2E6A50;
+    --blind:   #A5382A;
+    --card:    #FFFFFF;
+    --flag:    #F0EAD8;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.48;
+    padding-block: 32px 28px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .sheet { max-width: 730px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+
+  h1 {
+    font-family: Archivo, "IBM Plex Sans", sans-serif;
+    font-weight: 700;
+    font-size: clamp(24px, 4.8vw, 33px);
+    line-height: 1.1;
+    letter-spacing: -0.018em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .sub { margin: 6px 0 0; color: var(--ink-soft); max-width: 62ch; }
+
+  .ways { display: flex; flex-direction: column; gap: 11px; }
+
+  .way {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--seen);
+    border-radius: 3px;
+    padding: 13px 16px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 18px;
+    align-items: baseline;
+  }
+  .way.worst { border-left-color: var(--blind); }
+
+  .way-head { font-family: Archivo, sans-serif; font-weight: 500; font-size: 16.5px; }
+  .way-note { grid-column: 1 / -1; color: var(--ink-soft); font-size: 14px; margin: 0; }
+  .way-note b { color: var(--ink); font-weight: 600; }
+
+  .stamp {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--card); background: var(--seen);
+    padding: 2px 7px; border-radius: 2px; white-space: nowrap;
+  }
+  .stamp.worst { background: var(--blind); }
+
+  .armed {
+    grid-column: 1 / -1;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin: 3px 0 0;
+    display: flex; flex-wrap: wrap; gap: 4px 14px;
+  }
+  .armed span::before { content: "✓ "; color: var(--seen); }
+  .armed span.neg::before { content: "✗ "; color: var(--blind); }
+
+  .flag {
+    background: var(--flag);
+    border-radius: 3px;
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .flag strong { font-weight: 600; }
+
+  .ask {
+    border-top: 2px solid var(--accent);
+    padding-top: 15px;
+    font-family: Archivo, sans-serif;
+    font-weight: 500;
+    font-size: 17px;
+    display: flex; gap: 11px; align-items: baseline;
+  }
+  .ask span:first-child { color: var(--accent); }
+
+  .amend {
+    font-size: 12.5px; color: var(--ink-soft);
+    font-family: "IBM Plex Mono", monospace;
+    border-top: 1px solid var(--rule); padding-top: 11px;
+  }
+</style>
+
+<div class="sheet">
+
+  <div>
+    <h1>Three ways to get a guard past the new gate</h1>
+    <p class="sub">The gate is supposed to notice when a guard exists that nobody has signed off on. All ten checks pass. I tried three ways round it; all three worked.</p>
+  </div>
+
+  <div class="ways">
+
+    <div class="way worst">
+      <div class="way-head">Add a brand-new guard nobody approved</div>
+      <div class="stamp worst">worst &middot; no file editing needed</div>
+      <p class="way-note">Write an ordinary new guard and wire it up the ordinary way. The gate only recognises <b>one</b> of the four normal ways to wire something up in this language &mdash; use any of the other three and the guard simply doesn&rsquo;t exist as far as the gate is concerned. <b>This is the exact thing the gate was built to prevent.</b></p>
+      <p class="armed"><span>wired the one way it knows &rarr; caught</span><span class="neg">wired the second way &rarr; clean</span><span class="neg">wired the third way &rarr; clean</span></p>
+    </div>
+
+    <div class="way">
+      <div class="way-head">Delete a guard from the approved list</div>
+      <div class="stamp">3 of 11 files</div>
+      <p class="way-note">Three guard files can be struck off the list and the gate still reports OK &mdash; and one of the three is the file that <b>runs the other eight</b>.</p>
+      <p class="armed"><span>deleting a watched one &rarr; FAIL</span><span class="neg">deleting any of the three &rarr; clean</span></p>
+    </div>
+
+    <div class="way">
+      <div class="way-head">Invent a guard that was never written</div>
+      <div class="stamp">3 of 21 entries</div>
+      <p class="way-note">Three entries are skipped entirely. You can delete one, or <b>make one up for a guard that doesn&rsquo;t exist</b>, and the gate credits it either way &mdash; so the headline number it publishes can be typed in by hand.</p>
+      <p class="armed"><span>deleting a watched entry &rarr; FAIL</span><span class="neg">inventing one &rarr; clean</span></p>
+    </div>
+
+  </div>
+
+  <div class="flag">
+    <strong>Nothing is less safe today than yesterday.</strong> No guard stopped working; every one of them still runs. What&rsquo;s wrong is the gate&rsquo;s promise &mdash; and twelve more tickets are planned on top of the number it publishes.
+  </div>
+
+  <div class="ask">
+    <span>&rarr;</span>
+    <span>One decision: fix all three now, or fix the worst two now and ticket the third.</span>
+  </div>
+
+  <p class="amend">Amended after first publish. The first version showed only the two list-editing problems (&ldquo;six rows the gate can&rsquo;t see&rdquo;). The advisor found the third, which needs no file editing and is worse than both; it now leads the page.</p>
+
+</div>

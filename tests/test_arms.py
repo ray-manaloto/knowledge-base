@@ -343,6 +343,31 @@ def test_the_file_is_restored_after_every_arm(tmp_path: Path) -> None:
     assert module.read_text(encoding="utf-8") == before
 
 
+def test_a_toml_data_mutation_is_visible_and_restored_byte_identical(tmp_path: Path) -> None:
+    """The harness contract expansion (#753): a target need not be Python.
+
+    `arms.py`'s module docstring used to claim an arm breaks one line of
+    PRODUCTION code, while `_read_target` accepts any in-repo UTF-8 file — a
+    G00 DATA arm mutates `docs/guards/inventory.toml`, not python. This proves
+    that reach: the mutated TOML bytes are what the suite callback actually
+    sees while the arm is live, and the file is put back byte-for-byte after.
+    """
+    target = tmp_path / "data.toml"
+    target.write_bytes(b'value = "clean"\n')
+    before = target.read_bytes()
+    seen: list[bytes] = []
+
+    def suite() -> tuple[int, str]:
+        seen.append(target.read_bytes())
+        return (1, "FAILED test_x")
+
+    arm = arms.Arm("T1", "data.toml", 'value = "clean"', 'value = "mutated"', test="test_x")
+    row = arms._run_arm(arm, tmp_path, suite)
+    assert row.verdict is arms.Verdict.DIED
+    assert seen == [b'value = "mutated"\n'], "the suite must see the MUTATED toml bytes"
+    assert target.read_bytes() == before, "restoration must be byte-identical"
+
+
 def test_a_restore_that_did_not_take_raises_rather_than_returning(
     tmp_path: Path, monkeypatch
 ) -> None:

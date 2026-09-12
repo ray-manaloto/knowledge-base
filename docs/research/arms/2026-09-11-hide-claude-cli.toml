@@ -1,0 +1,83 @@
+# Mutation arms for the graphify 0.9.58 implicit-claude-cli strip.
+#
+# THE FINDING. graphify 0.9.58 added, purely additively (+49/-0, upstream #3475),
+# at `graphify/llm.py:3513`:
+#
+#     if not backend and _claude_cli_available():
+#         backend = "claude-cli"
+#
+# where `_claude_cli_available()` is `shutil.which("claude")`. `kb-label` runs
+# `graphify label .` with NO `--backend` (`graphify_ops.py:486`), so on any host
+# with the Claude CLI installed, a task `mise.toml` advertises as "deterministic,
+# no-LLM, Gemini-free" silently acquires an LLM call and spends tokens — against
+# `do-not.md` #4's `--backend`-explicit rule.
+#
+# GET THE MECHANISM RIGHT. `cli.py:2237-2268` computes `label_communities_by_hub`
+# FIRST and unconditionally, then lets the LLM OVERRIDE only where it returned a
+# real name. The deterministic base is never lost; 0.9.58 ADDS an unrequested call
+# on top. A cost regression, not a loss of determinism — and reporting it the
+# other way round already cost one wrong decision this round.
+#
+# WHY PATH RATHER THAN A FLAG: there is no opt-out. Probed at v0.9.58 — `--no-llm`
+# / `--hub` / `--deterministic` / `--offline` all absent, control arm
+# `--backend` / `--missing-only` / `--resolution` all present. `--backend ""` does
+# not work either: `not ""` is True, so an empty value still takes the claude-cli
+# branch.
+#
+# THE ARM THAT MATTERS MOST IS A2. The tempting "simplification" of this fix is to
+# drop the flag and always strip — which would silently break the SANCTIONED
+# claude-cli EXTRACTION backend, because `clean_env()` is used by every graphify
+# subprocess. A suite that only proves "claude is gone when asked" survives that
+# mutation happily, which is why the default-keeps-it arm is not symmetry padding.
+
+suites = ["tests/test_graphify_env.py"]
+
+# A0 — the control. A comment-only edit that must change nothing.
+[[arm]]
+id = "A0"
+control = true
+file = "python/src/kb_setup/graphify_env.py"
+old = '''    kept: list[str] = []'''
+new = '''    kept: list[str] = []  # (control)'''
+
+# A1 — the fix itself, never applied. This is the realistic break: someone edits
+# the call site in `graphify_ops.py` back to a bare `clean_env()`, or the flag
+# stops being read here. Either way the strip never runs and `kb-label` is back to
+# spending tokens while reporting success.
+[[arm]]
+id = "A1"
+test = "test_hide_claude_cli_removes_the_directory_that_can_launch_it"
+file = "python/src/kb_setup/graphify_env.py"
+old = '''    if hide_claude_cli and env.get("PATH"):'''
+new = '''    if False and env.get("PATH"):'''
+
+# A2 — the dangerous "simplification": make the strip unconditional. Reads as
+# tidier code, passes any test that only asks "is claude hidden?", and BREAKS the
+# sanctioned claude-cli extraction backend that `do-not.md` #4 depends on. Must be
+# caught by the default-keeps-it arm.
+[[arm]]
+id = "A2"
+test = "test_clean_env_keeps_claude_on_path_by_default"
+file = "python/src/kb_setup/graphify_env.py"
+old = '''    if hide_claude_cli and env.get("PATH"):'''
+new = '''    if env.get("PATH"):'''
+
+# A3 — the blunt strip: empty PATH instead of filtering it. This one is why the
+# surgical assertion exists. "Is the claude directory gone?" is TRUE under this
+# mutation, so a suite without the survives-the-other-entry check would score it a
+# pass while the subprocess lost every tool it can resolve.
+[[arm]]
+id = "A3"
+test = "test_hide_claude_cli_removes_the_directory_that_can_launch_it"
+file = "python/src/kb_setup/graphify_env.py"
+old = '''        if shutil.which("claude", path=entry) or shutil.which("claude.cmd", path=entry):'''
+new = '''        if True:'''
+
+# A4 — the filter that matches nothing: fully wired, visibly present in a diff,
+# and inert. The shape a reviewer skims past.
+[[arm]]
+id = "A4"
+test = "test_hide_claude_cli_removes_the_directory_that_can_launch_it"
+file = "python/src/kb_setup/graphify_env.py"
+old = '''        if shutil.which("claude", path=entry) or shutil.which("claude.cmd", path=entry):'''
+new = '''        if False:'''
