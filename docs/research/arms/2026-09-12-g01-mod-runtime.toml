@@ -1,0 +1,540 @@
+# Mutation arms for G01 (#754) — the function-hook runtime contract check.
+#
+# WHAT THIS SUITE IS ACTUALLY ABOUT. `kb-mod-runtime-check` is this repo's first
+# deliberately NON-HERMETIC gate: it shells to the installed `claude`, because
+# the thing it certifies is the runtime itself. That split is what these arms
+# have to respect — `kb_setup.arms` shells `python -m pytest` and nothing else
+# (`arms.py:289-306`), so only the check's DETECTION LOGIC is armable, never its
+# live half. Every arm below severs one line of that logic and requires a named
+# pytest to notice.
+#
+# 🔴 WHY THE TICKET'S LITERAL ARM ACTION IS NOT WHAT IS HERE. #754 asked for
+# "delete the regenerated artifact and leave a stale extra beside it". A
+# pytest-only runner cannot perform a filesystem mutation as an arm, so writing
+# it that way would have made this ticket depend on #771 (the command-runner
+# backend) for no gain. The advisor's verdict D is what these arms follow
+# instead: the MISSING and STALE-EXTRA states are constructed inside named
+# pytests (`test_a_missing_expected_output_is_caught`,
+# `test_a_stale_extra_output_is_caught`) and the arms mutate the tracked
+# detection logic those tests exercise. Same two states, same two directions,
+# no dependency.
+#
+# CONTROL DISCIPLINE. A0 is a comment-only edit that must SURVIVE. If A0 dies,
+# every other row is void: the suite is failing for a reason that has nothing to
+# do with the mutation.
+#
+# 🔴 A CLEAN SWEEP HERE IS A STATEMENT ABOUT THESE TESTS, NEVER ABOUT THE
+# PREMISE. Every arm below attacks the CODE. None of them can tell you that the
+# 11-symbol contract is the right contract, that token PRESENCE is the right
+# question to ask of a declarations file, or that the runtime spells the lane
+# marker `agentId` — those are premises, and a mutation sweep is structurally
+# blind to a wrong one.
+
+suites = ["tests/test_mod_runtime.py", "tests/test_mod_runtime_arms.py"]
+
+# A0 — the control. A comment-only edit that must change nothing.
+[[arm]]
+id = "A0"
+control = true
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''#: The mod surface whose runtime dependencies are derived.'''
+new = '''#: The mod surface whose runtime dependencies are derived (control).'''
+
+# A1 — SEVER THE TOPOLOGY VERDICT. Both directions at once: the exact-set
+# comparison still runs, and its answer is discarded. This is the row native
+# `datamodel-codegen --check` is MEASURED to get half-right (it catches a
+# deletion, rc 1 `MISSING:`, and misses a stale extra entirely, rc 0) — so if
+# this line stops deciding, the extra half has no detector anywhere in the repo.
+[[arm]]
+id = "A1"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        if missing_files or extra_files:'''
+new = '''        if False:'''
+# 🔴 RE-POINTED after this arm SURVIVED. It first named
+# `test_a_stale_extra_output_is_caught`, which calls `topology_findings`
+# directly — a pure function this mutation does not touch. The mutation severs
+# the VERDICT's call site, so only a test that drives `check()` can see it.
+test = "test_check_reports_findings_when_the_generator_writes_an_extra_artifact"
+
+# A2 — MAKE THE EXACT-SET COMPARISON ONE-DIRECTIONAL. The believable
+# "simplification": report what is missing and stop thinking about what is
+# extra. `topology_findings`' whole contract is that the two are SYMMETRIC.
+[[arm]]
+id = "A2"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    return frozenset(expected - produced), frozenset(produced - expected)'''
+new = '''    return frozenset(expected - produced), frozenset()'''
+test = "test_a_stale_extra_output_is_caught"
+
+# A3 — STOP STRIPPING COMMENTS. `register.ts`'s only literal `{ tool: "Edit" }`
+# sits inside a doc comment, so without this the extractor demands the runtime
+# declare `Edit` as a symbol. `guard_inventory.strip_ts_comments`' own docstring
+# already records that a presence check over raw text is wrong in BOTH
+# directions; this arm proves this module inherits that correctly.
+[[arm]]
+id = "A3"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    no_comments = guard_inventory.strip_ts_comments(register_source)'''
+new = '''    no_comments = register_source'''
+test = "test_the_committed_contract_is_exactly_the_pinned_set"
+# 🔴 RE-POINTED 2026-09-12, round 2, after `red suite did not name the test`.
+# The round-2 fix computes `no_strings` from the RAW source, so the
+# property-access path strips comments independently of `no_comments` and this
+# mutation no longer reaches the test it used to name. The exact-set pin is the
+# correct detector for what leaving comments in actually does — it admits EXTRA
+# tokens into the contract — and `kb-arms` refusing to score this as a pass is
+# the only reason the re-point happened rather than a silent mis-measurement.
+
+# A4 — STOP STRIPPING STRING LITERALS. Measured on the real module: four junk
+# tokens of 23 come from prose inside strings (`". Report this"` -> `Report`,
+# `".git"` -> `git`), because a full stop followed by a word is
+# indistinguishable from a member access once you are only matching text. Each
+# junk token is then demanded of the declarations and reds the gate.
+#
+# This is the half `strip_ts_comments` does NOT cover, which is why this module
+# adds `strip_ts_strings` rather than reusing one function for both.
+[[arm]]
+id = "A4"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    no_strings_comments_first = strip_ts_strings(no_comments)'''
+new = '''    no_strings_comments_first = no_comments'''
+test = "test_prose_inside_a_string_does_not_enter_the_contract"
+# RE-DERIVED a THIRD time, 2026-09-12 round 3: property access is now derived
+# from the UNION of both strip orders, so this row severs the blanking on the
+# comments-first source. A30/A31 own which orders are in the union; this row
+# still owns "strings are blanked at all".
+# RE-DERIVED 2026-09-12, round 2: the round-2 fix reordered this line to blank
+# strings BEFORE stripping comments, so the old anchor no longer occurs. A24 owns
+# the ORDER; this row still owns "strings are blanked at all".
+
+# A5 — SEVER THE NAMED ANCHOR AND THE FLOOR TOGETHER. The line refuses a
+# contract that has lost `agentId` (the lane marker, whose absence fails the
+# guard OPEN) or collapsed below its size floor. Severed, a module rewritten to
+# read the DOCUMENTED spelling `agent_id` yields a tidy, internally consistent
+# contract that every later check passes — which is the exact silent fail-open
+# this ticket exists to prevent.
+[[arm]]
+id = "A5"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    if len(tokens) < _MINIMUM_REQUIRED_TOKENS or _REQUIRED_ANCHOR not in tokens:'''
+new = '''    if False:'''
+test = "test_a_renamed_lane_marker_makes_the_contract_underivable"
+
+# A6 — SEVER THE FLOOR ALONE, keeping the anchor. A5 covers both clauses at
+# once and would pass if only the anchor half survived; this isolates the other
+# half. An empty contract is satisfied by every declarations file ever written,
+# including an empty one.
+[[arm]]
+id = "A6"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    if len(tokens) < _MINIMUM_REQUIRED_TOKENS or _REQUIRED_ANCHOR not in tokens:'''
+new = '''    if _REQUIRED_ANCHOR not in tokens:'''
+test = "test_a_collapsed_extractor_result_is_not_a_passing_contract"
+
+# A7 — REGRESS THE MATCHER TO A BARE SUBSTRING. Measured on the real vendored
+# file: `file_path` occurs 9 times by plain substring and 7 by word boundary,
+# the extras being longer field names that merely END in it. A substring matcher
+# reports the contract satisfied by a field that is not the field — and reports
+# it in the SAFE-LOOKING direction, since more matches read as more confidence.
+[[arm]]
+id = "A7"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    return re.compile(rf"\b{re.escape(token)}\b")'''
+new = '''    return re.compile(re.escape(token))'''
+test = "test_a_longer_field_that_merely_ends_in_a_required_name_is_not_a_match"
+# 🔴 RE-DERIVED 2026-09-12 after this arm reported PROBE BROKEN — "`old` does not
+# occur ... a refactor moved it". The refactor was THIS ROUND'S OWN FIX: A20 gave
+# the dotted arm a real boundary, `(?<![\w$.])…(?![\w$])`, which rewrote the two
+# lines A7 had quoted as one block. A7 now names only the IDENTIFIER arm, which
+# is what it was always about; A20 owns the dotted one.
+#
+# This is the second recorded instance of the same class here: an arm whose
+# anchor a later fix moves reads as a broken probe, and an arm whose anchor a
+# later fix leaves intact can keep passing while measuring something its id no
+# longer names. `kb-arms` distinguishes the first case loudly (rc `--`, never a
+# silent pass) — which is the only reason this was caught rather than shipped as
+# "19/20, close enough".
+
+# A8 — SEVER THE CHECK'S OWN CONTROL ARM. A matcher that reported everything
+# present would pass `missing_tokens` over an empty file and the gate would go
+# green having verified nothing. `probes-need-a-control-arm.md` rule 1 as a
+# property of the CHECK rather than of the session that wrote it.
+[[arm]]
+id = "A8"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    if not matcher_can_report_absence(fresh):'''
+new = '''    if False:'''
+# 🔴 RE-POINTED after this arm SURVIVED, same reason as A1: the original target
+# calls `matcher_can_report_absence` directly. Severing its CALL SITE is
+# invisible to a test of the predicate.
+test = "test_check_reports_not_run_when_its_own_matcher_is_broken"
+
+# A9 — DROP THE EVENT NAME FROM THE CONTRACT. `tool.call` is a STRING literal,
+# so it enters only because the event extraction runs against the
+# comment-stripped-but-string-intact source. Losing this line loses the one
+# symbol that says which event the module is registered for at all — and loses
+# it SILENTLY, because the remaining ten still reconcile clean.
+[[arm]]
+id = "A9"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    tokens.update(_ON_EVENT.findall(no_comments))'''
+new = '''    pass'''
+test = "test_the_registered_event_name_is_part_of_the_contract"
+
+# A10 — MAKE A MISSING BINARY READ AS CLEAN. The single most important failure
+# direction of a non-hermetic gate: on a machine with no `claude`, "we could not
+# ask" must never collapse into "we asked and it was fine". This is the mutation
+# that would let this gate certify a runtime it never examined, which is the
+# whole reason `Rc.NOT_RUN` exists as a fourth code.
+[[arm]]
+id = "A10"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    binary = resolve_claude()
+    if binary is None:'''
+new = '''    binary = resolve_claude()
+    if False:'''
+# 🔴 RE-POINTED after this arm SURVIVED, and this one is the most instructive
+# of the three: the original target asserted `check() == Rc.NOT_RUN`, which is
+# TRUE UNDER THE MUTATION TOO — falling through hands `str(None)` to
+# `subprocess.run`, which raises `OSError` and lands on the same code. The Rc
+# could never discriminate. The new target asserts the second probe is never
+# reached, which can.
+test = "test_no_binary_short_circuits_before_trying_to_execute_one"
+
+# A11 — WIDEN THE BUILTIN SUBTRACTION UNTIL IT SWALLOWS A REAL FIELD. The
+# builtin list is the one hand-maintained thing in an otherwise mechanical
+# derivation, and the module claims its failure direction is CLOSED: a builtin
+# MISSING from it only makes the check stricter. This arm attacks the other
+# direction — a builtin list that grows too far quietly shrinks the contract.
+# `agentId` is the field to test it with, because its loss is the one the guard
+# cannot fail closed on.
+[[arm]]
+id = "A11"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        if prop not in _JS_BUILTIN_MEMBERS'''
+new = '''        if prop not in _JS_BUILTIN_MEMBERS | {"agentId"}'''
+# RE-DERIVED 2026-09-12 round 3: the comprehension was rewritten to union both
+# strip orders, so the single-line form no longer occurs. The mutation is
+# unchanged in intent — drop the lane marker from the derived set.
+test = "test_an_event_field_read_off_a_binding_not_named_e_is_still_found"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A12-A20 — added 2026-09-12 by the session review of `3b921834`.
+#
+# WHY THEY EXIST. Two of the round's own findings converge here. First,
+# `c33a1fb5` shipped a P1 fix whose commit message says, verbatim, "The
+# `mod_runtime` fix is UNREVIEWED and UNARMED" — and reverting it left all 26
+# existing tests GREEN, because `generate_declarations` is monkeypatched in every
+# end-to-end test and the stub hardcodes its stdout. Second, the three P1s that
+# fix did not close were each measured invisible to the suite. So every row below
+# attacks code that, before this round, NO test in the tree could see change.
+#
+# 🔴 THE SAME CAVEAT AS A1-A11 APPLIES AND IS WORTH REPEATING. These arms are a
+# statement about `tests/test_mod_runtime_arms.py`, never about the premise. They
+# cannot tell you the extracted access forms are the RIGHT set of forms — only
+# that the three now extracted are noticed when severed. Computed access
+# (`e[key]`) and spreads remain unextracted BY DESIGN and are documented as such
+# in the module; no arm here covers them, and their absence from this list is not
+# evidence they are safe.
+
+# A12 — sever the "Unknown command" branch. Pre-`c33a1fb5` behaviour: a flag-off
+# run writes nothing, prints `Unknown command: /plugin-types` and exits **0**, so
+# rc cannot discriminate and the gate reported FINDINGS "expected output not
+# written" — a real-looking contract breach from a probe that never asked.
+[[arm]]
+id = "A12"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        if _UNKNOWN_COMMAND in combined:'''
+new = '''        if False:'''
+test = "test_an_unknown_plugin_types_command_is_not_run_rather_than_findings"
+
+# A13 — stop setting the flag explicitly and fall back to inheritance. This is
+# the realistic break: it looks like a simplification, and it PASSES inside any
+# Claude Code session, because `.claude/settings.json` exports the flag. It fails
+# only in a plain terminal or CI — which is exactly how the gate came to be green
+# "only because of where it ran". The test deletes the variable from its own env
+# for that reason; without that `delenv` the arm could not die.
+[[arm]]
+id = "A13"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",'''
+new = '''        "KB_ARM_A13_NOT_THE_FLAG": "1",'''
+test = "test_the_generator_subprocess_is_handed_the_function_hooks_flag"
+
+# A14 — stop isolating HOME. Measured before the fix: 13 directories named
+# `~/.claude/projects/-private-var-folders-…-kb-mod-runtime-<random>/`, each with
+# a session JSONL, accumulated in the real profile between 09:09 and 13:16 on one
+# day. Unbounded, never cleaned, one per gate run.
+[[arm]]
+id = "A14"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        "HOME": str(home),'''
+new = '''        "KB_ARM_A14_NOT_HOME": str(home),'''
+test = "test_the_generator_runs_under_an_isolated_home"
+
+# A15 — leave a caller's `CLAUDE_CONFIG_DIR` in place. Isolating HOME is not
+# enough on its own: that variable routes the writes straight back out of the
+# isolated home, so the pollution returns with the isolation still apparently in
+# effect. Severing it must be visible separately from A14.
+[[arm]]
+id = "A15"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    "CLAUDE_CONFIG_DIR",
+    "CLAUDE_CODE_DEBUG_LOGS_DIR",'''
+new = '''    "CLAUDE_CODE_DEBUG_LOGS_DIR",'''
+test = "test_the_generator_runs_under_an_isolated_home"
+# RE-DERIVED 2026-09-12, round 2: the single `env.pop` became a loop over
+# `_WRITE_LOCATION_OVERRIDES`, so this row now removes that ONE name from the
+# tuple. A27 owns "scrub only the first name"; this row still owns
+# "`CLAUDE_CONFIG_DIR` specifically is scrubbed".
+
+# A16 — stop extracting bracket access. `e["permissionMode"]` then leaves the
+# derived set at 11, unchanged, with nothing saying so.
+[[arm]]
+id = "A16"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    tokens.update(_bracket_access_outside_strings(no_comments))'''
+new = '''    pass  # arm A16: bracket access goes back to invisible'''
+test = "test_ordinary_access_forms_join_the_contract"
+
+# A17 — stop extracting destructuring. `const { permissionMode } = e` is the form
+# most likely to be written by someone adding a guard condition, and it was the
+# one with the worst failure direction: a guard that reads `undefined` and allows.
+[[arm]]
+id = "A17"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    for group in _DESTRUCTURE.findall(no_strings):'''
+new = '''    for group in []:'''
+test = "test_destructuring_with_rename_keeps_the_key_not_the_alias"
+
+# A18 — stop extracting template-literal interpolations. Note this one is not
+# hypothetical: `e.tool` is read ONLY inside template literals in the committed
+# `register.ts`, so before this round `tool` was in the contract purely by
+# accident, via the shorthand matcher `{ tool }`.
+[[arm]]
+id = "A18"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''            for body in _TEMPLATE_INTERP.findall(literal.group()):'''
+new = '''            for body in []:'''
+test = "test_ordinary_access_forms_join_the_contract"
+
+# A19 — search the declarations WITH comments again. Measured against the real
+# vendored file: `agentId` appears in ~10 comments and 6 declarations, and the
+# `tool.call` payload is alias-composed, so a rename that removed the field would
+# still find the name and the gate would read clean.
+[[arm]]
+id = "A19"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    visible = _visible(declarations)'''
+new = '''    visible = declarations  # arm A19: comments count as declarations again'''
+test = "test_a_symbol_present_only_in_a_comment_is_missing"
+
+# A20 — drop the right boundary from the dotted-name pattern. `tool.callback`
+# then satisfies `tool.call`. The pre-existing test named for this boundary could
+# not catch it: its negative case differed in the SECOND segment (`tool.result`),
+# so it never exercised a longer name with the same prefix.
+[[arm]]
+id = "A20"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    if "." in token:'''
+new = '''    if False:'''
+test = "test_an_extended_event_name_does_not_satisfy_the_required_one"
+# RE-DERIVED TWICE on 2026-09-12. First the anchor moved (the round-2 fix
+# tightened the boundary to `(?![\w$.])`). Then the re-derived row reported
+# `red suite did not name the test`, because my prediction about what severing
+# the branch would do was WRONG: I expected dotted events to stop matching
+# entirely. They do not. `\btool\.call\b` still matches inside `"tool.call"`,
+# because a quote is a non-word character on both sides — so the tests asserting
+# a dotted event is FOUND all stay green. What actually breaks is the EXTENDED
+# name: in `on("tool.call.after", …)` the character after `call` is a dot, which
+# `\b` happily accepts, so `tool.call.after` satisfies `tool.call` again.
+#
+# So this row and A25 name the same test on purpose. They sever different lines,
+# and either one alone reopens the same hole — which is the thing worth proving.
+# Recorded at length because the `red suite did not name the test` check is what
+# caught a confident wrong prediction; a harness that only counted red/green
+# would have scored this arm as a pass.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A21-A27 — the SECOND round's arms. A cold `gpt-6-astra` lane reviewed the A12-A20
+# fixes above and raised nine findings; FOUR were defects inside those very fixes.
+# That is this repo's fifth recorded instance of *the fix is where the defect
+# lives*, and it is why these rows exist at all: A16-A20 were armed, died, and
+# were still incomplete. **An arm proves a test notices a mutation. It says
+# nothing about whether the fix was the right fix.**
+#
+# Each row below fails on the round-1 code and passes on the round-2 code.
+
+# A21 — drop the member RECEIVER from bracket extraction. Round 1 matched any
+# `["name"]`, so a bare array literal `const status = ["bogusMember"]` put
+# `bogusMember` into the RUNTIME CONTRACT — ordinary local data promoted to a
+# declared runtime dependency, in the safe-looking direction (more tokens reads
+# as a stricter gate).
+[[arm]]
+id = "A21"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\].])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
+new = '''_BRACKET_ACCESS = re.compile(r"""\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
+test = "test_ordinary_data_and_prose_do_not_become_runtime_dependencies"
+
+# A22 — stop filtering matches that fall inside a string literal. Prose in a log
+# message — `$.ui.log("see e[\"bogusMember\"] for details")` — then becomes a
+# runtime dependency. Note the receiver requirement does NOT save this case: the
+# receiver is present inside the string too.
+[[arm]]
+id = "A22"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        if any(lo < start < hi for lo, hi in spans):
+            continue'''
+new = '''        if False:
+            continue'''
+test = "test_ordinary_data_and_prose_do_not_become_runtime_dependencies"
+
+# A23 — revert the destructuring pattern to the un-annotated form. Round 1 missed
+# `const { permissionMode }: any = e`, which is ordinary TypeScript rather than
+# the computed-access case the module explicitly excludes.
+[[arm]]
+id = "A23"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''_DESTRUCTURE = re.compile(r"(?:const|let|var)\s*\{([^}]*)\}\s*(?::[^=;]+)?=")'''
+new = '''_DESTRUCTURE = re.compile(r"(?:const|let|var)\s*\{([^}]*)\}\s*=")'''
+test = "test_single_quotes_and_type_annotations_are_not_invisible"
+
+# A24 — strip comments BEFORE blanking strings, the order round 1 used. The
+# stripper is not a lexer: it reads `//` inside `"https://example.com"` as a
+# comment and deletes the rest of the line, so a link erases the property read
+# beside it. A field the guard depends on, removed from its own contract.
+[[arm]]
+id = "A24"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    no_strings_strings_first = guard_inventory.strip_ts_comments(strip_ts_strings(register_source))'''
+new = '''    no_strings_strings_first = no_strings_comments_first'''
+test = "test_a_url_in_a_string_does_not_erase_the_property_read_beside_it"
+# RE-DERIVED 2026-09-12 round 3. This row used to own the strip ORDER; round 3
+# replaced a single order with the union of both, so A30 and A31 own the two
+# orders and this row now severs the strings-first source itself — which is the
+# member of the union that carries the URL case.
+
+# A25 — let the dotted right boundary admit another dot, as round 1 did.
+# `tool.call.after` then satisfies a required `tool.call`. The renamed-event case
+# A20 closed has a sibling that merely EXTENDS the name, and round 1 missed it.
+[[arm]]
+id = "A25"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        return re.compile(rf"(?<![\w$.]){re.escape(token)}(?![\w$.])")'''
+new = '''        return re.compile(rf"(?<![\w$.]){re.escape(token)}(?![\w$])")'''
+test = "test_an_extended_event_name_does_not_satisfy_the_required_one"
+
+# A26 — return `shutil.which`'s result unresolved. It is relative whenever PATH
+# carries a relative directory, and generation changes cwd, so a WORKING install
+# raises FileNotFoundError before the child starts and is reported as no install.
+[[arm]]
+id = "A26"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    return Path(found).absolute()'''
+new = '''    return Path(found)'''
+test = "test_a_relative_path_from_which_is_made_absolute"
+# RE-DERIVED 2026-09-12 round 3: `.resolve()` became `.absolute()` because
+# `.resolve()` dereferenced a mise shim and certified mise's version as Claude
+# Code's. A29 owns "do not dereference"; this row still owns "make it absolute".
+
+# A27 — scrub only `CLAUDE_CONFIG_DIR`, as round 1 did. Isolating `HOME` is not
+# enough on its own: every other name in the tuple points at an absolute write
+# location the runtime prefers, so a caller with one exported gets the child's
+# writes in their own directories while the isolation looks like it is working.
+[[arm]]
+id = "A27"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    for override in _WRITE_LOCATION_OVERRIDES:
+        env.pop(override, None)'''
+new = '''    env.pop("CLAUDE_CONFIG_DIR", None)'''
+test = "test_every_named_write_location_override_is_scrubbed"
+
+# A28 — compute the "present in the live one" set from the VENDORED file, as
+# round 1 did. `check()` calls this reporter after a FAILED reconciliation too,
+# so a token missing from BOTH inputs was announced as present live, directly
+# contradicting the verdict printed beside it.
+[[arm]]
+id = "A28"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    behind = sorted(absent_from_vendored - absent_from_fresh)'''
+new = '''    behind = sorted(absent_from_vendored)'''
+test = "test_the_vendored_delta_does_not_claim_live_presence_for_a_token_absent_from_both"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A29-A33 — the THIRD round. A cold lane reviewed round 2's fixes and raised
+# THREE P1 BLOCKING findings, every one a defect round 2 introduced. Sixth
+# instance in a single day of *the fix is where the defect lives*, and the
+# clearest argument this repo has for reading a fix as carefully as the defect.
+
+# A29 — dereference the symlink again. `.resolve()` and `.absolute()` both make
+# the path absolute; only `.resolve()` follows the link. `claude` on PATH here is
+# a MISE SHIM, so a cold lane measured `resolve_claude()` returning
+# `~/.local/bin/mise` and `claude_version()` on it reporting
+# `"2026.9.5 macos-arm64"` — mise's version certified as Claude Code's, rc 0, no
+# error. The round-2 test could not see it: it asserted only `is_absolute()`,
+# which BOTH satisfy.
+[[arm]]
+id = "A29"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    return Path(found).absolute()'''
+new = '''    return Path(found).resolve()'''
+test = "test_the_resolved_binary_is_not_symlink_dereferenced"
+
+# A30 — go back to ONE strip order (comments first). That order loses a property
+# read following a URL on the same line, because `//` inside the string reads as
+# a comment.
+[[arm]]
+id = "A30"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        for source in (no_strings_comments_first, no_strings_strings_first)'''
+new = '''        for source in (no_strings_comments_first,)'''
+test = "test_a_url_in_a_string_does_not_erase_the_property_read_beside_it"
+
+# A31 — go back to the OTHER single order (strings first), which is what round 2
+# shipped. A stray backtick in a comment then swallows the code beneath it: 11
+# tokens collapse to 6, landing exactly on the minimum floor so the gate stays
+# GREEN with half the contract gone. The two orders fail in opposite directions,
+# which is why the union is the fix and neither order alone is.
+[[arm]]
+id = "A31"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        for source in (no_strings_comments_first, no_strings_strings_first)'''
+new = '''        for source in (no_strings_strings_first,)'''
+test = "test_a_stray_backtick_in_a_comment_does_not_swallow_the_code_beneath_it"
+
+# A32 — drop optional chaining from the receiver class. `e?.["name"]` is ordinary
+# TypeScript that round 1 extracted and round 2's narrowing silently lost.
+[[arm]]
+id = "A32"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\].])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
+new = '''_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\]])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
+test = "test_forms_round_one_extracted_are_not_lost_by_round_twos_narrowing"
+
+# A33 — treat a template literal as one uniform exclusion zone, as round 2 did.
+# Its `${…}` regions are CODE, so `` `${e["name"]}` `` was discarded whole —
+# the second form round 1 extracted and round 2 lost.
+[[arm]]
+id = "A33"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        if not literal.group().startswith("`"):
+            spans.append((start, end))
+            continue'''
+new = '''        if True:
+            spans.append((start, end))
+            continue'''
+test = "test_forms_round_one_extracted_are_not_lost_by_round_twos_narrowing"
+
+# A34 — shrink the write-location tuple. The round-2 test derived its fixture AND
+# its assertion from this very tuple, so deleting entries left the suite green
+# while the variables genuinely leaked — a cold lane measured four `XDG_*`
+# variables present in the spied child env while the assertion computed
+# `leaked == []`. The names are now pinned literally in the test.
+[[arm]]
+id = "A34"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    "XDG_CONFIG_HOME",
+    "XDG_CACHE_HOME",'''
+new = '''    "XDG_CACHE_HOME",'''
+test = "test_every_named_write_location_override_is_scrubbed"

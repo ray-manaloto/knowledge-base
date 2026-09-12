@@ -138,6 +138,11 @@ Write the block above to a file — prose reaches a CLI through a file, never
 through backticks in zsh — and pipe it in:
 
 ```bash
+# The guard is its OWN statement, before the command. Inside the `\` continuation
+# it becomes two positional arguments and never fires — measured, attempt 3.
+: "${KB_LANE:?your caller must pass an absolute per-instance scratch path}"
+mkdir -p "$KB_LANE"
+
 mise run kb-codex -- --review \
   --base <FIXED> \
   --model gpt-6-astra \
@@ -145,7 +150,7 @@ mise run kb-codex -- --review \
   --sandbox read-only \
   --timeout 3600 \
   --output .agent/kb/review/reports/review-<HEAD SHA>-cold.md \
-  < /tmp/astra-method.txt
+  < "$KB_LANE/method.txt"
 ```
 
 Things about that command that are load-bearing:

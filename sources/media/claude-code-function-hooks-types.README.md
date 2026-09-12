@@ -27,6 +27,35 @@ Two lessons, and the second is the reason for this layout:
    defeats the vendoring.** Keep the artifact pristine; put every word about it
    somewhere else. Verify with the sha256 above before trusting a line number.
 
+## 🔴 RETIRED AS THE RUNTIME CONTRACT (2026-09-12, #754 G01)
+
+**This file is corpus evidence labelled 2.1.267. It is no longer what this repo
+checks the function-hook runtime against.** `mise run kb-mod-runtime-check`
+generates the declarations LIVE at the installed version and reconciles those.
+
+Why, measured the day it was retired: the installed **2.1.269** generates
+**9,263** lines against this file's **7,966**, and carries an entire event
+namespace this file has zero hits for (`session.authorize`: **0** here, **7**
+there — so the first of `anthropics/claude-code#92469`'s two named omissions is
+fixed upstream and this file cannot show it). This repo had been reasoning about
+function hooks from a file missing a whole namespace the running binary has.
+
+**Positive cross-checks against this file remain valid; negative ones never
+were.** A symbol present here is present. A symbol ABSENT here says nothing
+about the runtime — which is the direction that had been silently in use.
+
+Two further facts that bound how this file may be used at all:
+
+- **Its successor cannot be a checked-in file either.** The generated
+  declarations are ENVIRONMENT-dependent, not merely version-dependent: same
+  2.1.269 binary, `HOME` the only variable, `claude-code.d.ts` was 9,263 lines
+  against **9,156** and `claude-code-mcp.d.ts` 2,588 against **10**. No content
+  hash of these artifacts can ever be a gate. Re-vendoring at a newer version
+  would rebuild exactly the trap this retirement closes.
+- **The `+1,297` line delta quoted around this file is confounded.**
+  Version-only is `+1,190`; the remaining `+107` is the measuring machine's own
+  tool and MCP inventory.
+
 ---
 
 VENDORED SOURCE — see sources/media/ and `do-not.md` #6.
