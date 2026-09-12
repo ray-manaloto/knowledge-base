@@ -19,4 +19,8 @@ export const PROTECTED_SUFFIXES: readonly string[] = [
   "mise.toml",
   "hk.pkl",
   "python/src/kb_setup/hook_guard.py",
+  "schemas/guard-policy.schema.json",
+  "python/src/kb_setup/guard_codegen.py",
+  "python/src/kb_setup/settings_guard.py",
+  ".claude/mods/kb-settings-guard/hooks/protected-paths.ts",
 ];

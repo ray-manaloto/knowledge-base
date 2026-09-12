@@ -1101,6 +1101,7 @@ description = "Regenerate the settings-guard's protected-path policy (Python enu
 # exactly like every other schema-owned model) and then renders the TS array
 # datamodel-codegen has no target for. Logic in `kb_setup.guard_codegen`.
 run = "uv run --project {{config_root}} kb-setup guard-codegen"
+timeout = "5m"
 
 [tasks.kb-guard-codegen-check]
 description = "Gate: the guard-policy schema, its Python enum and its TS array all agree, with no stale generated file"
@@ -1116,6 +1117,7 @@ description = "Gate: the guard-policy schema, its Python enum and its TS array a
 # via `tests/test_guard_codegen.py`, the same wiring `kb-guard-inventory-check`
 # already established rather than growing `GATE_TASKS`.
 run = "uv run --project {{config_root}} kb-setup guard-codegen-check"
+timeout = "5m"
 
 [tasks.kb-lock-drift]
 description = "Gate: mise.lock still describes what mise.toml pins (runs mise's own lock --dry-run)"

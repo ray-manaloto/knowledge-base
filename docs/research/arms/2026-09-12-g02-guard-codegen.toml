@@ -27,13 +27,23 @@ new = '''#: The one schema authority (control).'''
 # A1 — SEVER THE NATIVE-CHECK DEFER. The native `datamodel-codegen --check`
 # call is what catches a deleted/differing generated Python file (spec §5, row
 # 1 and row 2); ignoring its return code makes this module blind to both.
+#
+# Re-derived for the fix round (#755 respec, F3): `check()`'s native-check
+# logic moved into `_check_native`, and the branch inverted (an early `return
+# None` on SUCCESS, rather than an early return on failure) so the
+# drift-vs-launch-failure discriminator could live in one place. The anchor
+# now severs the branch by making it unconditionally treat the native run as
+# successful, which is the equivalent "never detects a failure" mutation in
+# the new shape.
 [[arm]]
 id = "A1"
 file = "python/src/kb_setup/guard_codegen.py"
 old = '''    native = _run_native(repo_root, ["--all-jobs", "--check"])
-    if native.returncode != 0:'''
+    if native.returncode == 0:
+        return None'''
 new = '''    native = _run_native(repo_root, ["--all-jobs", "--check"])
-    if False:'''
+    if True:
+        return None'''
 test = "test_a_deleted_generated_python_file_is_caught_by_the_native_check"
 
 # A2 — SEVER THE STALE-EXTRA CHECK. This is the row native datamodel-codegen
@@ -91,3 +101,47 @@ old = '''    normalized = path.replace("\\", "/")
 new = '''    normalized = path.replace("\\", "/")
     return any(suffix in normalized for suffix in PROTECTED_SUFFIXES)'''
 test = "test_a_substring_that_is_not_a_path_segment_is_not_protected"
+
+# --- The fix round (#755 respec) — F1/F2/F6/F8's new checks, each armed -----
+
+# A6 — SEVER THE FLOOR (F2). An emptied or shrunk schema must still be a
+# reported finding, not a silent clean — checks 1-3 alone are internally
+# consistent even with zero entries.
+[[arm]]
+id = "A6"
+file = "python/src/kb_setup/guard_codegen.py"
+old = '''    enum_values = schema.get("enum", [])
+    if len(enum_values) < _MINIMUM_PROTECTED_PATHS:'''
+new = '''    enum_values = schema.get("enum", [])
+    if False:'''
+test = "test_an_emptied_schema_reports_below_the_floor"
+
+# A7 — SEVER THE CONSUMER CHECK (F1). `register.ts` can lose its only live
+# reader of the generated policy while every other check still agrees.
+[[arm]]
+id = "A7"
+file = "python/src/kb_setup/guard_codegen.py"
+old = '''    if not _register_ts_consumes_policy(register_source):'''
+new = '''    if False:'''
+test = "test_register_ts_with_the_import_commented_out_has_no_live_consumer"
+
+# A8 — REGRESS THE PROVENANCE BUILDER (F8) BACK TO NAMES. The exact defect two
+# prior tests could not catch: `PROTECTED_SUFFIXES` built from a mangled
+# member NAME instead of its VALUE.
+[[arm]]
+id = "A8"
+file = "python/src/kb_setup/settings_guard.py"
+old = '''    return tuple(member.value for member in enum_cls)'''
+new = '''    return tuple(member.name for member in enum_cls)'''
+test = "test_protected_suffixes_are_built_from_enum_values_not_names"
+
+# A9 — SEVER THE TS-RATIONALE DIVERGENCE CHECK (F6). A schema description that
+# drops the TS header's hardcoded rationale sentence must be a reported
+# finding — this is the ONE thing that would otherwise let the two headers
+# desynchronise silently.
+[[arm]]
+id = "A9"
+file = "python/src/kb_setup/guard_codegen.py"
+old = '''    if not _ts_rationale_is_current(schema.get("description", "")):'''
+new = '''    if False:'''
+test = "test_a_schema_whose_description_dropped_the_rationale_reports_findings"

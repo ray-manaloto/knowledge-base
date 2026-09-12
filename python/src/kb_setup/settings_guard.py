@@ -11,12 +11,15 @@ session: `datamodel-codegen` mangles member names for identifier safety — a
 leading dot becomes a `field_` prefix, so `.claude/settings.json` becomes
 `field_claude_settings_json` — and two names that collide are silently
 suffixed with no error and no warning. Values round-trip byte-exact and
-nothing is dropped (5 in, 5 out, all distinct), so the schema keeps authority
-over the *values*, which is the security-relevant half. A renamed member
-still fails LOUDLY at `ty check` (`error[unresolved-attribute]`), which is
-what makes the mangling survivable rather than dangerous — but there is no
-TypeScript type checker in this repo at all, so the generated `.ts` array's
-correctness rests entirely on `mise run kb-guard-codegen-check`.
+nothing is dropped (every schema entry in, none dropped, none colliding — the
+COUNT is derived from the schema at test time, never hardcoded here or in the
+tests; a hardcoded number is the exact defect F2/M2 found and fixed), so the
+schema keeps authority over the *values*, which is the security-relevant
+half. A renamed member still fails LOUDLY at `ty check`
+(`error[unresolved-attribute]`), which is what makes the mangling survivable
+rather than dangerous — but there is no TypeScript type checker in this repo
+at all, so the generated `.ts` array's correctness rests entirely on
+`mise run kb-guard-codegen-check`.
 
 🔴 **THIS MODULE IS DELIBERATELY UNWIRED.** Nothing in `kb_setup.hook_guard`
 imports it, and nothing should, without also updating
@@ -29,9 +32,23 @@ is a later ticket's job, with its own inventory update.
 
 from __future__ import annotations
 
+from enum import Enum
+
 from kb_setup.generated.guard_policy import ProtectedPathSuffix
 
-PROTECTED_SUFFIXES: tuple[str, ...] = tuple(member.value for member in ProtectedPathSuffix)
+
+def _protected_suffixes_from(enum_cls: type[Enum]) -> tuple[str, ...]:
+    """Build a protected-suffix tuple from an enum's VALUES, never its NAMES.
+
+    Factored out of the module-level assignment below so a test can feed it a
+    hostile enum whose member names and values deliberately differ (F8) — that
+    is what proves this reads `.value`, not `.name`, rather than merely
+    matching today's five (now nine) literal strings.
+    """
+    return tuple(member.value for member in enum_cls)
+
+
+PROTECTED_SUFFIXES: tuple[str, ...] = _protected_suffixes_from(ProtectedPathSuffix)
 """The settings-guard's protected-path policy, in schema order.
 
 Built from `ProtectedPathSuffix.value`, never from a member's (mangled) name —

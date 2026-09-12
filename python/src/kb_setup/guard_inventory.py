@@ -845,13 +845,18 @@ _FUNCTION_HOOK_EVENT = "tool.call"
 _BLOCKING_EVENTS = frozenset({"PreToolUse"})
 
 
-def _strip_ts_comments(source: str) -> str:
+def strip_ts_comments(source: str) -> str:
     """Remove `//` and `/* */` comments before any structural match.
 
     Load-bearing: the module's only literal `{ tool: "Edit" }` sits inside a
     doc comment (`register.ts:68`), and the two CORRECT rows (`Write`,
     `NotebookEdit`) have ZERO literal hits in the source — a presence check
     over raw text is wrong in both directions.
+
+    🔴 **Public, not `_`-prefixed (G02, #755, F1).** `guard_codegen.check`
+    reuses this rather than writing a second TS comment-stripper (C2/C7); a
+    private name would make that reuse an `SLF001` violation rather than an
+    ordinary cross-module call.
     """
     return _TS_LINE_COMMENT.sub("", _TS_BLOCK_COMMENT.sub(" ", source))
 
@@ -870,7 +875,7 @@ def function_hook_write_tools(root: Path) -> frozenset[str] | None:
         source = (root / FUNCTION_HOOK_SOURCE_PATH).read_text(encoding="utf-8")
     except OSError:
         return None
-    stripped = _strip_ts_comments(source)
+    stripped = strip_ts_comments(source)
     arrays = list(_WRITE_TOOLS_ARRAY.finditer(stripped))
     if len(arrays) != 1:
         return None
