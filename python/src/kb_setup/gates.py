@@ -195,6 +195,24 @@ GATE_TASKS = (
     # `mise lock --dry-run`, so it stays OUT of `CONCURRENT_SAFE` on the
     # fail-closed default.
     "kb-lock-drift",
+    # Added 2026-09-12 (G01, #754). The FIRST member of this tuple that is
+    # deliberately NON-HERMETIC: it shells to the installed `claude` and runs
+    # `/plugin-types`, because the thing it certifies is the runtime itself.
+    # Every other guard check in this repo earns its place in `test` instead
+    # (`kb-guard-codegen-check`, `kb-guard-inventory-check` — both explicitly
+    # OUT of this tuple, reached transitively through their own test modules);
+    # this one cannot, and the deciding risk is that a hermetic variant goes
+    # green WITHOUT EVER EXAMINING the runtime it claims to certify.
+    #
+    # It needs the binary, not credentials — `/plugin-types` was armed with
+    # `HOME` at an empty temp dir and still returned rc 0 — and a machine with
+    # no `claude` gets `Rc.NOT_RUN` (127), never a pass. It generates into a
+    # fresh temp CWD and writes nothing under the repo, so question 1 of
+    # `CONCURRENT_SAFE` is answered; question 2 is not — it spawns a subprocess
+    # whose contention with `test`'s xdist workers is uncharacterised, and
+    # `eval` was removed from that set for exactly that unexamined assumption.
+    # So it stays OUT, on the same fail-closed default as the four above.
+    "kb-mod-runtime-check",
 )
 #: `kb-corpus-integrity` WAS here, gating the semantic-corpus layer's staged
 #: evidence tree. It left with that layer's removal (2026-08-24) — see

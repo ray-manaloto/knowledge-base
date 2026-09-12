@@ -1924,3 +1924,32 @@ description = "PreToolUse: deny a SHELL write to a budgeted instruction file"
 # Reads the hook payload on stdin, so it is never run by hand.
 run = "uv run kb-setup instruction-shell-write"
 timeout = "60s"
+
+[tasks.kb-mod-runtime-check]
+description = "Gate: the function-hook declarations the mod surface depends on still match the INSTALLED Claude Code"
+# Built because the vendored contract was materially stale and nothing could
+# see it. `sources/media/claude-code-function-hooks-types.d.ts` is pinned at
+# 2.1.267 and 7,966 lines; the installed 2.1.269 generates 9,263 and carries an
+# entire event namespace (`session.authorize`) the vendored file has zero hits
+# for. Every gate ran green over that for as long as it existed.
+#
+# 🔴 DELIBERATELY NON-HERMETIC, which is why this is in `GATE_TASKS` directly
+# rather than reached through `test` the way `kb-guard-codegen-check` and
+# `kb-guard-inventory-check` are. Those two are hermetic and can be; a hermetic
+# variant of THIS check would go green without ever examining the runtime it
+# claims to certify, which is the exact failure it exists to end. What it needs
+# is the BINARY, not credentials: `/plugin-types` was armed with `HOME` at an
+# empty temp dir and still returned rc 0 with both files written. No `claude` on
+# PATH is `Rc.NOT_RUN` (127), never a pass.
+#
+# It generates into a FRESH TEMP CWD, never the repo: `/plugin-types` writes
+# `.claude/types/*.d.ts` relative to its working directory, and `.claude/types/`
+# here is neither tracked nor gitignored — so a run in the repo root would dirty
+# the tree and break `kb-gates`' own `dirty` accounting.
+#
+# `-- --arms` is the PROVING mode (it runs the committed spec through
+# `kb_setup.arms`, which mutates tracked files). The bare task is what gates.
+run = "uv run --project {{config_root}} kb-setup mod-runtime-check"
+# One `claude --version` plus one `/plugin-types` run, measured at ~4s wall.
+# The module carries its own 300s bound on the generation; this is the outer one.
+timeout = "360s"

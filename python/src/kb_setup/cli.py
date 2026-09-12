@@ -63,7 +63,7 @@ def _print_usage() -> int:
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | graphify-catalog | "
-        "lock-drift | "
+        "lock-drift | mod-runtime-check [--arms] | "
         "telemetry-prune | serve | serve-memory | env-refresh [--sentinel] | "
         "codex-config-check | "
         "instruction-edit-guard | "
@@ -228,6 +228,16 @@ def _run(argv: list[str] | None = None) -> int:
         # in `graphify_baseline`'s authority literal describe the commit the
         # manifest pins — and it reads the pinned COMMIT, never the worktree.
         return graphify_catalog.main(repo_root, rest)
+    if cmd == "mod-runtime-check":
+        from kb_setup import mod_runtime
+
+        # A bare arm on `funnel`'s precedent, and it takes `rest` — which is why
+        # it is HERE rather than in `_dispatch_lint` beside the other two guard
+        # checks: `--arms` is a real argument, and that dispatcher takes no argv.
+        # Unlike every other gate in this chain it SHELLS OUT to the installed
+        # `claude` (deliberately — see the module docstring), generating into a
+        # temp CWD so the repo tree is never written.
+        return mod_runtime.main(repo_root, rest)
     if cmd == "manifest-audit":
         from kb_setup import manifest_audit
 
@@ -708,7 +718,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "guard-inventory-check | guard-codegen | guard-codegen-check | "
         "handoff-check [path] | gates [task...] [--stop] | "
         "check <path...> | funnel | "
-        "graphify-catalog | lock-drift | "
+        "graphify-catalog | lock-drift | mod-runtime-check [--arms] | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
         "research-links <URL...> [--out PATH] | "

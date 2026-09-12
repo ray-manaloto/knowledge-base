@@ -1,0 +1,194 @@
+# Mutation arms for G01 (#754) — the function-hook runtime contract check.
+#
+# WHAT THIS SUITE IS ACTUALLY ABOUT. `kb-mod-runtime-check` is this repo's first
+# deliberately NON-HERMETIC gate: it shells to the installed `claude`, because
+# the thing it certifies is the runtime itself. That split is what these arms
+# have to respect — `kb_setup.arms` shells `python -m pytest` and nothing else
+# (`arms.py:289-306`), so only the check's DETECTION LOGIC is armable, never its
+# live half. Every arm below severs one line of that logic and requires a named
+# pytest to notice.
+#
+# 🔴 WHY THE TICKET'S LITERAL ARM ACTION IS NOT WHAT IS HERE. #754 asked for
+# "delete the regenerated artifact and leave a stale extra beside it". A
+# pytest-only runner cannot perform a filesystem mutation as an arm, so writing
+# it that way would have made this ticket depend on #771 (the command-runner
+# backend) for no gain. The advisor's verdict D is what these arms follow
+# instead: the MISSING and STALE-EXTRA states are constructed inside named
+# pytests (`test_a_missing_expected_output_is_caught`,
+# `test_a_stale_extra_output_is_caught`) and the arms mutate the tracked
+# detection logic those tests exercise. Same two states, same two directions,
+# no dependency.
+#
+# CONTROL DISCIPLINE. A0 is a comment-only edit that must SURVIVE. If A0 dies,
+# every other row is void: the suite is failing for a reason that has nothing to
+# do with the mutation.
+#
+# 🔴 A CLEAN SWEEP HERE IS A STATEMENT ABOUT THESE TESTS, NEVER ABOUT THE
+# PREMISE. Every arm below attacks the CODE. None of them can tell you that the
+# 11-symbol contract is the right contract, that token PRESENCE is the right
+# question to ask of a declarations file, or that the runtime spells the lane
+# marker `agentId` — those are premises, and a mutation sweep is structurally
+# blind to a wrong one.
+
+suites = ["tests/test_mod_runtime.py"]
+
+# A0 — the control. A comment-only edit that must change nothing.
+[[arm]]
+id = "A0"
+control = true
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''#: The mod surface whose runtime dependencies are derived.'''
+new = '''#: The mod surface whose runtime dependencies are derived (control).'''
+
+# A1 — SEVER THE TOPOLOGY VERDICT. Both directions at once: the exact-set
+# comparison still runs, and its answer is discarded. This is the row native
+# `datamodel-codegen --check` is MEASURED to get half-right (it catches a
+# deletion, rc 1 `MISSING:`, and misses a stale extra entirely, rc 0) — so if
+# this line stops deciding, the extra half has no detector anywhere in the repo.
+[[arm]]
+id = "A1"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        if missing_files or extra_files:'''
+new = '''        if False:'''
+# 🔴 RE-POINTED after this arm SURVIVED. It first named
+# `test_a_stale_extra_output_is_caught`, which calls `topology_findings`
+# directly — a pure function this mutation does not touch. The mutation severs
+# the VERDICT's call site, so only a test that drives `check()` can see it.
+test = "test_check_reports_findings_when_the_generator_writes_an_extra_artifact"
+
+# A2 — MAKE THE EXACT-SET COMPARISON ONE-DIRECTIONAL. The believable
+# "simplification": report what is missing and stop thinking about what is
+# extra. `topology_findings`' whole contract is that the two are SYMMETRIC.
+[[arm]]
+id = "A2"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    return frozenset(expected - produced), frozenset(produced - expected)'''
+new = '''    return frozenset(expected - produced), frozenset()'''
+test = "test_a_stale_extra_output_is_caught"
+
+# A3 — STOP STRIPPING COMMENTS. `register.ts`'s only literal `{ tool: "Edit" }`
+# sits inside a doc comment, so without this the extractor demands the runtime
+# declare `Edit` as a symbol. `guard_inventory.strip_ts_comments`' own docstring
+# already records that a presence check over raw text is wrong in BOTH
+# directions; this arm proves this module inherits that correctly.
+[[arm]]
+id = "A3"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    no_comments = guard_inventory.strip_ts_comments(register_source)'''
+new = '''    no_comments = register_source'''
+test = "test_a_literal_inside_a_comment_does_not_enter_the_contract"
+
+# A4 — STOP STRIPPING STRING LITERALS. Measured on the real module: four junk
+# tokens of 23 come from prose inside strings (`". Report this"` -> `Report`,
+# `".git"` -> `git`), because a full stop followed by a word is
+# indistinguishable from a member access once you are only matching text. Each
+# junk token is then demanded of the declarations and reds the gate.
+#
+# This is the half `strip_ts_comments` does NOT cover, which is why this module
+# adds `strip_ts_strings` rather than reusing one function for both.
+[[arm]]
+id = "A4"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    no_strings = strip_ts_strings(no_comments)'''
+new = '''    no_strings = no_comments'''
+test = "test_prose_inside_a_string_does_not_enter_the_contract"
+
+# A5 — SEVER THE NAMED ANCHOR AND THE FLOOR TOGETHER. The line refuses a
+# contract that has lost `agentId` (the lane marker, whose absence fails the
+# guard OPEN) or collapsed below its size floor. Severed, a module rewritten to
+# read the DOCUMENTED spelling `agent_id` yields a tidy, internally consistent
+# contract that every later check passes — which is the exact silent fail-open
+# this ticket exists to prevent.
+[[arm]]
+id = "A5"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    if len(tokens) < _MINIMUM_REQUIRED_TOKENS or _REQUIRED_ANCHOR not in tokens:'''
+new = '''    if False:'''
+test = "test_a_renamed_lane_marker_makes_the_contract_underivable"
+
+# A6 — SEVER THE FLOOR ALONE, keeping the anchor. A5 covers both clauses at
+# once and would pass if only the anchor half survived; this isolates the other
+# half. An empty contract is satisfied by every declarations file ever written,
+# including an empty one.
+[[arm]]
+id = "A6"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    if len(tokens) < _MINIMUM_REQUIRED_TOKENS or _REQUIRED_ANCHOR not in tokens:'''
+new = '''    if _REQUIRED_ANCHOR not in tokens:'''
+test = "test_a_collapsed_extractor_result_is_not_a_passing_contract"
+
+# A7 — REGRESS THE MATCHER TO A BARE SUBSTRING. Measured on the real vendored
+# file: `file_path` occurs 9 times by plain substring and 7 by word boundary,
+# the extras being longer field names that merely END in it. A substring matcher
+# reports the contract satisfied by a field that is not the field — and reports
+# it in the SAFE-LOOKING direction, since more matches read as more confidence.
+[[arm]]
+id = "A7"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    if "." in token:
+        return re.compile(re.escape(token))
+    return re.compile(rf"\b{re.escape(token)}\b")'''
+new = '''    return re.compile(re.escape(token))'''
+test = "test_a_longer_field_that_merely_ends_in_a_required_name_is_not_a_match"
+
+# A8 — SEVER THE CHECK'S OWN CONTROL ARM. A matcher that reported everything
+# present would pass `missing_tokens` over an empty file and the gate would go
+# green having verified nothing. `probes-need-a-control-arm.md` rule 1 as a
+# property of the CHECK rather than of the session that wrote it.
+[[arm]]
+id = "A8"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    if not matcher_can_report_absence(fresh):'''
+new = '''    if False:'''
+# 🔴 RE-POINTED after this arm SURVIVED, same reason as A1: the original target
+# calls `matcher_can_report_absence` directly. Severing its CALL SITE is
+# invisible to a test of the predicate.
+test = "test_check_reports_not_run_when_its_own_matcher_is_broken"
+
+# A9 — DROP THE EVENT NAME FROM THE CONTRACT. `tool.call` is a STRING literal,
+# so it enters only because the event extraction runs against the
+# comment-stripped-but-string-intact source. Losing this line loses the one
+# symbol that says which event the module is registered for at all — and loses
+# it SILENTLY, because the remaining ten still reconcile clean.
+[[arm]]
+id = "A9"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    tokens.update(_ON_EVENT.findall(no_comments))'''
+new = '''    pass'''
+test = "test_the_registered_event_name_is_part_of_the_contract"
+
+# A10 — MAKE A MISSING BINARY READ AS CLEAN. The single most important failure
+# direction of a non-hermetic gate: on a machine with no `claude`, "we could not
+# ask" must never collapse into "we asked and it was fine". This is the mutation
+# that would let this gate certify a runtime it never examined, which is the
+# whole reason `Rc.NOT_RUN` exists as a fourth code.
+[[arm]]
+id = "A10"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    binary = resolve_claude()
+    if binary is None:'''
+new = '''    binary = resolve_claude()
+    if False:'''
+# 🔴 RE-POINTED after this arm SURVIVED, and this one is the most instructive
+# of the three: the original target asserted `check() == Rc.NOT_RUN`, which is
+# TRUE UNDER THE MUTATION TOO — falling through hands `str(None)` to
+# `subprocess.run`, which raises `OSError` and lands on the same code. The Rc
+# could never discriminate. The new target asserts the second probe is never
+# reached, which can.
+test = "test_no_binary_short_circuits_before_trying_to_execute_one"
+
+# A11 — WIDEN THE BUILTIN SUBTRACTION UNTIL IT SWALLOWS A REAL FIELD. The
+# builtin list is the one hand-maintained thing in an otherwise mechanical
+# derivation, and the module claims its failure direction is CLOSED: a builtin
+# MISSING from it only makes the check stricter. This arm attacks the other
+# direction — a builtin list that grows too far quietly shrinks the contract.
+# `agentId` is the field to test it with, because its loss is the one the guard
+# cannot fail closed on.
+[[arm]]
+id = "A11"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        prop for prop in _PROPERTY_ACCESS.findall(no_strings) if prop not in _JS_BUILTIN_MEMBERS'''
+new = '''        prop
+        for prop in _PROPERTY_ACCESS.findall(no_strings)
+        if prop not in _JS_BUILTIN_MEMBERS | {"agentId"}'''
+test = "test_an_event_field_read_off_a_binding_not_named_e_is_still_found"
