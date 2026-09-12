@@ -68,6 +68,11 @@ title = "G02 — schema-owned policy data generating both the python and the TS 
 blockers = [753]
 
 [[ticket]]
+issue = 758
+title = "G05 — enforce the direction itself: rule, AGENTS.md, and a structural lint"
+blockers = [753, 755]
+
+[[ticket]]
 issue = 756
 title = "G03 — the settings reference guard on generated policy and verified adapters"
 blockers = [754, 755]
@@ -78,9 +83,9 @@ title = "G04 — cold bootstrap, the tracked flag, and a readiness task that run
 blockers = [756]
 
 [[ticket]]
-issue = 758
-title = "G05 — enforce the direction itself: rule, AGENTS.md, and a structural lint"
-blockers = [753, 755]
+issue = 728
+title = "V1 — rebase the graphify fork onto the newest release; refresh both skill trees + stamps; kb-fork-rebase"
+blockers = [727]
 
 [[ticket]]
 issue = 759
@@ -116,11 +121,6 @@ blockers = [757, 760]
 issue = 765
 title = "G12 — cutover: retire only proven replacements, verified on remote main"
 blockers = [758, 759, 760, 761, 762, 763, 764]
-
-[[ticket]]
-issue = 728
-title = "V1 — rebase the graphify fork onto the newest release; refresh both skill trees + stamps; kb-fork-rebase"
-blockers = [727]
 
 [[ticket]]
 issue = 739
