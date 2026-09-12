@@ -139,19 +139,47 @@ def load_inventory(path: Path) -> GuardInventory:
 _DYNAMIC_IMPORT_CALL_NAMES = frozenset({"__import__"})
 
 
+def _dynamic_import_local_names(tree: ast.AST) -> frozenset[str]:
+    """Local names bound to `importlib.import_module`, ALIASES INCLUDED.
+
+    `from importlib import import_module as load` binds the dynamic importer to
+    `load`, so a later `load("kb_setup.x")` is an `ast.Name` call the
+    attribute-and-builtin checks below never see. That alias form is the common
+    one, and a cold review measured it slipping past the backstop while the
+    accompanying static import was still returned -- a silently short set rather
+    than NOT_RUN, which is the precise failure the backstop exists to prevent.
+
+    Scoped to `importlib` on purpose: an unrelated local called `load` is not
+    evidence of indirection, and widening this to any short name would redden
+    the gate on ordinary code.
+    """
+    # Named `aliases`, not `names`: a second `names: set[str] = set()` in this
+    # file made the A0 control and the A2 reachability arm ambiguous, and
+    # `kb-arms` refused both as PROBE BROKEN rather than mutating the wrong
+    # occurrence. The reachability loop owns that spelling.
+    aliases: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "importlib":
+            aliases.update(
+                alias.asname or alias.name for alias in node.names if alias.name == "import_module"
+            )
+    return frozenset(aliases)
+
+
 def _has_unsupported_indirection(tree: ast.AST) -> bool:
     """True when `hook_guard.py` reaches a guard through unsupported indirection.
 
-    `importlib.import_module(...)`, `__import__(...)`, or a `getattr(...)` call
-    whose target names `kb_setup`. None of these are used by `hook_guard.py`
-    today -- this is a fail-closed backstop, not a reachability source in its
-    own right.
+    `importlib.import_module(...)` under any binding, `__import__(...)`, or a
+    `getattr(...)` call whose target names `kb_setup`. None of these are used by
+    `hook_guard.py` today -- this is a fail-closed backstop, not a reachability
+    source in its own right.
     """
+    aliased = _dynamic_import_local_names(tree)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
-        if isinstance(func, ast.Name) and func.id in _DYNAMIC_IMPORT_CALL_NAMES:
+        if isinstance(func, ast.Name) and func.id in _DYNAMIC_IMPORT_CALL_NAMES | aliased:
             return True
         if isinstance(func, ast.Attribute) and func.attr == "import_module":
             return True
@@ -463,7 +491,9 @@ _MISE_TASK_KB_SETUP_CMD: dict[str, str] = {
 _EXTERNAL_HOOK_GUARD_SUBCOMMANDS = frozenset({"read", "search"})
 
 
-def _resolve_direct_command(command: str) -> tuple[bool, str | None]:
+def _resolve_direct_command(
+    command: str, mise_cmds: dict[str, str] | None = None
+) -> tuple[bool, str | None]:
     """Classify one live PreToolUse command's target.
 
     Returns `(recognised, module_stem)`. `module_stem` is a repo module id
@@ -481,10 +511,15 @@ def _resolve_direct_command(command: str) -> tuple[bool, str | None]:
         return False, None
     if not tokens:
         return False, None
-    for resolver in (_resolve_graphify_binary, _resolve_kb_setup_cmd, _resolve_mise_task):
+    for resolver in (_resolve_graphify_binary, _resolve_kb_setup_cmd):
         result = resolver(tokens)
         if result is not None:
             return result
+    # Called apart from the chain above because it alone needs the table parsed
+    # from `mise.toml`, which only the caller (holding `root`) can read.
+    mise_result = _resolve_mise_task(tokens, mise_cmds)
+    if mise_result is not None:
+        return mise_result
     return False, None
 
 
@@ -512,12 +547,55 @@ def _resolve_kb_setup_cmd(tokens: list[str]) -> tuple[bool, str | None] | None:
     return (True, module) if module else (False, None)
 
 
-def _resolve_mise_task(tokens: list[str]) -> tuple[bool, str | None] | None:
-    """`mise run [-C <dir>] <task>` — resolved via the task's own `run =` line."""
+def _mise_task_kb_setup_cmds(root: Path) -> dict[str, str] | None:
+    """Each mise task's `kb-setup <cmd>`, PARSED FROM `mise.toml` itself.
+
+    This was a hand-maintained dict duplicating two `run =` lines, and a cold
+    review measured the consequence: repointing `kb-instruction-edit-guard` in
+    `mise.toml` produced ZERO reads of `mise.toml` and no finding, so the real
+    task-to-module route could drift while the gate reported the old route as
+    live. A gate that reconciles against a copy of its authority reconciles
+    against itself.
+
+    Returns None when `mise.toml` cannot be read or parsed -- the caller turns
+    that into NOT_RUN rather than an empty map, which would silently make every
+    mise-driven registration unrecognised.
+    """
+    try:
+        tasks = tomllib.loads((root / "mise.toml").read_text(encoding="utf-8"))["tasks"]
+    except OSError, tomllib.TOMLDecodeError, KeyError:
+        return None
+    found: dict[str, str] = {}
+    for name, body in tasks.items():
+        run = body.get("run") if isinstance(body, dict) else body
+        if not isinstance(run, str):
+            continue
+        try:
+            tokens = shlex.split(run)
+        except ValueError:
+            continue
+        for i, word in enumerate(tokens):
+            if word == "kb-setup" and tokens[i + 1 : i + 2]:
+                found[name] = tokens[i + 1]
+                break
+    return found
+
+
+def _resolve_mise_task(
+    tokens: list[str], mise_cmds: dict[str, str] | None
+) -> tuple[bool, str | None] | None:
+    """`mise run [-C <dir>] <task>` — resolved via the task's own `run =` line.
+
+    `mise_cmds` is the table parsed from `mise.toml` by the caller, which holds
+    the root; None means it could not be read, and every mise-driven command is
+    then UNRECOGNISED rather than silently unresolved.
+    """
     if tokens[:2] != ["mise", "run"]:
         return None
+    if mise_cmds is None:
+        return False, None
     task = _mise_task_name(tokens[2:])
-    kb_cmd = _MISE_TASK_KB_SETUP_CMD.get(task) if task else None
+    kb_cmd = mise_cmds.get(task) if task else None
     module = _DIRECT_MODULE_BY_KB_SETUP_CMD.get(kb_cmd) if kb_cmd else None
     return (True, module) if module else (False, None)
 
@@ -541,6 +619,34 @@ def _mise_task_name(tokens: list[str]) -> str | None:
     return None
 
 
+def _direct_targets(
+    live: list[dict[str, object]], mise_cmds: dict[str, str] | None
+) -> tuple[set[str], str | None]:
+    """Repo modules reached by a live registration CAPABLE OF BLOCKING A CALL.
+
+    Membership is the capability, never the event name: a registration counts
+    when it can synchronously prevent a tool call. `PreToolUse` is the classic
+    instance; `SessionStart`/`SessionEnd` are excluded because they cannot stop
+    anything, not because of what they are called. A future event with the same
+    power is a member automatically, and a future lifecycle event never is.
+
+    Returns `(targets, unresolved_command)`. A non-None second element is a
+    command shape the resolver does not know, which the caller turns into
+    NOT_RUN -- never silently classified as external, which would quietly shrink
+    the reachable set.
+    """
+    targets: set[str] = set()
+    for entry in live:
+        if str(entry["event"]) not in _BLOCKING_EVENTS:
+            continue
+        recognised, module_stem = _resolve_direct_command(str(entry["command"]), mise_cmds)
+        if not recognised:
+            return targets, str(entry["command"])
+        if module_stem is not None:
+            targets.add(module_stem)
+    return targets, None
+
+
 def _reconcile_modules(
     root: Path, inventory: GuardInventory, live: list[dict[str, object]]
 ) -> list[Finding]:
@@ -553,21 +659,24 @@ def _reconcile_modules(
                 "could not read the guard tuple — the module enumeration never ran",
             )
         ]
-    direct: set[str] = set()
-    for entry in live:
-        if str(entry["event"]) != "PreToolUse":
-            continue
-        recognised, module_stem = _resolve_direct_command(str(entry["command"]))
-        if not recognised:
-            return [
-                Finding(
-                    "NOT_RUN",
-                    str(entry["command"])[:70],
-                    "unrecognised direct-registration command shape — enumeration never ran",
-                )
-            ]
-        if module_stem is not None:
-            direct.add(module_stem)
+    mise_cmds = _mise_task_kb_setup_cmds(root)
+    if mise_cmds is None:
+        return [
+            Finding(
+                "NOT_RUN",
+                "mise.toml [tasks]",
+                "could not read the task table — mise-driven routes were never resolved",
+            )
+        ]
+    direct, unresolved = _direct_targets(live, mise_cmds)
+    if unresolved is not None:
+        return [
+            Finding(
+                "NOT_RUN",
+                unresolved[:70],
+                "unrecognised direct-registration command shape — enumeration never ran",
+            )
+        ]
 
     reachable = dispatched | direct
     present_stems = {Path(m.path).stem for m in inventory.modules}
@@ -601,13 +710,29 @@ def _reconcile_modules(
                     f"claims direct-registration; no live registration resolves to {stem}",
                 )
             )
-    findings.extend(_reconcile_module_ids(inventory))
+    findings.extend(_reconcile_module_ids(root, inventory))
     return findings
 
 
-def _reconcile_module_ids(inventory: GuardInventory) -> list[Finding]:
-    """Every registration's `module_ids` must resolve to a real inventory module."""
+def _reconcile_module_ids(root: Path, inventory: GuardInventory) -> list[Finding]:
+    """`module_ids` must resolve to a real module AND cover the route reached.
+
+    Existence alone was not enough, and the gap was measured: deleting
+    `module_ids` outright from a registration left the gate clean, because a
+    check that only rejects references to NONEXISTENT modules has nothing to say
+    about a reference that is missing. The schema defines these ids as the
+    modules a registration reaches, so an empty list on a registration that
+    demonstrably reaches one is a false statement about the route, not an
+    abstention.
+
+    Only the FORWARD direction is enforced -- the resolved module must appear.
+    `hook.pretool.hookguard` legitimately lists the eight modules it dispatches
+    to beside its own, so requiring an exact set would redden the gate on a row
+    that is correct and more informative than the rule.
+    """
     known = {m.id for m in inventory.modules}
+    by_path = {m.path: m.id for m in inventory.modules}
+    mise_cmds = _mise_task_kb_setup_cmds(root)
     findings: list[Finding] = []
     for reg in inventory.registrations:
         ids = reg.module_ids if isinstance(reg.module_ids, list) else []
@@ -616,6 +741,22 @@ def _reconcile_module_ids(inventory: GuardInventory) -> list[Finding]:
             for mid in ids
             if mid not in known
         )
+        recognised, stem = _resolve_direct_command(
+            str(getattr(reg.source, "command", "") or ""), mise_cmds
+        )
+        # `(False, _)` is an unrecognised shape, already NOT_RUN upstream; a
+        # recognised external binary yields `(True, None)` and owns no module.
+        if not recognised or stem is None:
+            continue
+        expected = by_path.get(f"{GUARD_DIR}/{stem}.py")
+        if expected is not None and expected not in ids:
+            findings.append(
+                Finding(
+                    "ROUTE_DRIFT",
+                    reg.id,
+                    f"reaches {expected} but module_ids does not list it",
+                )
+            )
     return findings
 
 
@@ -671,6 +812,12 @@ FUNCTION_HOOK_MANIFEST_PATH = Path(".claude/mods/kb-settings-guard/hooks/hooks.j
 #: `@marketplace` suffix) in `enabledPlugins` / `extraKnownMarketplaces`.
 _FUNCTION_HOOK_PLUGIN_NAME = "kb-settings-guard"
 
+#: The runtime flag without which NO function hook loads, read from
+#: `.claude/settings.json`'s `env` block. Tracked, so it is a legitimate static
+#: predicate; `.claude/settings.local.json` is NOT tracked and is never read
+#: here, or an untracked file would become ship-gate authority.
+_FUNCTION_HOOK_ENV_FLAG = "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS"
+
 _TS_LINE_COMMENT = re.compile(r"//[^\n]*")
 _TS_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 _WRITE_TOOLS_ARRAY = re.compile(
@@ -684,6 +831,18 @@ _REGISTER_LOOP = re.compile(
 )
 _STRING_LITERAL = re.compile(r'"([^"\\]*)"')
 _MATCHER_TOOL = re.compile(r'tool\s*:\s*"([^"]*)"')
+
+#: The ONE function-hook event this reconciler derives from `register.ts`. A row
+#: naming anything else is ROUTE_DRIFT, never grouped by its tool as if the
+#: event matched -- `tool.result`, for one, cannot synchronously prevent a call
+#: and so does not meet the membership capability at all.
+_FUNCTION_HOOK_EVENT = "tool.call"
+
+#: Events whose hooks can SYNCHRONOUSLY PREVENT A TOOL CALL. That capability --
+#: not the event's name -- is what makes a registration a member of this
+#: inventory, so a new event with the same power belongs here and a new
+#: lifecycle event never does.
+_BLOCKING_EVENTS = frozenset({"PreToolUse"})
 
 
 def _strip_ts_comments(source: str) -> str:
@@ -740,12 +899,32 @@ def _reconcile_function_hooks(
             )
         ]
     rows = [r for r in inventory.registrations if r.source.path == str(FUNCTION_HOOK_SOURCE_PATH)]
+
+    # A row whose EVENT is not `tool.call` describes a different registration
+    # than the one `register.ts` declares, and is reported as such rather than
+    # grouped by its tool and silently matched. The extractor derives
+    # `(path, "tool.call", tool)`; comparing the tool alone made the event half
+    # of that triple unenforced, so a row could be repointed at `tool.result`
+    # -- a hook that cannot block anything -- and the gate stayed green.
+    findings: list[Finding] = [
+        Finding(
+            "ROUTE_DRIFT",
+            row.id,
+            f"event is {str(getattr(row.source, 'event', '') or '')!r}, not 'tool.call'",
+        )
+        for row in rows
+        if str(getattr(row.source, "event", "") or "") != _FUNCTION_HOOK_EVENT
+    ]
+    rows = [
+        row for row in rows if str(getattr(row.source, "event", "") or "") == _FUNCTION_HOOK_EVENT
+    ]
+
     reviewed: dict[str, list[Registration]] = {}
     for row in rows:
         tool_match = _MATCHER_TOOL.search(str(getattr(row.source, "matcher", "") or ""))
         reviewed.setdefault(tool_match.group(1) if tool_match else "", []).append(row)
 
-    findings = [
+    findings.extend(
         Finding(
             "AMBIGUOUS_IDENTITY",
             ", ".join(r.id for r in group),
@@ -753,7 +932,7 @@ def _reconcile_function_hooks(
         )
         for tool, group in reviewed.items()
         if len(group) > 1
-    ]
+    )
     findings.extend(
         Finding(
             "UNCLASSIFIED",
@@ -799,17 +978,39 @@ def _function_hook_enabled_predicates(root: Path) -> dict[str, bool]:
         settings = {}
     enabled_plugins = settings.get("enabledPlugins", {})
     marketplaces = settings.get("extraKnownMarketplaces", {})
+    env = settings.get("env", {})
     plugin_enabled = isinstance(enabled_plugins, dict) and any(
         key.split("@", 1)[0] == _FUNCTION_HOOK_PLUGIN_NAME and value is True
         for key, value in enabled_plugins.items()
     )
-    marketplace_known = isinstance(marketplaces, dict) and any(
-        key.split("@", 1)[0] == _FUNCTION_HOOK_PLUGIN_NAME for key in marketplaces
+
+    # The OWNER half of `<plugin>@<owner>`, never the plugin name. An
+    # `extraKnownMarketplaces` key is a marketplace name (`ray-manaloto`,
+    # `astral-sh`), so comparing it to `kb-settings-guard` is unsatisfiable:
+    # measured against all 11 live keys, every comparison was False, which made
+    # `enabled` unreachable and the whole state check able to return only one
+    # answer. A check that cannot produce its other verdict is not a check.
+    owners = {
+        key.split("@", 1)[1]
+        for key, value in (enabled_plugins.items() if isinstance(enabled_plugins, dict) else ())
+        if value is True and "@" in key and key.split("@", 1)[0] == _FUNCTION_HOOK_PLUGIN_NAME
+    }
+    marketplace_known = (
+        isinstance(marketplaces, dict) and bool(owners) and owners <= set(marketplaces)
     )
+
+    # The feature flag, which was named in the design and never read. It is a
+    # TRACKED fact -- `.claude/settings.json` `env` -- so omitting it left a
+    # predicate the docstring claimed and the code did not have. Function hooks
+    # do not run at all without it, so no other predicate can substitute.
+    function_hooks_enabled = isinstance(env, dict) and str(
+        env.get(_FUNCTION_HOOK_ENV_FLAG, "")
+    ).strip() not in ("", "0")
     return {
         "hooks_json_valid": hooks_json_valid,
         "plugin_enabled": plugin_enabled,
         "marketplace_known": marketplace_known,
+        "function_hooks_enabled": function_hooks_enabled,
     }
 
 

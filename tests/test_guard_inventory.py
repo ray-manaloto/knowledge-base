@@ -40,6 +40,10 @@ def repo_copy(tmp_path: Path) -> Path:
         DEFAULT_INVENTORY_PATH,
         guard_inventory.FUNCTION_HOOK_SOURCE_PATH,
         guard_inventory.FUNCTION_HOOK_MANIFEST_PATH,
+        # `mise.toml` is an AUTHORITY, not scenery: the mise task -> module route
+        # is parsed from it rather than duplicated in python, so a copy without
+        # it reconciles to NOT_RUN. Omitting it made the control arm itself fail.
+        Path("mise.toml"),
     ):
         dest = tmp_path / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -555,14 +559,16 @@ def test_the_hookguard_command_resolves_to_hook_guard() -> None:
 
 def test_the_instruction_edit_guard_mise_task_resolves_to_its_module() -> None:
     recognised, module = guard_inventory._resolve_direct_command(
-        'mise run -C "${CLAUDE_PROJECT_DIR:-.}" kb-instruction-edit-guard'
+        'mise run -C "${CLAUDE_PROJECT_DIR:-.}" kb-instruction-edit-guard',
+        guard_inventory._mise_task_kb_setup_cmds(REPO),
     )
     assert (recognised, module) == (True, "instruction_edit_guard")
 
 
 def test_the_instruction_shell_write_mise_task_resolves_to_its_module() -> None:
     recognised, module = guard_inventory._resolve_direct_command(
-        'mise run -C "${CLAUDE_PROJECT_DIR:-.}" kb-instruction-shell-write'
+        'mise run -C "${CLAUDE_PROJECT_DIR:-.}" kb-instruction-shell-write',
+        guard_inventory._mise_task_kb_setup_cmds(REPO),
     )
     assert (recognised, module) == (True, "instruction_shell_write")
 
@@ -584,7 +590,8 @@ def test_an_unknown_graphify_hook_guard_subcommand_is_not_recognised() -> None:
 
 def test_an_unmapped_mise_task_is_not_recognised() -> None:
     recognised, module = guard_inventory._resolve_direct_command(
-        'mise run -C "${CLAUDE_PROJECT_DIR:-.}" kb-brand-new-guard'
+        'mise run -C "${CLAUDE_PROJECT_DIR:-.}" kb-brand-new-guard',
+        guard_inventory._mise_task_kb_setup_cmds(REPO),
     )
     assert (recognised, module) == (False, None)
 
@@ -655,3 +662,167 @@ def test_every_do_not_invariant_carries_an_anchor() -> None:
     assert digests is not None
     assert len(digests) == 15
     assert sum(1 for ordinal, _ in digests.values() if ordinal is not None) == 13
+
+
+# --- round 2 of the cold review: five defects found IN THE FIX -------------
+#
+# Each test below exists because a probe reproduced a silent-clean path, not
+# because the shape looked wrong. The arm that found each one is named.
+
+
+def test_an_aliased_dynamic_import_still_fails_closed(tmp_path: Path) -> None:
+    """`from importlib import import_module as load` bypassed the backstop.
+
+    The alias binds the dynamic importer to an `ast.Name` the attribute check
+    never sees, so enumeration returned the accompanying static module instead
+    of NOT_RUN — a silently short set, which is the exact failure the backstop
+    exists to prevent.
+    """
+    root = _hook_guard_fixture(
+        tmp_path,
+        "from importlib import import_module as load\n"
+        "from kb_setup import brandnew_guard\n"
+        'load("kb_setup.other_guard")\n',
+        ("brandnew_guard", "other_guard"),
+    )
+    assert dispatched_module_names(root) == frozenset()
+
+
+def test_an_unrelated_local_named_load_does_not_trip_the_backstop(tmp_path: Path) -> None:
+    """CONTROL for the arm above: the alias scan is scoped to `importlib`.
+
+    A `load` bound to anything else is ordinary code. Without this arm the fix
+    could redden the gate on every module that happens to define one.
+    """
+    root = _hook_guard_fixture(
+        tmp_path,
+        "from json import loads as load\nfrom kb_setup import brandnew_guard\nload('{}')\n",
+        ("brandnew_guard",),
+    )
+    assert "brandnew_guard" in dispatched_module_names(root)
+
+
+def test_a_function_hook_row_naming_a_non_tool_call_event_is_route_drift(
+    repo_copy: Path,
+) -> None:
+    """The comparison keyed on the TOOL alone, ignoring `source.event`.
+
+    It claims to reconcile `(path, "tool.call", tool)`, so a row repointed at
+    `tool.result` — an event that cannot block a call at all — stayed green.
+    """
+    inventory = load_inventory(repo_copy / DEFAULT_INVENTORY_PATH)
+    row = next(r for r in inventory.registrations if r.id.endswith("kb-settings-guard.edit"))
+    row.source.event = "tool.result"
+    assert "ROUTE_DRIFT" in _verdicts(reconcile(repo_copy, inventory))
+
+
+def test_a_registration_whose_module_ids_omit_its_resolved_module_is_route_drift(
+    repo_copy: Path,
+) -> None:
+    """Existence alone was checked, so DELETING `module_ids` stayed clean.
+
+    The schema defines these ids as the modules a registration reaches; an empty
+    list on a registration that demonstrably reaches one is a false statement
+    about the route, not an abstention.
+    """
+    inventory = load_inventory(repo_copy / DEFAULT_INVENTORY_PATH)
+    reg = next(
+        r for r in inventory.registrations if r.id.endswith("instruction-edit.claudemd.edit")
+    )
+    reg.module_ids = []
+    assert "ROUTE_DRIFT" in _verdicts(reconcile(repo_copy, inventory))
+
+
+def test_rows_that_legitimately_reach_no_repo_module_keep_an_empty_module_ids(
+    repo_copy: Path,
+) -> None:
+    """CONTROL for the arm above.
+
+    The graphify binary, the lifecycle tasks and the function-hook rows all
+    carry `module_ids = []` correctly — graphify is external, the lifecycle
+    tasks cannot block a tool call, and `register.ts` is not a python module.
+    A forward-direction rule that reddened on those would be worse than the gap.
+    """
+    inventory = load_inventory(repo_copy / DEFAULT_INVENTORY_PATH)
+    assert reconcile(repo_copy, inventory) == []
+
+
+def test_a_repointed_mise_task_is_detected_rather_than_read_from_a_copy(
+    repo_copy: Path,
+) -> None:
+    """The task -> module map was a hand-copied duplicate of two `run =` lines.
+
+    Reconciliation made ZERO reads of `mise.toml`, so the real route could drift
+    while the gate reported the old one as live. A gate that reconciles against
+    a copy of its authority reconciles against itself.
+    """
+    mise = repo_copy / "mise.toml"
+    mise.write_text(
+        mise.read_text(encoding="utf-8").replace(
+            'run = "uv run kb-setup instruction-edit-guard"',
+            'run = "uv run kb-setup hookguard"',
+        ),
+        encoding="utf-8",
+    )
+    inventory = load_inventory(repo_copy / DEFAULT_INVENTORY_PATH)
+    assert "ROUTE_DRIFT" in _verdicts(reconcile(repo_copy, inventory))
+
+
+def test_an_absent_mise_toml_is_not_run_never_clean(repo_copy: Path) -> None:
+    """A missing authority is NOT_RUN, not an empty map.
+
+    An empty map would make every mise-driven registration UNRECOGNISED, which
+    reports as a different defect than "the question was never asked".
+    """
+    (repo_copy / "mise.toml").unlink()
+    inventory = load_inventory(repo_copy / DEFAULT_INVENTORY_PATH)
+    assert "NOT_RUN" in _verdicts(reconcile(repo_copy, inventory))
+
+
+def _settings_with(repo_copy: Path, patch) -> dict[str, bool]:
+    settings_path = repo_copy / SETTINGS_PATH
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    patch(settings)
+    settings_path.write_text(json.dumps(settings), encoding="utf-8")
+    return guard_inventory._function_hook_enabled_predicates(repo_copy)
+
+
+def test_enabling_the_plugin_under_a_known_marketplace_satisfies_every_predicate(
+    repo_copy: Path,
+) -> None:
+    """The direction that was STRUCTURALLY UNREACHABLE before this fix.
+
+    `marketplace_known` compared `extraKnownMarketplaces` keys to the PLUGIN
+    name, but those keys are marketplace names. Measured against all 11 live
+    keys, every comparison was False — so `enabled` could never be reached and
+    the whole state check could return only one answer.
+    """
+
+    def patch(settings: dict) -> None:
+        settings.setdefault("enabledPlugins", {})["kb-settings-guard@ray-manaloto"] = True
+
+    assert all(_settings_with(repo_copy, patch).values())
+
+
+def test_enabling_the_plugin_under_an_unknown_marketplace_is_rejected(repo_copy: Path) -> None:
+    """The overstatement direction: enabled, but from a marketplace nothing declares."""
+
+    def patch(settings: dict) -> None:
+        settings.setdefault("enabledPlugins", {})["kb-settings-guard@missing-marketplace"] = True
+
+    assert _settings_with(repo_copy, patch)["marketplace_known"] is False
+
+
+def test_removing_the_function_hook_env_flag_falsifies_its_predicate(repo_copy: Path) -> None:
+    """The predicate the design named and the code never read.
+
+    Function hooks do not load at all without `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`,
+    and it is a TRACKED fact in `.claude/settings.json`, so no other predicate
+    can substitute for it. Removing it previously left every predicate true.
+    """
+
+    def patch(settings: dict) -> None:
+        settings.setdefault("enabledPlugins", {})["kb-settings-guard@ray-manaloto"] = True
+        settings.get("env", {}).pop("CLAUDE_CODE_ENABLE_FUNCTION_HOOKS", None)
+
+    assert _settings_with(repo_copy, patch)["function_hooks_enabled"] is False

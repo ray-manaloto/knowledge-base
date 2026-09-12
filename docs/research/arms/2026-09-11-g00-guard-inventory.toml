@@ -264,3 +264,78 @@ command = "on(\"tool.call\", Bogus, handler)"
 [[registrations.reviewed_scope_cases]]
 tool = "Bogus"'''
 test = "test_the_committed_inventory_reconciles_clean"
+
+# --- round 2 of the cold review: arms for the five defects found IN THE FIX ---
+#
+# Every arm below severs a check the cold lane proved was missing, and each one
+# reproduces a path that reported CLEAN before it existed. They are listed in
+# the order the review found them.
+
+[[arm]]
+id = "A9"
+file = "python/src/kb_setup/guard_inventory.py"
+old = 'if str(getattr(row.source, "event", "") or "") != _FUNCTION_HOOK_EVENT'
+new = "if False"
+test = "test_a_function_hook_row_naming_a_non_tool_call_event_is_route_drift"
+meaning = "drops the event half of the (path, tool.call, tool) triple, so a row repointed at tool.result reads clean"
+
+[[arm]]
+id = "A10"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        if expected is not None and expected not in ids:'''
+new = '''        if False:'''
+test = "test_a_registration_whose_module_ids_omit_its_resolved_module_is_route_drift"
+meaning = "reverts module_ids to an existence-only check, where DELETING the field is invisible"
+
+[[arm]]
+id = "A11"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        tasks = tomllib.loads((root / "mise.toml").read_text(encoding="utf-8"))["tasks"]'''
+new = '''        tasks = {
+            "kb-instruction-edit-guard": {"run": "uv run kb-setup instruction-edit-guard"},
+            "kb-instruction-shell-write": {"run": "uv run kb-setup instruction-shell-write"},
+        }'''
+test = "test_a_repointed_mise_task_is_detected_rather_than_read_from_a_copy"
+meaning = "restores the hand-copied duplicate of mise.toml's run lines, so the real route can drift unseen"
+
+[[arm]]
+id = "A12"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        if isinstance(node, ast.ImportFrom) and node.module == "importlib":'''
+new = '''        if False:'''
+test = "test_an_aliased_dynamic_import_still_fails_closed"
+meaning = "stops recognising `import_module` under an alias, reopening the backstop bypass"
+
+[[arm]]
+id = "A13"
+file = "python/src/kb_setup/guard_inventory.py"
+old = "isinstance(marketplaces, dict) and bool(owners) and owners <= set(marketplaces)"
+new = '''isinstance(marketplaces, dict) and any(
+            key.split("@", 1)[0] == _FUNCTION_HOOK_PLUGIN_NAME for key in marketplaces
+        )'''
+test = "test_enabling_the_plugin_under_a_known_marketplace_satisfies_every_predicate"
+meaning = "restores comparing marketplace KEYS to the plugin NAME, which is unsatisfiable against all 11 live keys"
+
+# A13 is the one arm here whose mutation is the ORIGINAL CODE rather than a
+# no-op. That is deliberate: the defect was not a missing check but a check
+# comparing the wrong two things, and the only realistic break is putting the
+# wrong comparison back. Reverting it makes `enabled` unreachable again, which
+# is what the named test now refuses.
+
+[[arm]]
+id = "A14"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''    function_hooks_enabled = isinstance(env, dict) and str(
+        env.get(_FUNCTION_HOOK_ENV_FLAG, "")
+    ).strip() not in ("", "0")'''
+new = '''    function_hooks_enabled = True'''
+test = "test_removing_the_function_hook_env_flag_falsifies_its_predicate"
+meaning = "hard-codes the feature-flag predicate true, the state it was in when the design named it and the code never read it"
+
+[[arm]]
+id = "A15"
+file = "python/src/kb_setup/guard_inventory.py"
+old = '''        if str(entry["event"]) not in _BLOCKING_EVENTS:'''
+new = '''        if False:'''
+test = "test_the_committed_inventory_reconciles_clean"
+meaning = "admits the six lifecycle registrations, which cannot block a tool call and are not inventory members"
