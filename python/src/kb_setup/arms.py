@@ -1,11 +1,19 @@
 # Copyright (c) 2026 Raymond Manaloto
 """Run mutation arms from a declarative spec — the harness as a module (#160).
 
-A mutation arm breaks one line of PRODUCTION code and asserts a NAMED test goes
-red. `.claude/rules/probes-need-a-control-arm.md` rule 2 requires them; seven
+A mutation arm breaks one line and asserts a NAMED test goes red.
+`.claude/rules/probes-need-a-control-arm.md` rule 2 requires them; seven
 successive rounds have written one by hand in the session scratchpad, and the
 same defects keep coming back with them. This module is the fix: the runner
 lives here with its tests, and a round contributes only **data**.
+
+🔴 THE TARGET IS NOT ALWAYS PRODUCTION PYTHON. `_read_target` (below) accepts
+any in-repo UTF-8 file, and G00's arm suite (#753) is the reason this line
+exists: a DATA file (`docs/guards/inventory.toml`) can encode a defect just as
+surely as a line of code can, and a suite that only ever mutates the code
+missing the data axis is exactly how three reconciler defects shipped
+undetected. So read "one line" as "one line of this repo's tracked text",
+never as "one line of `.py`".
 
 ## Why a module, when a report already argued against one
 

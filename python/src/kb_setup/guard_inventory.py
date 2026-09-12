@@ -63,6 +63,7 @@ import ast
 import hashlib
 import json
 import re
+import shlex
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -433,8 +434,116 @@ def _reconcile_scope_and_attributes(
     return findings
 
 
-def _reconcile_modules(root: Path, inventory: GuardInventory) -> list[Finding]:
-    findings: list[Finding] = []
+#: `kb-setup <cmd>` -> the repo module stem that command drives, for the
+#: commands THIS repo's own `.claude/settings.json` and `mise.toml` name today.
+#: A small explicit table rather than importing `cli.py` (which has no
+#: importable dispatch table -- 84 `if cmd ==` branches with its own C901 etc.
+#: suppressions, `cli.py:210` -- and would run import-time side effects to
+#: resolve one string). Extending this table is how a NEW direct registration
+#: becomes recognised; an entry absent here is UNRESOLVED, never silently
+#: treated as external.
+_DIRECT_MODULE_BY_KB_SETUP_CMD: dict[str, str] = {
+    "hookguard": "hook_guard",
+    "instruction-edit-guard": "instruction_edit_guard",
+    "instruction-shell-write": "instruction_shell_write",
+}
+
+#: mise task name -> the `kb-setup <cmd>` it runs, taken from that task's own
+#: `run =` line in `mise.toml` (`kb-instruction-edit-guard` ->
+#: `uv run kb-setup instruction-edit-guard`, and the shell-write sibling). A
+#: task name absent here is UNRESOLVED, not external -- see
+#: `_resolve_direct_command`.
+_MISE_TASK_KB_SETUP_CMD: dict[str, str] = {
+    "kb-instruction-edit-guard": "instruction-edit-guard",
+    "kb-instruction-shell-write": "instruction-shell-write",
+}
+
+#: graphify's own binary (`do-not.md`'s `external-classic-hook` disposition):
+#: recognised and skipped, never treated as a repo module and never UNRESOLVED.
+_EXTERNAL_HOOK_GUARD_SUBCOMMANDS = frozenset({"read", "search"})
+
+
+def _resolve_direct_command(command: str) -> tuple[bool, str | None]:
+    """Classify one live PreToolUse command's target.
+
+    Returns `(recognised, module_stem)`. `module_stem` is a repo module id
+    (e.g. `"hook_guard"`) when the command drives one; `None` when the command
+    is a recognised EXTERNAL binary (graphify's own
+    `.venv/bin/graphify hook-guard read|search`), which is not a repo module by
+    disposition. `recognised` is `False` for ANY command shape this resolver
+    does not know -- so the caller treats it as NOT_RUN rather than silently
+    classifying an unknown command as external, which is the exact over-reach
+    the ticket calls out.
+    """
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return False, None
+    if not tokens:
+        return False, None
+    for resolver in (_resolve_graphify_binary, _resolve_kb_setup_cmd, _resolve_mise_task):
+        result = resolver(tokens)
+        if result is not None:
+            return result
+    return False, None
+
+
+def _resolve_graphify_binary(tokens: list[str]) -> tuple[bool, str | None] | None:
+    """`.venv/bin/graphify hook-guard read|search` — external, not a repo module.
+
+    Returns `None` (try the next resolver) when the command is not this shape
+    at all; `(False, None)` when it IS this shape but names an unrecognised
+    `hook-guard` subcommand — that must stay NOT_RUN, never "external".
+    """
+    if not tokens[0].endswith("/graphify") or tokens[1:2] != ["hook-guard"]:
+        return None
+    if tokens[2:3] and tokens[2] in _EXTERNAL_HOOK_GUARD_SUBCOMMANDS:
+        return True, None
+    return False, None
+
+
+def _resolve_kb_setup_cmd(tokens: list[str]) -> tuple[bool, str | None] | None:
+    """`... kb-setup <cmd>` — direct at any position, per `hook.pretool.hookguard`."""
+    if "kb-setup" not in tokens:
+        return None
+    idx = tokens.index("kb-setup")
+    cmd = tokens[idx + 1] if idx + 1 < len(tokens) else None
+    module = _DIRECT_MODULE_BY_KB_SETUP_CMD.get(cmd) if cmd else None
+    return (True, module) if module else (False, None)
+
+
+def _resolve_mise_task(tokens: list[str]) -> tuple[bool, str | None] | None:
+    """`mise run [-C <dir>] <task>` — resolved via the task's own `run =` line."""
+    if tokens[:2] != ["mise", "run"]:
+        return None
+    task = _mise_task_name(tokens[2:])
+    kb_cmd = _MISE_TASK_KB_SETUP_CMD.get(task) if task else None
+    module = _DIRECT_MODULE_BY_KB_SETUP_CMD.get(kb_cmd) if kb_cmd else None
+    return (True, module) if module else (False, None)
+
+
+def _mise_task_name(tokens: list[str]) -> str | None:
+    """The task name in a `mise run [-C <dir>] <task>` argument tail.
+
+    Skips `-C <dir>` (the only flag-with-value this resolver's known commands
+    use) and any other `-`-prefixed flag, then returns the first bare token.
+    """
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok == "-C":
+            i += 2
+            continue
+        if tok.startswith("-"):
+            i += 1
+            continue
+        return tok
+    return None
+
+
+def _reconcile_modules(
+    root: Path, inventory: GuardInventory, live: list[dict[str, object]]
+) -> list[Finding]:
     dispatched = dispatched_module_names(root)
     if not dispatched:
         return [
@@ -444,24 +553,69 @@ def _reconcile_modules(root: Path, inventory: GuardInventory) -> list[Finding]:
                 "could not read the guard tuple — the module enumeration never ran",
             )
         ]
-    by_stem = {Path(m.path).stem: m for m in inventory.modules}
-    findings.extend(
+    direct: set[str] = set()
+    for entry in live:
+        if str(entry["event"]) != "PreToolUse":
+            continue
+        recognised, module_stem = _resolve_direct_command(str(entry["command"]))
+        if not recognised:
+            return [
+                Finding(
+                    "NOT_RUN",
+                    str(entry["command"])[:70],
+                    "unrecognised direct-registration command shape — enumeration never ran",
+                )
+            ]
+        if module_stem is not None:
+            direct.add(module_stem)
+
+    reachable = dispatched | direct
+    present_stems = {Path(m.path).stem for m in inventory.modules}
+    findings = [
         Finding(
             "UNCLASSIFIED",
             f"{GUARD_DIR / name}.py",
-            "reached by hook_guard dispatch but absent from the inventory",
+            "reached live but absent from the inventory",
         )
-        for name in sorted(dispatched - by_stem.keys())
-    )
-    for name, module in sorted(by_stem.items()):
+        for name in sorted(reachable - present_stems)
+    ]
+    for module in inventory.modules:
         path = root / module.path
         if not path.exists():
             findings.append(Finding("ORPHAN", module.id, f"{module.path} does not exist"))
             continue
-        if module.reached_by.value == "hook-guard-dispatch" and name not in dispatched:
+        stem = path.stem
+        if module.reached_by.value == "hook-guard-dispatch" and stem not in dispatched:
             findings.append(
-                Finding("ORPHAN", module.id, "claims hook-guard-dispatch but is not in the tuple")
+                Finding(
+                    "ROUTE_DRIFT",
+                    module.id,
+                    f"claims hook-guard-dispatch; {stem} is not reached that way",
+                )
             )
+        if module.reached_by.value == "direct-registration" and stem not in direct:
+            findings.append(
+                Finding(
+                    "ROUTE_DRIFT",
+                    module.id,
+                    f"claims direct-registration; no live registration resolves to {stem}",
+                )
+            )
+    findings.extend(_reconcile_module_ids(inventory))
+    return findings
+
+
+def _reconcile_module_ids(inventory: GuardInventory) -> list[Finding]:
+    """Every registration's `module_ids` must resolve to a real inventory module."""
+    known = {m.id for m in inventory.modules}
+    findings: list[Finding] = []
+    for reg in inventory.registrations:
+        ids = reg.module_ids if isinstance(reg.module_ids, list) else []
+        findings.extend(
+            Finding("ORPHAN", reg.id, f"module_ids references unknown module {mid}")
+            for mid in ids
+            if mid not in known
+        )
     return findings
 
 
@@ -543,7 +697,7 @@ def reconcile(root: Path, inventory: GuardInventory) -> list[Finding]:
     if live is None:
         return [Finding("NOT_RUN", str(SETTINGS_PATH), "unreadable — reconciliation never ran")]
     findings = _reconcile_registrations(inventory, live)
-    findings.extend(_reconcile_modules(root, inventory))
+    findings.extend(_reconcile_modules(root, inventory, live))
     findings.extend(_reconcile_invariants(root, inventory))
     findings.extend(_reconcile_contradictions(inventory))
     return findings

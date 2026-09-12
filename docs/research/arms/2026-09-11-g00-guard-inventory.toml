@@ -140,3 +140,43 @@ new = '''    reached: set[str] = set()
     names = reached
     for node in ast.walk(tree):'''
 test = "test_reachability_finds_the_four_modules_a_name_pattern_misses"
+
+# --------------------------------------------------------------------------- #
+# DATA arms (F1/F2, #753). Every arm above mutates the CODE
+# (`guard_inventory.py`); none mutates the DATA file it reconciles against,
+# which is precisely why F1 and F2 shipped undetected. These arms mutate the
+# committed `docs/guards/inventory.toml` directly, so the target the
+# `repo_copy` fixture copies is the mutated one; the named test is always
+# `test_the_committed_inventory_reconciles_clean` (`tests/test_guard_inventory.py:53`),
+# the one test that reads the COMMITTED file rather than a repo-relative
+# fixture path.
+# --------------------------------------------------------------------------- #
+
+# data.module-control — a comment-only edit to the inventory TOML's own header
+# comment (never to a field a test parses) that must change nothing
+# observable. If this dies, the suite is unstable and neither data arm below
+# can be trusted.
+#
+# 🔴 The FIRST version of this control edited a `[[modules]]` block's `id =`
+# line instead, and it BROKE: this suite's own F1 tests locate that exact
+# block by matching `id = "module.hook-guard"\n` verbatim
+# (`_drop_module_block` in `tests/test_guard_inventory.py`), so appending a
+# trailing comment there changed what THOSE tests could find -- an edit to a
+# field a test parses is not inert just because no schema rejects it.
+[[arm]]
+id = "data.module-control"
+control = true
+file = "docs/guards/inventory.toml"
+old = '''# Validated and RECONCILED by `mise run kb-guard-inventory-check`. A row that no'''
+new = '''# Validated and RECONCILED by `mise run kb-guard-inventory-check`. A row that no  (control)'''
+
+# data.direct-route-fiction — F1's own arm. Repoint `module.hook-guard`'s path
+# to another EXISTING file. Before F1, nothing checked a `direct-registration`
+# module's route at all, so this SURVIVED; F1 adds the ROUTE_DRIFT check that
+# must now catch it.
+[[arm]]
+id = "data.direct-route-fiction"
+file = "docs/guards/inventory.toml"
+old = '''path = "python/src/kb_setup/hook_guard.py"'''
+new = '''path = "python/src/kb_setup/check_first.py"'''
+test = "test_the_committed_inventory_reconciles_clean"

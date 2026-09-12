@@ -10,10 +10,12 @@ the difference between an armed gate and one that reddens for any cause at all.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 
 import pytest
+from kb_setup import guard_inventory
 from kb_setup.guard_inventory import (
     DEFAULT_INVENTORY_PATH,
     DO_NOT_PATH,
@@ -261,6 +263,153 @@ def test_a_deleted_guard_module_fails_with_orphan(repo_copy: Path) -> None:
     (repo_copy / "python" / "src" / "kb_setup" / "stage_explicitly.py").unlink()
     findings = reconcile(repo_copy, load_inventory(repo_copy / DEFAULT_INVENTORY_PATH))
     assert "ORPHAN" in _verdicts(findings)
+
+
+# --- F1: direct-registration modules are now reconciled --------------------
+
+
+def _drop_module_block(text: str, module_id: str) -> str:
+    """Delete one `[[modules]]` block by id, from a copy of the inventory text."""
+    pattern = re.compile(
+        r'\[\[modules\]\]\nid = "' + re.escape(module_id) + r'"\n.*?(?=\n\[\[modules\]\]|\n# --- )',
+        re.DOTALL,
+    )
+    new_text, n = pattern.subn("", text, count=1)
+    assert n == 1, f"expected exactly one [[modules]] block for {module_id}"
+    return new_text
+
+
+def _add_pretool_hook(settings: dict, matcher: str, command: str, timeout: int = 30) -> None:
+    settings["hooks"]["PreToolUse"].append(
+        {"matcher": matcher, "hooks": [{"type": "command", "command": command, "timeout": timeout}]}
+    )
+
+
+def test_a_direct_registration_module_dropped_from_inventory_is_unclassified(
+    repo_copy: Path,
+) -> None:
+    """`module.instruction-edit-guard` is `direct-registration`.
+
+    Not `hook-guard-dispatch` -- the axis F1 adds a check for.
+    """
+    path = repo_copy / DEFAULT_INVENTORY_PATH
+    path.write_text(
+        _drop_module_block(path.read_text(encoding="utf-8"), "module.instruction-edit-guard"),
+        encoding="utf-8",
+    )
+    findings = reconcile(repo_copy, load_inventory(path))
+    assert "UNCLASSIFIED" in _verdicts(findings)
+
+
+def test_the_dispatchers_own_module_row_dropped_is_unclassified(repo_copy: Path) -> None:
+    """`module.hook-guard` is the dispatcher itself, also `direct-registration`."""
+    path = repo_copy / DEFAULT_INVENTORY_PATH
+    path.write_text(
+        _drop_module_block(path.read_text(encoding="utf-8"), "module.hook-guard"), encoding="utf-8"
+    )
+    findings = reconcile(repo_copy, load_inventory(path))
+    assert "UNCLASSIFIED" in _verdicts(findings)
+
+
+def test_a_repointed_direct_module_path_fails_reconciliation(repo_copy: Path) -> None:
+    """F1's own arm: repoint `module.hook-guard`'s path to another EXISTING file.
+
+    Before F1 nothing checked a `direct-registration` module's route at all, so
+    this mutation survived reconciliation entirely.
+    """
+    path = repo_copy / DEFAULT_INVENTORY_PATH
+    text = path.read_text(encoding="utf-8")
+    original = 'path = "python/src/kb_setup/hook_guard.py"'
+    assert text.count(original) == 1
+    path.write_text(
+        text.replace(original, 'path = "python/src/kb_setup/check_first.py"', 1), encoding="utf-8"
+    )
+    findings = reconcile(repo_copy, load_inventory(path))
+    assert findings, "repointing a direct-registration module's path must not reconcile clean"
+
+
+def test_an_unrecognised_direct_command_shape_is_not_run(repo_copy: Path) -> None:
+    """An unknown command shape must be NOT_RUN, never silently 'external'."""
+    settings_path = repo_copy / SETTINGS_PATH
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    _add_pretool_hook(settings, "Bash", "./scripts/a-brand-new-guard.sh")
+    settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    findings = reconcile(repo_copy, load_inventory(repo_copy / DEFAULT_INVENTORY_PATH))
+    assert "NOT_RUN" in _verdicts(findings)
+
+
+def test_an_unmapped_mise_task_direct_command_is_not_run(repo_copy: Path) -> None:
+    """A `mise run` task this resolver has no entry for must be NOT_RUN too."""
+    settings_path = repo_copy / SETTINGS_PATH
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    _add_pretool_hook(settings, "Bash", 'mise run -C "${CLAUDE_PROJECT_DIR:-.}" kb-brand-new-guard')
+    settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    findings = reconcile(repo_copy, load_inventory(repo_copy / DEFAULT_INVENTORY_PATH))
+    assert "NOT_RUN" in _verdicts(findings)
+
+
+def test_a_registration_referencing_an_unknown_module_id_is_flagged(repo_copy: Path) -> None:
+    """`module_ids` must resolve to a real inventory module -- blind spot 5's other half."""
+    path = repo_copy / DEFAULT_INVENTORY_PATH
+    text = path.read_text(encoding="utf-8")
+    anchor = '  "module.hook-guard",\n'
+    assert text.count(anchor) == 1
+    path.write_text(
+        text.replace(anchor, anchor + '  "module.does-not-exist",\n', 1), encoding="utf-8"
+    )
+    findings = reconcile(repo_copy, load_inventory(path))
+    assert any("module.does-not-exist" in f.detail for f in findings)
+
+
+# --- F1: the resolver itself -----------------------------------------------
+
+
+def test_the_hookguard_command_resolves_to_hook_guard() -> None:
+    recognised, module = guard_inventory._resolve_direct_command(
+        'uv run --project "${CLAUDE_PROJECT_DIR:-.}/python" kb-setup hookguard'
+    )
+    assert (recognised, module) == (True, "hook_guard")
+
+
+def test_the_instruction_edit_guard_mise_task_resolves_to_its_module() -> None:
+    recognised, module = guard_inventory._resolve_direct_command(
+        'mise run -C "${CLAUDE_PROJECT_DIR:-.}" kb-instruction-edit-guard'
+    )
+    assert (recognised, module) == (True, "instruction_edit_guard")
+
+
+def test_the_instruction_shell_write_mise_task_resolves_to_its_module() -> None:
+    recognised, module = guard_inventory._resolve_direct_command(
+        'mise run -C "${CLAUDE_PROJECT_DIR:-.}" kb-instruction-shell-write'
+    )
+    assert (recognised, module) == (True, "instruction_shell_write")
+
+
+def test_the_graphify_binary_read_and_search_resolve_to_external() -> None:
+    for sub in ("read", "search"):
+        recognised, module = guard_inventory._resolve_direct_command(
+            f'"${{CLAUDE_PROJECT_DIR:-.}}/.venv/bin/graphify" hook-guard {sub}'
+        )
+        assert (recognised, module) == (True, None)
+
+
+def test_an_unknown_graphify_hook_guard_subcommand_is_not_recognised() -> None:
+    recognised, module = guard_inventory._resolve_direct_command(
+        '"${CLAUDE_PROJECT_DIR:-.}/.venv/bin/graphify" hook-guard bogus'
+    )
+    assert (recognised, module) == (False, None)
+
+
+def test_an_unmapped_mise_task_is_not_recognised() -> None:
+    recognised, module = guard_inventory._resolve_direct_command(
+        'mise run -C "${CLAUDE_PROJECT_DIR:-.}" kb-brand-new-guard'
+    )
+    assert (recognised, module) == (False, None)
+
+
+def test_a_wholly_unknown_command_shape_is_not_recognised() -> None:
+    recognised, module = guard_inventory._resolve_direct_command("./scripts/a-brand-new-guard.sh")
+    assert (recognised, module) == (False, None)
 
 
 def test_an_unreadable_authority_is_not_run_not_a_pass(repo_copy: Path) -> None:
