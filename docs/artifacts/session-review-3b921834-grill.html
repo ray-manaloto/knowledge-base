@@ -1,0 +1,112 @@
+<title>Review of Session 3b921834</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#FBFAF7; --ink:#1C1A17; --muted:#6B6459; --rule:#E3DFD6;
+    --accent:#2F5D7C; --good:#3D6B3F; --warn:#8C5A10; --tint:#F1F0EA;
+  }
+  body{background:var(--ground);color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    font-size:15px;line-height:1.5;
+    padding:clamp(20px,4vw,34px) clamp(16px,4vw,32px);}
+  .page{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:18px;}
+  h1{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:700;
+    font-size:clamp(24px,4vw,32px);line-height:1.1;margin:0;
+    text-wrap:balance;letter-spacing:-0.015em;}
+  .sub{margin:6px 0 0;color:var(--muted);}
+  .sub b{color:var(--ink);font-weight:600;}
+  figure{margin:0;} svg{max-width:100%;height:auto;display:block;}
+  figcaption{color:var(--muted);font-size:12.5px;margin-top:6px;}
+  ol.decisions{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule);
+    display:grid;grid-template-columns:1fr 1fr;gap:0 26px;}
+  ol.decisions li{border-bottom:1px solid var(--rule);padding:10px 0;
+    display:grid;grid-template-columns:30px 1fr;gap:11px;align-items:baseline;}
+  .num{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:700;
+    color:var(--accent);font-size:15px;}
+  .q{font-weight:600;display:block;}
+  .opts{color:var(--muted);font-size:13.5px;}
+  .opts em{font-style:normal;color:var(--accent);font-weight:500;}
+  .ask{border:1px solid var(--accent);padding:11px 16px;font-weight:600;color:var(--accent);}
+  @media (max-width:640px){ol.decisions{grid-template-columns:1fr;}}
+</style>
+
+<div class="page">
+
+  <header>
+    <h1>Round 6 — here is the map you asked for</h1>
+    <p class="sub">Five strands. Two of them <b>cannot run at the same time as their neighbour</b>, because they edit the same file — those queue. Everything else runs in parallel, each in its own copy of the repo.</p>
+  </header>
+
+  <figure>
+    <svg viewBox="0 0 880 268" role="img" aria-label="Five strands of work running in parallel, with two queue points where strands edit the same file, feeding a review fan-out and then fixes.">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+          <path d="M0 0 L10 5 L0 10 z" fill="#6B6459"/>
+        </marker>
+      </defs>
+      <g font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#1C1A17">
+
+        <rect x="0" y="10" width="134" height="32" rx="3" fill="#FFFFFF" stroke="#2F5D7C" stroke-width="1.4"/>
+        <text x="10" y="30" fill="#2F5D7C" font-weight="600">1 · the map itself</text>
+        <line x1="134" y1="26" x2="168" y2="26" stroke="#6B6459" stroke-width="1.3" marker-end="url(#a2)"/>
+        <rect x="172" y="10" width="150" height="32" rx="3" fill="#FFFFFF" stroke="#2F5D7C" stroke-width="1.4"/>
+        <text x="182" y="30" fill="#2F5D7C" font-weight="600">2 · separate desks</text>
+        <text x="336" y="30" font-size="11" fill="#8C5A10">queue — both edit mise.toml</text>
+
+        <rect x="0" y="58" width="134" height="32" rx="3" fill="#F1F0EA" stroke="#C9C3B6"/>
+        <text x="10" y="78">3 · turn agentsview on</text>
+        <line x1="134" y1="74" x2="168" y2="74" stroke="#6B6459" stroke-width="1.3" marker-end="url(#a2)"/>
+        <rect x="172" y="58" width="150" height="32" rx="3" fill="#F1F0EA" stroke="#C9C3B6"/>
+        <text x="182" y="78">4 · give codex the tools</text>
+        <text x="336" y="78" font-size="11" fill="#8C5A10">queue — both edit codex config</text>
+
+        <rect x="0" y="106" width="322" height="32" rx="3" fill="#F1F0EA" stroke="#C9C3B6"/>
+        <text x="10" y="126">5 · read agentsview into the graph</text>
+
+        <rect x="0" y="154" width="322" height="32" rx="3" fill="#F1F0EA" stroke="#C9C3B6"/>
+        <text x="10" y="174">6 · graphify tickets + our own pin</text>
+
+        <rect x="0" y="202" width="322" height="32" rx="3" fill="#F1F0EA" stroke="#C9C3B6"/>
+        <text x="10" y="222">7 · research how handover should work</text>
+
+        <line x1="540" y1="26" x2="572" y2="100" stroke="#6B6459" stroke-width="1.3" marker-end="url(#a2)"/>
+
+        <rect x="576" y="96" width="150" height="46" rx="3" fill="#2F5D7C"/>
+        <text x="588" y="117" fill="#FFFFFF" font-weight="600">the readers</text>
+        <text x="588" y="133" fill="#DCE7EF" font-size="11">6 sessions × 5 angles</text>
+
+        <line x1="726" y1="119" x2="752" y2="119" stroke="#6B6459" stroke-width="1.3" marker-end="url(#a2)"/>
+        <rect x="756" y="96" width="120" height="46" rx="3" fill="#FFFFFF" stroke="#2F5D7C" stroke-width="1.4"/>
+        <text x="768" y="117" fill="#2F5D7C" font-weight="600">fix what</text>
+        <text x="768" y="133" fill="#2F5D7C" font-weight="600">they found</text>
+
+        <text x="576" y="176" font-size="11" fill="#6B6459">the readers cannot start until</text>
+        <text x="576" y="192" font-size="11" fill="#6B6459">the desks are separate — that is</text>
+        <text x="576" y="208" font-size="11" fill="#6B6459">the only hard ordering here</text>
+      </g>
+    </svg>
+    <figcaption>Strands 3–7 start immediately and independently. Only the readers wait.</figcaption>
+  </figure>
+
+  <ol class="decisions">
+    <li><span class="num">D1</span><span>
+      <span class="q">Does all of this land today?</span>
+      <span class="opts">Seven strands is more than the four you ticked. Some can wait <em>without blocking anything</em>.</span>
+    </span></li>
+    <li><span class="num">D2</span><span>
+      <span class="q">Four commits are sitting unshipped.</span>
+      <span class="opts">No pull request, no review on them. Ship them first, or <em>build on top</em>?</span>
+    </span></li>
+    <li><span class="num">D3</span><span>
+      <span class="q">Who reviews today's own work?</span>
+      <span class="opts">Whoever writes it cannot review it. Codex writes most of this.</span>
+    </span></li>
+    <li><span class="num">D4</span><span>
+      <span class="q">The old task list you said to delete.</span>
+      <span class="opts">It spans 8 files and overlaps the handover change. <em>Same round, or after?</em></span>
+    </span></li>
+  </ol>
+
+  <p class="ask">Four. Then the grilling is done and I start.</p>
+
+</div>

@@ -1,0 +1,198 @@
+# Round DAG — the map that must exist before any fan-out.
+#
+# Ray, 2026-09-12, session kb-20260912.000, verbatim:
+#   "i asked for a DAG so we can visualize what can be parallelized via git
+#    worktrees / make that requirement and enforce that as how we want to move
+#    forward always / we are very behind on work and keep going backwards due to
+#    all the technical debt we are incurring"
+#
+# Settled across SEVEN /grilling rounds (27 answers) in session kb-20260912.000.
+# Decision page: docs/artifacts/session-review-3b921834-grill.html
+#
+# SEMANTICS. `touches` is the merge-conflict predictor, NOT a write lock: every
+# mutating unit runs in its own git worktree on its own branch off `main`, so two
+# units may WRITE the same path concurrently. What they may not do is merge in an
+# arbitrary order — units sharing a `touches` entry are serialized at MERGE time,
+# in the order their ids appear here. `depends_on` is the only true ordering.
+#
+# READ-ONLY units carry `worktree = false` deliberately. A fresh worktree does not
+# contain `.agent/` (gitignored) and does not carry another branch's tracked files,
+# so a review lane given a worktree would be reviewing material it cannot see. The
+# isolation those units need is a unique report path, which is `lane_scratch`'s
+# half of the answer, not the worktree's.
+
+[round]
+id = "2026-09-12-session-review"
+title = "Review session 3b921834, fix what it left, and stop the round going backwards"
+base = "main"
+pr_policy = "one PR per unit"                                                           # Ray, round 7 Q2
+reviewer = "kb-codex-astra-reviewer"                                                    # Ray, round 6 Q3 — cold, by ref
+
+# ---------------------------------------------------------------- prerequisite
+
+[[unit]]
+id = "P0"
+title = "Fix the three mod_runtime P1s, review, ship and land #754"
+branch = "feat/754-plugin-types-contract"                                     # already exists, 4 commits ahead
+worktree = false                                                              # the branch itself, not a copy
+depends_on = []
+touches = ["python/src/kb_setup/mod_runtime.py", "tests/test_mod_runtime.py"]
+# CORRECTED on first read: `blocks_all = true` was wrong. Only S9 depends on P0
+# (both edit mod_runtime.py). Every other unit branches off the CURRENT main and
+# runs now; P0 lands independently. The DAG caught this — which is the point.
+note = """
+Ray, round 7 Q1: fix the three P1s FIRST, then review, then ship. The P1s are in
+#754's own code, so shipping as-is merges a gate whose central claim is measured
+FALSE.
+"""
+
+# ------------------------------------------------------- the enforcement strand
+
+[[unit]]
+id = "S1"
+title = "The DAG artifact + the gate that refuses an ungated fan-out"
+branch = "feat/dag-gate"
+worktree = true
+depends_on = ["P0"]
+touches = [
+  "mise.toml",
+  "hk.pkl",
+  "python/src/kb_setup/dag.py",
+  "python/src/kb_setup/cli.py",
+  ".claude/rules/parallel-work-needs-a-dag.md",
+  "tests/test_dag.py",
+]
+note = "Ray, round 5 Q1: a committed TOML DAG plus a PreToolUse deny. A drawing nobody checks is advice; this repo measures advisory at 0-of-19 and deny at 62-to-0."
+
+[[unit]]
+id = "S2"
+title = "lane_scratch.py — the two things a worktree cannot isolate"
+branch = "feat/lane-scratch"
+worktree = true
+depends_on = ["P0"]
+touches = [
+  "mise.toml",
+  "hk.pkl",
+  "python/src/kb_setup/lane_scratch.py",
+  "python/src/kb_setup/cli.py",
+  ".claude/agents",
+  ".claude/skills/kb-review/references/lanes.md",
+  ".agents/skills/kb-review/references/lanes.md",
+  ".claude/rules/ai-cli-invocation.md",
+  "tests/test_lane_scratch.py",
+]
+note = "Scope from scratch-isolation-review.md:655 — its own Report, CLI verb, hk step and arms, reusing lane_recording's fence walkers and skill_lint.command_lines(). Covers the shared /private/tmp scratchpad and $TMPDIR."
+
+[[unit]]
+id = "S6h"
+title = "Function-hook migration, wave 1 only — graph_first + agentsview_first"
+branch = "feat/function-hook-wave-1"
+worktree = true
+depends_on = ["S1"]
+touches = [".claude/mods", ".claude/settings.json", "hk.pkl"]
+note = """
+Ray, round 5 Q3: waves, secret_guard LAST. Wave 1 = the two orientation rules +
+deleting graphify's warning-only Bash|Grep entry at .claude/settings.json:16-20.
+Wave 2 = check_first/absent_binary/stage_explicitly/the task table. Wave 3 =
+secret_guard, only once waves 1-2 have run clean.
+WRITTEN CLAUDE-SIDE so kb-codex-astra-reviewer's read on it is genuinely cross-family.
+register.ts:46's "NEVER BASH" narrows to "never tool.call on Bash".
+"""
+
+# ------------------------------------------------------------ the tooling strand
+
+[[unit]]
+id = "S3"
+title = "agentsview project wiring + liveness"
+branch = "feat/agentsview-wiring"
+worktree = true
+depends_on = ["P0"]
+touches = [
+  ".mcp.json",
+  ".codex/config.toml",
+  ".claude/settings.json",
+  "mise.toml",
+  "python/src/kb_setup/agentsview_health.py",
+]
+note = "MCP at PROJECT scope in both configs — never ~/.codex/config.toml (do-not.md #11). Liveness escalation (Ray, round 3 Q4): try to start -> message dotfiles -> start it ourselves -> hard block only if it cannot start."
+
+[[unit]]
+id = "S4"
+title = "Give codex lanes real research tools"
+branch = "feat/codex-research-tools"
+worktree = true
+depends_on = ["S3"]                                                                                                                                                                                                                           # same file: .codex/config.toml
+touches = [".codex/config.toml", "docs/research"]
+note = "context7 now (no key). exa + firecrawl via an env-NAME allowlist, keys from dotfiles. last30days: investigate whether it has an MCP surface at all. Plus #778 — codex lanes cannot query the graph, so 4 of 4 fell back to grepping."
+
+[[unit]]
+id = "S5"
+title = "Read agentsview into the graph"
+branch = "feat/agentsview-ingestion"
+worktree = true
+depends_on = ["P0"]
+touches = ["sources", "graphify-out"]
+note = "kb-build over sources/agentsview.manifest (registered 2026-09-11, never ingested) plus a kind=docs mirror of agentsview.io, then deep extraction, reflection and artifacts. Runs on the 0.9.57 pin — the fork bump is dotfiles'."
+
+[[unit]]
+id = "S6"
+title = "graphify fork tickets + our own pin follow-up"
+branch = "chore/graphify-0959-followup"
+worktree = true
+depends_on = ["P0"]
+touches = [
+  "pyproject.toml",
+  "uv.lock",
+  "currency.toml",
+  "sources/graphify.manifest",
+]
+note = "Issues now fileable — the fork's tracker was OFF and is now ON. Fork rebase 0.9.57 -> 0.9.59 is dotfiles'; this repo does only the pyproject rev + kb-skill-refresh once it lands."
+
+# ---------------------------------------------------------------- the review itself
+
+[[unit]]
+id = "S7"
+title = "Research how /clear-prep and handover should work"
+branch = "docs/handover-research"
+worktree = false                                                                                                                                                                                                                                                  # read-only + one report
+depends_on = []
+touches = ["docs/research"]
+note = "Ray, round 4 Q4: kb-codex-astra-advisor researches optimizing /clear-prep against existing plugins/tools/skills/frameworks, searching via last30days, firecrawl search + developer index, exa, context7. Its verdict decides what /session-resume reads."
+
+[[unit]]
+id = "S8"
+title = "The review fan-out — 6 sessions, 5 angles"
+branch = "docs/session-review-2026-09-12"
+worktree = false # see SEMANTICS: lanes must see .agent/ and the current branch
+depends_on = []
+touches = ["docs/research/reports", ".agent/kb/review-round"]
+lanes = [
+  "a1-behaviour",
+  "a2-handoff-claims",
+  "a3-code-faults",
+  "a4-report-facts",
+  "a5-vague-and-missing",
+]
+synthesis = "kb-codex-astra-advisor"
+note = "Each lane writes ONLY .agent/kb/review-round/lanes/<lane>.md, incrementally. .agent/notepad.md is forbidden to lanes — Write is read-modify-write and loses content."
+
+[[unit]]
+id = "S9"
+title = "Fix what the review found"
+branch = "fix/session-review-findings"
+worktree = true
+depends_on = ["S8", "P0"]
+touches = ["UNKNOWN — set from S8's findings before dispatch"]
+note = "Ray, round 3 Q1: the defects get fixed in THIS session, not handed off."
+
+# ------------------------------------------------------------------- deferred
+
+[[deferred]]
+id = "D1"
+title = "Remove next-ticket and the chain file entirely (8 files)"
+reason = "Ray, round 6 Q4 — waits for S7's verdict, because removing the pointer before knowing what replaces it risks removing it twice. Queues behind S1/S2 on mise.toml anyway, so waiting costs no parallelism."
+
+[[deferred]]
+id = "D2"
+title = "Function-hook migration waves 2 and 3"
+reason = "Wave 3 is secret_guard, the one guard whose failure is irreversible and whose trust is keyed to a hash that a hook edit silently invalidates."
