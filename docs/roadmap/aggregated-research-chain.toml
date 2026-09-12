@@ -58,11 +58,6 @@
 # Plan + every measurement: docs/research/reports/2026-09-11-function-hooks-enforcement-programme.md
 
 [[ticket]]
-issue = 753
-title = "G00 — inventory every guard registration, module and invariant with a disposition"
-blockers = []
-
-[[ticket]]
 issue = 754
 title = "G01 — pin the runtime contract with live probes, not a checked-in d.ts"
 blockers = [753]
