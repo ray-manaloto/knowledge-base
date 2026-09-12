@@ -131,6 +131,16 @@ owner_kind = "repository"
 invariant_ids = []
 evidence = "measured-this-session"
 note = "Smallest guard. CITES the graphify-out invariant as motivation but does not enforce it: it refuses a blanket add without inspecting what is staged."
+[[modules]]
+id = "module.result"
+path = "python/src/kb_setup/result.py"
+reached_by = "hook-guard-dispatch"
+current_surface = "support-module"
+disposition = "support-module"
+owner_kind = "repository"
+invariant_ids = []
+evidence = "measured-this-session"
+note = "SURFACED BY THE F3 FIX (#753): hook_guard.py:28 imports Ok/Result/exit_code at module scope via `from kb_setup.result import ...`, a shape the prior AST walk (keyed only on `node.module == \"kb_setup\"`) never recognised. Shared error-surface types, not itself a guard -- support-module is the honest disposition, per the schema's own definition of that value."
 
 # --- INVARIANTS -------------------------------------------------------------
 [[invariants]]

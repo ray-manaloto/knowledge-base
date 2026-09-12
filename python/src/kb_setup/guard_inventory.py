@@ -131,32 +131,109 @@ def load_inventory(path: Path) -> GuardInventory:
         raise GuardInventoryError(msg) from exc
 
 
+#: Calls this walk treats as UNSUPPORTED INDIRECTION -- a dynamic import this
+#: static AST walk cannot see past. Detecting one fails the whole enumeration
+#: CLOSED (empty -> NOT_RUN upstream) rather than silently returning a set that
+#: omits whatever the indirection hides.
+_DYNAMIC_IMPORT_CALL_NAMES = frozenset({"__import__"})
+
+
+def _has_unsupported_indirection(tree: ast.AST) -> bool:
+    """True when `hook_guard.py` reaches a guard through unsupported indirection.
+
+    `importlib.import_module(...)`, `__import__(...)`, or a `getattr(...)` call
+    whose target names `kb_setup`. None of these are used by `hook_guard.py`
+    today -- this is a fail-closed backstop, not a reachability source in its
+    own right.
+    """
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if isinstance(func, ast.Name) and func.id in _DYNAMIC_IMPORT_CALL_NAMES:
+            return True
+        if isinstance(func, ast.Attribute) and func.attr == "import_module":
+            return True
+        if isinstance(func, ast.Name) and func.id == "getattr" and node.args:
+            try:
+                target_src = ast.unparse(node.args[0])
+            except ValueError, TypeError:
+                target_src = ""
+            if "kb_setup" in target_src:
+                return True
+    return False
+
+
 def dispatched_module_names(root: Path) -> frozenset[str]:
-    """Every guard module `hook_guard` imports, by AST walk at ALL depths.
+    """Every guard module reachable from `hook_guard.py`, by AST walk at ALL depths.
 
-    The reachability half a filename pattern cannot reproduce, and the reason it
-    is an AST walk rather than a regex over the dispatch tuple: **`hook_guard`
-    imports only 2 of its 9 guards at module scope** (`graph_first` at `:27`);
-    the other seven are FUNCTION-LOCAL imports inside their own wrappers around
-    `:347-358`. A module-scope walk finds 2 of 9, and a regex over the tuple
-    finds all 9 only because of the shape that code happens to have today.
-    `ast.walk` visits every `ImportFrom` at every depth, so neither nesting nor a
-    refactor of `hook_guard` can hide one.
+    Recognises every STATIC import shape the language offers for reaching a
+    sibling module in the same package: `from kb_setup import X`,
+    `from kb_setup.X import y`, `import kb_setup.X`, `from . import X`, and
+    `from .X import y`.
 
-    Returns EMPTY when the file cannot be read or parsed; the caller treats that
-    as NOT_RUN. A parser that silently matches nothing would otherwise report a
-    clean reconciliation against nothing at all.
+    A PRIOR version of this walk recognised only the first of those five shapes
+    -- it keyed on `node.module == "kb_setup"` alone, so `import kb_setup.X`,
+    `from . import X` and `from .X import y` all passed through unseen. That is
+    the reachability half a filename pattern cannot reproduce either way: it is
+    an AST walk rather than a regex over the dispatch tuple because `hook_guard`
+    imports exactly **one** of its eight guards at module scope
+    (`graph_first`, `:27`) and reaches the other seven through FUNCTION-LOCAL
+    imports inside their own wrappers -- state the MECHANISM, not a quoted pair
+    of counts: this docstring previously said "2 of 9", which had already
+    drifted by the time it was read. `ast.walk` visits every `ImportFrom` and
+    `Import` at every depth, so neither nesting nor a refactor of `hook_guard`
+    can hide a guard reached through one of the five supported shapes.
+
+    FAILS CLOSED, not silently, on detected unsupported indirection --
+    `importlib.import_module`, `__import__`, or a `getattr` call naming
+    `kb_setup` -- by returning EMPTY, which the caller already treats as
+    NOT_RUN. A dynamic import or a re-export is out of scope for a static walk
+    by construction; narrowing the claim to what this function can actually see
+    is the fix, not pretending it can see further.
+
+    Returns EMPTY when the file cannot be read or parsed, or when unsupported
+    indirection is detected; the caller treats that as NOT_RUN. A parser that
+    silently matches nothing would otherwise report a clean reconciliation
+    against nothing at all.
     """
     try:
         source = (root / GUARD_DIR / "hook_guard.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
     except OSError, SyntaxError:
         return frozenset()
+    if _has_unsupported_indirection(tree):
+        return frozenset()
     names: set[str] = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "kb_setup":
-            names.update(alias.name for alias in node.names)
+        if isinstance(node, ast.ImportFrom):
+            names.update(_import_from_targets(node))
+        elif isinstance(node, ast.Import):
+            names.update(
+                alias.name.split(".")[1]
+                for alias in node.names
+                if alias.name.startswith("kb_setup.")
+            )
     return frozenset(names & _module_stems(root))
+
+
+def _import_from_targets(node: ast.ImportFrom) -> set[str]:
+    """The sibling-module name(s) one `ImportFrom` node reaches, if any.
+
+    Split out of `dispatched_module_names` purely to keep that walk's own
+    branching within this repo's complexity budget. Covers four of the five
+    shapes that function documents; the fifth, plain `import kb_setup.X`, is an
+    `ast.Import` and handled by the caller.
+    """
+    if node.level == 0 and node.module == "kb_setup":
+        return {alias.name for alias in node.names}
+    if node.level == 0 and node.module is not None and node.module.startswith("kb_setup."):
+        return {node.module.split(".")[1]}
+    if node.level == 1 and node.module is None:
+        return {alias.name for alias in node.names}
+    if node.level == 1 and node.module is not None:
+        return {node.module.split(".")[0]}
+    return set()
 
 
 def _module_stems(root: Path) -> frozenset[str]:

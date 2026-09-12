@@ -50,12 +50,19 @@ test = "test_an_unclassified_live_hook_fails_with_that_verdict"
 
 # A2 — reachability narrowed to MODULE SCOPE only, which is the pre-AST bug in
 # its most believable form: it looks like a reasonable simplification, and
-# `hook_guard` imports only 2 of its 9 guards at module scope.
+# `hook_guard` imports only 1 of its 8 guards at module scope.
+#
+# 🔴 The bare `for node in ast.walk(tree):` line is no longer unique in this
+# file (F3 added `_has_unsupported_indirection`'s own walk over the same
+# `tree`), so `old` now anchors on the two-line combination that is unique to
+# `dispatched_module_names`'s own reachability loop.
 [[arm]]
 id = "A2"
 file = "python/src/kb_setup/guard_inventory.py"
-old = '''    for node in ast.walk(tree):'''
-new = '''    for node in tree.body:'''
+old = '''    names: set[str] = set()
+    for node in ast.walk(tree):'''
+new = '''    names: set[str] = set()
+    for node in tree.body:'''
 test = "test_reachability_finds_the_four_modules_a_name_pattern_misses"
 
 # A3 — an unparseable `if` condition silently WIDENED instead of reported. This

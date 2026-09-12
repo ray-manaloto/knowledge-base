@@ -89,6 +89,92 @@ def test_unreadable_hook_guard_yields_empty_not_a_false_clean(tmp_path: Path) ->
     assert dispatched_module_names(tmp_path) == frozenset()
 
 
+# --- F3: every static import shape, not only `from kb_setup import X` -----
+
+
+def _hook_guard_fixture(tmp_path: Path, body: str, extra_modules: tuple[str, ...] = ()) -> Path:
+    """A minimal `hook_guard.py` plus stub sibling modules.
+
+    The stubs are what `_module_stems` admits, so whatever import shape a test
+    names must also appear as an actual file.
+    """
+    guard_dir = tmp_path / "python" / "src" / "kb_setup"
+    guard_dir.mkdir(parents=True, exist_ok=True)
+    (guard_dir / "hook_guard.py").write_text(body, encoding="utf-8")
+    for name in extra_modules:
+        (guard_dir / f"{name}.py").write_text("", encoding="utf-8")
+    return tmp_path
+
+
+def test_a_from_kb_setup_import_reaches_a_brand_new_guard(tmp_path: Path) -> None:
+    root = _hook_guard_fixture(
+        tmp_path, "from kb_setup import brandnew_guard\n", ("brandnew_guard",)
+    )
+    assert "brandnew_guard" in dispatched_module_names(root)
+
+
+def test_a_bare_import_of_a_submodule_reaches_a_brand_new_guard(tmp_path: Path) -> None:
+    """`import kb_setup.brandnew_guard` -- silently missed before this fix."""
+    root = _hook_guard_fixture(tmp_path, "import kb_setup.brandnew_guard\n", ("brandnew_guard",))
+    assert "brandnew_guard" in dispatched_module_names(root)
+
+
+def test_a_relative_bare_import_reaches_a_brand_new_guard(tmp_path: Path) -> None:
+    """`from . import brandnew_guard` -- silently missed before this fix."""
+    root = _hook_guard_fixture(tmp_path, "from . import brandnew_guard\n", ("brandnew_guard",))
+    assert "brandnew_guard" in dispatched_module_names(root)
+
+
+def test_a_relative_submodule_import_reaches_a_brand_new_guard(tmp_path: Path) -> None:
+    """`from .brandnew_guard import decide` -- silently missed before this fix."""
+    root = _hook_guard_fixture(
+        tmp_path, "from .brandnew_guard import decide\n", ("brandnew_guard",)
+    )
+    assert "brandnew_guard" in dispatched_module_names(root)
+
+
+def test_a_dotted_from_import_reaches_the_named_submodule(tmp_path: Path) -> None:
+    """`from kb_setup.stage_explicitly import decide` -- the victim-substitution arm."""
+    root = _hook_guard_fixture(
+        tmp_path, "from kb_setup.stage_explicitly import decide\n", ("stage_explicitly",)
+    )
+    assert "stage_explicitly" in dispatched_module_names(root)
+
+
+def test_an_import_module_call_naming_kb_setup_fails_closed(tmp_path: Path) -> None:
+    """A dynamic `importlib.import_module` call must NOT be silently omitted."""
+    root = _hook_guard_fixture(
+        tmp_path,
+        'import importlib\nimportlib.import_module("kb_setup.brandnew_guard")\n',
+        ("brandnew_guard",),
+    )
+    assert dispatched_module_names(root) == frozenset()
+
+
+def test_a_bare_dunder_import_call_fails_closed(tmp_path: Path) -> None:
+    root = _hook_guard_fixture(
+        tmp_path, '__import__("kb_setup.brandnew_guard")\n', ("brandnew_guard",)
+    )
+    assert dispatched_module_names(root) == frozenset()
+
+
+def test_a_getattr_on_kb_setup_fails_closed(tmp_path: Path) -> None:
+    root = _hook_guard_fixture(
+        tmp_path, "import kb_setup\ngetattr(kb_setup, 'brandnew_guard')\n", ("brandnew_guard",)
+    )
+    assert dispatched_module_names(root) == frozenset()
+
+
+def test_a_getattr_unrelated_to_kb_setup_does_not_trip_the_backstop(tmp_path: Path) -> None:
+    """The backstop is scoped to `kb_setup`; an ordinary getattr must still work."""
+    root = _hook_guard_fixture(
+        tmp_path,
+        "from kb_setup import brandnew_guard\ngetattr(object(), 'x', None)\n",
+        ("brandnew_guard",),
+    )
+    assert "brandnew_guard" in dispatched_module_names(root)
+
+
 # --- the effective-case denominator ----------------------------------------
 
 
