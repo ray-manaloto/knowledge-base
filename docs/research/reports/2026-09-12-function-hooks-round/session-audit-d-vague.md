@@ -1,5 +1,16 @@
 # Session audit D — vague or unmeasured claims
 
+> 🔴 **THIS SWEEP IS PARTIAL. Do not read its silence as coverage.** The lane that
+> wrote it was ended at a 2,400-second bound (`rc 124`) before it finished. It
+> wrote incrementally, so every section below reached disk and everything present
+> is real — but the sweep never completed, so a claim this file does not mention
+> was not necessarily examined.
+>
+> Added 2026-09-12 by the session review of `3b921834`. The fact was recorded in
+> three *other* files — the round README, the handoff, and the audit synthesis —
+> and nowhere in this one, so a reader who opened it alone could not discover it.
+> That is the defect this note closes, not the timeout itself.
+
 Audit baseline: `4cdd8bfb` (`4cdd8bfbc3a2d7919adc8057c34afd487813fa26`) on branch `feat/754-plugin-types-contract`.
 
 ## Method and graph health
