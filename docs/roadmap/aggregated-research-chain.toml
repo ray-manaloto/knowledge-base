@@ -63,11 +63,6 @@ title = "G01 — pin the runtime contract with live probes, not a checked-in d.t
 blockers = [753]
 
 [[ticket]]
-issue = 755
-title = "G02 — schema-owned policy data generating both the python and the TS literals"
-blockers = [753]
-
-[[ticket]]
 issue = 758
 title = "G05 — enforce the direction itself: rule, AGENTS.md, and a structural lint"
 blockers = [753, 755]
@@ -78,9 +73,19 @@ title = "G03 — the settings reference guard on generated policy and verified a
 blockers = [754, 755]
 
 [[ticket]]
+issue = 772
+title = "settings guard: NotebookEdit is registered but reads a field it does not have, so it can never deny"
+blockers = [754, 755]
+
+[[ticket]]
 issue = 757
 title = "G04 — cold bootstrap, the tracked flag, and a readiness task that runs BEFORE work"
 blockers = [756]
+
+[[ticket]]
+issue = 773
+title = "G04b — prove the settings guard BEHAVES: five static-gate gaps that need the mod registered"
+blockers = [757]
 
 [[ticket]]
 issue = 728
@@ -121,6 +126,14 @@ blockers = [757, 760]
 issue = 765
 title = "G12 — cutover: retire only proven replacements, verified on remote main"
 blockers = [758, 759, 760, 761, 762, 763, 764]
+
+# ADVISORY, and placed here deliberately. #771 is blocked on a cost measurement
+# (wall clock + token spend per live-probe arm), which this file has no field for —
+# so its POSITION is what defers it. Its only issue blocker is #754.
+[[ticket]]
+issue = 771
+title = "G01b — live runtime probes, advisory until their cost is measured"
+blockers = [754]
 
 [[ticket]]
 issue = 739
