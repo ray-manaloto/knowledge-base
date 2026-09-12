@@ -228,7 +228,10 @@ _IDENTIFIER = re.compile(r"[A-Za-z_$][\w$]*")
 #: Both quote styles are accepted. The double-quote-only version shipped first and
 #: left `e['permissionMode']` invisible, i.e. it closed only half of the P1 it was
 #: written for.
-_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\]])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")
+#: The `.` in the lookbehind is for OPTIONAL CHAINING — `e?.["name"]` is ordinary
+#: TypeScript and round 2's receiver class rejected it, losing a form round 1 had
+#: extracted. An array literal is still excluded: `= ["x"]` has a space before `[`.
+_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\].])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")
 #: `const { a, b: alias } = e` — keys only, never the alias. The optional
 #: `: Type` before `=` matters: `const { permissionMode }: any = e` is ordinary
 #: TypeScript and was invisible without it.
@@ -354,7 +357,22 @@ def _bracket_access_outside_strings(no_comments: str) -> set[str]:
     :data:`_BRACKET_ACCESS` does the other half, rejecting a bare array literal
     such as ``const status = ["bogusMember"]``.
     """
-    spans = [m.span() for m in _TS_STRING.finditer(no_comments)]
+    # 🔴 A template literal is NOT a uniform exclusion zone. Its `${…}` regions
+    # are code, and round 2 discarded the whole literal — losing `` `${e["name"]}` ``,
+    # another form round 1 had extracted. So a backtick literal contributes only
+    # the parts OUTSIDE its interpolations as exclusion spans; a quoted string
+    # contributes all of itself.
+    spans: list[tuple[int, int]] = []
+    for literal in _TS_STRING.finditer(no_comments):
+        start, end = literal.span()
+        if not literal.group().startswith("`"):
+            spans.append((start, end))
+            continue
+        cursor = start
+        for interp in _TEMPLATE_INTERP.finditer(literal.group()):
+            spans.append((cursor, start + interp.start()))
+            cursor = start + interp.end()
+        spans.append((cursor, end))
     found: set[str] = set()
     for match in _BRACKET_ACCESS.finditer(no_comments):
         start = match.start()
@@ -380,30 +398,39 @@ def required_runtime_tokens(register_source: str) -> frozenset[str] | None:
     say so, exactly as `guard_inventory.function_hook_write_tools` does.
     """
     no_comments = guard_inventory.strip_ts_comments(register_source)
-    # 🔴 STRINGS FIRST, then comments — the order is the fix, not an accident.
-    # `strip_ts_comments` is not a lexer: it treats `//` inside a string literal
-    # as the start of a comment, so `const url = "https://example.com";` deletes
-    # the rest of that line. Measured by a cold lane: with a real property read
-    # after such a URL on the same line, reconciliation against declarations
-    # lacking that field exited 0, while the same read without the URL exited 1 —
-    # a field the guard depends on, erased from its own contract by a link in the
-    # line above it.
+    # 🔴 BOTH ORDERS, UNIONED — because each order alone loses real fields, in
+    # opposite directions, and a cold lane measured both.
     #
-    # Blanking strings first makes the URL `""` before comment-stripping ever
-    # looks at it, and a genuine `//` comment is never inside a string, so
-    # nothing that should be stripped survives the reorder.
+    # `strip_ts_comments` is not a lexer, so the two passes interfere:
     #
-    # RESIDUAL, stated rather than left implicit: the `no_comments` text below
-    # still comes from the unreordered path, because the event name and the
-    # bracket key ARE string literals and blanking them first would erase the
-    # thing being extracted. Those patterns are anchored (`on(`, and a member
-    # receiver) which bounds the exposure, but the underlying stripper is shared
-    # with `guard_inventory` and fixing it properly is its own change.
-    no_strings = guard_inventory.strip_ts_comments(strip_ts_strings(register_source))
+    # * comments-then-strings loses a read that follows a URL on the same line.
+    #   `const url = "https://example.com"; const pm = e.permissionMode;` — the
+    #   `//` inside the string reads as a comment and the rest of the line goes.
+    # * strings-then-comments loses a read after a **stray backtick in a
+    #   comment**, because the template-literal alternative crosses newlines and
+    #   swallows the code beneath it. Measured: 11 tokens → 6, dropping
+    #   `command`, `cwd`, `permissionMode`, `sessionId` and `toolName`, landing
+    #   exactly on the floor so the gate stayed green.
+    #
+    # Round 2 fixed the first by reordering and opened the second. A union keeps
+    # both: a field erased by one order survives in the other, and neither order
+    # can INVENT a field. The risk a union does carry is EXTRAS, and that
+    # direction has a detector — `test_the_committed_contract_is_exactly_the_pinned_set`
+    # compares the derived set against the committed 11 by name, so any new
+    # member shows up as a diff a human reads.
+    no_strings_comments_first = strip_ts_strings(no_comments)
+    no_strings_strings_first = guard_inventory.strip_ts_comments(strip_ts_strings(register_source))
 
     tokens: set[str] = {
-        prop for prop in _PROPERTY_ACCESS.findall(no_strings) if prop not in _JS_BUILTIN_MEMBERS
+        prop
+        for source in (no_strings_comments_first, no_strings_strings_first)
+        for prop in _PROPERTY_ACCESS.findall(source)
+        if prop not in _JS_BUILTIN_MEMBERS
     }
+    #: Kept for the object-key and destructuring passes below, which want one
+    #: string-free text; the union above is specific to property access, where
+    #: both losses were measured.
+    no_strings = no_strings_strings_first
     # Event names and matcher keys come from the source WITH strings intact —
     # the event name IS a string literal, so blanking it first would erase it.
     tokens.update(_ON_EVENT.findall(no_comments))
@@ -505,15 +532,17 @@ def resolve_claude() -> Path | None:
     found = shutil.which("claude")
     if not found:
         return None
-    # 🔴 ABSOLUTE, because generation runs with a different cwd. `shutil.which`
-    # returns a relative path whenever `PATH` carries a relative directory, and a
-    # relative spelling that works from the repo raises `FileNotFoundError`
-    # before the child even starts once cwd moves to the temp work dir. Measured
-    # by a cold lane with a relative spelling of the real install directory: the
-    # version probe exited 0 from the repo and failed from `/tmp`, while the
-    # absolute-path control exited 0 in both. A working installation would have
-    # been reported as no installation at all.
-    return Path(found).resolve()
+    # 🔴 `.absolute()`, NEVER `.resolve()`. Both make the path absolute, which is
+    # what generation needs — it runs with a different cwd, and a relative
+    # spelling from `PATH` raises `FileNotFoundError` before the child starts.
+    # Only `.resolve()` also DEREFERENCES SYMLINKS, and on this machine `claude`
+    # on `PATH` is a mise shim: a cold lane measured `resolve_claude()` returning
+    # `~/.local/bin/mise` and `claude_version()` on it reporting
+    # `"2026.9.5 macos-arm64"` — mise's version certified as Claude Code's, rc 0,
+    # no error anywhere. The docstring above says the shim IS what runs and is
+    # deliberately what this gate probes; dereferencing it silently probes
+    # something else.
+    return Path(found).absolute()
 
 
 def claude_version(binary: Path) -> str | None:

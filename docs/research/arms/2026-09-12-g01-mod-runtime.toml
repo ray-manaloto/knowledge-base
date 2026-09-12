@@ -96,9 +96,13 @@ test = "test_the_committed_contract_is_exactly_the_pinned_set"
 [[arm]]
 id = "A4"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''    no_strings = guard_inventory.strip_ts_comments(strip_ts_strings(register_source))'''
-new = '''    no_strings = register_source'''
+old = '''    no_strings_comments_first = strip_ts_strings(no_comments)'''
+new = '''    no_strings_comments_first = no_comments'''
 test = "test_prose_inside_a_string_does_not_enter_the_contract"
+# RE-DERIVED a THIRD time, 2026-09-12 round 3: property access is now derived
+# from the UNION of both strip orders, so this row severs the blanking on the
+# comments-first source. A30/A31 own which orders are in the union; this row
+# still owns "strings are blanked at all".
 # RE-DERIVED 2026-09-12, round 2: the round-2 fix reordered this line to blank
 # strings BEFORE stripping comments, so the old anchor no longer occurs. A24 owns
 # the ORDER; this row still owns "strings are blanked at all".
@@ -207,10 +211,11 @@ test = "test_no_binary_short_circuits_before_trying_to_execute_one"
 [[arm]]
 id = "A11"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''        prop for prop in _PROPERTY_ACCESS.findall(no_strings) if prop not in _JS_BUILTIN_MEMBERS'''
-new = '''        prop
-        for prop in _PROPERTY_ACCESS.findall(no_strings)
-        if prop not in _JS_BUILTIN_MEMBERS | {"agentId"}'''
+old = '''        if prop not in _JS_BUILTIN_MEMBERS'''
+new = '''        if prop not in _JS_BUILTIN_MEMBERS | {"agentId"}'''
+# RE-DERIVED 2026-09-12 round 3: the comprehension was rewritten to union both
+# strip orders, so the single-line form no longer occurs. The mutation is
+# unchanged in intent — drop the lane marker from the derived set.
 test = "test_an_event_field_read_off_a_binding_not_named_e_is_still_found"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -368,7 +373,7 @@ test = "test_an_extended_event_name_does_not_satisfy_the_required_one"
 [[arm]]
 id = "A21"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\]])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
+old = '''_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\].])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
 new = '''_BRACKET_ACCESS = re.compile(r"""\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
 test = "test_ordinary_data_and_prose_do_not_become_runtime_dependencies"
 
@@ -402,9 +407,13 @@ test = "test_single_quotes_and_type_annotations_are_not_invisible"
 [[arm]]
 id = "A24"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''    no_strings = guard_inventory.strip_ts_comments(strip_ts_strings(register_source))'''
-new = '''    no_strings = strip_ts_strings(no_comments)'''
+old = '''    no_strings_strings_first = guard_inventory.strip_ts_comments(strip_ts_strings(register_source))'''
+new = '''    no_strings_strings_first = no_strings_comments_first'''
 test = "test_a_url_in_a_string_does_not_erase_the_property_read_beside_it"
+# RE-DERIVED 2026-09-12 round 3. This row used to own the strip ORDER; round 3
+# replaced a single order with the union of both, so A30 and A31 own the two
+# orders and this row now severs the strings-first source itself — which is the
+# member of the union that carries the URL case.
 
 # A25 — let the dotted right boundary admit another dot, as round 1 did.
 # `tool.call.after` then satisfies a required `tool.call`. The renamed-event case
@@ -422,9 +431,12 @@ test = "test_an_extended_event_name_does_not_satisfy_the_required_one"
 [[arm]]
 id = "A26"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''    return Path(found).resolve()'''
+old = '''    return Path(found).absolute()'''
 new = '''    return Path(found)'''
-test = "test_the_resolved_binary_is_absolute"
+test = "test_a_relative_path_from_which_is_made_absolute"
+# RE-DERIVED 2026-09-12 round 3: `.resolve()` became `.absolute()` because
+# `.resolve()` dereferenced a mise shim and certified mise's version as Claude
+# Code's. A29 owns "do not dereference"; this row still owns "make it absolute".
 
 # A27 — scrub only `CLAUDE_CONFIG_DIR`, as round 1 did. Isolating `HOME` is not
 # enough on its own: every other name in the tuple points at an absolute write
@@ -436,7 +448,7 @@ file = "python/src/kb_setup/mod_runtime.py"
 old = '''    for override in _WRITE_LOCATION_OVERRIDES:
         env.pop(override, None)'''
 new = '''    env.pop("CLAUDE_CONFIG_DIR", None)'''
-test = "test_every_write_location_override_is_scrubbed"
+test = "test_every_named_write_location_override_is_scrubbed"
 
 # A28 — compute the "present in the live one" set from the VENDORED file, as
 # round 1 did. `check()` calls this reporter after a FAILED reconciliation too,
@@ -448,3 +460,81 @@ file = "python/src/kb_setup/mod_runtime.py"
 old = '''    behind = sorted(absent_from_vendored - absent_from_fresh)'''
 new = '''    behind = sorted(absent_from_vendored)'''
 test = "test_the_vendored_delta_does_not_claim_live_presence_for_a_token_absent_from_both"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A29-A33 — the THIRD round. A cold lane reviewed round 2's fixes and raised
+# THREE P1 BLOCKING findings, every one a defect round 2 introduced. Sixth
+# instance in a single day of *the fix is where the defect lives*, and the
+# clearest argument this repo has for reading a fix as carefully as the defect.
+
+# A29 — dereference the symlink again. `.resolve()` and `.absolute()` both make
+# the path absolute; only `.resolve()` follows the link. `claude` on PATH here is
+# a MISE SHIM, so a cold lane measured `resolve_claude()` returning
+# `~/.local/bin/mise` and `claude_version()` on it reporting
+# `"2026.9.5 macos-arm64"` — mise's version certified as Claude Code's, rc 0, no
+# error. The round-2 test could not see it: it asserted only `is_absolute()`,
+# which BOTH satisfy.
+[[arm]]
+id = "A29"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    return Path(found).absolute()'''
+new = '''    return Path(found).resolve()'''
+test = "test_the_resolved_binary_is_not_symlink_dereferenced"
+
+# A30 — go back to ONE strip order (comments first). That order loses a property
+# read following a URL on the same line, because `//` inside the string reads as
+# a comment.
+[[arm]]
+id = "A30"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        for source in (no_strings_comments_first, no_strings_strings_first)'''
+new = '''        for source in (no_strings_comments_first,)'''
+test = "test_a_url_in_a_string_does_not_erase_the_property_read_beside_it"
+
+# A31 — go back to the OTHER single order (strings first), which is what round 2
+# shipped. A stray backtick in a comment then swallows the code beneath it: 11
+# tokens collapse to 6, landing exactly on the minimum floor so the gate stays
+# GREEN with half the contract gone. The two orders fail in opposite directions,
+# which is why the union is the fix and neither order alone is.
+[[arm]]
+id = "A31"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        for source in (no_strings_comments_first, no_strings_strings_first)'''
+new = '''        for source in (no_strings_strings_first,)'''
+test = "test_a_stray_backtick_in_a_comment_does_not_swallow_the_code_beneath_it"
+
+# A32 — drop optional chaining from the receiver class. `e?.["name"]` is ordinary
+# TypeScript that round 1 extracted and round 2's narrowing silently lost.
+[[arm]]
+id = "A32"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\].])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
+new = '''_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\]])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
+test = "test_forms_round_one_extracted_are_not_lost_by_round_twos_narrowing"
+
+# A33 — treat a template literal as one uniform exclusion zone, as round 2 did.
+# Its `${…}` regions are CODE, so `` `${e["name"]}` `` was discarded whole —
+# the second form round 1 extracted and round 2 lost.
+[[arm]]
+id = "A33"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        if not literal.group().startswith("`"):
+            spans.append((start, end))
+            continue'''
+new = '''        if True:
+            spans.append((start, end))
+            continue'''
+test = "test_forms_round_one_extracted_are_not_lost_by_round_twos_narrowing"
+
+# A34 — shrink the write-location tuple. The round-2 test derived its fixture AND
+# its assertion from this very tuple, so deleting entries left the suite green
+# while the variables genuinely leaked — a cold lane measured four `XDG_*`
+# variables present in the spied child env while the assertion computed
+# `leaked == []`. The names are now pinned literally in the test.
+[[arm]]
+id = "A34"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    "XDG_CONFIG_HOME",
+    "XDG_CACHE_HOME",'''
+new = '''    "XDG_CACHE_HOME",'''
+test = "test_every_named_write_location_override_is_scrubbed"

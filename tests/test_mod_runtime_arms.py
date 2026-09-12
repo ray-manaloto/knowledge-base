@@ -240,21 +240,6 @@ def test_the_resolved_binary_is_absolute(monkeypatch: pytest.MonkeyPatch) -> Non
     assert resolved.is_absolute()
 
 
-def test_every_write_location_override_is_scrubbed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Isolating HOME is not enough — these each name an absolute write location."""
-    seen = _spy_subprocess(monkeypatch)
-    for name in mod_runtime._WRITE_LOCATION_OVERRIDES:
-        monkeypatch.setenv(name, f"/should/be/dropped/{name}")
-    _stub_binary(monkeypatch)
-
-    mod_runtime.check(REPO)
-
-    env = seen.get("env")
-    assert isinstance(env, dict)
-    leaked = [name for name in mod_runtime._WRITE_LOCATION_OVERRIDES if name in env]
-    assert leaked == [], f"the child can still write outside the isolated HOME via {leaked}"
-
-
 def test_the_vendored_delta_does_not_claim_live_presence_for_a_token_absent_from_both(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -268,3 +253,119 @@ def test_the_vendored_delta_does_not_claim_live_presence_for_a_token_absent_from
     printed = capsys.readouterr().out
     assert "present in the live one: kbTokenInNeitherInput" not in printed
     assert "absent from BOTH" in printed
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 3 — arms for the THREE P1 blocking findings a cold lane raised against
+# round 2. All three were defects round 2 introduced. Sixth instance in one day.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_the_resolved_binary_is_not_symlink_dereferenced(monkeypatch: pytest.MonkeyPatch) -> None:
+    """🔴 `.resolve()` returned the MISE binary and reported mise's version as Claude's.
+
+    `claude` on PATH here is a mise shim. `.resolve()` follows it to
+    `~/.local/bin/mise`, and `claude_version()` on that exits 0 reporting
+    `"2026.9.5 macos-arm64"` — a version certified with no error anywhere. The
+    gate's own docstring says the shim IS what runs and is deliberately what it
+    probes.
+
+    This test is written to fail under `.resolve()` and pass under `.absolute()`;
+    the round-2 version asserted only `is_absolute()`, which BOTH satisfy, and a
+    cold lane measured that as a surviving mutation.
+    """
+    link = Path(tempfile.mkdtemp()) / "claude"
+    target = link.parent / "real-binary"
+    target.write_text("#!/bin/sh\n", encoding="utf-8")
+    link.symlink_to(target)
+    monkeypatch.setattr(mod_runtime.shutil, "which", lambda _name: str(link))
+
+    resolved = mod_runtime.resolve_claude()
+
+    assert resolved is not None
+    assert resolved.is_absolute()
+    assert resolved.name == "claude", "the symlink must NOT be dereferenced to its target"
+
+
+def test_a_stray_backtick_in_a_comment_does_not_swallow_the_code_beneath_it() -> None:
+    """The other direction of the strip-order bug, which round 2's reorder opened.
+
+    Measured by a cold lane: 11 tokens collapsed to 6 — losing `permissionMode`
+    among others — and landed exactly on the minimum-token floor, so the gate
+    stayed green while the contract had lost half its members.
+    """
+    injected = "// a comment with a stray ` backtick\n    const pm = e.permissionMode;"
+    derived = mod_runtime.required_runtime_tokens(
+        _SRC.replace(_ANCHOR, _ANCHOR + "\n    " + injected)
+    )
+    assert derived is not None
+    assert "permissionMode" in derived
+    assert derived >= _COMMITTED, "the committed contract must survive a backtick in a comment"
+
+
+@pytest.mark.parametrize(
+    "form",
+    [
+        'const pm = e?.["permissionMode"];',  # optional chaining
+        '$.ui.log(`pm ${e["permissionMode"]}`);',  # inside a template interpolation
+    ],
+)
+def test_forms_round_one_extracted_are_not_lost_by_round_twos_narrowing(form: str) -> None:
+    """Both were extracted before round 2 and dropped by it — a silent regression."""
+    derived = mod_runtime.required_runtime_tokens(_SRC.replace(_ANCHOR, _ANCHOR + "\n    " + form))
+    assert derived is not None
+    assert "permissionMode" in derived
+
+
+def test_every_named_write_location_override_is_scrubbed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """🔴 The round-2 test derived its fixture AND its assertion from the same tuple.
+
+    Deleting five of the six entries left the suite green while the variables
+    genuinely leaked into the child environment — a cold lane measured two
+    surviving mutations with four `XDG_*` variables present in the spied env
+    while the assertion computed `leaked == []`. A test whose expectation is
+    read from the thing under test cannot fail when that thing shrinks.
+
+    The names are pinned LITERALLY here for exactly that reason.
+    """
+    expected = {
+        "CLAUDE_CONFIG_DIR",
+        "CLAUDE_CODE_DEBUG_LOGS_DIR",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    }
+    assert set(mod_runtime._WRITE_LOCATION_OVERRIDES) == expected, (
+        "a name removed from the tuple is a variable that leaks; add it back or "
+        "change this literal deliberately"
+    )
+
+    seen = _spy_subprocess(monkeypatch)
+    for name in sorted(expected):
+        monkeypatch.setenv(name, f"/should/be/dropped/{name}")
+    _stub_binary(monkeypatch)
+
+    mod_runtime.check(REPO)
+
+    env = seen.get("env")
+    assert isinstance(env, dict)
+    leaked = sorted(name for name in expected if name in env)
+    assert leaked == [], f"the child can still write outside the isolated HOME via {leaked}"
+
+
+def test_a_relative_path_from_which_is_made_absolute(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Generation changes cwd, so a relative `PATH` entry breaks after the chdir.
+
+    Kept SEPARATE from the no-dereference test on purpose: that one cannot fail
+    under a relative path (its fixture is already absolute), and this one cannot
+    fail under `.resolve()` (which is also absolute). One test covering both
+    would be satisfied by either half, which is how round 2 shipped a
+    `.resolve()` that reported mise's version as Claude Code's.
+    """
+    monkeypatch.setattr(mod_runtime.shutil, "which", lambda _name: "relative/dir/claude")
+
+    resolved = mod_runtime.resolve_claude()
+
+    assert resolved is not None
+    assert resolved.is_absolute()
