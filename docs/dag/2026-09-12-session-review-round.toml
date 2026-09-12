@@ -37,9 +37,23 @@ branch = "feat/754-plugin-types-contract"                                     # 
 worktree = false                                                              # the branch itself, not a copy
 depends_on = []
 touches = ["python/src/kb_setup/mod_runtime.py", "tests/test_mod_runtime.py"]
-# CORRECTED on first read: `blocks_all = true` was wrong. Only S9 depends on P0
-# (both edit mod_runtime.py). Every other unit branches off the CURRENT main and
-# runs now; P0 lands independently. The DAG caught this — which is the point.
+# CORRECTED TWICE, and the second correction is the interesting one.
+#
+# First pass: `blocks_all = true` was wrong. Only S9 genuinely depends on P0
+# (both edit mod_runtime.py); every other unit branches off the CURRENT main and
+# runs now, with P0 landing independently.
+#
+# Second pass: that prose correction was applied and the DATA was not. Five units
+# — S1, S2, S3, S5, S6 — kept `depends_on = ["P0"]`, so the file said
+# "independent" in a comment and "wait for P0" in the field a scheduler reads. A
+# cold reviewer PARSED the TOML and counted six direct P0 dependents against a
+# comment claiming one; its check of the documented singleton exited 1 and its
+# check of the actual six-element list exited 0.
+#
+# Both are now `depends_on = []`. The durable point is not the edit: it is that a
+# scheduling artifact has a prose layer and a data layer, and correcting only the
+# prose leaves the machine-readable half stating the opposite. Whoever builds
+# S1's gate should make the gate read the DATA, never the comments.
 note = """
 Ray, round 7 Q1: fix the three P1s FIRST, then review, then ship. The P1s are in
 #754's own code, so shipping as-is merges a gate whose central claim is measured
@@ -53,7 +67,7 @@ id = "S1"
 title = "The DAG artifact + the gate that refuses an ungated fan-out"
 branch = "feat/dag-gate"
 worktree = true
-depends_on = ["P0"]
+depends_on = [] # branches off main; does NOT wait for P0
 touches = [
   "mise.toml",
   "hk.pkl",
@@ -69,7 +83,7 @@ id = "S2"
 title = "lane_scratch.py — the two things a worktree cannot isolate"
 branch = "feat/lane-scratch"
 worktree = true
-depends_on = ["P0"]
+depends_on = [] # branches off main; does NOT wait for P0
 touches = [
   "mise.toml",
   "hk.pkl",
@@ -106,7 +120,7 @@ id = "S3"
 title = "agentsview project wiring + liveness"
 branch = "feat/agentsview-wiring"
 worktree = true
-depends_on = ["P0"]
+depends_on = [] # branches off main; does NOT wait for P0
 touches = [
   ".mcp.json",
   ".codex/config.toml",
@@ -130,7 +144,7 @@ id = "S5"
 title = "Read agentsview into the graph"
 branch = "feat/agentsview-ingestion"
 worktree = true
-depends_on = ["P0"]
+depends_on = []                                                                                                                                                                                                                           # branches off main; does NOT wait for P0
 touches = ["sources", "graphify-out"]
 note = "kb-build over sources/agentsview.manifest (registered 2026-09-11, never ingested) plus a kind=docs mirror of agentsview.io, then deep extraction, reflection and artifacts. Runs on the 0.9.57 pin — the fork bump is dotfiles'."
 
@@ -139,7 +153,7 @@ id = "S6"
 title = "graphify fork tickets + our own pin follow-up"
 branch = "chore/graphify-0959-followup"
 worktree = true
-depends_on = ["P0"]
+depends_on = [] # branches off main; does NOT wait for P0
 touches = [
   "pyproject.toml",
   "uv.lock",

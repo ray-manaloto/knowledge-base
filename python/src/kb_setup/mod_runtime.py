@@ -158,6 +158,29 @@ PRIMARY_DECLARATIONS = Path(".claude/types/claude-code.d.ts")
 #: so the rc cannot discriminate and this string is what does.
 _UNKNOWN_COMMAND = "Unknown command"
 
+#: Environment variables naming an ABSOLUTE write location the runtime honours in
+#: preference to `$HOME`. Each is removed from the generator's environment, because
+#: pointing `HOME` at a temp directory does nothing about a caller who has one of
+#: these exported — the child then writes into the caller's own directories while
+#: the isolation looks like it is working.
+#:
+#: 🔴 **Enumerated, and the list is the part most likely to go stale.** A prefix
+#: rule over `CLAUDE_*` would also strip variables that are not write locations
+#: (`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS` among them, which this function sets on
+#: purpose), so there is no mechanical derivation to lean on. If a future runtime
+#: adds another such variable, this gate will silently leak to it until someone
+#: adds it here — which is exactly how `CLAUDE_CODE_DEBUG_LOGS_DIR` was missed
+#: until a cold lane ran the installed logger's own path resolver against a
+#: captured child environment.
+_WRITE_LOCATION_OVERRIDES = (
+    "CLAUDE_CONFIG_DIR",
+    "CLAUDE_CODE_DEBUG_LOGS_DIR",
+    "XDG_CONFIG_HOME",
+    "XDG_CACHE_HOME",
+    "XDG_DATA_HOME",
+    "XDG_STATE_HOME",
+)
+
 #: Seconds. The measured generation is ~4s; this bounds a wedge rather than
 #: predicting a duration (`.claude/rules/long-running-command-hangs.md`).
 _GENERATE_TIMEOUT_S = 300
@@ -194,10 +217,22 @@ _OBJECT_KEY = re.compile(r"(?m)^\s*(?P<key>[A-Za-z_$][\w$]*)\s*:")
 
 _IDENTIFIER = re.compile(r"[A-Za-z_$][\w$]*")
 
-#: `e["permissionMode"]` — run over the source WITH strings intact.
-_BRACKET_ACCESS = re.compile(r'\[\s*"([A-Za-z_$][\w$]*)"\s*\]')
-#: `const { a, b: alias } = e` — keys only, never the alias.
-_DESTRUCTURE = re.compile(r"(?:const|let|var)\s*\{([^}]*)\}\s*=")
+#: `e["permissionMode"]` / `e['permissionMode']` — a MEMBER expression only.
+#:
+#: 🔴 **The receiver is load-bearing and its absence was a real defect.** Without
+#: `(?<=[\w$)\]])` this matched a bare array literal — `const s = ["bogusMember"]`
+#: — and put `bogusMember` into the runtime contract, turning ordinary local data
+#: into a declared runtime dependency. Measured by the cold lane: reconciliation
+#: exited 1 against declarations that otherwise satisfied the contract.
+#:
+#: Both quote styles are accepted. The double-quote-only version shipped first and
+#: left `e['permissionMode']` invisible, i.e. it closed only half of the P1 it was
+#: written for.
+_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\]])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")
+#: `const { a, b: alias } = e` — keys only, never the alias. The optional
+#: `: Type` before `=` matters: `const { permissionMode }: any = e` is ordinary
+#: TypeScript and was invisible without it.
+_DESTRUCTURE = re.compile(r"(?:const|let|var)\s*\{([^}]*)\}\s*(?::[^=;]+)?=")
 #: `${e.x}` bodies, pulled out of each template literal BEFORE it is blanked.
 _TEMPLATE_INTERP = re.compile(r"\$\{([^}]*)\}")
 
@@ -303,6 +338,32 @@ def strip_ts_strings(source: str) -> str:
     return _TS_STRING.sub('""', source)
 
 
+def _bracket_access_outside_strings(no_comments: str) -> set[str]:
+    """Field names read as `receiver["name"]`, ignoring occurrences inside strings.
+
+    🔴 **Neither "run it over the stripped source" nor "run it over the raw
+    source" works, which is why this is a function rather than one more
+    `findall`.** The key in `e["permissionMode"]` *is* a string literal, so
+    :func:`strip_ts_strings` blanks the very thing being extracted; but leaving
+    strings intact means a diagnostic message that merely mentions
+    ``e["bogusMember"]`` puts `bogusMember` into the runtime contract. Both
+    directions were measured by a cold lane, each with a control.
+
+    So: match over the source with strings intact, then discard any match whose
+    own start lies inside a string literal. The receiver requirement in
+    :data:`_BRACKET_ACCESS` does the other half, rejecting a bare array literal
+    such as ``const status = ["bogusMember"]``.
+    """
+    spans = [m.span() for m in _TS_STRING.finditer(no_comments)]
+    found: set[str] = set()
+    for match in _BRACKET_ACCESS.finditer(no_comments):
+        start = match.start()
+        if any(lo < start < hi for lo, hi in spans):
+            continue
+        found.add(match.group(2))
+    return found
+
+
 def required_runtime_tokens(register_source: str) -> frozenset[str] | None:
     """What `register.ts` requires OF THE RUNTIME, derived from its own text.
 
@@ -319,7 +380,26 @@ def required_runtime_tokens(register_source: str) -> frozenset[str] | None:
     say so, exactly as `guard_inventory.function_hook_write_tools` does.
     """
     no_comments = guard_inventory.strip_ts_comments(register_source)
-    no_strings = strip_ts_strings(no_comments)
+    # 🔴 STRINGS FIRST, then comments — the order is the fix, not an accident.
+    # `strip_ts_comments` is not a lexer: it treats `//` inside a string literal
+    # as the start of a comment, so `const url = "https://example.com";` deletes
+    # the rest of that line. Measured by a cold lane: with a real property read
+    # after such a URL on the same line, reconciliation against declarations
+    # lacking that field exited 0, while the same read without the URL exited 1 —
+    # a field the guard depends on, erased from its own contract by a link in the
+    # line above it.
+    #
+    # Blanking strings first makes the URL `""` before comment-stripping ever
+    # looks at it, and a genuine `//` comment is never inside a string, so
+    # nothing that should be stripped survives the reorder.
+    #
+    # RESIDUAL, stated rather than left implicit: the `no_comments` text below
+    # still comes from the unreordered path, because the event name and the
+    # bracket key ARE string literals and blanking them first would erase the
+    # thing being extracted. Those patterns are anchored (`on(`, and a member
+    # receiver) which bounds the exposure, but the underlying stripper is shared
+    # with `guard_inventory` and fixing it properly is its own change.
+    no_strings = guard_inventory.strip_ts_comments(strip_ts_strings(register_source))
 
     tokens: set[str] = {
         prop for prop in _PROPERTY_ACCESS.findall(no_strings) if prop not in _JS_BUILTIN_MEMBERS
@@ -330,7 +410,7 @@ def required_runtime_tokens(register_source: str) -> frozenset[str] | None:
     for matcher in _ON_MATCHER.findall(no_comments):
         tokens.update(_IDENTIFIER.findall(matcher))
     tokens.update(_OBJECT_KEY.findall(no_strings))
-    tokens.update(_BRACKET_ACCESS.findall(no_comments))
+    tokens.update(_bracket_access_outside_strings(no_comments))
     for group in _DESTRUCTURE.findall(no_strings):
         for part in group.split(","):
             key = re.split(r"[:=]", part, maxsplit=1)[0].strip()
@@ -365,7 +445,13 @@ def _token_pattern(token: str) -> re.Pattern[str]:
     non-zero, stable) is identical under both, the digits are not.
     """
     if "." in token:
-        return re.compile(rf"(?<![\w$.]){re.escape(token)}(?![\w$])")
+        # The right boundary must reject a following DOT as well as a word
+        # character. Measured by a cold lane: with `(?![\w$])`, replacing every
+        # `tool.call` in a declarations copy with `tool.call.after` still
+        # reconciled clean (exit 0), while `tool.result` correctly failed
+        # (exit 1). A renamed event that merely EXTENDS the required name is the
+        # exact shape this boundary exists to catch.
+        return re.compile(rf"(?<![\w$.]){re.escape(token)}(?![\w$.])")
     return re.compile(rf"\b{re.escape(token)}\b")
 
 
@@ -417,7 +503,17 @@ def resolve_claude() -> Path | None:
     read from the binary rather than assumed for the same reason.
     """
     found = shutil.which("claude")
-    return Path(found) if found else None
+    if not found:
+        return None
+    # 🔴 ABSOLUTE, because generation runs with a different cwd. `shutil.which`
+    # returns a relative path whenever `PATH` carries a relative directory, and a
+    # relative spelling that works from the repo raises `FileNotFoundError`
+    # before the child even starts once cwd moves to the temp work dir. Measured
+    # by a cold lane with a relative spelling of the real install directory: the
+    # version probe exited 0 from the repo and failed from `/tmp`, while the
+    # absolute-path control exited 0 in both. A working installation would have
+    # been reported as no installation at all.
+    return Path(found).resolve()
 
 
 def claude_version(binary: Path) -> str | None:
@@ -471,9 +567,17 @@ def generate_declarations(
         "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
         "HOME": str(home),
     }
-    # A caller-set `CLAUDE_CONFIG_DIR` routes the writes back out of the isolated
-    # HOME, which is the entire point of setting it.
-    env.pop("CLAUDE_CONFIG_DIR", None)
+    # 🔴 Setting `HOME` is NOT sufficient on its own. Every variable below names
+    # an absolute write location that the runtime honours in preference to
+    # `$HOME`, so a caller who has one exported routes the child's writes straight
+    # back into their own directories with the isolation still apparently in
+    # effect. `CLAUDE_CONFIG_DIR` was dropped first; a cold lane then captured the
+    # child environment and ran the installed logger's own path resolver, which
+    # selected an inherited `CLAUDE_CODE_DEBUG_LOGS_DIR` over the isolated HOME.
+    # Enumerated rather than pattern-matched, because a prefix rule would also
+    # strip variables that are not write locations.
+    for override in _WRITE_LOCATION_OVERRIDES:
+        env.pop(override, None)
     return subprocess.run(
         [str(binary), "-p", "/plugin-types", "--permission-mode", "bypassPermissions"],
         cwd=workdir,
@@ -499,16 +603,32 @@ def _report_vendored_delta(repo_root: Path, fresh: str, required: frozenset[str]
     except OSError as err:
         print(f"[mod-runtime-check] (informational) cannot read {VENDORED_DECLARATIONS}: {err}")
         return
-    stale = sorted(missing_tokens(required, vendored))
+    # 🔴 "Present in the live one" is a claim about `fresh`, so it is checked
+    # against `fresh` — it used to be asserted from the vendored file alone.
+    # `check()` calls this reporter AFTER reconciliation fails too, so a token
+    # missing from BOTH inputs was printed as "present in the live one" while the
+    # gate was simultaneously failing for its absence there. The diagnostic
+    # contradicted the verdict it was printed beside.
+    absent_from_vendored = missing_tokens(required, vendored)
+    absent_from_fresh = missing_tokens(required, fresh)
     print(
         f"[mod-runtime-check] (informational) vendored {VENDORED_DECLARATIONS.name}: "
         f"{len(vendored.splitlines())} lines vs {len(fresh.splitlines())} generated"
     )
-    if stale:
+    behind = sorted(absent_from_vendored - absent_from_fresh)
+    if behind:
         print(
             "[mod-runtime-check] (informational) required tokens ABSENT from the vendored "
-            f"file, present in the live one: {', '.join(stale)} — corpus evidence only, "
+            f"file, present in the live one: {', '.join(behind)} — corpus evidence only, "
             "not a contract; this does not fail the gate"
+        )
+    nowhere = sorted(absent_from_vendored & absent_from_fresh)
+    if nowhere:
+        print(
+            "[mod-runtime-check] (informational) required tokens absent from BOTH the "
+            f"vendored file and the live declarations: {', '.join(nowhere)} — these are "
+            "the gate's own findings, restated here only so this line cannot be read as "
+            "evidence that they are present anywhere"
         )
 
 

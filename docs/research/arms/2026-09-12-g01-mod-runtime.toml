@@ -76,7 +76,14 @@ id = "A3"
 file = "python/src/kb_setup/mod_runtime.py"
 old = '''    no_comments = guard_inventory.strip_ts_comments(register_source)'''
 new = '''    no_comments = register_source'''
-test = "test_a_literal_inside_a_comment_does_not_enter_the_contract"
+test = "test_the_committed_contract_is_exactly_the_pinned_set"
+# 🔴 RE-POINTED 2026-09-12, round 2, after `red suite did not name the test`.
+# The round-2 fix computes `no_strings` from the RAW source, so the
+# property-access path strips comments independently of `no_comments` and this
+# mutation no longer reaches the test it used to name. The exact-set pin is the
+# correct detector for what leaving comments in actually does — it admits EXTRA
+# tokens into the contract — and `kb-arms` refusing to score this as a pass is
+# the only reason the re-point happened rather than a silent mis-measurement.
 
 # A4 — STOP STRIPPING STRING LITERALS. Measured on the real module: four junk
 # tokens of 23 come from prose inside strings (`". Report this"` -> `Report`,
@@ -89,9 +96,12 @@ test = "test_a_literal_inside_a_comment_does_not_enter_the_contract"
 [[arm]]
 id = "A4"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''    no_strings = strip_ts_strings(no_comments)'''
-new = '''    no_strings = no_comments'''
+old = '''    no_strings = guard_inventory.strip_ts_comments(strip_ts_strings(register_source))'''
+new = '''    no_strings = register_source'''
 test = "test_prose_inside_a_string_does_not_enter_the_contract"
+# RE-DERIVED 2026-09-12, round 2: the round-2 fix reordered this line to blank
+# strings BEFORE stripping comments, so the old anchor no longer occurs. A24 owns
+# the ORDER; this row still owns "strings are blanked at all".
 
 # A5 — SEVER THE NAMED ANCHOR AND THE FLOOR TOGETHER. The line refuses a
 # contract that has lost `agentId` (the lane marker, whose absence fails the
@@ -264,16 +274,21 @@ test = "test_the_generator_runs_under_an_isolated_home"
 [[arm]]
 id = "A15"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''    env.pop("CLAUDE_CONFIG_DIR", None)'''
-new = '''    pass  # arm A15: the caller's override survives'''
+old = '''    "CLAUDE_CONFIG_DIR",
+    "CLAUDE_CODE_DEBUG_LOGS_DIR",'''
+new = '''    "CLAUDE_CODE_DEBUG_LOGS_DIR",'''
 test = "test_the_generator_runs_under_an_isolated_home"
+# RE-DERIVED 2026-09-12, round 2: the single `env.pop` became a loop over
+# `_WRITE_LOCATION_OVERRIDES`, so this row now removes that ONE name from the
+# tuple. A27 owns "scrub only the first name"; this row still owns
+# "`CLAUDE_CONFIG_DIR` specifically is scrubbed".
 
 # A16 — stop extracting bracket access. `e["permissionMode"]` then leaves the
 # derived set at 11, unchanged, with nothing saying so.
 [[arm]]
 id = "A16"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''    tokens.update(_BRACKET_ACCESS.findall(no_comments))'''
+old = '''    tokens.update(_bracket_access_outside_strings(no_comments))'''
 new = '''    pass  # arm A16: bracket access goes back to invisible'''
 test = "test_ordinary_access_forms_join_the_contract"
 
@@ -316,6 +331,120 @@ test = "test_a_symbol_present_only_in_a_comment_is_missing"
 [[arm]]
 id = "A20"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''        return re.compile(rf"(?<![\w$.]){re.escape(token)}(?![\w$])")'''
-new = '''        return re.compile(re.escape(token))'''
-test = "test_a_longer_dotted_name_does_not_satisfy_the_event"
+old = '''    if "." in token:'''
+new = '''    if False:'''
+test = "test_an_extended_event_name_does_not_satisfy_the_required_one"
+# RE-DERIVED TWICE on 2026-09-12. First the anchor moved (the round-2 fix
+# tightened the boundary to `(?![\w$.])`). Then the re-derived row reported
+# `red suite did not name the test`, because my prediction about what severing
+# the branch would do was WRONG: I expected dotted events to stop matching
+# entirely. They do not. `\btool\.call\b` still matches inside `"tool.call"`,
+# because a quote is a non-word character on both sides — so the tests asserting
+# a dotted event is FOUND all stay green. What actually breaks is the EXTENDED
+# name: in `on("tool.call.after", …)` the character after `call` is a dot, which
+# `\b` happily accepts, so `tool.call.after` satisfies `tool.call` again.
+#
+# So this row and A25 name the same test on purpose. They sever different lines,
+# and either one alone reopens the same hole — which is the thing worth proving.
+# Recorded at length because the `red suite did not name the test` check is what
+# caught a confident wrong prediction; a harness that only counted red/green
+# would have scored this arm as a pass.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A21-A27 — the SECOND round's arms. A cold `gpt-6-astra` lane reviewed the A12-A20
+# fixes above and raised nine findings; FOUR were defects inside those very fixes.
+# That is this repo's fifth recorded instance of *the fix is where the defect
+# lives*, and it is why these rows exist at all: A16-A20 were armed, died, and
+# were still incomplete. **An arm proves a test notices a mutation. It says
+# nothing about whether the fix was the right fix.**
+#
+# Each row below fails on the round-1 code and passes on the round-2 code.
+
+# A21 — drop the member RECEIVER from bracket extraction. Round 1 matched any
+# `["name"]`, so a bare array literal `const status = ["bogusMember"]` put
+# `bogusMember` into the RUNTIME CONTRACT — ordinary local data promoted to a
+# declared runtime dependency, in the safe-looking direction (more tokens reads
+# as a stricter gate).
+[[arm]]
+id = "A21"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''_BRACKET_ACCESS = re.compile(r"""(?<=[\w$)\]])\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
+new = '''_BRACKET_ACCESS = re.compile(r"""\[\s*(?P<q>["'])([A-Za-z_$][\w$]*)(?P=q)\s*\]""")'''
+test = "test_ordinary_data_and_prose_do_not_become_runtime_dependencies"
+
+# A22 — stop filtering matches that fall inside a string literal. Prose in a log
+# message — `$.ui.log("see e[\"bogusMember\"] for details")` — then becomes a
+# runtime dependency. Note the receiver requirement does NOT save this case: the
+# receiver is present inside the string too.
+[[arm]]
+id = "A22"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        if any(lo < start < hi for lo, hi in spans):
+            continue'''
+new = '''        if False:
+            continue'''
+test = "test_ordinary_data_and_prose_do_not_become_runtime_dependencies"
+
+# A23 — revert the destructuring pattern to the un-annotated form. Round 1 missed
+# `const { permissionMode }: any = e`, which is ordinary TypeScript rather than
+# the computed-access case the module explicitly excludes.
+[[arm]]
+id = "A23"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''_DESTRUCTURE = re.compile(r"(?:const|let|var)\s*\{([^}]*)\}\s*(?::[^=;]+)?=")'''
+new = '''_DESTRUCTURE = re.compile(r"(?:const|let|var)\s*\{([^}]*)\}\s*=")'''
+test = "test_single_quotes_and_type_annotations_are_not_invisible"
+
+# A24 — strip comments BEFORE blanking strings, the order round 1 used. The
+# stripper is not a lexer: it reads `//` inside `"https://example.com"` as a
+# comment and deletes the rest of the line, so a link erases the property read
+# beside it. A field the guard depends on, removed from its own contract.
+[[arm]]
+id = "A24"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    no_strings = guard_inventory.strip_ts_comments(strip_ts_strings(register_source))'''
+new = '''    no_strings = strip_ts_strings(no_comments)'''
+test = "test_a_url_in_a_string_does_not_erase_the_property_read_beside_it"
+
+# A25 — let the dotted right boundary admit another dot, as round 1 did.
+# `tool.call.after` then satisfies a required `tool.call`. The renamed-event case
+# A20 closed has a sibling that merely EXTENDS the name, and round 1 missed it.
+[[arm]]
+id = "A25"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''        return re.compile(rf"(?<![\w$.]){re.escape(token)}(?![\w$.])")'''
+new = '''        return re.compile(rf"(?<![\w$.]){re.escape(token)}(?![\w$])")'''
+test = "test_an_extended_event_name_does_not_satisfy_the_required_one"
+
+# A26 — return `shutil.which`'s result unresolved. It is relative whenever PATH
+# carries a relative directory, and generation changes cwd, so a WORKING install
+# raises FileNotFoundError before the child starts and is reported as no install.
+[[arm]]
+id = "A26"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    return Path(found).resolve()'''
+new = '''    return Path(found)'''
+test = "test_the_resolved_binary_is_absolute"
+
+# A27 — scrub only `CLAUDE_CONFIG_DIR`, as round 1 did. Isolating `HOME` is not
+# enough on its own: every other name in the tuple points at an absolute write
+# location the runtime prefers, so a caller with one exported gets the child's
+# writes in their own directories while the isolation looks like it is working.
+[[arm]]
+id = "A27"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    for override in _WRITE_LOCATION_OVERRIDES:
+        env.pop(override, None)'''
+new = '''    env.pop("CLAUDE_CONFIG_DIR", None)'''
+test = "test_every_write_location_override_is_scrubbed"
+
+# A28 — compute the "present in the live one" set from the VENDORED file, as
+# round 1 did. `check()` calls this reporter after a FAILED reconciliation too,
+# so a token missing from BOTH inputs was announced as present live, directly
+# contradicting the verdict printed beside it.
+[[arm]]
+id = "A28"
+file = "python/src/kb_setup/mod_runtime.py"
+old = '''    behind = sorted(absent_from_vendored - absent_from_fresh)'''
+new = '''    behind = sorted(absent_from_vendored)'''
+test = "test_the_vendored_delta_does_not_claim_live_presence_for_a_token_absent_from_both"

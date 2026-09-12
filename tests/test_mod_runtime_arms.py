@@ -168,3 +168,103 @@ def test_the_generator_runs_under_an_isolated_home(monkeypatch: pytest.MonkeyPat
     work = Path(str(seen["cwd"]))
     assert home.parent == work.parent, "HOME must sit BESIDE the work dir"
     assert home != work, "a HOME inside the work dir surfaces as UNEXPECTED OUTPUT"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 2 — arms for the nine findings a cold `gpt-6-astra` lane raised against
+# the round-1 fixes above. Four of the nine were defects IN THOSE FIXES, which
+# is this repo's fifth recorded instance of "the fix is where the defect lives".
+# Every test below FAILS on the round-1 code.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.parametrize(
+    "form",
+    [
+        "const pm = e['permissionMode'];",  # single quotes
+        "const { permissionMode }: any = e;",  # a type annotation before `=`
+    ],
+)
+def test_single_quotes_and_type_annotations_are_not_invisible(form: str) -> None:
+    """Round 1 matched only double quotes and only un-annotated destructuring."""
+    derived = mod_runtime.required_runtime_tokens(_SRC.replace(_ANCHOR, _ANCHOR + "\n    " + form))
+    assert derived is not None
+    assert "permissionMode" in derived
+
+
+@pytest.mark.parametrize(
+    "noise",
+    [
+        'const status = ["bogusMember"];',  # an array literal has no receiver
+        # Prose inside a string. 🔴 The QUOTING here is load-bearing and the first
+        # version of this case was a no-op: written as
+        # `$.ui.log("see e[\\"bogusMember\\"] ...")` the character after `[` is a
+        # BACKSLASH, so `_BRACKET_ACCESS` never matched it at all and the arm that
+        # severs the span filter SURVIVED — a test that could not fail, caught by
+        # the mutation sweep rather than by reading it. A TS single-quoted string
+        # holding unescaped double quotes is both realistic and actually matches.
+        "$.ui.log('see e[\"bogusMember\"] for details');",
+    ],
+)
+def test_ordinary_data_and_prose_do_not_become_runtime_dependencies(noise: str) -> None:
+    """Round 1's bracket scan needed no receiver and ran with strings intact."""
+    derived = mod_runtime.required_runtime_tokens(_SRC.replace(_ANCHOR, _ANCHOR + "\n    " + noise))
+    assert derived is not None
+    assert "bogusMember" not in derived
+
+
+def test_a_url_in_a_string_does_not_erase_the_property_read_beside_it() -> None:
+    """`strip_ts_comments` sees `//` inside `"https://…"` and eats the rest of the line."""
+    injected = 'const url = "https://example.com"; const pm = e.permissionMode;'
+    derived = mod_runtime.required_runtime_tokens(
+        _SRC.replace(_ANCHOR, _ANCHOR + "\n    " + injected)
+    )
+    assert derived is not None
+    assert "permissionMode" in derived
+
+
+def test_an_extended_event_name_does_not_satisfy_the_required_one() -> None:
+    """`tool.call.after` contains `tool.call`; the right boundary must reject a dot."""
+    assert mod_runtime.missing_tokens(
+        frozenset({"tool.call"}), 'on("tool.call.after", handler)'
+    ) == frozenset({"tool.call"})
+
+
+def test_the_resolved_binary_is_absolute(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Generation changes cwd, so a relative `which` result fails after the chdir."""
+    monkeypatch.setattr(mod_runtime.shutil, "which", lambda _name: "relative/dir/claude")
+
+    resolved = mod_runtime.resolve_claude()
+
+    assert resolved is not None
+    assert resolved.is_absolute()
+
+
+def test_every_write_location_override_is_scrubbed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolating HOME is not enough — these each name an absolute write location."""
+    seen = _spy_subprocess(monkeypatch)
+    for name in mod_runtime._WRITE_LOCATION_OVERRIDES:
+        monkeypatch.setenv(name, f"/should/be/dropped/{name}")
+    _stub_binary(monkeypatch)
+
+    mod_runtime.check(REPO)
+
+    env = seen.get("env")
+    assert isinstance(env, dict)
+    leaked = [name for name in mod_runtime._WRITE_LOCATION_OVERRIDES if name in env]
+    assert leaked == [], f"the child can still write outside the isolated HOME via {leaked}"
+
+
+def test_the_vendored_delta_does_not_claim_live_presence_for_a_token_absent_from_both(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The reporter runs after a FAILED reconciliation too, and contradicted it."""
+    mod_runtime._report_vendored_delta(
+        REPO,
+        fresh="interface ToolCallEvent { file_path: string; }",
+        required=frozenset({"kbTokenInNeitherInput"}),
+    )
+
+    printed = capsys.readouterr().out
+    assert "present in the live one: kbTokenInNeitherInput" not in printed
+    assert "absent from BOTH" in printed

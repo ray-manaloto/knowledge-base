@@ -96,19 +96,38 @@ def test_the_committed_register_ts_derives_a_usable_contract() -> None:
     assert len(required) >= mod_runtime._MINIMUM_REQUIRED_TOKENS
 
 
-def test_the_committed_contract_is_satisfied_by_the_vendored_declarations() -> None:
-    """A POSITIVE cross-check against the vendored file, which is still valid.
+def test_the_matcher_finds_real_symbols_in_the_vendored_declarations() -> None:
+    """A POSITIVE cross-check against the vendored file — a HISTORICAL pair.
 
     The vendored 2.1.267 declarations are retired as *negative* authority — an
     absence there proves nothing about the runtime. A presence still proves
     presence, and this is the cheap hermetic arm that the required-token matcher
     finds real symbols in a real declarations file rather than matching nothing.
+
+    🔴 **It is pinned to a FIXED historical set, not to today's derived one, and
+    that distinction was a real defect.** This assertion used to compare the live
+    `required_runtime_tokens(register.ts)` against the 2.1.267 file, which made
+    absence from an immutable historical snapshot BLOCKING for a growing
+    consumer. Measured by a cold lane: adding a `session.authorize` registration
+    to a copy of `register.ts` turned this test from exit 0 to exit 1, while
+    reconciliation against declarations that actually carry that event exited 0.
+    So adopting any newer runtime capability would red pytest while the live
+    contract passed — the module's own "retired as negative authority" stance,
+    contradicted by its own test.
+
+    Pairing a historical declarations file with a historical token set keeps the
+    property that is actually worth asserting (the matcher is not vacuously
+    matching nothing) and drops the one that was never true.
     """
-    source = (REPO / mod_runtime.REGISTER_TS).read_text(encoding="utf-8")
-    required = mod_runtime.required_runtime_tokens(source)
-    assert required is not None
+    historical = frozenset({"tool.call", "agentId", "file_path", "deny"})
     vendored = (REPO / mod_runtime.VENDORED_DECLARATIONS).read_text(encoding="utf-8")
-    assert mod_runtime.missing_tokens(required, vendored) == frozenset()
+    assert mod_runtime.missing_tokens(historical, vendored) == frozenset()
+    # The control: the same matcher against the same file MUST be able to report
+    # absence, or the assertion above is satisfied by a matcher that says yes to
+    # everything.
+    assert mod_runtime.missing_tokens(frozenset({"kbAbsentControlSymbol"}), vendored) == frozenset(
+        {"kbAbsentControlSymbol"}
+    )
 
 
 # --------------------------------------------------------------------------
