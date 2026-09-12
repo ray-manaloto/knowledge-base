@@ -316,13 +316,33 @@ def _stale_generated_files(repo_root: Path) -> list[Path]:
 
 
 def _check_floor(schema: dict) -> Rc | None:
-    """F2: the policy must not be empty or shrunk below its floor."""
-    enum_values = schema.get("enum", [])
-    if len(enum_values) < _MINIMUM_PROTECTED_PATHS:
+    """F2: the policy must not be empty, shrunk, or padded below its floor.
+
+    🔴 **A COUNT IS A WEAK INVARIANT, and the round-2 cold lane proved it twice.**
+    The first version counted `enum` entries and nothing else, so
+    `["mise.toml"] * 5` cleared a floor of 5 with **one** distinct path actually
+    protected. Hence the DISTINCT count below, and `uniqueItems` in the schema —
+    belt and braces, because the schema constrains an author while this
+    constrains the gate.
+
+    The count is still only a floor, not a policy assertion: dropping the four
+    real entries and keeping the guard's own four clears it. That residual is
+    deliberate and is recorded on the ticket rather than papered over with a
+    bigger number, which would be the same weak invariant one digit later.
+    """
+    enum_values = schema.get("enum")
+    if not isinstance(enum_values, list):
         print(
-            f"[guard-codegen-check] {SCHEMA_PATH} has only {len(enum_values)} "
-            f"entries, below the floor of {_MINIMUM_PROTECTED_PATHS} — a lane "
-            "emptied or shrank the guard policy"
+            f"[guard-codegen-check] {SCHEMA_PATH} has no usable `enum` list "
+            f"(found {type(enum_values).__name__}) — the policy cannot be read"
+        )
+        return Rc.NOT_RUN
+    distinct = len({v for v in enum_values if isinstance(v, str)})
+    if distinct < _MINIMUM_PROTECTED_PATHS:
+        print(
+            f"[guard-codegen-check] {SCHEMA_PATH} protects only {distinct} DISTINCT "
+            f"path(s) across {len(enum_values)} entries, below the floor of "
+            f"{_MINIMUM_PROTECTED_PATHS} — a lane emptied, shrank or padded the policy"
         )
         return Rc.FINDINGS
     return None
@@ -421,7 +441,28 @@ def check(repo_root: Path) -> Rc:
     call.
     """
     schema_path = repo_root / SCHEMA_PATH
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+
+    # 🔴 GUARDED, and the unguarded version was a REGRESSION INTRODUCED BY F3 —
+    # the fix written to make "could not run" reportable made it UNREACHABLE for
+    # the commonest could-not-run input. A bare `json.loads(read_text())` here
+    # raises on a deleted schema, malformed JSON, or `"enum": null`, and an
+    # uncaught traceback exits 1 — numerically indistinguishable from
+    # `Rc.FINDINGS`. So the classifier below could not see its own motivating
+    # case, while `check()` still printed a drift verdict for a file that was
+    # never read. Caught by the round-2 cold lane on `c1932522`.
+    try:
+        raw = schema_path.read_text(encoding="utf-8")
+    except OSError as err:
+        print(f"[guard-codegen-check] cannot read {SCHEMA_PATH}: {err}")
+        return Rc.NOT_RUN
+    try:
+        schema = json.loads(raw)
+    except json.JSONDecodeError as err:
+        print(f"[guard-codegen-check] {SCHEMA_PATH} is not valid JSON: {err}")
+        return Rc.NOT_RUN
+    if not isinstance(schema, dict):
+        print(f"[guard-codegen-check] {SCHEMA_PATH} is not a JSON object")
+        return Rc.NOT_RUN
 
     # LAZY thunks, not eager values: each `_check_*` can be expensive (a
     # subprocess launch) or assume an earlier check already passed (the
@@ -441,11 +482,26 @@ def check(repo_root: Path) -> Rc:
         if result is not None:
             return result
 
+    # 🔴 THE CLEAN LINE STATES ONLY WHAT THIS GATE PROVES, AND NAMES WHAT IT
+    # DOES NOT. The previous wording ended "...and register.ts still consumes the
+    # generated policy", which a round-2 cold lane defeated five ways — two of
+    # them caught by nothing here and by no test: an early `return false` inside
+    # `isProtectedPath`, and deleting its CALL SITE so a perfectly correct
+    # predicate is invoked by nobody.
+    #
+    # Those are BEHAVIOURAL properties of a TypeScript module, and this is a
+    # static reader of its text. No further pattern added here would close the
+    # class — the next round finds a sixth shape — so the honest move is to
+    # narrow the claim and let the ticket that REGISTERS the mod (G04, #757)
+    # prove behaviour end-to-end through the live loader, which is the first
+    # point at which that is even possible. Residuals are filed, not hidden.
     print(
-        "[guard-codegen-check] clean: the schema, the generated Python enum, and the "
-        "generated TS array all agree, the policy meets its floor, the TS rationale "
-        "matches the schema, no stale generated file survives, and register.ts still "
-        "consumes the generated policy."
+        "[guard-codegen-check] clean: the schema, the generated Python enum and the "
+        "generated TS array agree; the policy clears its DISTINCT-path floor; the TS "
+        "rationale matches the schema; no stale generated file survives; and "
+        "register.ts still references the generated policy inside isProtectedPath. "
+        "NOT proven here: that isProtectedPath is reachable, called, or behaves — "
+        "this gate reads text, it does not run the guard (see #757)."
     )
     return Rc.OK
 

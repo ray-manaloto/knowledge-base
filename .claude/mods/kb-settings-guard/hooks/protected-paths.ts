@@ -23,4 +23,5 @@ export const PROTECTED_SUFFIXES: readonly string[] = [
   "python/src/kb_setup/guard_codegen.py",
   "python/src/kb_setup/settings_guard.py",
   ".claude/mods/kb-settings-guard/hooks/protected-paths.ts",
+  ".claude/mods/kb-settings-guard/hooks/register.ts",
 ];

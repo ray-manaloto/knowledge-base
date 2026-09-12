@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ray-manaloto/knowledge-base/schemas/guard-policy.schema.json",
   "title": "ProtectedPathSuffix",
-  "description": "A path a delegated lane may never write: it switches off this repo's own guard stack.\n\nRuled by Ray, 2026-09-11 (grilling Q3): the settings pair plus the guard's own machinery, because a lane that can edit `mise.toml` neuters every `kb-*` guard task just as surely as one that edits `settings.json`. This is the ONE authority two consumers are generated from: the TypeScript array `.claude/mods/kb-settings-guard/hooks/protected-paths.ts` imports (`PROTECTED_SUFFIXES`), and the Python enum `kb_setup.settings_guard` re-exports under the same name. Regenerate both with `mise run kb-guard-codegen`; `mise run kb-guard-codegen-check` is the drift gate. A value here is matched as an exact path, or as a `/`-prefixed suffix of a backslash-to-forward-slash normalised path — see `isProtectedPath` in `register.ts` and `is_protected_path` in `settings_guard.py`, which must stay semantically identical. This schema, its own generator, and its own Python consumer are themselves in the enum below — so once the settings-guard mod is registered (G04, #757), editing this policy from a delegated lane in the main checkout is denied like every other entry here; that edit happens in a worktree, where a lane already has full authority.",
+  "description": "A path a delegated lane may never write: it switches off this repo's own guard stack.\n\nRuled by Ray, 2026-09-11 (grilling Q3): the settings pair plus the guard's own machinery, because a lane that can edit `mise.toml` neuters every `kb-*` guard task just as surely as one that edits `settings.json`. This is the ONE authority two consumers are generated from: the TypeScript array `.claude/mods/kb-settings-guard/hooks/protected-paths.ts` imports (`PROTECTED_SUFFIXES`), and the Python enum `kb_setup.settings_guard` re-exports under the same name. Regenerate both with `mise run kb-guard-codegen`; `mise run kb-guard-codegen-check` is the drift gate. A value here is matched as an exact path, or as a `/`-prefixed suffix of a backslash-to-forward-slash normalised path — see `isProtectedPath` in `register.ts` and `is_protected_path` in `settings_guard.py`, which must stay semantically identical. This schema, its own generator, its own Python consumer, the generated TypeScript data AND `register.ts` — the module that actually does the denying — are themselves in the enum below, so once the settings-guard mod is registered (G04, #757), editing this policy from a delegated lane in the main checkout is denied like every other entry here; that edit happens in a worktree, where a lane already has full authority. `register.ts` was MISSING from this list until a round-2 cold review of `c1932522` pointed out that the set protected the generated data and left out the file that enforces it.",
   "enum": [
     ".claude/settings.json",
     ".claude/settings.local.json",
@@ -12,6 +12,8 @@
     "schemas/guard-policy.schema.json",
     "python/src/kb_setup/guard_codegen.py",
     "python/src/kb_setup/settings_guard.py",
-    ".claude/mods/kb-settings-guard/hooks/protected-paths.ts"
-  ]
+    ".claude/mods/kb-settings-guard/hooks/protected-paths.ts",
+    ".claude/mods/kb-settings-guard/hooks/register.ts"
+  ],
+  "uniqueItems": true
 }

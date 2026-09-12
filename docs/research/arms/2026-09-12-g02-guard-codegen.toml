@@ -94,11 +94,11 @@ test = "test_the_committed_tree_reconciles_clean"
 [[arm]]
 id = "A5"
 file = "python/src/kb_setup/settings_guard.py"
-old = '''    normalized = path.replace("\\", "/")
+old = '''    normalized = _normalize(path)
     return any(
         normalized == suffix or normalized.endswith(f"/{suffix}") for suffix in PROTECTED_SUFFIXES
     )'''
-new = '''    normalized = path.replace("\\", "/")
+new = '''    normalized = _normalize(path)
     return any(suffix in normalized for suffix in PROTECTED_SUFFIXES)'''
 test = "test_a_substring_that_is_not_a_path_segment_is_not_protected"
 
@@ -110,11 +110,65 @@ test = "test_a_substring_that_is_not_a_path_segment_is_not_protected"
 [[arm]]
 id = "A6"
 file = "python/src/kb_setup/guard_codegen.py"
-old = '''    enum_values = schema.get("enum", [])
-    if len(enum_values) < _MINIMUM_PROTECTED_PATHS:'''
-new = '''    enum_values = schema.get("enum", [])
+old = '''    distinct = len({v for v in enum_values if isinstance(v, str)})
+    if distinct < _MINIMUM_PROTECTED_PATHS:'''
+new = '''    distinct = len({v for v in enum_values if isinstance(v, str)})
     if False:'''
 test = "test_an_emptied_schema_reports_below_the_floor"
+
+# --- Round 2's findings (#755, reviewed at `c1932522`) — my OWN fixes, armed --
+#
+# 🔴 Every arm below attacks a fix I wrote MYSELF in response to round 2. This
+# repo's recorded pattern is that the fix is the least-reviewed code in the diff,
+# and round 2 proved it twice on this very ticket: the F3 fix made `NOT_RUN`
+# UNREACHABLE for its own motivating case, and the F8 test still passed against
+# the literal it forbids. There is no round 3, so these arms are the only thing
+# standing behind those repairs.
+
+# A10 — REGRESS THE SCHEMA READ back to the unguarded form. This is the exact
+# defect round 2 found: a bare `json.loads(read_text())` raises on a deleted or
+# malformed schema, and an uncaught traceback exits 1 — numerically FINDINGS —
+# so the classifier can never see its own commonest input.
+[[arm]]
+id = "A10"
+file = "python/src/kb_setup/guard_codegen.py"
+old = '''    try:
+        raw = schema_path.read_text(encoding="utf-8")
+    except OSError as err:'''
+new = '''    try:
+        raw = schema_path.read_text(encoding="utf-8")
+    except ZeroDivisionError as err:'''
+test = "test_a_missing_schema_reports_not_run_rather_than_findings"
+
+# A11 — REGRESS THE FLOOR from DISTINCT back to a raw count. `["mise.toml"] * 10`
+# then clears a floor of 5 with ONE path actually protected. A count is a weak
+# invariant; this arm is what keeps it from quietly becoming one again.
+[[arm]]
+id = "A11"
+file = "python/src/kb_setup/guard_codegen.py"
+old = '''    distinct = len({v for v in enum_values if isinstance(v, str)})'''
+new = '''    distinct = len([v for v in enum_values if isinstance(v, str)])'''
+test = "test_a_duplicate_padded_policy_is_caught_by_the_distinct_floor"
+
+# A12 — REGRESS `PROTECTED_SUFFIXES` to a hand-maintained literal holding the
+# SAME values. Every equality assertion in the suite still passes against this —
+# round 2 proved that, rc 0 — so only the AST provenance check can kill it.
+[[arm]]
+id = "A12"
+file = "python/src/kb_setup/settings_guard.py"
+old = '''PROTECTED_SUFFIXES: tuple[str, ...] = _protected_suffixes_from(ProtectedPathSuffix)'''
+new = '''PROTECTED_SUFFIXES: tuple[str, ...] = tuple(m.value for m in ProtectedPathSuffix)'''
+test = "test_protected_suffixes_is_assigned_from_a_call_not_a_literal"
+
+# A13 — REGRESS THE PATH NORMALISATION. `.claude/./settings.json` and
+# `.claude//settings.json` then fail OPEN again, and absence of a match is the
+# ALLOW signal in this guard.
+[[arm]]
+id = "A13"
+file = "python/src/kb_setup/settings_guard.py"
+old = '''    normalized = _normalize(path)'''
+new = '''    normalized = path.replace("\\", "/")'''
+test = "test_equivalent_spellings_of_a_protected_path_are_protected"
 
 # A7 — SEVER THE CONSUMER CHECK (F1). `register.ts` can lose its only live
 # reader of the generated policy while every other check still agrees.

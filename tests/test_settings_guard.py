@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import enum
 import json
 from pathlib import Path
@@ -49,6 +50,84 @@ def test_protected_suffixes_are_built_from_enum_values_not_names() -> None:
     assert "mise.toml" in settings_guard.PROTECTED_SUFFIXES
     assert "hk.pkl" in settings_guard.PROTECTED_SUFFIXES
     assert "python/src/kb_setup/hook_guard.py" in settings_guard.PROTECTED_SUFFIXES
+
+
+def test_equivalent_spellings_of_a_protected_path_are_protected() -> None:
+    r"""🔴 A fail-open round 2 found: absence of a match is the ALLOW signal.
+
+    `.claude/./settings.json` and `.claude//settings.json` reach exactly the
+    same file as `.claude/settings.json`, and the plain `\\`->`/` matcher
+    returned False for both while returning True for the canonical spelling.
+    A guard that does not recognise a spelling does not merely miss it — it
+    permits it.
+
+    The negative controls are the point: normalisation must not turn this into
+    a substring matcher that protects everything.
+    """
+    protected = (
+        ".claude/settings.json",
+        ".claude/./settings.json",
+        ".claude//settings.json",
+        "/a/b/.claude/settings.json",
+        ".claude/x/../settings.json",
+        ".claude\\settings.json",
+        ".claude/mods/kb-settings-guard/hooks/register.ts",
+    )
+    for path in protected:
+        assert settings_guard.is_protected_path(path), f"fail-open on {path!r}"
+
+    not_protected = (
+        "settings.json",
+        "docs/README.md",
+        "a/.claude/settings.json.bak",
+        "notmise.toml",
+        "",
+    )
+    for path in not_protected:
+        assert not settings_guard.is_protected_path(path), f"false positive on {path!r}"
+
+
+def test_protected_suffixes_is_assigned_from_a_call_not_a_literal() -> None:
+    """🔴 The assertion every EQUALITY check above structurally cannot make.
+
+    A round-2 cold review of `c1932522` reverted `PROTECTED_SUFFIXES` to a
+    hand-maintained literal tuple of the same nine strings and the test above
+    **still passed, rc 0** — because every one of its assertions compares
+    VALUES, and a literal holding today's values equals the derived tuple by
+    construction. It proves `_protected_suffixes_from` is correct; it never
+    proved the CONSTANT is built by it. That is the third time this one fact
+    has been asserted by a test that could not fail (F8 / M2 / round 2).
+
+    So this reads the SOURCE: the module-level binding must be an assignment
+    whose value is a CALL. A literal — `("a", "b")`, `[...]`, or a name — fails
+    here and cannot be made to pass by choosing the right strings.
+    """
+    module_src = Path(settings_guard.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(module_src)
+
+    bindings = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign | ast.Assign)
+        and any(
+            isinstance(t, ast.Name) and t.id == "PROTECTED_SUFFIXES"
+            for t in ([node.target] if isinstance(node, ast.AnnAssign) else node.targets)
+        )
+    ]
+    assert len(bindings) == 1, f"expected exactly one module-level binding, found {len(bindings)}"
+
+    value = bindings[0].value
+    assert isinstance(value, ast.Call), (
+        "PROTECTED_SUFFIXES must be DERIVED by a call, not written as a literal — "
+        f"found {type(value).__name__}"
+    )
+    assert isinstance(value.func, ast.Name), (
+        f"the call must be a plain name, found {type(value.func).__name__}"
+    )
+    assert value.func.id == "_protected_suffixes_from", (
+        "PROTECTED_SUFFIXES must be built by _protected_suffixes_from, the same "
+        f"function the hostile-enum test above proves reads .value — found {value.func.id}"
+    )
 
 
 def test_no_value_is_dropped_and_none_collide() -> None:

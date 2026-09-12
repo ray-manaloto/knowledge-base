@@ -16,10 +16,13 @@ class ProtectedPathSuffix(Enum):
     check` is the drift gate. A value here is matched as an exact path, or as a `/`-prefixed
     suffix of a backslash-to-forward-slash normalised path — see `isProtectedPath` in
     `register.ts` and `is_protected_path` in `settings_guard.py`, which must stay semantically
-    identical. This schema, its own generator, and its own Python consumer are themselves in the
-    enum below — so once the settings-guard mod is registered (G04, #757), editing this policy
+    identical. This schema, its own generator, its own Python consumer, the generated TypeScript
+    data AND `register.ts` — the module that actually does the denying — are themselves in the
+    enum below, so once the settings-guard mod is registered (G04, #757), editing this policy
     from a delegated lane in the main checkout is denied like every other entry here; that edit
-    happens in a worktree, where a lane already has full authority.
+    happens in a worktree, where a lane already has full authority. `register.ts` was MISSING
+    from this list until a round-2 cold review of `c1932522` pointed out that the set protected
+    the generated data and left out the file that enforces it.
     """
 
     field_claude_settings_json = ".claude/settings.json"
@@ -32,4 +35,7 @@ class ProtectedPathSuffix(Enum):
     python_src_kb_setup_settings_guard_py = "python/src/kb_setup/settings_guard.py"
     field_claude_mods_kb_settings_guard_hooks_protected_paths_ts = (
         ".claude/mods/kb-settings-guard/hooks/protected-paths.ts"
+    )
+    field_claude_mods_kb_settings_guard_hooks_register_ts = (
+        ".claude/mods/kb-settings-guard/hooks/register.ts"
     )

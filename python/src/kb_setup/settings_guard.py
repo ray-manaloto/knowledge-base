@@ -56,17 +56,53 @@ see the module docstring.
 """
 
 
+def _normalize(path: str) -> str:
+    r"""`\` -> `/`, then collapse `//`, `/./` and lexical `..` segments.
+
+    🔴 **THIS IS A DELIBERATE DIVERGENCE FROM `register.ts`, AND IT IS FILED.**
+    The round-2 cold lane on `c1932522` found the plain `\\`->`/` form fails
+    OPEN on the equivalent spellings of a protected path: `.claude/./settings.json`
+    and `.claude//settings.json` both returned False while `.claude/settings.json`
+    and `/a/b/.claude/settings.json` returned True. Absence of a match is the
+    ALLOW signal in this guard, so a spelling the matcher does not recognise is a
+    hole, not a miss.
+
+    `register.ts:87` still carries the unfixed form and is FROZEN for this ticket
+    (`guard_inventory`'s anchored regexes parse it). So the two implementations
+    are **no longer behaviourally identical**, which the docstring below used to
+    claim outright. The TS half must land before #757 registers the mod — that is
+    the point at which the hole becomes live — and it is recorded there.
+
+    Lexical, never filesystem: no `resolve()`, no symlink following, no IO. That
+    keeps it total and side-effect-free, and it is strictly more protective than
+    not normalising. A symlinked alias reaching the same file is still unmatched,
+    which `register.ts` already documents as a known limit.
+    """
+    parts: list[str] = []
+    for segment in path.replace("\\", "/").split("/"):
+        if segment in {"", "."}:
+            continue
+        if segment == ".." and parts and parts[-1] != "..":
+            parts.pop()
+            continue
+        parts.append(segment)
+    collapsed = "/".join(parts)
+    return f"/{collapsed}" if path.startswith(("/", "\\")) else collapsed
+
+
 def is_protected_path(path: str) -> bool:
     r"""Is `path` one of `PROTECTED_SUFFIXES`, exactly or as a path-segment suffix?
 
-    Mirrors `isProtectedPath` in `register.ts` byte-for-byte in behaviour: a
-    `\\` -> `/` normalised path matches a suffix either exactly, or when the
-    normalised path ends with `/` + that suffix. A bare substring match (no
+    Mirrors `isProtectedPath` in `register.ts` **except for normalisation**,
+    which is stricter here — see `_normalize` above, which closes a fail-open the
+    TypeScript side still has and which is filed against #757. Otherwise
+    identical: a normalised path matches a suffix either exactly, or when it
+    ends with `/` + that suffix. A bare substring match (no
     leading `/` and no exact-path check) is deliberately excluded, the same
     false-positive class `register.ts` already documents avoiding — matching
     `tool.call`'s serialized event text rather than a real path segment.
     """
-    normalized = path.replace("\\", "/")
+    normalized = _normalize(path)
     return any(
         normalized == suffix or normalized.endswith(f"/{suffix}") for suffix in PROTECTED_SUFFIXES
     )

@@ -337,6 +337,71 @@ def test_the_floor_constant_is_at_most_the_committed_enum_size() -> None:
     assert len(schema["enum"]) >= guard_codegen._MINIMUM_PROTECTED_PATHS
 
 
+# --- round 2's findings: my OWN fixes, each armed -------------------------
+
+
+def test_a_missing_schema_reports_not_run_rather_than_findings(tmp_path: Path) -> None:
+    """🔴 The regression F3's own fix introduced, and round 2 caught.
+
+    `check()` used to open with a bare `json.loads(read_text())` ahead of every
+    `_check_*`. A deleted schema raised, the traceback exited 1, and 1 is
+    numerically `Rc.FINDINGS` — so the classifier written to distinguish
+    "could not run" from "ran and found drift" could not see its own commonest
+    could-not-run input, while the gate reported drift for a file never read.
+
+    Both directions matter here, so both are asserted: a MISSING schema and a
+    MALFORMED one are `NOT_RUN`, while a real, readable schema that genuinely
+    violates the floor stays `FINDINGS`. Without that second assertion this
+    test would pass against a `check()` that returned `NOT_RUN` for everything.
+    """
+    schema_path = tmp_path / guard_codegen.SCHEMA_PATH
+    schema_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # absent
+    assert guard_codegen.check(tmp_path) == Rc.NOT_RUN
+
+    # present but unparsable
+    schema_path.write_text("{ not json", encoding="utf-8")
+    assert guard_codegen.check(tmp_path) == Rc.NOT_RUN
+
+    # present, parseable, but `enum` is not a list
+    schema_path.write_text(json.dumps({"enum": None}), encoding="utf-8")
+    assert guard_codegen.check(tmp_path) == Rc.NOT_RUN
+
+    # CONTROL: readable and parseable, genuinely below the floor -> FINDINGS,
+    # not NOT_RUN. This is what stops the fix collapsing every outcome into one.
+    schema_path.write_text(json.dumps({"enum": []}), encoding="utf-8")
+    assert guard_codegen.check(tmp_path) == Rc.FINDINGS
+
+
+def test_a_duplicate_padded_policy_is_caught_by_the_distinct_floor(tmp_path: Path) -> None:
+    """🔴 A COUNT IS A WEAK INVARIANT — round 2 padded past the floor.
+
+    `["mise.toml"] * 10` clears a raw-count floor of 5 while exactly ONE path is
+    actually protected. The floor counts DISTINCT string entries for that
+    reason. Control: ten genuinely distinct entries must pass, or this test
+    would also pass against a floor that rejects everything.
+    """
+    schema = json.loads((REPO / guard_codegen.SCHEMA_PATH).read_text(encoding="utf-8"))
+    schema_path = tmp_path / guard_codegen.SCHEMA_PATH
+    schema_path.parent.mkdir(parents=True, exist_ok=True)
+
+    schema["enum"] = ["mise.toml"] * 10
+    schema_path.write_text(json.dumps(schema), encoding="utf-8")
+    assert guard_codegen.check(tmp_path) == Rc.FINDINGS
+
+    # CONTROL: the same COUNT, all distinct, must clear the floor — so this is
+    # not simply "the check rejects everything". Asserted against `_check_floor`
+    # directly, because `check()` on a bare tmp tree fails a LATER check for
+    # unrelated reasons and would make this control meaningless.
+    schema["enum"] = [f"distinct/path/{n}.toml" for n in range(10)]
+    assert guard_codegen._check_floor(schema) is None
+
+    # and the padded form is refused by that same predicate, not by a neighbour
+    schema["enum"] = ["mise.toml"] * 10
+    assert guard_codegen._check_floor(schema) == Rc.FINDINGS
+
+
 # --- F6: the TS header's hardcoded rationale vs. the schema's description --
 
 
