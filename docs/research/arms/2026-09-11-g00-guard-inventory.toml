@@ -180,3 +180,58 @@ file = "docs/guards/inventory.toml"
 old = '''path = "python/src/kb_setup/hook_guard.py"'''
 new = '''path = "python/src/kb_setup/check_first.py"'''
 test = "test_the_committed_inventory_reconciles_clean"
+
+# data.function-control — the sibling control, on the function-hook rows this
+# time. A comment-only edit that must change nothing.
+[[arm]]
+id = "data.function-control"
+control = true
+file = "docs/guards/inventory.toml"
+old = '''id = "hook.toolcall.kb-settings-guard.edit"'''
+new = '''id = "hook.toolcall.kb-settings-guard.edit"  # (control)'''
+
+# data.function-notebookedit-omitted — F2's first arm. Delete a REAL
+# function-hook row (`register.ts` still registers NotebookEdit). Before F2,
+# `_reconcile_registrations` filtered `classic = [r for r in
+# inventory.registrations if r.source.path == str(SETTINGS_PATH)]`, which
+# drops every `register.ts` row silently — nothing read them at all, so this
+# SURVIVED.
+[[arm]]
+id = "data.function-notebookedit-omitted"
+file = "docs/guards/inventory.toml"
+old = '''[[registrations]]
+id = "hook.toolcall.kb-settings-guard.notebookedit"'''
+new = '''[[registrations]]
+id = "hook.toolcall.kb-settings-guard.notebookedit-DELETED"'''
+test = "test_the_committed_inventory_reconciles_clean"
+
+# data.function-delete-fiction — F2's other arm, the direction the axis
+# currently accepts: ADD a fabricated row for a tool `register.ts` never
+# registers. A `str.replace` harness cannot literally insert a whole new TOML
+# table, so this appends the fabrication after the LAST existing function-hook
+# row's own final field (`tool = "NotebookEdit"`) — unique in the file, and the
+# only occurrence of that exact line.
+[[arm]]
+id = "data.function-delete-fiction"
+file = "docs/guards/inventory.toml"
+old = '''tool = "NotebookEdit"'''
+new = '''tool = "NotebookEdit"
+
+[[registrations]]
+id = "hook.toolcall.kb-settings-guard.bogus"
+current_surface = "function-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = ".claude/mods/kb-settings-guard"
+module_ids = []
+state = "declared"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/mods/kb-settings-guard/hooks/register.ts"
+event = "tool.call"
+matcher = "{ tool: \"Bogus\" }"
+command = "on(\"tool.call\", Bogus, handler)"
+
+[[registrations.reviewed_scope_cases]]
+tool = "Bogus"'''
+test = "test_the_committed_inventory_reconciles_clean"

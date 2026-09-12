@@ -33,8 +33,14 @@ REPO = Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def repo_copy(tmp_path: Path) -> Path:
-    """A mutable copy of the four authorities the reconciler reads."""
-    for rel in (SETTINGS_PATH, DO_NOT_PATH, DEFAULT_INVENTORY_PATH):
+    """A mutable copy of the authorities the reconciler reads."""
+    for rel in (
+        SETTINGS_PATH,
+        DO_NOT_PATH,
+        DEFAULT_INVENTORY_PATH,
+        guard_inventory.FUNCTION_HOOK_SOURCE_PATH,
+        guard_inventory.FUNCTION_HOOK_MANIFEST_PATH,
+    ):
         dest = tmp_path / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO / rel, dest)
@@ -359,6 +365,167 @@ def test_a_registration_referencing_an_unknown_module_id_is_flagged(repo_copy: P
     )
     findings = reconcile(repo_copy, load_inventory(path))
     assert any("module.does-not-exist" in f.detail for f in findings)
+
+
+# --- F2: function-hook registrations were dropped entirely -----------------
+
+
+def _register_ts_fixture(tmp_path: Path, body: str) -> Path:
+    """A minimal `.claude/mods/kb-settings-guard/hooks/{register.ts,hooks.json}`."""
+    mod_dir = tmp_path / ".claude" / "mods" / "kb-settings-guard" / "hooks"
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "register.ts").write_text(body, encoding="utf-8")
+    (mod_dir / "hooks.json").write_text(
+        json.dumps({"modules": ["./register.ts"]}), encoding="utf-8"
+    )
+    return tmp_path
+
+
+_REGISTER_LOOP_BODY = (
+    "export function register(on: any): void {\n"
+    "  for (const tool of WRITE_TOOLS) {\n"
+    '    on("tool.call", { tool }, handler);\n'
+    "  }\n"
+    "}\n"
+)
+
+
+def test_function_hook_write_tools_extracts_edit_write_notebookedit() -> None:
+    tools = guard_inventory.function_hook_write_tools(REPO)
+    assert tools == frozenset({"Edit", "Write", "NotebookEdit"})
+
+
+def test_a_doc_comment_literal_tool_is_never_mistaken_for_a_registration(
+    tmp_path: Path,
+) -> None:
+    """`register.ts:68`'s only literal `{ tool: "Edit" }` sits in a comment."""
+    body = (
+        '// a fake { tool: "Bogus" } mention, purely prose\n'
+        'const WRITE_TOOLS: readonly string[] = ["Edit", "Write"];\n'
+    ) + _REGISTER_LOOP_BODY
+    root = _register_ts_fixture(tmp_path, body)
+    assert guard_inventory.function_hook_write_tools(root) == frozenset({"Edit", "Write"})
+
+
+def test_a_missing_write_tools_array_is_not_run(tmp_path: Path) -> None:
+    root = _register_ts_fixture(tmp_path, _REGISTER_LOOP_BODY)
+    assert guard_inventory.function_hook_write_tools(root) is None
+
+
+def test_a_duplicate_write_tools_array_is_not_run(tmp_path: Path) -> None:
+    body = (
+        'const WRITE_TOOLS: readonly string[] = ["Edit"];\n'
+        'const WRITE_TOOLS: readonly string[] = ["Edit", "Write"];\n'
+    ) + _REGISTER_LOOP_BODY
+    root = _register_ts_fixture(tmp_path, body)
+    assert guard_inventory.function_hook_write_tools(root) is None
+
+
+def test_a_missing_register_loop_is_not_run(tmp_path: Path) -> None:
+    body = 'const WRITE_TOOLS: readonly string[] = ["Edit", "Write"];\n'
+    root = _register_ts_fixture(tmp_path, body)
+    assert guard_inventory.function_hook_write_tools(root) is None
+
+
+def test_a_duplicate_register_loop_is_not_run(tmp_path: Path) -> None:
+    body = (
+        ('const WRITE_TOOLS: readonly string[] = ["Edit", "Write"];\n')
+        + _REGISTER_LOOP_BODY
+        + _REGISTER_LOOP_BODY
+    )
+    root = _register_ts_fixture(tmp_path, body)
+    assert guard_inventory.function_hook_write_tools(root) is None
+
+
+def _drop_registration_block(text: str, reg_id: str) -> str:
+    """Delete one `[[registrations]]` block by id, from a copy of the inventory text."""
+    pattern = re.compile(
+        r'\[\[registrations\]\]\nid = "'
+        + re.escape(reg_id)
+        + r'"\n.*?(?=\n\[\[registrations\]\]|\Z)',
+        re.DOTALL,
+    )
+    new_text, n = pattern.subn("", text, count=1)
+    assert n == 1, f"expected exactly one [[registrations]] block for {reg_id}"
+    return new_text
+
+
+def test_a_notebookedit_function_hook_row_dropped_is_unclassified(repo_copy: Path) -> None:
+    """`register.ts` still registers NotebookEdit; no row now describes it."""
+    path = repo_copy / DEFAULT_INVENTORY_PATH
+    path.write_text(
+        _drop_registration_block(
+            path.read_text(encoding="utf-8"), "hook.toolcall.kb-settings-guard.notebookedit"
+        ),
+        encoding="utf-8",
+    )
+    findings = reconcile(repo_copy, load_inventory(path))
+    assert "UNCLASSIFIED" in _verdicts(findings)
+
+
+def test_a_fabricated_function_hook_row_for_a_nonexistent_tool_is_orphan(
+    repo_copy: Path,
+) -> None:
+    """A row describing a tool `register.ts` never registers must be flagged."""
+    path = repo_copy / DEFAULT_INVENTORY_PATH
+    fabricated = """
+[[registrations]]
+id = "hook.toolcall.kb-settings-guard.bogus"
+current_surface = "function-hook"
+disposition = "function-hook"
+owner_kind = "repository"
+owner_ref = ".claude/mods/kb-settings-guard"
+module_ids = []
+state = "declared"
+evidence = "measured-this-session"
+[registrations.source]
+path = ".claude/mods/kb-settings-guard/hooks/register.ts"
+event = "tool.call"
+matcher = "{ tool: \\"Bogus\\" }"
+command = "on(\\"tool.call\\", Bogus, handler)"
+
+[[registrations.reviewed_scope_cases]]
+tool = "Bogus"
+"""
+    path.write_text(path.read_text(encoding="utf-8") + fabricated, encoding="utf-8")
+    findings = reconcile(repo_copy, load_inventory(path))
+    assert "ORPHAN" in _verdicts(findings)
+
+
+def _set_registration_state(text: str, reg_id: str, new_state: str) -> str:
+    """Rewrite one registration's `state = "..."` line, identified by its own id."""
+    pattern = re.compile(r'(id = "' + re.escape(reg_id) + r'".*?\nstate = )"[a-z]+"', re.DOTALL)
+    new_text, n = pattern.subn(lambda m: f'{m.group(1)}"{new_state}"', text, count=1)
+    assert n == 1, f"expected exactly one state field for {reg_id}"
+    return new_text
+
+
+def test_a_function_hook_row_claiming_enabled_without_predicates_is_a_contradiction(
+    repo_copy: Path,
+) -> None:
+    """`enabledPlugins` presence alone is insufficient -- overstatement direction."""
+    path = repo_copy / DEFAULT_INVENTORY_PATH
+    text = _set_registration_state(
+        path.read_text(encoding="utf-8"), "hook.toolcall.kb-settings-guard.edit", "enabled"
+    )
+    path.write_text(text, encoding="utf-8")
+    findings = reconcile(repo_copy, load_inventory(path))
+    assert "CONTRADICTION" in _verdicts(findings)
+
+
+def test_a_function_hook_row_left_declared_when_all_predicates_hold_is_a_contradiction(
+    repo_copy: Path,
+) -> None:
+    """Understatement: every static predicate holds but the row still says `declared`."""
+    settings_path = repo_copy / SETTINGS_PATH
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    settings["enabledPlugins"]["kb-settings-guard@ray-manaloto"] = True
+    settings["extraKnownMarketplaces"]["kb-settings-guard"] = {
+        "source": {"source": "github", "repo": "ray-manaloto/kb-settings-guard"}
+    }
+    settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    findings = reconcile(repo_copy, load_inventory(repo_copy / DEFAULT_INVENTORY_PATH))
+    assert "CONTRADICTION" in _verdicts(findings)
 
 
 # --- F1: the resolver itself -----------------------------------------------

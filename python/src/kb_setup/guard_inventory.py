@@ -659,6 +659,192 @@ def _reconcile_invariants(root: Path, inventory: GuardInventory) -> list[Finding
     return findings
 
 
+#: The mod's own hook source -- a SEPARATE authority from `.claude/settings.json`,
+#: never mixed into `_reconcile_registrations`'s `classic` filter.
+FUNCTION_HOOK_SOURCE_PATH = Path(".claude/mods/kb-settings-guard/hooks/register.ts")
+
+#: The mod's manifest, whose `modules` array must name a tracked file for
+#: `enabled` to be even POSSIBLE -- see `_function_hook_enabled_predicates`.
+FUNCTION_HOOK_MANIFEST_PATH = Path(".claude/mods/kb-settings-guard/hooks/hooks.json")
+
+#: The plugin's declared identity, as it appears (possibly with a
+#: `@marketplace` suffix) in `enabledPlugins` / `extraKnownMarketplaces`.
+_FUNCTION_HOOK_PLUGIN_NAME = "kb-settings-guard"
+
+_TS_LINE_COMMENT = re.compile(r"//[^\n]*")
+_TS_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_WRITE_TOOLS_ARRAY = re.compile(
+    r"const\s+WRITE_TOOLS\s*:\s*readonly\s+string\[\]\s*=\s*\[(?P<body>[^\]]*)\]\s*;"
+)
+_REGISTER_LOOP = re.compile(
+    r"export\s+function\s+register\s*\([^)]*\)\s*:\s*void\s*\{\s*"
+    r"for\s*\(\s*const\s+tool\s+of\s+WRITE_TOOLS\s*\)\s*\{\s*"
+    r'on\s*\(\s*"tool\.call"\s*,\s*\{\s*tool\s*\}\s*,\s*\w+\s*\)\s*;?\s*'
+    r"\}\s*\}"
+)
+_STRING_LITERAL = re.compile(r'"([^"\\]*)"')
+_MATCHER_TOOL = re.compile(r'tool\s*:\s*"([^"]*)"')
+
+
+def _strip_ts_comments(source: str) -> str:
+    """Remove `//` and `/* */` comments before any structural match.
+
+    Load-bearing: the module's only literal `{ tool: "Edit" }` sits inside a
+    doc comment (`register.ts:68`), and the two CORRECT rows (`Write`,
+    `NotebookEdit`) have ZERO literal hits in the source — a presence check
+    over raw text is wrong in both directions.
+    """
+    return _TS_LINE_COMMENT.sub("", _TS_BLOCK_COMMENT.sub(" ", source))
+
+
+def function_hook_write_tools(root: Path) -> frozenset[str] | None:
+    """The tool set `register.ts`'s loop actually registers, comments stripped.
+
+    Requires EXACTLY one top-level `WRITE_TOOLS` array and EXACTLY one
+    supported registration loop over it — a duplicate or a rewritten loop shape
+    this cannot verify returns `None`, same as a missing file. The caller
+    treats `None` as NOT_RUN, never a silent skip: an anchored extractor that
+    cannot see the current shape must say so, not report an empty tool set as
+    if the loop legitimately registers nothing.
+    """
+    try:
+        source = (root / FUNCTION_HOOK_SOURCE_PATH).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    stripped = _strip_ts_comments(source)
+    arrays = list(_WRITE_TOOLS_ARRAY.finditer(stripped))
+    if len(arrays) != 1:
+        return None
+    if len(list(_REGISTER_LOOP.finditer(stripped))) != 1:
+        return None
+    tools = _STRING_LITERAL.findall(arrays[0].group("body"))
+    if not tools or len(set(tools)) != len(tools):
+        return None
+    return frozenset(tools)
+
+
+def _reconcile_function_hooks(
+    inventory: GuardInventory, tools: frozenset[str] | None
+) -> list[Finding]:
+    """Bidirectional reconciliation of `register.ts` against its inventory rows.
+
+    Compares the derived `(path, tool.call, tool)` set from `register.ts`
+    against the inventory rows sourced from that same path.
+    """
+    if tools is None:
+        return [
+            Finding(
+                "NOT_RUN",
+                str(FUNCTION_HOOK_SOURCE_PATH),
+                "register.ts structure unsupported — enumeration never ran",
+            )
+        ]
+    rows = [r for r in inventory.registrations if r.source.path == str(FUNCTION_HOOK_SOURCE_PATH)]
+    reviewed: dict[str, list[Registration]] = {}
+    for row in rows:
+        tool_match = _MATCHER_TOOL.search(str(getattr(row.source, "matcher", "") or ""))
+        reviewed.setdefault(tool_match.group(1) if tool_match else "", []).append(row)
+
+    findings = [
+        Finding(
+            "AMBIGUOUS_IDENTITY",
+            ", ".join(r.id for r in group),
+            f"{len(group)} rows registered for tool.call {tool!r}",
+        )
+        for tool, group in reviewed.items()
+        if len(group) > 1
+    ]
+    findings.extend(
+        Finding(
+            "UNCLASSIFIED",
+            f"tool.call {tool}",
+            f"{FUNCTION_HOOK_SOURCE_PATH} registers {tool} with no inventory row",
+        )
+        for tool in sorted(tools - reviewed.keys())
+    )
+    findings.extend(
+        Finding("ORPHAN", group[0].id, f"no live tool.call registration for {tool!r}")
+        for tool, group in reviewed.items()
+        if tool not in tools
+    )
+    return findings
+
+
+def _function_hook_enabled_predicates(root: Path) -> dict[str, bool]:
+    """The three static predicates `enabled` requires, checked independently.
+
+    G00 asserts only what is statically checkable: the mod's `hooks.json`
+    validly names the tracked `register.ts`, the plugin appears TRUE in
+    `enabledPlugins`, and the plugin's marketplace is declared in
+    `extraKnownMarketplaces`. Installation, loading and dispatch are G04's
+    (#757), never a tree read.
+    """
+    hooks_json_valid = False
+    try:
+        manifest = json.loads((root / FUNCTION_HOOK_MANIFEST_PATH).read_text(encoding="utf-8"))
+        modules = manifest.get("modules", []) if isinstance(manifest, dict) else []
+        target = (root / FUNCTION_HOOK_SOURCE_PATH).resolve()
+        mod_dir = (root / FUNCTION_HOOK_MANIFEST_PATH).parent
+        hooks_json_valid = any(
+            isinstance(m, str) and (mod_dir / m).resolve() == target for m in modules
+        )
+    except OSError, json.JSONDecodeError:
+        hooks_json_valid = False
+
+    try:
+        settings = json.loads((root / SETTINGS_PATH).read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
+        settings = {}
+    if not isinstance(settings, dict):
+        settings = {}
+    enabled_plugins = settings.get("enabledPlugins", {})
+    marketplaces = settings.get("extraKnownMarketplaces", {})
+    plugin_enabled = isinstance(enabled_plugins, dict) and any(
+        key.split("@", 1)[0] == _FUNCTION_HOOK_PLUGIN_NAME and value is True
+        for key, value in enabled_plugins.items()
+    )
+    marketplace_known = isinstance(marketplaces, dict) and any(
+        key.split("@", 1)[0] == _FUNCTION_HOOK_PLUGIN_NAME for key in marketplaces
+    )
+    return {
+        "hooks_json_valid": hooks_json_valid,
+        "plugin_enabled": plugin_enabled,
+        "marketplace_known": marketplace_known,
+    }
+
+
+def _reconcile_function_hook_state(root: Path, inventory: GuardInventory) -> list[Finding]:
+    """Reject BOTH overstatement and understatement of a function-hook row's `state`.
+
+    `enabled` requires every static predicate together; `enabledPlugins`
+    presence alone is insufficient (a plugin can be enabled with no
+    corresponding marketplace entry, or vice versa, and neither half makes it
+    live). A row claiming `enabled` while any predicate fails is
+    OVERSTATEMENT; a row left at `declared` while ALL predicates hold is
+    UNDERSTATEMENT — both are a state contradicting the same static facts.
+    """
+    predicates = _function_hook_enabled_predicates(root)
+    all_hold = all(predicates.values())
+    findings: list[Finding] = []
+    for reg in inventory.registrations:
+        if reg.source.path != str(FUNCTION_HOOK_SOURCE_PATH):
+            continue
+        if reg.state is RegistrationState.enabled and not all_hold:
+            failing = sorted(k for k, v in predicates.items() if not v)
+            findings.append(
+                Finding("CONTRADICTION", reg.id, f"state=enabled but {failing} do not hold")
+            )
+        elif reg.state is RegistrationState.declared and all_hold:
+            findings.append(
+                Finding(
+                    "CONTRADICTION",
+                    reg.id,
+                    "state=declared but every static enablement predicate holds",
+                )
+            )
+    return findings
+
+
 def _reconcile_contradictions(inventory: GuardInventory) -> list[Finding]:
     """Dispositions that contradict their own owner or surface.
 
@@ -700,6 +886,8 @@ def reconcile(root: Path, inventory: GuardInventory) -> list[Finding]:
     findings.extend(_reconcile_modules(root, inventory, live))
     findings.extend(_reconcile_invariants(root, inventory))
     findings.extend(_reconcile_contradictions(inventory))
+    findings.extend(_reconcile_function_hooks(inventory, function_hook_write_tools(root)))
+    findings.extend(_reconcile_function_hook_state(root, inventory))
     return findings
 
 
