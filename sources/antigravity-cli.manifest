@@ -12,7 +12,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] antigravity-cli` (`aqua:` backend)
-#   pinned here:    1.1.25
+#   pinned here:    1.2.2
 # A pin that drifts from the installed version makes the corpus answer
 # questions about code we are not running. Not hypothetical —
 # `sources/graphify.manifest` records exactly that failure: it sat two
@@ -38,7 +38,7 @@
 # changed between 1.1.20 and 1.1.25". `kind = docs` ingests exactly those two
 # files instead.
 url = https://github.com/google-antigravity/antigravity-cli
-ref = 1.2.0
-commit = 34406bef8e87fc103783c0c9715e5e2cce3c3e1b
+ref = 1.2.2
+commit = ba985e6b5de2ac8aa09860a154a102831eb7722b
 kind = docs
 added = 2026-08-02

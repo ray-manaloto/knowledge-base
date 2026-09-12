@@ -1947,7 +1947,7 @@ manifest = "sources/codex.manifest"
 # did not mention antigravity at all. Both halves wrong, and the figure reached
 # Ray's own directive text before anyone re-derived it.
 mise_key = "antigravity-cli"
-expected = "1.2.0"
+expected = "1.2.2"
 binary = "agy"
 github = "google-antigravity/antigravity-cli"
 # The HOUSE form (`^v?(\d+\.\d+\.\d+)`, as at `[tool.hk]` and `[tool.fnox]`),

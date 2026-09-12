@@ -698,6 +698,32 @@ settings reference**.
   implementation: `register.ts` derives the verdict from `$.session.cwd()` alone
   and never compares it to `e.file_path`, so a lane in a worktree writing an
   absolute path into the main checkout is ALLOWED.
+
+  > 🔴 **CORRECTION, 2026-09-11 (session `kb-20260911.004`) — the "live defect"
+  > sentence above was ALREADY FALSE WHEN THIS FILE WAS COMMITTED.** The claim is
+  > kept verbatim rather than deleted, per `agent-report-persistence.md`; this
+  > note is the annotation.
+  >
+  > `register.ts` does **not** derive the verdict from `$.session.cwd()`. It
+  > resolves the destination via `targetInLinkedWorktree($, filePath)`, whose own
+  > docstring at `.claude/mods/kb-settings-guard/hooks/register.ts:112-119` says:
+  > *"🔴 This asks about `e.file_path`, NOT about `$.session.cwd()`. An earlier
+  > version of this module derived the verdict from the session's cwd alone…"* —
+  > i.e. the cwd form is the version this file's author was remembering, and it
+  > had already been replaced.
+  >
+  > **Both files landed in the SAME commit**, `696c9ae2` (#768) — so this was
+  > never a description of a shipped state. Probe, control-armed:
+  > `grep -n 'session\.cwd\|session' register.ts` → 6 hits, **all inside
+  > comments**; control arm `grep -c file_path register.ts` → **2**, real code.
+  >
+  > **Consequence for G03: it must NOT "fix" `register.ts`.** The destination-
+  > resolution behaviour described as missing is present. G03's job on this axis
+  > is **regression preservation** — pin the existing behaviour with the matrix
+  > above (own-worktree write, canonical-checkout destination *from* that lane,
+  > subdirectory launch, relative path) so it cannot silently revert to the cwd
+  > form. Independently confirmed by `kb-codex-advisor` (`gpt-5.6-sol`/`xhigh`),
+  > verdict at `.agent/kb/reports/agents/g01-g02-advisor-verdict.md`.
 - **G04's independence**: *"a missing mod cannot reliably warn about its own
   absence."* Use an **independent** SessionStart checker — possibly an existing
   classic lifecycle hook with a narrowly recorded reason. Before current-session

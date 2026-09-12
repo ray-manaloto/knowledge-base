@@ -51,10 +51,38 @@ exists on this machine; it is an ORPHAN and nothing pins it — see the block be
 which corrects what this paragraph used to claim.) Line numbers shift between
 versions, so cite a SYMBOL with its line rather than a line alone.
 
+🔴 HOW BIG THE SKEW ACTUALLY IS — MEASURED 2026-09-12 (session `kb-20260911.004`).
+The paragraph above states the skew; it did not say what it costs. Regenerating at
+the installed 2.1.269 and comparing:
+
+| | lines | sha256 (first 16) |
+|---|---|---|
+| this file (2.1.267) | **7,966** | `ed6cf189ee388d62` — matches the sha at the top, so the byte-pristine policy HELD |
+| fresh (2.1.269) | **9,263** | `51e327a1b0badc09` |
+
+**+1,297 lines, 2,061 changed diff lines, across two patch releases.** Event-level,
+control-armed: `session.authorize` **0 → 7** (so the FIRST of #92469's two named
+omissions is FIXED in 2.1.269), `flag.value` **0 → 0** (the second is STILL OPEN);
+control arm `tool.call` 46 → 61 (grew), `classic.PreToolUse` 9 → 9 (stable), so the
+probe discriminates.
+
+Read that twice: this repo has been reasoning about function hooks from a file
+missing an entire event namespace the running binary carries. **That is the whole
+argument of #754** — pin the contract with live probes, not with this file.
+
+🔴 AND `/plugin-types` RUNS HEADLESS — measured the same session, refuting a live
+advisor claim that it was unverified:
+`cd <scratch> && ~/.local/share/claude/versions/2.1.269 -p '/plugin-types' --permission-mode bypassPermissions < /dev/null`
+→ **rc 0**, writing `.claude/types/claude-code.d.ts` *and* `claude-code-mcp.d.ts`
+("the plugin API … and 30 built-in tools" / "170 MCP tools from 12 servers"). So
+regeneration is automatable; it does not need deferring out of a ticket.
+
 🔴 NEGATIVE CONCLUSIONS FROM THIS FILE ARE UNSAFE. `anthropics/claude-code#92469`
 reports the generated declarations OMITTING events the runtime carries
 (`session.authorize`, `flag.value`). Absence here is not absence in the engine.
 Positive findings are fine; "X is not supported" is not derivable.
+**Still true as of 2026-09-12** — but note the measurement above: `session.authorize`
+is no longer an example of it, `flag.value` still is. Do not cite the pair.
 
 🔴 AND A DECLARED TYPE IS NOT RUNTIME BEHAVIOUR. That a name is admitted by
 `ClassicEventName` says the type accepts the string, never that registering it

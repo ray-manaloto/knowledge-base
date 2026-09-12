@@ -237,7 +237,7 @@ gh = "2.98.0"
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
 "npm:@openai/codex" = "0.154.0"
-antigravity-cli = "1.2.0"
+antigravity-cli = "1.2.2"
 "npm:ctx7" = { version = "0.5.9", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.3"
 # coreutils: macOS ships BSD userland, not GNU — this repo's own rules and
@@ -1091,6 +1091,33 @@ description = "Gate: the G00 guard inventory still describes the live enforcemen
 # (settings.json, the guard dispatch tuple, do-not.md's anchors, the inventory)
 # and re-derives every count rather than comparing two stored snapshots.
 run = "uv run --project {{config_root}} kb-setup guard-inventory-check"
+
+[tasks.kb-guard-codegen]
+description = "Regenerate the settings-guard's protected-path policy (Python enum + TS array) from its schema"
+# `.claude/mods/kb-settings-guard/hooks/protected-paths.ts` used to be
+# hand-maintained, with a header naming a generator that did not exist (G02,
+# #755). `schemas/guard-policy.schema.json` is now the one authority: this runs
+# the ordinary `[tool.datamodel-codegen]` batch (so the Python enum regenerates
+# exactly like every other schema-owned model) and then renders the TS array
+# datamodel-codegen has no target for. Logic in `kb_setup.guard_codegen`.
+run = "uv run --project {{config_root}} kb-setup guard-codegen"
+timeout = "5m"
+
+[tasks.kb-guard-codegen-check]
+description = "Gate: the guard-policy schema, its Python enum and its TS array all agree, with no stale generated file"
+# Native `datamodel-codegen --all-jobs --check` catches a generated Python file
+# that differs from its schema or was deleted, but MISSES a stale extra
+# generated-looking file left behind by a renamed/removed job (measured
+# three-armed against the real tree). This wraps that native check, adds the
+# stale-extra scan (keyed on the generated-provenance marker, never on "any
+# file no job names"), and adds the one check native codegen cannot do at all:
+# whether the committed `.ts` array still matches what the schema renders.
+# HERMETIC (C9) — reads committed files and a temp regeneration, no network, no
+# credentials — which is what lets it be reached transitively through `test`
+# via `tests/test_guard_codegen.py`, the same wiring `kb-guard-inventory-check`
+# already established rather than growing `GATE_TASKS`.
+run = "uv run --project {{config_root}} kb-setup guard-codegen-check"
+timeout = "5m"
 
 [tasks.kb-lock-drift]
 description = "Gate: mise.lock still describes what mise.toml pins (runs mise's own lock --dry-run)"
