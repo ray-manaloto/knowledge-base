@@ -66,10 +66,9 @@ finding aid; the quoted text is the evidence. Two probes settle the
 load-bearing claims against whatever version the reader actually runs, which
 is strictly better than a snapshot of 2.1.267:
 
-    strings -a "$(readlink -f "$(command -v claude)")" \
-      | grep -oE 'classic\.[A-Za-z]{3,}' | sort -u
-    strings -a "$(readlink -f "$(command -v claude)")" \
-      | grep -oE '"PreToolUse","PostToolUse"[^]]{0,600}'
+    B=$(readlink -f ~/.local/bin/claude)     # NOT `command -v claude`
+    strings -a "$B" | grep -oE 'classic\.[A-Za-z]{3,}' | sort -u
+    strings -a "$B" | grep -oE '"PreToolUse","PostToolUse"[^]]{0,600}'
 
 ⚠️ THE FIRST PROBE ALONE READS AS A REFUTATION AND IS A FALSE ALARM. In 2.1.269
 only four `classic.*` LITERALS exist (PreToolUse, SessionEnd, SessionStart,
@@ -120,10 +119,34 @@ DIFFERENT one: config-read, then filesystem-walk, then a recursive grep that
 included backups. When a claim about where something is declared surprises you,
 change the route, not the care.
 
+🔴 **`command -v claude` DOES NOT FIND CLAUDE ON THIS MACHINE, AND THE ORPHAN IS
+WHY.** This paragraph told readers to resolve the binary with
+`readlink -f "$(command -v claude)"` until 2026-09-11 — instance SIX of this
+file's own failure pattern, and the first one inside the REMEDY rather than the
+claim. Measured:
+
+    command -v claude                       -> ~/.local/share/mise/shims/claude
+    readlink -f "$(command -v claude)"      -> ~/.local/bin/mise
+
+The orphaned 2.1.251 install creates a mise SHIM that shadows the real binary, so
+the recipe resolved to **mise itself**. Armed side by side, probe 1 through each:
+
+    ~/.local/bin/claude  ->  classic.PreToolUse, classic.SessionEnd,
+                             classic.SessionStart, classic.Setup
+    the shim             ->  classic.yarnpkg
+
+**It does not error — it returns one plausible-looking hit from a different
+program.** A reader following the old recipe gets an answer, and the answer is
+about mise.
+
+So the orphan is not merely inert: **it owns `claude` on PATH**, which is exactly
+the `conda:git` shape invoked above, live right now. `mise prune` stops being
+housekeeping and becomes a correctness fix.
+
 **What actually runs is 2.1.269**, self-updating, via
-`~/.local/bin/claude -> ~/.local/share/claude/versions/2.1.269`. Resolve the real
-binary with `readlink -f "$(command -v claude)"`; do not use `mise which`, and do
-not assume a version from any config file. The orphan matters because **2.1.251
+`~/.local/bin/claude -> ~/.local/share/claude/versions/2.1.269`. Resolve it by
+naming that path explicitly — `readlink -f ~/.local/bin/claude` — never through
+`command -v`, never `mise which`, and never inferred from a config file. The orphan matters because **2.1.251
 carries no `classic.*` bridge at all** — it predates this feature — so a probe
 that happens to reach it answers about a binary that cannot exhibit the
 behaviour.
