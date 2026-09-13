@@ -48,9 +48,16 @@ Note `cp` on PATH here is this repo's pinned GNU coreutils and has no `-c` flag
 at all — a detail that no longer matters to this module and is recorded so the
 `/bin/cp` form is not reintroduced as a simplification.
 
-COUNTS ARE NOT QUOTED HERE. An earlier draft said "8 of 97 clones"; the tracked
-manifests and the clones actually present are different numbers and both move.
-Re-derive: `ls -d sources/*/ | wc -l` against `git ls-files sources/ | wc -l`.
+COUNTS ARE NOT QUOTED HERE, and the command to re-derive them took two tries.
+An earlier draft said "8 of 97 clones". The replacement said to run
+`ls -d sources/*/ | wc -l` against `git ls-files sources/ | wc -l` — which
+returns 100 against 177, counting four TRACKED subdirectories as clones and
+every tracked file rather than the manifests. Both halves were wrong, which is
+the whole lesson: a command that looks like a measurement is still a claim.
+Clones actually present, and tracked manifests:
+
+    ls -d sources/*/ | while read -r d; do [ -e "$d/.git" ] && echo "$d"; done | wc -l
+    git ls-files "sources/*.manifest" | wc -l
 
 DONOR QUIESCENCE (a requirement an advisor consult named and a first draft of
 this spec dropped). `clonefile(2)` can observe a clone while `kb-build` /
@@ -288,12 +295,23 @@ def _reuse_existing_clone(dst: Path, rel: str, pin: str | None) -> Result[Worktr
     this module, deliberately, so the caller's branch reads as "try reuse,
     else copy" rather than a third `Result` state nothing else needs.
     """
-    if dst.exists() and not (dst.is_dir() and not dst.is_symlink() and (dst / ".git").exists()):
+    if (dst.is_symlink() or dst.exists()) and not (
+        dst.is_dir() and not dst.is_symlink() and (dst / ".git").exists()
+    ):
         # Present but NOT a clone — a symlink, a file, or a plain directory an
         # interrupted run left behind. Refuse by name. Falling through to the
         # copy would surface this as a bare `EEXIST`, which is true and tells
         # the reader nothing about what to do; and the version before
         # `clonefile(2)` copied INTO such a directory and then deleted it.
+        #
+        # 🔴 `is_symlink() or exists()`, NOT `exists()` alone. `Path.exists()`
+        # FOLLOWS symlinks, so a DANGLING one reads as absent — this guard
+        # returned "go copy it" and `clonefile(2)` (flags=0 follows the link)
+        # then wrote a whole clone at the link's target, OUTSIDE the worktree,
+        # from a guard whose own message says "not touching a path this task
+        # did not create". Found by round 2 of the cold review, in the fix that
+        # round 1 added. A reaped `/private/tmp` agent scratchpad is exactly
+        # what leaves a symlink outliving its target.
         return Err(
             f"{dst} exists and is not a git clone — remove it by hand and re-run. "
             f"Not touching a path this task did not create",
@@ -357,6 +375,28 @@ def _prepare_clone(donor: Path, target: Path, name: str) -> Result[WorktreeItem]
     return _copy_clone(src, dst, rel, pin)
 
 
+def _reuse_existing_graph_file(src: Path, dst: Path, rel: str) -> Result[WorktreeItem]:
+    """A graph file already here is `already-present` ONLY at the donor's size.
+
+    `clonefile(2)` is atomic, so a run killed after the syscall leaves a
+    complete copy of a then-truncated donor — and without this, the next run
+    stamps it `already-present` forever. That is what round 1's F-9 actually
+    said; the first fix put its size check on the CREATE branch, which is the
+    one branch that case never takes. Split out as its own function to mirror
+    `_reuse_existing_clone`, and because the alternative was a seventh `return`
+    in one function.
+    """
+    here, there = dst.stat().st_size, src.stat().st_size
+    if here != there:
+        return Err(
+            f"{rel} is present at {here} bytes but the donor holds {there} — it is a "
+            f"partial or stale copy. Remove it by hand and re-run; refusing to certify "
+            f"it as already-present",
+            rc=Rc.NOT_RUN,
+        )
+    return Ok(_item(rel, WorktreeItemStatus.already_present, f"{here} bytes"))
+
+
 def _prepare_graph_file(donor: Path, target: Path, rel: str) -> Result[WorktreeItem]:
     """Clone one graph file, then prove the copy is the size the donor was.
 
@@ -371,8 +411,21 @@ def _prepare_graph_file(donor: Path, target: Path, rel: str) -> Result[WorktreeI
     src, dst = donor / rel, target / rel
     if not src.is_file():
         return Ok(_item(rel, WorktreeItemStatus.skipped, "donor has no such file"))
-    if dst.is_file() and not dst.is_symlink():
-        return Ok(_item(rel, WorktreeItemStatus.already_present))
+    if dst.is_symlink():
+        # Same trap as `_reuse_existing_clone`, and it lands worse here: a
+        # DANGLING symlink is invisible to `is_file()`, so this fell through to
+        # the copy and `clonefile(2)` wrote the graph THROUGH the link, outside
+        # the worktree — and reported `created`, rc 0, with nothing downstream
+        # to disagree. A symlink at a graph path is also exactly the shared
+        # mutable state this module rejects symlinks for.
+        return Err(
+            f"{dst} is a symlink — remove it by hand and re-run. Writing through it "
+            f"would put the graph outside this worktree and share it with whatever "
+            f"else points there",
+            rc=Rc.BAD_REQUEST,
+        )
+    if dst.is_file():
+        return _reuse_existing_graph_file(src, dst, rel)
     dst.parent.mkdir(parents=True, exist_ok=True)
     before = src.stat().st_size
     failure = _clonefile(src, dst)
@@ -445,29 +498,18 @@ def _resolve_target_and_donor(target: Path, donor: Path | None) -> Result[tuple[
 
 
 def _prepare_all_items(donor: Path, target: Path) -> Result[list[WorktreeItem]]:
-    """Every required clone, then every required graph file — Err short-circuits."""
-    clones_present = [n for n in REQUIRED_CLONES if (donor / "sources" / n / ".git").exists()]
-    files_present = [p for p in REQUIRED_GRAPH_FILES if (donor / p).is_file()]
-    missing_clones = [n for n in REQUIRED_CLONES if n not in clones_present]
-    missing_files = [p for p in REQUIRED_GRAPH_FILES if p not in files_present]
+    """Every required clone, then every required graph file — Err short-circuits.
 
-    # 🔴 REQUIRED means required. This refused only when EVERYTHING was absent
-    # until a cold review armed it: a donor with the graph files but neither
-    # clone returned `Ok`, printed two `skipped` rows and exited 0 — declaring
-    # a worktree ready in which both tests this module exists to fix still
-    # fail. `skipped` is a real status and it is the right ROW; what was wrong
-    # is that no skipped REQUIRED item reached the exit code.
-    if missing_clones or missing_files:
-        return Err(
-            f"donor {donor} is missing required material — "
-            f"clones {missing_clones or 'none'} of "
-            f"{len(REQUIRED_CLONES)} examined ({', '.join(REQUIRED_CLONES)}); "
-            f"graph files {missing_files or 'none'} of "
-            f"{len(REQUIRED_GRAPH_FILES)} examined ({', '.join(REQUIRED_GRAPH_FILES)}). "
-            f"Run `mise run kb-build` in the donor, then re-run this",
-            rc=Rc.NOT_RUN,
-        )
-
+    🔴 THE GRADE IS ON THE TARGET, NOT ON THE DONOR'S INVENTORY, and the
+    difference is a round-2 finding against a round-1 fix. Round 1's F-7 asked
+    that a skipped REQUIRED item reach the exit code; the first fix made the
+    donor's inventory a PRECONDITION of the whole run, which refuses a
+    fully-prepared worktree because a third party removed a clone it no longer
+    needs — contradicting this module's own idempotency claim, and reachable
+    during `kb-build`'s own re-clone window. Grading what the target ENDS UP
+    with answers F-7 without inventing that coupling, and keeps `skipped` a
+    reachable, honest row rather than a status nothing can produce.
+    """
     items: list[WorktreeItem] = []
     for name in REQUIRED_CLONES:
         result = _prepare_clone(donor, target, name)
@@ -481,6 +523,18 @@ def _prepare_all_items(donor: Path, target: Path) -> Result[list[WorktreeItem]]:
         if not isinstance(result, Ok):
             return result
         items.append(result.value)
+
+    absent = [n for n in REQUIRED_CLONES if not (target / "sources" / n / ".git").exists()]
+    absent += [p for p in REQUIRED_GRAPH_FILES if not (target / p).is_file()]
+    if absent:
+        return Err(
+            f"{target} is still missing required material after the run: {absent}. "
+            f"Examined {len(REQUIRED_CLONES)} clone(s) ({', '.join(REQUIRED_CLONES)}) and "
+            f"{len(REQUIRED_GRAPH_FILES)} graph file(s) "
+            f"({', '.join(REQUIRED_GRAPH_FILES)}); the donor {donor} does not have them. "
+            f"Run `mise run kb-build` in the donor, then re-run this",
+            rc=Rc.NOT_RUN,
+        )
     return Ok(items)
 
 

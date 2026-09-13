@@ -14,6 +14,7 @@ hand against a real throwaway worktree per the spec's verification sequence.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -446,3 +447,127 @@ def test_running_from_a_subdirectory_resolves_to_the_worktree_root(
     subdir.mkdir(parents=True)
 
     assert wt.main(subdir, []) == int(Rc.OK)
+
+
+def test_a_dangling_symlink_at_the_destination_is_refused_not_written_through(
+    donor_and_target: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The round-2 defect, armed — in the round-1 fix's own guard.
+
+    `Path.exists()` FOLLOWS symlinks, so a dangling one read as absent: the
+    guard said "go copy it" and `clonefile(2)` (flags=0 follows the link) wrote
+    a whole clone at the link's TARGET, outside the worktree — from a guard
+    whose message is "not touching a path this task did not create". A reaped
+    `/private/tmp` agent scratchpad is exactly what leaves a symlink outliving
+    its target.
+    """
+    monkeypatch.setattr(wt, "_uv_sync", _no_sync)
+    _donor, target = donor_and_target
+    name = wt.REQUIRED_CLONES[0]
+    outside = target.parent / "OUTSIDE-THE-WORKTREE"
+    (target / "sources" / name).symlink_to(outside)
+
+    result = wt.prepare_existing(target)
+
+    assert isinstance(result, Err)
+    assert result.rc == Rc.BAD_REQUEST
+    assert not outside.exists(), "must not write a clone through the link, outside the target"
+
+
+def test_a_dangling_symlink_at_a_graph_path_is_refused(
+    donor_and_target: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same trap on the graph path, where it landed worse.
+
+    Nothing downstream disagreed with `_prepare_graph_file`, so this one
+    returned `created` and rc 0 while putting the graph outside the worktree.
+    """
+    monkeypatch.setattr(wt, "_uv_sync", _no_sync)
+    _donor, target = donor_and_target
+    rel = wt.REQUIRED_GRAPH_FILES[0]
+    outside = target.parent / "OUTSIDE-GRAPH.json"
+    (target / rel).parent.mkdir(parents=True, exist_ok=True)
+    (target / rel).symlink_to(outside)
+
+    result = wt.prepare_existing(target)
+
+    assert isinstance(result, Err)
+    assert result.rc == Rc.BAD_REQUEST
+    assert not outside.exists(), "must not write the graph through the link"
+
+
+def test_a_stale_graph_file_is_not_certified_already_present(
+    donor_and_target: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F-9's other half — the branch the first fix did not reach.
+
+    `clonefile(2)` is atomic, so a run killed AFTER the syscall leaves a
+    complete copy of a then-truncated donor. The size check went on the create
+    branch; the certifying branch had none, so the next run stamped it
+    `already-present` forever.
+    """
+    monkeypatch.setattr(wt, "_uv_sync", _no_sync)
+    _donor, target = donor_and_target
+    rel = wt.REQUIRED_GRAPH_FILES[0]
+    (target / rel).parent.mkdir(parents=True, exist_ok=True)
+    (target / rel).write_text("{}\n", encoding="utf-8")
+
+    result = wt.prepare_existing(target)
+
+    assert isinstance(result, Err)
+    assert result.rc == Rc.NOT_RUN
+    assert "already-present" in result.message
+
+
+def test_a_prepared_target_does_not_depend_on_the_donors_inventory(
+    donor_and_target: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The round-2 over-correction, armed.
+
+    The first F-7 fix made the donor's inventory a precondition of the whole
+    run, so a fully-prepared worktree was refused because the donor had since
+    lost a clone it no longer needed — contradicting this module's own
+    idempotency claim, and reachable during `kb-build`'s re-clone window.
+    """
+    monkeypatch.setattr(wt, "_uv_sync", _no_sync)
+    donor, target = donor_and_target
+    first = wt.prepare_existing(target)
+    assert isinstance(first, Ok), getattr(first, "message", first)
+
+    shutil.rmtree(donor / "sources" / wt.REQUIRED_CLONES[0])
+
+    second = wt.prepare_existing(target)
+    assert isinstance(second, Ok), "the target has everything; the donor's state is not its problem"
+
+
+def test_a_physical_copy_is_not_a_clone(
+    donor_and_target: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The headline guarantee, armed — the one property this module exists for.
+
+    Round 1's F-8 was "the fail-closed branches have zero tests"; the fix
+    deleted those branches (correctly) and added no test of the property they
+    protected. A round-2 arm then replaced `_clonefile` with a genuine
+    `shutil.copytree` that preserves every observable the unit tests check, and
+    the whole suite stayed green — so "never a silent physical copy" would not
+    be noticed if someone simplified the `ctypes` call away.
+
+    Free space discriminates where the observables do not: cloning a file costs
+    nothing, copying it costs its size.
+    """
+    monkeypatch.setattr(wt, "_uv_sync", _no_sync)
+    donor, target = donor_and_target
+    payload = donor / "graphify-out" / "graph.json"
+    payload.write_bytes(b"x" * (48 * 1024 * 1024))
+
+    statvfs = os.statvfs
+    before = statvfs(str(target)).f_bavail * statvfs(str(target)).f_frsize
+    result = wt.prepare_existing(target)
+    after = statvfs(str(target)).f_bavail * statvfs(str(target)).f_frsize
+
+    assert isinstance(result, Ok), getattr(result, "message", result)
+    assert (target / "graphify-out" / "graph.json").stat().st_size == payload.stat().st_size
+    assert before - after < payload.stat().st_size // 2, (
+        "cloning must not consume the payload's size in real disk — a physical "
+        "copy would, and that is the one thing this module promises not to do"
+    )

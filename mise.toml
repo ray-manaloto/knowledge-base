@@ -1169,10 +1169,15 @@ description = "Make a fresh git worktree usable: CoW-copy required sources/* clo
 # test_graphify_catalog.py::test_the_real_repo_agrees_with_its_own_pin) — and a
 # graph-less worktree also breaks the graph-first standing instruction (#778).
 #
-# NATIVE, as far as one exists: APFS clonefile via `/bin/cp -c -R`, never a
-# physical copy and never `worktree.symlinkDirectories` (shadows tracked
-# manifests / cannot serve the two graph FILES) or `.worktreeinclude` (a real
-# copy, not CoW, and only applies to worktrees Claude Code itself created).
+# NATIVE, and it is the SYSCALL: `clonefile(2)` via ctypes — never `/bin/cp -c`,
+# which cannot fail closed (Apple's man page: it falls back to `copyfile(2)`
+# silently, so rc 0 does not mean it cloned), never `worktree.symlinkDirectories`
+# (shadows tracked manifests / cannot serve the two graph FILES) and never
+# `.worktreeinclude` (a real copy, not CoW, and only applies to worktrees Claude
+# Code itself created). This line said `/bin/cp -c -R` until a cold review found
+# the check built on it could not fail closed; the module docstring was rewritten
+# in that commit and this task comment was not, which is the stale-describing-doc
+# class `tool-currency-and-native-first.md` rule 5 exists for.
 # `[deps.uv] auto = true` above already syncs the SAME-checkout case; this
 # task's own `uv sync --locked` is for the cross-checkout `--target` case.
 #

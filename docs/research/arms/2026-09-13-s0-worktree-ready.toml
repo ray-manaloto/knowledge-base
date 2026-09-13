@@ -68,7 +68,9 @@ new = '''    if False:
 id = "A3"
 test = "test_an_existing_non_clone_directory_is_refused_not_deleted"
 file = "python/src/kb_setup/worktree.py"
-old = '''    if dst.exists() and not (dst.is_dir() and not dst.is_symlink() and (dst / ".git").exists()):'''
+old = '''    if (dst.is_symlink() or dst.exists()) and not (
+        dst.is_dir() and not dst.is_symlink() and (dst / ".git").exists()
+    ):'''
 new = '''    if False:'''
 
 # A4 — SEVER THE MISSING-REQUIRED REFUSAL. Also a cold-review defect: a donor
@@ -78,7 +80,7 @@ new = '''    if False:'''
 id = "A4"
 test = "test_a_missing_required_clone_is_not_a_success"
 file = "python/src/kb_setup/worktree.py"
-old = '''    if missing_clones or missing_files:
+old = '''    if absent:
         return Err('''
 new = '''    if False:
         return Err('''
@@ -117,4 +119,65 @@ file = "python/src/kb_setup/worktree.py"
 old = '''    if top.returncode != 0 or Path(top.stdout.strip() or "/dev/null").resolve() != clone.resolve():
         return ""'''
 new = '''    if False:
+        return ""'''
+
+# A8 — SEVER THE DANGLING-SYMLINK HALF of the guard, leaving the `exists()` the
+# round-1 fix shipped. `Path.exists()` FOLLOWS symlinks, so a dangling one reads
+# as absent and `clonefile(2)` (flags=0 follows the link) writes a whole clone at
+# the link's target, OUTSIDE the worktree — from a guard whose own message says
+# it is not touching what it did not create. Round 2 found this in round 1's fix.
+[[arm]]
+id = "A8"
+test = "test_a_dangling_symlink_at_the_destination_is_refused_not_written_through"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if (dst.is_symlink() or dst.exists()) and not ('''
+new = '''    if (dst.exists()) and not ('''
+
+# A9 — SEVER THE SAME GUARD ON THE GRAPH PATH, where it landed worse: nothing
+# downstream disagreed, so the run returned `created` and rc 0 while putting the
+# graph outside the worktree.
+[[arm]]
+id = "A9"
+test = "test_a_dangling_symlink_at_a_graph_path_is_refused"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if dst.is_symlink():
+        # Same trap as `_reuse_existing_clone`'''
+new = '''    if False:
+        # Same trap as `_reuse_existing_clone`'''
+
+# A10 — SEVER THE STALE-GRAPH-FILE CHECK on the REUSE branch. The first F-9 fix
+# put its size check on the CREATE branch, which is the one branch a stale copy
+# never takes; `already-present` then certified a truncated file forever.
+[[arm]]
+id = "A10"
+test = "test_a_stale_graph_file_is_not_certified_already_present"
+file = "python/src/kb_setup/worktree.py"
+old = '''    here, there = dst.stat().st_size, src.stat().st_size
+    if here != there:'''
+new = '''    here, there = dst.stat().st_size, src.stat().st_size
+    if False:'''
+
+# A11 — REPLACE THE SYSCALL WITH A GENUINE PHYSICAL COPY that preserves every
+# observable the unit tests check (`""` on success, EEXIST, ENOENT). This is the
+# arm the suite did not have: round 1's F-8 said the fail-closed branches were
+# untested, the fix DELETED those branches, and nothing then tested the property
+# they protected — so a "simplification" away from ctypes would go unnoticed.
+# Only a free-space measurement can tell these apart.
+[[arm]]
+id = "A11"
+test = "test_a_physical_copy_is_not_a_clone"
+file = "python/src/kb_setup/worktree.py"
+old = '''    ctypes.set_errno(0)
+    rc = _LIBC.clonefile(os.fsencode(str(src)), os.fsencode(str(dst)), 0)
+    if rc == 0:
+        return ""'''
+new = '''    import shutil as _sh
+
+    if dst.exists():
+        return "EEXIST"
+    if not src.exists():
+        return "ENOENT"
+    _sh.copytree(src, dst) if src.is_dir() else _sh.copy2(src, dst)
+    rc = 0
+    if rc == 0:
         return ""'''
