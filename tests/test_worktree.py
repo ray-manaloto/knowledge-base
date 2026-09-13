@@ -270,3 +270,39 @@ def test_main_honours_explicit_target_flag(
     monkeypatch.setattr(wt, "_uv_sync", _no_sync)
     donor, target = donor_and_target
     assert wt.main(donor, ["--target", str(target)]) == int(Rc.OK)
+
+
+def test_a_donor_that_moved_mid_copy_refuses_and_removes_the_torn_copy(
+    donor_and_target: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The torn-copy branch, armed.
+
+    `/bin/cp -c -R` can observe a clone while `kb-build` or `kb-update` is
+    mutating it. The copy then has a HEAD the target's manifest does not pin —
+    and it fails the very end-to-end test this module exists to fix,
+    INTERMITTENTLY, so it reads as flake rather than as a missing check.
+
+    This test exists because a mutation arm found the branch UNCOVERED. Every
+    other fixture here builds a donor whose clone HEAD already equals the pin,
+    so the comparison was true in every direction and severing it changed
+    nothing. Advancing the donor past the target's pin is what makes the
+    branch reachable — the same shape as a donor moving mid-copy.
+    """
+    monkeypatch.setattr(wt, "_uv_sync", _no_sync)
+    donor, target = donor_and_target
+    name = wt.REQUIRED_CLONES[0]
+
+    moved = donor / "sources" / name
+    (moved / "marker.txt").write_text("the donor moved\n", encoding="utf-8")
+    _git(moved, "add", "-A")
+    _git(moved, "commit", "-q", "-m", "donor advanced past the target's pin")
+
+    result = wt.prepare_existing(target)
+
+    assert isinstance(result, Err)
+    assert result.rc == Rc.NOT_RUN
+    assert "moved during the copy" in result.message
+    assert not (target / "sources" / name).exists(), (
+        "the torn copy must be removed, not left in place for a later run to "
+        "report as already-present"
+    )

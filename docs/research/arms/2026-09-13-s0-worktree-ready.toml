@@ -1,0 +1,106 @@
+# Mutation arms for S0 (#S0, `kb-worktree-ready`) — the worktree readiness module.
+#
+# WHAT THIS SUITE IS ABOUT. The module's job is to make a fresh git worktree
+# usable, and every interesting failure it can have is SILENT: a torn copy that
+# still looks like a clone, a physical 11 GB copy that "succeeded", a refusal
+# that never fires. Each arm below severs ONE such detection independently and
+# requires `tests/test_worktree.py` to notice. A check verified only on clean
+# input is decoration (`.claude/rules/probes-need-a-control-arm.md` rule 2).
+#
+# CONTROL DISCIPLINE. A0 is a comment-only edit that must SURVIVE. If A0 dies,
+# every other row is void — the suite is failing for a reason that has nothing
+# to do with the mutation.
+
+suites = ["tests/test_worktree.py"]
+
+# A0 — the control. A comment-only edit that must change nothing.
+[[arm]]
+id = "A0"
+control = true
+file = "python/src/kb_setup/worktree.py"
+old = '''"""Apple's `cp`, by absolute path — the pinned GNU coreutils `cp` on PATH here
+has no `-c` flag and errors rather than cloning."""'''
+new = '''"""Apple's `cp`, by absolute path (control) — the pinned GNU coreutils `cp` on
+PATH here has no `-c` flag and errors rather than cloning."""'''
+
+# A1 — SEVER THE TORN-COPY CHECK. This is the requirement an advisor named and
+# the spec's first draft dropped entirely: `cp -c -R` can observe a clone while
+# `kb-build` mutates it, and the resulting copy has a HEAD that does not match
+# the pin. Without this branch the module reports `created` over a torn copy,
+# and the failure surfaces later as an intermittent test failure that reads as
+# flake rather than as a missing check.
+[[arm]]
+id = "A1"
+test = "test_a_donor_that_moved_mid_copy_refuses_and_removes_the_torn_copy"
+file = "python/src/kb_setup/worktree.py"
+old = '''    head = _rev_parse(dst)
+    if pin and head != pin:
+        import shutil'''
+new = '''    head = _rev_parse(dst)
+    if False:
+        import shutil'''
+
+# A2 — SEVER THE EXISTING-CLONE PIN CHECK. A clone already present in the target
+# at the WRONG commit must not be silently trusted; without this branch the
+# module reports `already-present` and the end-to-end tests it exists to fix
+# still fail, with nothing pointing at the cause.
+[[arm]]
+id = "A2"
+test = "test_refuses_when_an_existing_clone_disagrees_with_the_pin"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if pin and head != pin:
+        return Err(
+            f"{dst} HEAD is {head or 'UNAVAILABLE'}, not the pin {pin} — repair or "'''
+new = '''    if False:
+        return Err(
+            f"{dst} HEAD is {head or 'UNAVAILABLE'}, not the pin {pin} — repair or "'''
+
+# A3 — USE THE `cp` ON PATH INSTEAD OF APPLE'S. `cp` here resolves to this
+# repo's pinned GNU coreutils, which has no `-c` flag at all. This is the arm
+# for the gotcha that would otherwise be discovered only by noticing a copy took
+# minutes instead of seconds.
+[[arm]]
+id = "A3"
+test = "test_prepares_a_fresh_worktree"
+file = "python/src/kb_setup/worktree.py"
+old = '''_CP = Path("/bin/cp")'''
+new = '''_CP = Path("cp")'''
+
+# A4 — SEVER THE NOTHING-EXAMINED REFUSAL. The house rule is REFUSE rather than
+# return an empty result: a donor with none of the required material must exit
+# `Rc.NOT_RUN` naming what it examined, never a silent success that leaves the
+# caller believing the worktree is ready.
+[[arm]]
+id = "A4"
+test = "test_nothing_examined_refuses_naming_counts"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if not clones_present and not files_present:
+        return Err('''
+new = '''    if False:
+        return Err('''
+
+# A5 — SEVER THE MAIN-CHECKOUT REFUSAL. Running this against the main checkout
+# is a BAD_REQUEST, not work to be done; without the branch the module would
+# start copying the main checkout onto itself.
+[[arm]]
+id = "A5"
+test = "test_refuses_the_main_checkout"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if target == main_checkout:
+        return Err('''
+new = '''    if False:
+        return Err('''
+
+# A6 — SEVER THE LONGEST-MOUNTPOINT RULE. `_best_mount_type` is what makes
+# "fail closed if clonefile is unavailable" true, and it must pick the most
+# specific mountpoint containing the path. Taking the FIRST match instead lets a
+# parent mount's filesystem type answer for a nested one — which is exactly how
+# a non-APFS target would be mistaken for an APFS one.
+[[arm]]
+id = "A6"
+test = "test_best_mount_type_matches_the_longest_mountpoint"
+file = "python/src/kb_setup/worktree.py"
+old = '''        if (target == mount or target.startswith(mount.rstrip("/") + "/")) and len(mount) > len(
+            best_mount
+        ):'''
+new = '''        if (target == mount or target.startswith(mount.rstrip("/") + "/")) and not best_mount:'''
