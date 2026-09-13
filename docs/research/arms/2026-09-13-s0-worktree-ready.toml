@@ -1,14 +1,22 @@
-# Mutation arms for S0 (#S0, `kb-worktree-ready`) — the worktree readiness module.
+# Mutation arms for S0 (`kb-worktree-ready`) — the worktree readiness module.
 #
-# WHAT THIS SUITE IS ABOUT. The module's job is to make a fresh git worktree
-# usable, and every interesting failure it can have is SILENT: a torn copy that
-# still looks like a clone, a physical 11 GB copy that "succeeded", a refusal
-# that never fires. Each arm below severs ONE such detection independently and
-# requires `tests/test_worktree.py` to notice. A check verified only on clean
-# input is decoration (`.claude/rules/probes-need-a-control-arm.md` rule 2).
+# WHAT THIS SUITE IS ABOUT. Every interesting failure this module can have is
+# SILENT: a torn copy that still looks like a clone, a physical multi-hundred-MB
+# copy that "succeeded", a refusal that never fires, a HEAD read from the wrong
+# repository. Each arm severs ONE such detection and requires
+# `tests/test_worktree.py` to notice. A check verified only on clean input is
+# decoration (`.claude/rules/probes-need-a-control-arm.md` rule 2).
+#
+# REVISED after a cold review found three BLOCKING defects that this suite's
+# first version could not have caught, because the mechanism it armed was the
+# wrong one. A3 and A6 used to sever a `mount(8)` parser and a `/bin/cp -c`
+# invocation; both are GONE, replaced by `clonefile(2)` called directly. The
+# lesson is worth more than the rows: an arm can only ever ask whether a test
+# notices a change to the code that EXISTS — it cannot tell you the code is
+# built on a proxy that does not answer the question.
 #
 # CONTROL DISCIPLINE. A0 is a comment-only edit that must SURVIVE. If A0 dies,
-# every other row is void — the suite is failing for a reason that has nothing
+# every other row is void: the suite is failing for a reason that has nothing
 # to do with the mutation.
 
 suites = ["tests/test_worktree.py"]
@@ -18,17 +26,13 @@ suites = ["tests/test_worktree.py"]
 id = "A0"
 control = true
 file = "python/src/kb_setup/worktree.py"
-old = '''"""Apple's `cp`, by absolute path — the pinned GNU coreutils `cp` on PATH here
-has no `-c` flag and errors rather than cloning."""'''
-new = '''"""Apple's `cp`, by absolute path (control) — the pinned GNU coreutils `cp` on
-PATH here has no `-c` flag and errors rather than cloning."""'''
+old = '''#: The clones this repo's own end-to-end tests actually need.'''
+new = '''#: The clones this repo's own end-to-end tests actually need (control).'''
 
-# A1 — SEVER THE TORN-COPY CHECK. This is the requirement an advisor named and
-# the spec's first draft dropped entirely: `cp -c -R` can observe a clone while
-# `kb-build` mutates it, and the resulting copy has a HEAD that does not match
-# the pin. Without this branch the module reports `created` over a torn copy,
-# and the failure surfaces later as an intermittent test failure that reads as
-# flake rather than as a missing check.
+# A1 — SEVER THE TORN-COPY CHECK. The requirement an advisor named and the
+# spec's first draft dropped: a clone copied while `kb-build` mutates it has a
+# HEAD that does not match the pin, and the failure surfaces later as an
+# intermittent test failure that reads as flake.
 [[arm]]
 id = "A1"
 test = "test_a_donor_that_moved_mid_copy_refuses_and_removes_the_torn_copy"
@@ -40,10 +44,9 @@ new = '''    head = _rev_parse(dst)
     if False:
         import shutil'''
 
-# A2 — SEVER THE EXISTING-CLONE PIN CHECK. A clone already present in the target
-# at the WRONG commit must not be silently trusted; without this branch the
-# module reports `already-present` and the end-to-end tests it exists to fix
-# still fail, with nothing pointing at the cause.
+# A2 — SEVER THE EXISTING-CLONE PIN CHECK. A clone already present at the WRONG
+# commit must not be silently trusted, or the end-to-end tests this module
+# exists to fix still fail with nothing pointing at the cause.
 [[arm]]
 id = "A2"
 test = "test_refuses_when_an_existing_clone_disagrees_with_the_pin"
@@ -55,33 +58,34 @@ new = '''    if False:
         return Err(
             f"{dst} HEAD is {head or 'UNAVAILABLE'}, not the pin {pin} — repair or "'''
 
-# A3 — USE THE `cp` ON PATH INSTEAD OF APPLE'S. `cp` here resolves to this
-# repo's pinned GNU coreutils, which has no `-c` flag at all. This is the arm
-# for the gotcha that would otherwise be discovered only by noticing a copy took
-# minutes instead of seconds.
+# A3 — SEVER THE NON-CLONE-SQUATTER REFUSAL. This is a cold-review defect: a
+# pre-existing plain directory at `sources/<name>` was copied INTO, the pin was
+# then read from the enclosing repository, and the cleanup DELETED a directory
+# the module never created — while reporting a donor race that never happened.
+# The module can manufacture its own precondition, since an interrupted copy
+# leaves exactly that state.
 [[arm]]
 id = "A3"
-test = "test_prepares_a_fresh_worktree"
+test = "test_an_existing_non_clone_directory_is_refused_not_deleted"
 file = "python/src/kb_setup/worktree.py"
-old = '''_CP = Path("/bin/cp")'''
-new = '''_CP = Path("cp")'''
+old = '''    if dst.exists() and not (dst.is_dir() and not dst.is_symlink() and (dst / ".git").exists()):'''
+new = '''    if False:'''
 
-# A4 — SEVER THE NOTHING-EXAMINED REFUSAL. The house rule is REFUSE rather than
-# return an empty result: a donor with none of the required material must exit
-# `Rc.NOT_RUN` naming what it examined, never a silent success that leaves the
-# caller believing the worktree is ready.
+# A4 — SEVER THE MISSING-REQUIRED REFUSAL. Also a cold-review defect: a donor
+# with the graph files but neither clone exited 0 and declared the worktree
+# ready, printing two `skipped` rows that reached no exit code.
 [[arm]]
 id = "A4"
-test = "test_nothing_examined_refuses_naming_counts"
+test = "test_a_missing_required_clone_is_not_a_success"
 file = "python/src/kb_setup/worktree.py"
-old = '''    if not clones_present and not files_present:
+old = '''    if missing_clones or missing_files:
         return Err('''
 new = '''    if False:
         return Err('''
 
 # A5 — SEVER THE MAIN-CHECKOUT REFUSAL. Running this against the main checkout
-# is a BAD_REQUEST, not work to be done; without the branch the module would
-# start copying the main checkout onto itself.
+# is a BAD_REQUEST, not work to be done; without the branch it would start
+# copying the main checkout onto itself.
 [[arm]]
 id = "A5"
 test = "test_refuses_the_main_checkout"
@@ -91,16 +95,26 @@ old = '''    if target == main_checkout:
 new = '''    if False:
         return Err('''
 
-# A6 — SEVER THE LONGEST-MOUNTPOINT RULE. `_best_mount_type` is what makes
-# "fail closed if clonefile is unavailable" true, and it must pick the most
-# specific mountpoint containing the path. Taking the FIRST match instead lets a
-# parent mount's filesystem type answer for a nested one — which is exactly how
-# a non-APFS target would be mistaken for an APFS one.
+# A6 — SEVER THE GRAPH-FILE QUIESCENCE CHECK. The third cold-review finding:
+# clones were checked against their pin and the 756 MB graph files against
+# nothing, so a `kb-build` writing during the copy produced a truncated file
+# that `already-present` then certified on every later run.
 [[arm]]
 id = "A6"
-test = "test_best_mount_type_matches_the_longest_mountpoint"
+test = "test_a_graph_file_that_changed_size_mid_copy_is_removed"
 file = "python/src/kb_setup/worktree.py"
-old = '''        if (target == mount or target.startswith(mount.rstrip("/") + "/")) and len(mount) > len(
-            best_mount
-        ):'''
-new = '''        if (target == mount or target.startswith(mount.rstrip("/") + "/")) and not best_mount:'''
+old = '''    if copied != before or copied != after:'''
+new = '''    if False:'''
+
+# A7 — SEVER THE REPOSITORY-ROOT CHECK IN `_rev_parse`. `git -C <path> rev-parse
+# HEAD` WALKS UP: handed a non-repository it answers with the enclosing
+# worktree's HEAD and exits 0. Without `--show-toplevel` first, every pin
+# comparison in this module can be answered by the wrong repository.
+[[arm]]
+id = "A7"
+test = "test_rev_parse_refuses_an_ancestors_answer"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if top.returncode != 0 or Path(top.stdout.strip() or "/dev/null").resolve() != clone.resolve():
+        return ""'''
+new = '''    if False:
+        return ""'''

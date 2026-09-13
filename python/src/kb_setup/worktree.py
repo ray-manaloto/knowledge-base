@@ -13,8 +13,9 @@ and `kb-query` exits 2 in every worktree (no `graph.json`), so every worktree
 lane silently falls back to grepping — this repo's first standing instruction,
 broken by construction (#778, out of scope here).
 
-MECHANISM: APFS copy-on-write, via Apple's `/bin/cp -c -R` — NOT symlinks and
-NOT `git clone --local`. Both alternatives were measured and rejected:
+MECHANISM: copy-on-write, via `clonefile(2)` called directly — NOT symlinks,
+NOT `git clone --local`, and NOT `/bin/cp -c`. All three were measured and
+rejected:
 
 - a whole-`sources/` symlink shadows the worktree's own committed manifests
   with the donor's, and `git status` reports every tracked file under it as
@@ -24,23 +25,35 @@ NOT `git clone --local`. Both alternatives were measured and rejected:
   directories only, so a symlink (mode 120000) escapes it; `git check-ignore`
   confirms (rc 1 on a clone symlink, rc 0 on a real one);
 - `git clone --local` is silently ignored for a shallow source (`depth=1`),
-  and 8 of 97 clones including `sources/graphify` are shallow.
+  and 8 of the present clones including `sources/graphify` are shallow;
+- `/bin/cp -c` CANNOT FAIL CLOSED, which is the whole reason this module calls
+  the syscall instead. Apple's man page: *"if the target filesystem does not
+  support cloning, cp will fallback to using copyfile(2) instead to ensure the
+  copy still succeeds."* Measured across two real APFS volumes: rc 0, empty
+  stderr, and 62,918,656 bytes of real disk consumed — a full physical copy
+  reported as success.
 
-`cp` on PATH here is this repo's pinned GNU coreutils and has no `-c` flag —
-it must be invoked by absolute path. `shutil` has no `clonefile` binding.
+FAIL CLOSED, by asking the thing itself. `clonefile(2)` returns `EXDEV` across
+volumes and `ENOTSUP` where cloning is unsupported; it never falls back. The
+first version of this module tried to reach the same guarantee by parsing
+`mount(8)` and requiring both sides to report `apfs`, and a cold review armed
+that layer and found it wrong twice over, each way resolving toward PERMIT — a
+mountpoint with a SPACE in its name did not match the regex and the lookup then
+fell through to `/` (which is `apfs`), and `apfs AND apfs` is not `same volume`
+while `clonefile` is single-volume. Both defects are gone with the parser: see
+`_clonefile` for the arms.
 
-FAIL CLOSED, and NOT by trusting `cp -c`'s own exit code. Apple's own man page
-(read this session, contradicting the working assumption `cp -c` errors out):
-*"if the target filesystem does not support cloning, cp will fallback to using
-copyfile(2) instead to ensure the copy still succeeds."* So `cp -c -R` cannot
-fail loudly on an unsupported filesystem — it silently does the 11 GB physical
-copy the spec forbids. `_filesystem_type` checks BOTH donor and target are
-`apfs` (via `mount(8)`'s own report, the source of truth macOS itself uses)
-BEFORE any copy runs, and refuses rather than finding out afterward from how
-long it took.
+`shutil` has no `clonefile` binding, so `ctypes` is how the syscall is reached.
+Note `cp` on PATH here is this repo's pinned GNU coreutils and has no `-c` flag
+at all — a detail that no longer matters to this module and is recorded so the
+`/bin/cp` form is not reintroduced as a simplification.
+
+COUNTS ARE NOT QUOTED HERE. An earlier draft said "8 of 97 clones"; the tracked
+manifests and the clones actually present are different numbers and both move.
+Re-derive: `ls -d sources/*/ | wc -l` against `git ls-files sources/ | wc -l`.
 
 DONOR QUIESCENCE (a requirement an advisor consult named and a first draft of
-this spec dropped). `/bin/cp -c -R` can observe a clone while `kb-build` /
+this spec dropped). `clonefile(2)` can observe a clone while `kb-build` /
 `kb-update` mutates it underneath. A torn copy has a HEAD that does not match
 the pin, which fails the very test this module exists to fix — and does so
 INTERMITTENTLY, reading as flake rather than a missing check. So every copied
@@ -91,7 +104,10 @@ wrong.
 
 from __future__ import annotations
 
-import re
+import ctypes
+import ctypes.util
+import errno
+import os
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -104,9 +120,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Callable, Sequence
 
 #: The clones this repo's own end-to-end tests actually need. A future test
-#: needing a third clone adds it here — deliberately not "every clone": all 97
-#: would be ~580 s / ~100 MB per worktree, and time, not disk, is the
-#: constraint CoW does not remove.
+#: needing a third clone adds it here — deliberately not "every clone".
+#: Copying every present clone was measured at ~580 s against ~3 s for these
+#: two: TIME, dominated by inode count, is the constraint copy-on-write does
+#: not remove. Disk is a non-issue either way.
 REQUIRED_CLONES: tuple[str, ...] = ("skillopt", "graphify")
 
 #: The two graph files `kb-query` and `graphify-catalog` need, relative to a
@@ -120,14 +137,61 @@ REQUIRED_GRAPH_FILES: tuple[str, ...] = (
     "graphify-out/graph-prose.json",
 )
 
-_CP = Path("/bin/cp")
-"""Apple's `cp`, by absolute path — the pinned GNU coreutils `cp` on PATH here
-has no `-c` flag and errors rather than cloning."""
-
-#: `mount(8)`'s own report line: "<device> on <mountpoint> (<type>, ...)".
-_MOUNT_LINE = re.compile(r"^.+ on (?P<mount>/\S*) \((?P<type>[^,)]+)[^)]*\)\s*$")
-
 _USAGE = "kb-setup worktree-ready [--target PATH]"
+
+
+def _libc() -> ctypes.CDLL:
+    """libSystem, with `clonefile(2)` typed. Module-level so it binds once."""
+    lib = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    lib.clonefile.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint32]
+    lib.clonefile.restype = ctypes.c_int
+    return lib
+
+
+_LIBC = _libc()
+
+
+def _clonefile(src: Path, dst: Path) -> str:
+    """Clone `src` to `dst` with `clonefile(2)`. `""` on success, else why not.
+
+    🔴 THIS REPLACED `/bin/cp -c -R`, AND THE REASON IS THE WHOLE POINT OF THE
+    CHECK IT DELETED. `cp -c` cannot report that cloning was unavailable —
+    Apple's man page: *"if the target filesystem does not support cloning, cp
+    will fallback to using copyfile(2) instead to ensure the copy still
+    succeeds."* So a design that fails closed cannot be built on `cp -c`'s exit
+    code, and the first version of this module tried to compensate by parsing
+    `mount(8)` and requiring both sides to be `apfs`. A cold review armed that
+    parser and found it wrong in two independent ways, each resolving toward
+    PERMIT:
+
+    - a mountpoint containing a SPACE did not match its regex, and the lookup
+      then fell through to the longest match that did — always `/`, which is
+      `apfs` here. A non-cloneable volume read as cloneable;
+    - `apfs AND apfs` is not `same volume`, and `clonefile(2)` is single-volume.
+      Measured across two real APFS volumes: `/bin/cp -c` returned rc 0 with
+      empty stderr while consuming 62,918,656 bytes — a full physical copy.
+
+    The syscall has neither problem, because it is the thing being asked about
+    rather than a proxy for it. Armed both directions on this machine:
+
+    | arm | result |
+    |---|---|
+    | same volume (control) | rc 0 |
+    | across two APFS volumes | **-1 `EXDEV`** |
+    | `dst` already exists | **-1 `EEXIST`** |
+    | `src` missing | -1 `ENOENT` |
+
+    `EXDEV` is what makes fail-closed true with no filesystem-type check at
+    all, and `EEXIST` is load-bearing for a second reason — see
+    `_prepare_clone`. It recurses directories including `.git`, which
+    `graphify_catalog` requires (armed: a cloned tree's `.git/HEAD` is present).
+    """
+    ctypes.set_errno(0)
+    rc = _LIBC.clonefile(os.fsencode(str(src)), os.fsencode(str(dst)), 0)
+    if rc == 0:
+        return ""
+    code = ctypes.get_errno()
+    return f"clonefile({src} -> {dst}) failed: {errno.errorcode.get(code, code)}"
 
 
 def _run(argv: Sequence[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -135,7 +199,22 @@ def _run(argv: Sequence[str], *, cwd: Path | None = None) -> subprocess.Complete
 
 
 def _rev_parse(clone: Path) -> str:
-    """`git -C clone rev-parse HEAD`, or `""` — never accept stderr as evidence."""
+    """`clone`'s OWN HEAD, or `""` — never an ancestor repository's answer.
+
+    🔴 `git -C <path> rev-parse HEAD` WALKS UP. Handed a directory that is not
+    a repository, it answers with the enclosing worktree's HEAD and reports
+    success, so a caller comparing that against a pin gets a confident wrong
+    answer about the wrong repository. Armed: `_rev_parse("python/src")`
+    returned this checkout's own HEAD.
+
+    That is why `--show-toplevel` is checked first: it is the question "is this
+    path a repository root", and only then is HEAD worth reading. A cold review
+    found the earlier version deleting a pre-existing directory and blaming a
+    donor race that had not happened, on the strength of the walked-up answer.
+    """
+    top = _run(["git", "-C", str(clone), "rev-parse", "--show-toplevel"])
+    if top.returncode != 0 or Path(top.stdout.strip() or "/dev/null").resolve() != clone.resolve():
+        return ""
     proc = _run(["git", "-C", str(clone), "rev-parse", "HEAD"])
     return proc.stdout.strip() if proc.returncode == 0 and not proc.stderr else ""
 
@@ -160,53 +239,13 @@ def _registered_worktrees(start: Path) -> list[Path] | None:
     ]
 
 
-def _best_mount_type(mount_output: str, target: str) -> str:
-    """Pure: the longest-matching mountpoint's filesystem type for `target`.
-
-    Split from `_filesystem_type` so the matching logic — the part a defect
-    would actually live in — is testable against canned `mount(8)` text
-    without shelling out, while `_filesystem_type` itself stays a thin,
-    untested-by-design wrapper (`probes-need-a-control-arm.md`'s point about a
-    mocked subprocess testing the mock does not apply to a PARSER).
-    """
-    best_mount, best_type = "", ""
-    for line in mount_output.splitlines():
-        match = _MOUNT_LINE.match(line)
-        if not match:
-            continue
-        mount, fstype = match.group("mount"), match.group("type")
-        if (target == mount or target.startswith(mount.rstrip("/") + "/")) and len(mount) > len(
-            best_mount
-        ):
-            best_mount, best_type = mount, fstype
-    return best_type
-
-
-def _filesystem_type(path: Path) -> str:
-    """The filesystem type backing `path`, via `mount`'s own report.
-
-    Why not trust `cp -c`'s exit code: Apple's man page says a target
-    filesystem that cannot clone makes `cp -c` fall back to `copyfile(2)`
-    silently, so `cp` itself cannot tell us clonefile ran. This is the check
-    that makes "fail closed if clonefile is unavailable" actually true, by
-    asking BEFORE copying rather than trusting the copy's own success.
-    """
-    proc = _run(["mount"])
-    if proc.returncode != 0:
-        return ""
-    return _best_mount_type(proc.stdout, str(path.resolve()))
-
-
-def _clonefile_available(donor: Path, target: Path) -> bool:
-    return _filesystem_type(donor) == "apfs" and _filesystem_type(target) == "apfs"
-
-
-def _cow_copy(src: Path, dst: Path) -> str:
-    """CoW-copy `src` onto `dst` via `/bin/cp -c -R`. Returns stderr, `""` on success."""
-    proc = _run([str(_CP), "-c", "-R", str(src), str(dst)])
-    if proc.returncode != 0:
-        return proc.stderr.strip() or f"cp -c -R exited {proc.returncode}"
-    return ""
+#: DELETED, deliberately, and recorded so nobody rebuilds it: `_MOUNT_LINE`,
+#: `_best_mount_type`, `_filesystem_type` and `_clonefile_available` used to
+#: parse `mount(8)` and require both sides to report `apfs`. That whole layer
+#: existed only because `/bin/cp -c` cannot say whether it cloned. Asking
+#: `clonefile(2)` directly answers the real question — *can this source be
+#: cloned to this destination* — so the proxy, its regex and its two tests are
+#: gone rather than fixed. See `_clonefile` for the arms.
 
 
 def _pinned_commit(target: Path, name: str) -> str | None:
@@ -249,7 +288,18 @@ def _reuse_existing_clone(dst: Path, rel: str, pin: str | None) -> Result[Worktr
     this module, deliberately, so the caller's branch reads as "try reuse,
     else copy" rather than a third `Result` state nothing else needs.
     """
-    if not (dst.is_dir() and not dst.is_symlink() and (dst / ".git").exists()):
+    if dst.exists() and not (dst.is_dir() and not dst.is_symlink() and (dst / ".git").exists()):
+        # Present but NOT a clone — a symlink, a file, or a plain directory an
+        # interrupted run left behind. Refuse by name. Falling through to the
+        # copy would surface this as a bare `EEXIST`, which is true and tells
+        # the reader nothing about what to do; and the version before
+        # `clonefile(2)` copied INTO such a directory and then deleted it.
+        return Err(
+            f"{dst} exists and is not a git clone — remove it by hand and re-run. "
+            f"Not touching a path this task did not create",
+            rc=Rc.BAD_REQUEST,
+        )
+    if not dst.exists():
         return None
     head = _rev_parse(dst)
     if pin and head != pin:
@@ -261,19 +311,25 @@ def _reuse_existing_clone(dst: Path, rel: str, pin: str | None) -> Result[Worktr
     return Ok(_item(rel, WorktreeItemStatus.already_present, f"HEAD {head or 'UNAVAILABLE'}"))
 
 
-def _copy_clone(
-    src: Path, dst: Path, rel: str, pin: str | None, *, fs_ok: bool
-) -> Result[WorktreeItem]:
-    if not fs_ok:
-        return Err(
-            f"clonefile is unavailable copying {src} to {dst} (not both APFS) — "
-            f"refusing to physically copy {rel} rather than silently degrading",
-            rc=Rc.NOT_RUN,
-        )
+def _copy_clone(src: Path, dst: Path, rel: str, pin: str | None) -> Result[WorktreeItem]:
+    """Clone `src` onto a `dst` that must NOT already exist.
+
+    Nothing here checks the filesystem first, and that is the design: the
+    `clonefile(2)` call IS the check. It returns `EXDEV` across volumes and
+    `ENOTSUP` where cloning is unsupported, so there is no path on which this
+    silently performs a physical copy — which is precisely what `/bin/cp -c`
+    could not promise.
+
+    `EEXIST` is doing a second job. The earlier `cp -R` form, handed a `dst`
+    that already existed as a plain directory, copied INTO it and produced
+    `dst/<name>/` — after which the pin check read the wrong repository and the
+    cleanup deleted a directory this module never created. The syscall refuses
+    that case outright, so it cannot arise.
+    """
     dst.parent.mkdir(parents=True, exist_ok=True)
-    stderr = _cow_copy(src, dst)
-    if stderr:
-        return Err(f"copying {rel} failed: {stderr}", rc=Rc.NOT_RUN)
+    failure = _clonefile(src, dst)
+    if failure:
+        return Err(f"copying {rel} failed: {failure}", rc=Rc.NOT_RUN)
 
     head = _rev_parse(dst)
     if pin and head != pin:
@@ -288,7 +344,7 @@ def _copy_clone(
     return Ok(_item(rel, WorktreeItemStatus.created, f"HEAD {head or 'UNAVAILABLE'}"))
 
 
-def _prepare_clone(donor: Path, target: Path, name: str, *, fs_ok: bool) -> Result[WorktreeItem]:
+def _prepare_clone(donor: Path, target: Path, name: str) -> Result[WorktreeItem]:
     rel = f"sources/{name}"
     src, dst = donor / "sources" / name, target / "sources" / name
     if not (src / ".git").exists():
@@ -298,28 +354,40 @@ def _prepare_clone(donor: Path, target: Path, name: str, *, fs_ok: bool) -> Resu
     existing = _reuse_existing_clone(dst, rel, pin)
     if existing is not None:
         return existing
-    return _copy_clone(src, dst, rel, pin, fs_ok=fs_ok)
+    return _copy_clone(src, dst, rel, pin)
 
 
-def _prepare_graph_file(
-    donor: Path, target: Path, rel: str, *, fs_ok: bool
-) -> Result[WorktreeItem]:
+def _prepare_graph_file(donor: Path, target: Path, rel: str) -> Result[WorktreeItem]:
+    """Clone one graph file, then prove the copy is the size the donor was.
+
+    A clone has no pin to check it against, so the quiescence guarantee the
+    clones get cannot be had here — but the asymmetry was total until a cold
+    review named it, and a `kb-build` writing `graph.json` mid-copy yields a
+    truncated file that the `already-present` branch then certifies on every
+    later run. Comparing the size against the donor AFTER the copy catches the
+    torn case cheaply; it is weaker than a pin and is stated as such rather
+    than left to look like the clones' check.
+    """
     src, dst = donor / rel, target / rel
     if not src.is_file():
         return Ok(_item(rel, WorktreeItemStatus.skipped, "donor has no such file"))
     if dst.is_file() and not dst.is_symlink():
         return Ok(_item(rel, WorktreeItemStatus.already_present))
-    if not fs_ok:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    before = src.stat().st_size
+    failure = _clonefile(src, dst)
+    if failure:
+        return Err(f"copying {rel} failed: {failure}", rc=Rc.NOT_RUN)
+    copied, after = dst.stat().st_size, src.stat().st_size
+    if copied != before or copied != after:
+        dst.unlink(missing_ok=True)
         return Err(
-            f"clonefile is unavailable between {donor} and {target} (not both APFS) — "
-            f"refusing to physically copy {rel} rather than silently degrading",
+            f"{rel} copied {copied} bytes; the donor read {before} before and {after} "
+            f"after — it was being written during the copy. Removed the torn copy "
+            f"rather than leaving it to be reported already-present forever",
             rc=Rc.NOT_RUN,
         )
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    stderr = _cow_copy(src, dst)
-    if stderr:
-        return Err(f"copying {rel} failed: {stderr}", rc=Rc.NOT_RUN)
-    return Ok(_item(rel, WorktreeItemStatus.created))
+    return Ok(_item(rel, WorktreeItemStatus.created, f"{copied} bytes"))
 
 
 def _uv_sync(target: Path) -> Err | None:
@@ -352,6 +420,14 @@ def _resolve_target_and_donor(target: Path, donor: Path | None) -> Result[tuple[
     main_checkout = worktrees[0]
     resolved_donor = donor.resolve() if donor is not None else main_checkout
 
+    # Running from a SUBDIRECTORY of a worktree used to refuse with "not a
+    # registered linked worktree", which is false — you are inside one, just
+    # not standing at its root. `git` already answers this; ask it rather than
+    # requiring the caller to `cd` first.
+    top = _run(["git", "-C", str(target), "rev-parse", "--show-toplevel"])
+    if top.returncode == 0 and top.stdout.strip():
+        target = Path(top.stdout.strip()).resolve()
+
     if target == main_checkout:
         return Err(
             f"{target} is the main checkout, not a linked worktree — it already has "
@@ -372,26 +448,36 @@ def _prepare_all_items(donor: Path, target: Path) -> Result[list[WorktreeItem]]:
     """Every required clone, then every required graph file — Err short-circuits."""
     clones_present = [n for n in REQUIRED_CLONES if (donor / "sources" / n / ".git").exists()]
     files_present = [p for p in REQUIRED_GRAPH_FILES if (donor / p).is_file()]
-    if not clones_present and not files_present:
+    missing_clones = [n for n in REQUIRED_CLONES if n not in clones_present]
+    missing_files = [p for p in REQUIRED_GRAPH_FILES if p not in files_present]
+
+    # 🔴 REQUIRED means required. This refused only when EVERYTHING was absent
+    # until a cold review armed it: a donor with the graph files but neither
+    # clone returned `Ok`, printed two `skipped` rows and exited 0 — declaring
+    # a worktree ready in which both tests this module exists to fix still
+    # fail. `skipped` is a real status and it is the right ROW; what was wrong
+    # is that no skipped REQUIRED item reached the exit code.
+    if missing_clones or missing_files:
         return Err(
-            f"donor {donor} has none of the required clones or graph files — "
-            f"examined {len(REQUIRED_CLONES)} clone(s): {', '.join(REQUIRED_CLONES)}; "
-            f"examined {len(REQUIRED_GRAPH_FILES)} graph file(s): "
-            f"{', '.join(REQUIRED_GRAPH_FILES)}",
+            f"donor {donor} is missing required material — "
+            f"clones {missing_clones or 'none'} of "
+            f"{len(REQUIRED_CLONES)} examined ({', '.join(REQUIRED_CLONES)}); "
+            f"graph files {missing_files or 'none'} of "
+            f"{len(REQUIRED_GRAPH_FILES)} examined ({', '.join(REQUIRED_GRAPH_FILES)}). "
+            f"Run `mise run kb-build` in the donor, then re-run this",
             rc=Rc.NOT_RUN,
         )
 
-    fs_ok = _clonefile_available(donor, target)
     items: list[WorktreeItem] = []
     for name in REQUIRED_CLONES:
-        result = _prepare_clone(donor, target, name, fs_ok=fs_ok)
+        result = _prepare_clone(donor, target, name)
         if not isinstance(result, Ok):
             return result
         items.append(result.value)
 
     (target / "graphify-out").mkdir(parents=True, exist_ok=True)
     for rel in REQUIRED_GRAPH_FILES:
-        result = _prepare_graph_file(donor, target, rel, fs_ok=fs_ok)
+        result = _prepare_graph_file(donor, target, rel)
         if not isinstance(result, Ok):
             return result
         items.append(result.value)

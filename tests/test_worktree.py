@@ -14,6 +14,7 @@ hand against a real throwaway worktree per the spec's verification sequence.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -217,20 +218,65 @@ def test_refuses_when_an_existing_clone_disagrees_with_the_pin(
     assert "HEAD" in result.message
 
 
-def test_best_mount_type_matches_the_longest_mountpoint() -> None:
-    """Pure parser test: a nested mountpoint must win over its parent."""
-    mount_output = (
-        "/dev/disk3s1s1 on / (apfs, local, journaled)\n"
-        "/dev/disk3s6 on /System/Volumes/VM (apfs, local, journaled, noexec)\n"
-        "map auto_home on /home (autofs, automounted, nobrowse)\n"
-    )
-    assert wt._best_mount_type(mount_output, "/Users/t/repo") == "apfs"
-    assert wt._best_mount_type(mount_output, "/System/Volumes/VM/x") == "apfs"
-    assert wt._best_mount_type(mount_output, "/home/t") == "autofs"
+def test_clonefile_refuses_an_existing_destination(tmp_path: Path) -> None:
+    """EEXIST, and it is load-bearing rather than incidental.
+
+    The `/bin/cp -R` form this replaced copied INTO an existing directory,
+    producing `dst/<name>/`; the pin check then read the enclosing repository
+    and the cleanup deleted a directory the module never created. The syscall
+    refusing outright is what makes that unreachable, so it is armed here
+    rather than assumed.
+    """
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "f.txt").write_text("x\n", encoding="utf-8")
+    dst = tmp_path / "dst"
+    dst.mkdir()
+
+    failure = wt._clonefile(src, dst)
+
+    assert failure, "cloning onto an existing path must fail, not merge into it"
+    assert "EEXIST" in failure
+    assert not (dst / "src").exists(), "nothing may be copied INTO the existing directory"
 
 
-def test_best_mount_type_reports_nothing_for_no_match() -> None:
-    assert wt._best_mount_type("garbage\nnot a mount line\n", "/no/such/mount") == ""
+def test_clonefile_succeeds_and_recurses_into_dot_git(tmp_path: Path) -> None:
+    """The control arm for the test above, plus the `.git` claim.
+
+    `graphify_catalog` needs `clone/.git` to exist in the copy, so a mechanism
+    that skipped dotfiles would pass every other test here and fail the one
+    end-to-end test this module exists to fix.
+    """
+    src = tmp_path / "src"
+    (src / ".git").mkdir(parents=True)
+    (src / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    dst = tmp_path / "dst"
+
+    assert wt._clonefile(src, dst) == ""
+    assert (dst / ".git" / "HEAD").is_file()
+
+
+def test_clonefile_refuses_a_missing_source(tmp_path: Path) -> None:
+    failure = wt._clonefile(tmp_path / "nope", tmp_path / "dst")
+    assert "ENOENT" in failure
+
+
+def test_rev_parse_refuses_an_ancestors_answer(tmp_path: Path) -> None:
+    """`git -C <path> rev-parse HEAD` WALKS UP — this must not accept that.
+
+    Armed against the real failure: a plain directory nested inside a real
+    repository. `git` answers with the enclosing repository's HEAD and exits
+    0, so a caller comparing that to a pin gets a confident wrong answer about
+    the wrong repository. The control arm below is the same call on a genuine
+    clone root, which must still return its own HEAD.
+    """
+    repo = tmp_path / "repo"
+    head = _init_clone(repo)
+    nested = repo / "not-a-repo"
+    nested.mkdir()
+
+    assert wt._rev_parse(nested) == "", "an ancestor's HEAD is not this path's HEAD"
+    assert wt._rev_parse(repo) == head, "control: a real clone root still answers"
 
 
 def test_parse_rejects_unknown_flag() -> None:
@@ -306,3 +352,97 @@ def test_a_donor_that_moved_mid_copy_refuses_and_removes_the_torn_copy(
         "the torn copy must be removed, not left in place for a later run to "
         "report as already-present"
     )
+
+
+def test_a_missing_required_clone_is_not_a_success(
+    donor_and_target: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A donor with the graph files but not the clones must NOT exit 0.
+
+    `REQUIRED_CLONES` is named required. The first version refused only when
+    clones AND graph files were all absent, so this case returned `Ok`, printed
+    two `skipped` rows, and declared a worktree ready in which both end-to-end
+    tests still fail. `skipped` is the right ROW; what was missing is that no
+    skipped REQUIRED item reached the exit code.
+    """
+    monkeypatch.setattr(wt, "_uv_sync", _no_sync)
+    donor, target = donor_and_target
+    shutil.rmtree(donor / "sources" / wt.REQUIRED_CLONES[0])
+
+    result = wt.prepare_existing(target)
+
+    assert isinstance(result, Err)
+    assert result.rc == Rc.NOT_RUN
+    assert wt.REQUIRED_CLONES[0] in result.message
+    assert "kb-build" in result.message, "a refusal must name the remediation"
+
+
+def test_an_existing_non_clone_directory_is_refused_not_deleted(
+    donor_and_target: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The destructive path, armed.
+
+    An interrupted copy can leave `sources/<name>/` present without a usable
+    `.git`, and the module can therefore manufacture its own precondition. The
+    earlier version copied into that directory, misread the pin from the
+    enclosing worktree, and then `rmtree`'d it — destroying a directory it had
+    not created, while reporting a donor race that never happened.
+    """
+    monkeypatch.setattr(wt, "_uv_sync", _no_sync)
+    _, target = donor_and_target
+    name = wt.REQUIRED_CLONES[0]
+    squatter = target / "sources" / name
+    squatter.mkdir(parents=True)
+    (squatter / "IMPORTANT.txt").write_text("not ours to delete\n", encoding="utf-8")
+
+    result = wt.prepare_existing(target)
+
+    assert isinstance(result, Err)
+    assert result.rc == Rc.BAD_REQUEST, "the request was wrong, not the world"
+    assert (squatter / "IMPORTANT.txt").is_file(), "must not delete what it did not create"
+    assert "moved during the copy" not in result.message, (
+        "must not blame a race that did not happen"
+    )
+
+
+def test_a_graph_file_that_changed_size_mid_copy_is_removed(
+    donor_and_target: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Donor quiescence for the graph files, which had none.
+
+    A clone is checked against its pin; a graph file has no pin, so the copy
+    was accepted unconditionally — and `already-present` then certified a
+    truncated file on every later run. Simulated by growing the donor file
+    during the clone, which is what a concurrent `kb-build` does.
+    """
+    monkeypatch.setattr(wt, "_uv_sync", _no_sync)
+    _donor, target = donor_and_target
+    rel = wt.REQUIRED_GRAPH_FILES[0]
+    real_clonefile = wt._clonefile
+
+    def _grow_the_donor_mid_copy(src: Path, dst: Path) -> str:
+        failure = real_clonefile(src, dst)
+        if str(src).endswith(rel):
+            src.write_text('{"nodes": [1, 2, 3]}\n', encoding="utf-8")
+        return failure
+
+    monkeypatch.setattr(wt, "_clonefile", _grow_the_donor_mid_copy)
+
+    result = wt.prepare_existing(target)
+
+    assert isinstance(result, Err)
+    assert result.rc == Rc.NOT_RUN
+    assert "being written during the copy" in result.message
+    assert not (target / rel).exists(), "the torn copy must not survive to be reported present"
+
+
+def test_running_from_a_subdirectory_resolves_to_the_worktree_root(
+    donor_and_target: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A subdirectory is INSIDE a worktree; refusing it told the caller a falsehood."""
+    monkeypatch.setattr(wt, "_uv_sync", _no_sync)
+    _, target = donor_and_target
+    subdir = target / "python" / "src"
+    subdir.mkdir(parents=True)
+
+    assert wt.main(subdir, []) == int(Rc.OK)
