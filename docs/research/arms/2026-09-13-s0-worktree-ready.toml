@@ -1,0 +1,183 @@
+# Mutation arms for S0 (`kb-worktree-ready`) — the worktree readiness module.
+#
+# WHAT THIS SUITE IS ABOUT. Every interesting failure this module can have is
+# SILENT: a torn copy that still looks like a clone, a physical multi-hundred-MB
+# copy that "succeeded", a refusal that never fires, a HEAD read from the wrong
+# repository. Each arm severs ONE such detection and requires
+# `tests/test_worktree.py` to notice. A check verified only on clean input is
+# decoration (`.claude/rules/probes-need-a-control-arm.md` rule 2).
+#
+# REVISED after a cold review found three BLOCKING defects that this suite's
+# first version could not have caught, because the mechanism it armed was the
+# wrong one. A3 and A6 used to sever a `mount(8)` parser and a `/bin/cp -c`
+# invocation; both are GONE, replaced by `clonefile(2)` called directly. The
+# lesson is worth more than the rows: an arm can only ever ask whether a test
+# notices a change to the code that EXISTS — it cannot tell you the code is
+# built on a proxy that does not answer the question.
+#
+# CONTROL DISCIPLINE. A0 is a comment-only edit that must SURVIVE. If A0 dies,
+# every other row is void: the suite is failing for a reason that has nothing
+# to do with the mutation.
+
+suites = ["tests/test_worktree.py"]
+
+# A0 — the control. A comment-only edit that must change nothing.
+[[arm]]
+id = "A0"
+control = true
+file = "python/src/kb_setup/worktree.py"
+old = '''#: The clones this repo's own end-to-end tests actually need.'''
+new = '''#: The clones this repo's own end-to-end tests actually need (control).'''
+
+# A1 — SEVER THE TORN-COPY CHECK. The requirement an advisor named and the
+# spec's first draft dropped: a clone copied while `kb-build` mutates it has a
+# HEAD that does not match the pin, and the failure surfaces later as an
+# intermittent test failure that reads as flake.
+[[arm]]
+id = "A1"
+test = "test_a_donor_that_moved_mid_copy_refuses_and_removes_the_torn_copy"
+file = "python/src/kb_setup/worktree.py"
+old = '''    head = _rev_parse(dst)
+    if pin and head != pin:
+        import shutil'''
+new = '''    head = _rev_parse(dst)
+    if False:
+        import shutil'''
+
+# A2 — SEVER THE EXISTING-CLONE PIN CHECK. A clone already present at the WRONG
+# commit must not be silently trusted, or the end-to-end tests this module
+# exists to fix still fail with nothing pointing at the cause.
+[[arm]]
+id = "A2"
+test = "test_refuses_when_an_existing_clone_disagrees_with_the_pin"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if pin and head != pin:
+        return Err(
+            f"{dst} HEAD is {head or 'UNAVAILABLE'}, not the pin {pin} — repair or "'''
+new = '''    if False:
+        return Err(
+            f"{dst} HEAD is {head or 'UNAVAILABLE'}, not the pin {pin} — repair or "'''
+
+# A3 — SEVER THE NON-CLONE-SQUATTER REFUSAL. This is a cold-review defect: a
+# pre-existing plain directory at `sources/<name>` was copied INTO, the pin was
+# then read from the enclosing repository, and the cleanup DELETED a directory
+# the module never created — while reporting a donor race that never happened.
+# The module can manufacture its own precondition, since an interrupted copy
+# leaves exactly that state.
+[[arm]]
+id = "A3"
+test = "test_an_existing_non_clone_directory_is_refused_not_deleted"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if (dst.is_symlink() or dst.exists()) and not (
+        dst.is_dir() and not dst.is_symlink() and (dst / ".git").exists()
+    ):'''
+new = '''    if False:'''
+
+# A4 — SEVER THE MISSING-REQUIRED REFUSAL. Also a cold-review defect: a donor
+# with the graph files but neither clone exited 0 and declared the worktree
+# ready, printing two `skipped` rows that reached no exit code.
+[[arm]]
+id = "A4"
+test = "test_a_missing_required_clone_is_not_a_success"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if absent:
+        return Err('''
+new = '''    if False:
+        return Err('''
+
+# A5 — SEVER THE MAIN-CHECKOUT REFUSAL. Running this against the main checkout
+# is a BAD_REQUEST, not work to be done; without the branch it would start
+# copying the main checkout onto itself.
+[[arm]]
+id = "A5"
+test = "test_refuses_the_main_checkout"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if target == main_checkout:
+        return Err('''
+new = '''    if False:
+        return Err('''
+
+# A6 — SEVER THE GRAPH-FILE QUIESCENCE CHECK. The third cold-review finding:
+# clones were checked against their pin and the 756 MB graph files against
+# nothing, so a `kb-build` writing during the copy produced a truncated file
+# that `already-present` then certified on every later run.
+[[arm]]
+id = "A6"
+test = "test_a_graph_file_that_changed_size_mid_copy_is_removed"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if copied != before or copied != after:'''
+new = '''    if False:'''
+
+# A7 — SEVER THE REPOSITORY-ROOT CHECK IN `_rev_parse`. `git -C <path> rev-parse
+# HEAD` WALKS UP: handed a non-repository it answers with the enclosing
+# worktree's HEAD and exits 0. Without `--show-toplevel` first, every pin
+# comparison in this module can be answered by the wrong repository.
+[[arm]]
+id = "A7"
+test = "test_rev_parse_refuses_an_ancestors_answer"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if top.returncode != 0 or Path(top.stdout.strip() or "/dev/null").resolve() != clone.resolve():
+        return ""'''
+new = '''    if False:
+        return ""'''
+
+# A8 — SEVER THE DANGLING-SYMLINK HALF of the guard, leaving the `exists()` the
+# round-1 fix shipped. `Path.exists()` FOLLOWS symlinks, so a dangling one reads
+# as absent and `clonefile(2)` (flags=0 follows the link) writes a whole clone at
+# the link's target, OUTSIDE the worktree — from a guard whose own message says
+# it is not touching what it did not create. Round 2 found this in round 1's fix.
+[[arm]]
+id = "A8"
+test = "test_a_dangling_symlink_at_the_destination_is_refused_not_written_through"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if (dst.is_symlink() or dst.exists()) and not ('''
+new = '''    if (dst.exists()) and not ('''
+
+# A9 — SEVER THE SAME GUARD ON THE GRAPH PATH, where it landed worse: nothing
+# downstream disagreed, so the run returned `created` and rc 0 while putting the
+# graph outside the worktree.
+[[arm]]
+id = "A9"
+test = "test_a_dangling_symlink_at_a_graph_path_is_refused"
+file = "python/src/kb_setup/worktree.py"
+old = '''    if dst.is_symlink():
+        # Same trap as `_reuse_existing_clone`'''
+new = '''    if False:
+        # Same trap as `_reuse_existing_clone`'''
+
+# A10 — SEVER THE STALE-GRAPH-FILE CHECK on the REUSE branch. The first F-9 fix
+# put its size check on the CREATE branch, which is the one branch a stale copy
+# never takes; `already-present` then certified a truncated file forever.
+[[arm]]
+id = "A10"
+test = "test_a_stale_graph_file_is_not_certified_already_present"
+file = "python/src/kb_setup/worktree.py"
+old = '''    here, there = dst.stat().st_size, src.stat().st_size
+    if here != there:'''
+new = '''    here, there = dst.stat().st_size, src.stat().st_size
+    if False:'''
+
+# A11 — REPLACE THE SYSCALL WITH A GENUINE PHYSICAL COPY that preserves every
+# observable the unit tests check (`""` on success, EEXIST, ENOENT). This is the
+# arm the suite did not have: round 1's F-8 said the fail-closed branches were
+# untested, the fix DELETED those branches, and nothing then tested the property
+# they protected — so a "simplification" away from ctypes would go unnoticed.
+# Only a free-space measurement can tell these apart.
+[[arm]]
+id = "A11"
+test = "test_a_physical_copy_is_not_a_clone"
+file = "python/src/kb_setup/worktree.py"
+old = '''    ctypes.set_errno(0)
+    rc = _LIBC.clonefile(os.fsencode(str(src)), os.fsencode(str(dst)), 0)
+    if rc == 0:
+        return ""'''
+new = '''    import shutil as _sh
+
+    if dst.exists():
+        return "EEXIST"
+    if not src.exists():
+        return "ENOENT"
+    _sh.copytree(src, dst) if src.is_dir() else _sh.copy2(src, dst)
+    rc = 0
+    if rc == 0:
+        return ""'''

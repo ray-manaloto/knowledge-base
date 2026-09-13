@@ -63,7 +63,7 @@ def _print_usage() -> int:
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | graphify-catalog | "
-        "lock-drift | mod-runtime-check [--arms] | "
+        "lock-drift | mod-runtime-check [--arms] | worktree-ready [--target PATH] | "
         "telemetry-prune | serve | serve-memory | env-refresh [--sentinel] | "
         "codex-config-check | "
         "instruction-edit-guard | "
@@ -228,6 +228,16 @@ def _run(argv: list[str] | None = None) -> int:
         # in `graphify_baseline`'s authority literal describe the commit the
         # manifest pins — and it reads the pinned COMMIT, never the worktree.
         return graphify_catalog.main(repo_root, rest)
+    if cmd == "worktree-ready":
+        from kb_setup import worktree
+
+        # A bare arm on `funnel`'s precedent: no graph read or write, so no
+        # `_GRAPH_WRITERS` membership. Makes a fresh worktree usable — CoW-copies
+        # the required `sources/*` clones and graph files from the main checkout,
+        # then runs `uv sync --locked` in the target — because a fresh worktree
+        # has neither and two end-to-end tests fail there and pass in the main
+        # checkout at the same base.
+        return worktree.main(repo_root, rest)
     if cmd == "mod-runtime-check":
         from kb_setup import mod_runtime
 

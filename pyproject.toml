@@ -426,6 +426,12 @@ custom-template-dir = "schemas/templates/guard-policy"
 custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
 """Generated guard-policy enum; edit the schema and rerun the generator."""'''
 
+[tool.datamodel-codegen.jobs.worktree]
+input = "schemas/worktree.schema.json"
+output = "python/src/kb_setup/generated/worktree.py"
+custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
+"""Generated worktree-readiness models; edit the schema and rerun the generator."""'''
+
 [tool.datamodel-codegen.jobs.codex-review-evidence]
 input = "schemas/codex-review-evidence.schema.json"
 output = "python/src/kb_setup/generated/codex_review_evidence.py"

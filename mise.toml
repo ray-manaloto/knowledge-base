@@ -1160,6 +1160,35 @@ run = "uv run kb-setup graphify-catalog"
 # the bound exists so a wedged git cannot hold the gate batch open.
 timeout = "120s"
 
+[tasks.kb-worktree-ready]
+description = "Make a fresh git worktree usable: CoW-copy required sources/* clones + graph files, then uv sync"
+# Built because a fresh worktree has ZERO sources/* clones (gitignored,
+# re-fetched by kb-build) and no graphify-out/, so two end-to-end tests fail
+# there and pass in the main checkout at the same base
+# (test_skillopt_contract.py::test_live_installed_contract_and_repository_are_exact,
+# test_graphify_catalog.py::test_the_real_repo_agrees_with_its_own_pin) — and a
+# graph-less worktree also breaks the graph-first standing instruction (#778).
+#
+# NATIVE, and it is the SYSCALL: `clonefile(2)` via ctypes — never `/bin/cp -c`,
+# which cannot fail closed (Apple's man page: it falls back to `copyfile(2)`
+# silently, so rc 0 does not mean it cloned), never `worktree.symlinkDirectories`
+# (shadows tracked manifests / cannot serve the two graph FILES) and never
+# `.worktreeinclude` (a real copy, not CoW, and only applies to worktrees Claude
+# Code itself created). This line said `/bin/cp -c -R` until a cold review found
+# the check built on it could not fail closed; the module docstring was rewritten
+# in that commit and this task comment was not, which is the stale-describing-doc
+# class `tool-currency-and-native-first.md` rule 5 exists for.
+# `[deps.uv] auto = true` above already syncs the SAME-checkout case; this
+# task's own `uv sync --locked` is for the cross-checkout `--target` case.
+#
+# Idempotent, and repair-first rather than create-then-repair: the harness
+# makes worktrees (`Agent(isolation: "worktree")`, `EnterWorktree`) without
+# asking us, so a create-only task would be unreachable in exactly the case
+# that matters. Nothing calls this automatically yet — that wiring is a later
+# unit; this task always names its own remediation command on refusal.
+run = "uv run kb-setup worktree-ready"
+timeout = "180s"
+
 [tasks.kb-codex]
 description = "Run a codex lane with this repo's mandatory flags; --timeout bounds it (#672 U1)"
 # The ONE place that owns the codex flags, so a lane cannot be wrong by
