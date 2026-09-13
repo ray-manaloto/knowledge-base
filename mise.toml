@@ -1160,6 +1160,30 @@ run = "uv run kb-setup graphify-catalog"
 # the bound exists so a wedged git cannot hold the gate batch open.
 timeout = "120s"
 
+[tasks.kb-worktree-ready]
+description = "Make a fresh git worktree usable: CoW-copy required sources/* clones + graph files, then uv sync"
+# Built because a fresh worktree has ZERO sources/* clones (gitignored,
+# re-fetched by kb-build) and no graphify-out/, so two end-to-end tests fail
+# there and pass in the main checkout at the same base
+# (test_skillopt_contract.py::test_live_installed_contract_and_repository_are_exact,
+# test_graphify_catalog.py::test_the_real_repo_agrees_with_its_own_pin) — and a
+# graph-less worktree also breaks the graph-first standing instruction (#778).
+#
+# NATIVE, as far as one exists: APFS clonefile via `/bin/cp -c -R`, never a
+# physical copy and never `worktree.symlinkDirectories` (shadows tracked
+# manifests / cannot serve the two graph FILES) or `.worktreeinclude` (a real
+# copy, not CoW, and only applies to worktrees Claude Code itself created).
+# `[deps.uv] auto = true` above already syncs the SAME-checkout case; this
+# task's own `uv sync --locked` is for the cross-checkout `--target` case.
+#
+# Idempotent, and repair-first rather than create-then-repair: the harness
+# makes worktrees (`Agent(isolation: "worktree")`, `EnterWorktree`) without
+# asking us, so a create-only task would be unreachable in exactly the case
+# that matters. Nothing calls this automatically yet — that wiring is a later
+# unit; this task always names its own remediation command on refusal.
+run = "uv run kb-setup worktree-ready"
+timeout = "180s"
+
 [tasks.kb-codex]
 description = "Run a codex lane with this repo's mandatory flags; --timeout bounds it (#672 U1)"
 # The ONE place that owns the codex flags, so a lane cannot be wrong by

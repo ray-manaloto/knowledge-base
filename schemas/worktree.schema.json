@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ray-manaloto/knowledge-base/schemas/worktree.schema.json",
+  "title": "WorktreeReadyReport",
+  "description": "The output of `mise run kb-worktree-ready`: what `kb_setup.worktree.prepare_existing` did to make a fresh `git worktree` usable — which required source clones and graph files it found already present, CoW-copied from the main checkout, or had to skip because the donor lacked them, plus the donor's own identity so a stale donor graph reads as stale rather than certified current. A closed set (`created`/`already-present`/`skipped`) typed as a bare `str` fails SILENTLY here — see `reviewed-classification.schema.json`'s own description for the two-`kb-build`-run cost of that shape — so this is generated rather than hand-written.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target",
+    "donor",
+    "donor_graph",
+    "items"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The worktree this run made ready, as an absolute path."
+    },
+    "donor": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The main checkout the clones and graph files were copied from."
+    },
+    "donor_graph": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The donor's graph.json identity (path, size, mtime), or \"absent\"."
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/WorktreeItem"
+      },
+      "description": "One row per required clone and per required graph file."
+    }
+  },
+  "$defs": {
+    "WorktreeItemStatus": {
+      "enum": [
+        "created",
+        "already-present",
+        "skipped"
+      ]
+    },
+    "WorktreeItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "status"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The repo-relative path this row describes, e.g. sources/graphify."
+        },
+        "status": {
+          "$ref": "#/$defs/WorktreeItemStatus"
+        },
+        "detail": {
+          "type": "string",
+          "description": "The copied clone's HEAD, or why it was skipped."
+        }
+      }
+    }
+  }
+}

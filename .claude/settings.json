@@ -283,5 +283,8 @@
     }
   },
   "outputStyle": "ELI5 Visual",
-  "teammateMode": "auto"
+  "teammateMode": "auto",
+  "worktree": {
+    "baseRef": "head"
+  }
 }
