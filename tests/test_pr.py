@@ -1299,3 +1299,52 @@ def test_a_binding_check_still_blocks_alongside_an_advisory_failure(monkeypatch)
 
     assert green is False
     assert "lint=fail" in summary
+
+
+# --------------------------------------------------------------------------
+# stdout is git's answer; stderr is someone else's
+# --------------------------------------------------------------------------
+
+# Verbatim from this machine, 2026-09-15: `git` is a mise shim, and a mise
+# upgrade (v2026.9.9 moved the azure-cli registry entry onto `with`/`expose`/
+# `dependency_prereleases`, which a user-global `uvx = false` pin contradicts)
+# put 186 bytes on the stderr of EVERY git call in the repo.
+_SHIM_NOISE = (
+    "mise WARN  Failed to resolve tool version list for azure-cli: "
+    "[~/.config/mise/config.toml] azure-cli@2.90.0: with, expose, and "
+    "dependency_prereleases cannot be combined with uvx = false\n"
+)
+
+
+def test_working_tree_clean_reads_stdout_not_a_noisy_stderr(monkeypatch, tmp_path):
+    """A clean tree stays clean however loud the shim is.
+
+    Merged, this made `working_tree_clean` False on a provably clean tree, so
+    `ship` refused every time — a check that could only fail.
+    """
+    _stub_run(monkeypatch, lambda _cmd: _Proc(0, "", _SHIM_NOISE))
+
+    assert pr.working_tree_clean(tmp_path) is True
+
+
+def test_working_tree_clean_still_sees_real_dirt_through_the_noise(monkeypatch, tmp_path):
+    """The control arm: it must still answer False for actual modifications.
+
+    Without this, a `working_tree_clean` hard-wired to True would satisfy the
+    test above.
+    """
+    dirt = " M python/src/kb_setup/pr.py\n"
+    _stub_run(monkeypatch, lambda _cmd: _Proc(0, dirt, _SHIM_NOISE))
+
+    assert pr.working_tree_clean(tmp_path) is False
+
+
+def test_current_branch_is_not_contaminated_by_stderr(monkeypatch, tmp_path):
+    """`push` builds `<sha>:refs/heads/<branch>` from this.
+
+    Measured before the split: 213 characters instead of 27. Only the dirty
+    refusal firing first kept a garbage ref off the remote.
+    """
+    _stub_run(monkeypatch, lambda _cmd: _Proc(0, "fix/tracked-files-fail-loud\n", _SHIM_NOISE))
+
+    assert pr.current_branch(tmp_path) == "fix/tracked-files-fail-loud"

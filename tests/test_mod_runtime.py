@@ -279,9 +279,17 @@ def test_a_matcher_that_reports_everything_present_is_caught() -> None:
 
 
 def test_a_missing_expected_output_is_caught() -> None:
+    """Derived from the tuple, not its arity.
+
+    This asserted `missing == {EXPECTED_OUTPUTS[1]}` until 2026-09-15, when
+    Claude Code 2.1.272 added a third artifact and the assertion went red on a
+    correct `topology_findings` — a test that pinned how MANY declarations exist
+    rather than the behaviour it names. Everything not produced is missing,
+    however long the tuple gets.
+    """
     produced = {mod_runtime.EXPECTED_OUTPUTS[0]}
     missing, extra = mod_runtime.topology_findings(produced, set(mod_runtime.EXPECTED_OUTPUTS))
-    assert missing == frozenset({mod_runtime.EXPECTED_OUTPUTS[1]})
+    assert missing == frozenset(mod_runtime.EXPECTED_OUTPUTS[1:])
     assert extra == frozenset()
 
 

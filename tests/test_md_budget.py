@@ -16,13 +16,10 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+import pytest
 from kb_setup import md_budget
 from kb_setup.result import Err, Ok, Rc, exit_code
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    import pytest
 
 _REPO = Path(__file__).parent.parent.absolute()
 
@@ -581,3 +578,49 @@ def test_a_nested_stub_does_not_relax_the_agents_budget(tmp_path: Path) -> None:
     report = md_budget.check(root)
 
     assert any(v.path == "docs/AGENTS.md" for v in report.violations)
+
+
+# --- git enumeration: "could not ask" must not read as "nothing to say" -------
+
+
+def test_tracked_files_enumerates_a_real_repo(tmp_path: Path) -> None:
+    """The POSITIVE arm, so the raise below is not a probe that only fails.
+
+    Without this, a `tracked_files` that raised unconditionally would still
+    satisfy `test_tracked_files_raises_when_git_cannot_be_asked`.
+    """
+    root = _git_repo(tmp_path)
+    _commit(root, "CLAUDE.md", "# x\n")
+
+    assert md_budget.tracked_files(root) == ["CLAUDE.md"]
+
+
+def test_tracked_files_raises_when_git_cannot_be_asked(tmp_path: Path) -> None:
+    """A git failure must not return `[]` — that is an ANSWER, and it is wrong.
+
+    Measured 2026-09-15: a transient in-container git failure made this return
+    `[]`, which made dotfiles' `md_size_budget` corpus empty and its
+    `test_three_classifiers_agree_on_the_real_corpus` blame a classifier. The
+    whole ~4,200-line ship log contained no git error, because none was raised
+    or logged.
+    """
+    not_a_repo = tmp_path / "bare"
+    not_a_repo.mkdir()
+
+    with pytest.raises(md_budget.GitEnumerationError, match="git ls-files failed"):
+        md_budget.tracked_files(not_a_repo)
+
+
+def test_check_cannot_pass_vacuously_when_git_fails(tmp_path: Path) -> None:
+    """The defect that MATTERS: `check` builds its whole corpus from git.
+
+    An empty enumeration made the gate walk nothing and report clean — a gate
+    that can only pass (`probes-need-a-control-arm.md` rule 9). This asserts
+    the gate now propagates rather than certifying an unread tree.
+    """
+    not_a_repo = tmp_path / "bare"
+    not_a_repo.mkdir()
+    (not_a_repo / "CLAUDE.md").write_text("# not budgeted if git is unasked\n")
+
+    with pytest.raises(md_budget.GitEnumerationError):
+        md_budget.check(not_a_repo)

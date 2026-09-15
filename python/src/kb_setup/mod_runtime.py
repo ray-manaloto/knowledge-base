@@ -146,6 +146,24 @@ VENDORED_DECLARATIONS = Path("sources/media/claude-code-function-hooks-types.d.t
 EXPECTED_OUTPUTS = (
     Path(".claude/types/claude-code.d.ts"),
     Path(".claude/types/claude-code-mcp.d.ts"),
+    #: Added 2026-09-15 for Claude Code **2.1.272**, which began writing a third
+    #: file. The gate caught it as `UNEXPECTED OUTPUT` — working as designed —
+    #: and this is the reviewed acceptance it asked for, not a widening to make
+    #: a red gate green.
+    #:
+    #: Reviewed by generating it under the same isolated bare `HOME` the gate
+    #: uses: 916 bytes, 16 lines, all header, ending in "No enabled plugin names
+    #: a type contract in its manifest." It is an INDEX of the enabled plugins'
+    #: type contracts, so like `claude-code-mcp.d.ts` its CONTENT is
+    #: environment-dependent while its filename is not — which is the exact
+    #: property the topology check relies on.
+    #:
+    #: ⚠️ Its own header says each contributing plugin also gets a
+    #: `claude-code-plugins/<plugin>.d.ts` beside it. Those never appear here
+    #: because the generator runs under a `HOME` with no enabled plugins; if
+    #: this gate is ever run against a real `HOME`, the produced set grows by
+    #: one file per such plugin and an exact-set check would fail on every one.
+    Path(".claude/types/claude-code-plugins.d.ts"),
 )
 
 #: The declarations file the token contract is checked against. `claude-code-mcp.d.ts`
