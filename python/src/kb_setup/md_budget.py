@@ -458,14 +458,43 @@ def closure_size(
 # --- The sweep ---------------------------------------------------------------
 
 
+class GitEnumerationError(RuntimeError):
+    """``git`` could not be asked, so no corpus answer exists.
+
+    Raised rather than returning ``[]`` because every caller here builds its
+    whole corpus from ``tracked_files``: an empty list makes ``find_violations``
+    walk nothing and the ``md_size_budget`` gate PASS — a gate that can only
+    pass, which is the shape ``probes-need-a-control-arm.md`` rule 9 forbids.
+    "git said nothing" and "git could not be asked" must not share a value.
+
+    Measured 2026-09-15: a transient in-container git failure during a
+    devcontainer ``postCreateCommand`` made this return ``[]`` silently, and
+    dotfiles' ``test_three_classifiers_agree_on_the_real_corpus`` reported it as
+    a classifier disagreement — the assertion's other side swallowed the same
+    failure, so both halves agreed on a fiction. Nothing in the ~4,200-line ship
+    log named a git error, because nothing logged one.
+    """
+
+
 def tracked_files(root: Path) -> list[str]:
-    """Every git-tracked path, for classification."""
+    """Every git-tracked path, for classification.
+
+    Raises ``GitEnumerationError`` when git exits non-zero. See that class for
+    why this is louder than the sibling ``dotfiles_setup.env_blob_scan``
+    variant, which logs and returns ``[]``: that one feeds a scanner whose
+    caller re-checks, this one feeds a gate's entire corpus.
+    """
     out = subprocess.run(
         ["git", "-C", str(root), "ls-files"],
         capture_output=True,
         text=True,
         check=False,
     )
+    if out.returncode != 0:
+        raise GitEnumerationError(
+            f"git ls-files failed in {root} (rc={out.returncode}): "
+            f"{out.stderr.strip() or '<no stderr>'}"
+        )
     return [f for f in out.stdout.split("\n") if f]
 
 
