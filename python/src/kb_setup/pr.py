@@ -106,28 +106,56 @@ _ADVISORY_CHECKS = frozenset({"CodeRabbit", "Repowise / code health"})
 _TERMINAL_WAIT = 180
 
 
-def _run(
+def _run_split(
     cmd: list[str], *, cwd: Path | None = None, timeout: int = _GIT_TIMEOUT
-) -> tuple[int, str]:
-    """Run ``cmd`` capturing output; return ``(returncode, stdout+stderr)``."""
+) -> tuple[int, str, str]:
+    """Run ``cmd``; return ``(returncode, stdout, stderr)`` kept SEPARATE.
+
+    Every caller that reads command output as DATA — a branch name, a porcelain
+    status, a ref probe — must use this and read ``stdout`` only. ``git`` is a
+    mise shim here, and mise writes its own warnings to the child's stderr, so
+    a merged stream makes an unrelated warning indistinguishable from git's
+    answer.
+
+    Measured 2026-09-15 on this machine, after a mise upgrade collided with a
+    user-global ``uvx = false`` pin: ``git status --porcelain`` returned rc=0,
+    stdout 0 bytes, stderr 186 bytes of an ``azure-cli`` warning. Read merged,
+    that made ``working_tree_clean`` False on a provably clean tree — a check
+    that could only fail, so ``ship`` could never run. ``current_branch``
+    returned 213 characters instead of 27, and ``push`` builds
+    ``<sha>:refs/heads/<branch>`` from it; only the dirty refusal firing first
+    kept a garbage ref off the remote.
+    """
     try:
         proc = subprocess.run(
             cmd, cwd=cwd, capture_output=True, text=True, check=False, timeout=timeout
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        return 1, f"{cmd[0]}: {exc}"
-    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+        return 1, "", f"{cmd[0]}: {exc}"
+    return proc.returncode, (proc.stdout or ""), (proc.stderr or "")
+
+
+def _run(
+    cmd: list[str], *, cwd: Path | None = None, timeout: int = _GIT_TIMEOUT
+) -> tuple[int, str]:
+    """Run ``cmd`` capturing output; return ``(returncode, stdout+stderr)``.
+
+    Kept for DIAGNOSTIC callers, which want everything the command said. A
+    caller reading output as data wants :func:`_run_split` instead.
+    """
+    rc, out, err = _run_split(cmd, cwd=cwd, timeout=timeout)
+    return rc, out + err
 
 
 def current_branch(repo_root: Path) -> str:
     """Return the checked-out branch name, or "" if it cannot be determined."""
-    rc, out = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root)
+    rc, out, _err = _run_split(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root)
     return out.strip() if rc == 0 else ""
 
 
 def working_tree_clean(repo_root: Path) -> bool:
     """Return True when nothing is staged, modified, or untracked-and-unignored."""
-    rc, out = _run(["git", "status", "--porcelain"], cwd=repo_root)
+    rc, out, _err = _run_split(["git", "status", "--porcelain"], cwd=repo_root)
     return rc == 0 and not out.strip()
 
 
@@ -356,14 +384,14 @@ def _local_ahead_gap(repo_root: Path, pr_number: int, oid: str) -> str | None:
         return reason
     branch = ref.removeprefix("refs/heads/")
 
-    rc, out = _run(["git", "rev-parse", "--verify", "--quiet", ref, "--"], cwd=repo_root)
+    rc, out, err = _run_split(["git", "rev-parse", "--verify", "--quiet", ref, "--"], cwd=repo_root)
     if rc == 1 and not out.strip():
         # State 1: well-formed name, no such ref here. Nothing local to lose.
         return None
     if rc != 0:
         return (
             f"could not tell whether local branch '{branch}' exists here "
-            f"({out.strip()[:200]}); refusing rather than merging blind"
+            f"({(out + err).strip()[:200]}); refusing rather than merging blind"
         )
     # On success `--verify` printed exactly the resolved oid — reuse it as the
     # local tip below rather than a second `rev-parse` call.
@@ -375,18 +403,24 @@ def _local_ahead_gap(repo_root: Path, pr_number: int, oid: str) -> str | None:
     # qualified `ref` above is unambiguous. The trailing `--` (house precedent:
     # `review.py:1069`) stops an unresolvable right-hand side from being read as
     # a pathspec instead of a revision — the branch name is remote-supplied.
-    rc, out = _run(["git", "rev-list", "--count", f"{oid}..{ref}", "--"], cwd=repo_root)
-    # `_run` concatenates stdout+stderr, and a shadowed bare name would have put
-    # an ambiguity WARNING on stderr — never `int()` the raw output blindly, even
-    # though the qualified `ref` above should never trigger one. Both failure
-    # shapes (a non-zero rc, and an rc-0 output with no clean integer) collapse
-    # to the same refusal: either way the question was never answered.
+    rc, out, err = _run_split(["git", "rev-list", "--count", f"{oid}..{ref}", "--"], cwd=repo_root)
+    # Read STDOUT only. This site used to read `_run`'s merged stream and take
+    # its LAST non-empty line, on the reasoning that a shadowed bare name would
+    # have put an ambiguity warning on stderr. That defence inverted the moment
+    # anything else wrote to stderr: `git` is a mise shim here, so mise's own
+    # warning WAS the last line, `isdigit()` failed, and this refused every
+    # comparison it was asked to make. Measured 2026-09-15 — it failed three
+    # tests in this file on unmodified `main`, including a genuinely-ahead
+    # branch reported as uncomparable. Still never `int()` blindly: both
+    # failure shapes (a non-zero rc, and an rc-0 stdout with no clean integer)
+    # collapse to the same refusal, because either way the question was never
+    # answered.
     non_empty = [line.strip() for line in out.splitlines() if line.strip()] if rc == 0 else []
     count_text = non_empty[-1] if non_empty else ""
     if rc != 0 or not count_text.isdigit():
         return (
             f"could not compare local '{branch}' against PR head {oid[:12]} "
-            f"(got {out.strip()[:200]!r}); refusing rather than merging blind"
+            f"(got {(out + err).strip()[:200]!r}); refusing rather than merging blind"
         )
     ahead = int(count_text)
     if ahead == 0:
