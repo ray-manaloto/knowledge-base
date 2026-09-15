@@ -275,7 +275,12 @@ def evaluate(root: Path, tool: str, payload: dict[str, object]) -> Verdict:
         )
     try:
         report = md_budget.check(root, overrides={rel: proposed})
-    except (OSError, ValueError, RecursionError) as exc:
+    except (
+        OSError,
+        ValueError,
+        RecursionError,
+        md_budget.GitEnumerationError,
+    ) as exc:
         return Verdict(
             deny=True,
             reason=(

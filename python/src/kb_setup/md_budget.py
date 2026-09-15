@@ -695,7 +695,14 @@ def check_md_budget(
     operation — and if it ever did, that is precisely the silent no-op this
     change exists to surface.
     """
-    report = check(root, exclude=exclude)
+    try:
+        report = check(root, exclude=exclude)
+    except GitEnumerationError as exc:
+        # Same "could not run" class as `counted == 0` below, so the same rc.
+        # This function's contract is to RETURN rather than raise, and a
+        # traceback out of the `md_size_budget` hk step is louder but less
+        # actionable than the message `md_budget_main` already renders.
+        return Err(f"COULD NOT ENUMERATE THE CORPUS — {exc}", rc=Rc.NOT_RUN)
     if report.counted == 0:
         return Err(
             "NO INSTRUCTION FILES MATCHED — the budget gate did not run. "

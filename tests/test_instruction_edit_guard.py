@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING
 
 from kb_setup import instruction_edit_guard as guard
 from kb_setup import md_budget
-from kb_setup.result import Rc
+from kb_setup.result import Err, Rc
 
 if TYPE_CHECKING:
     import pytest
@@ -376,3 +376,65 @@ def test_main_survives_unparsable_stdin(tmp_path: Path, capsys: pytest.CaptureFi
 def test_main_survives_empty_stdin(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert guard.main(tmp_path, "") == Rc.OK
     assert capsys.readouterr().out == ""
+
+
+# --- a git failure denies; it never escapes the hook -------------------------
+
+
+def test_a_git_failure_denies_rather_than_escaping_the_hook(tmp_path: Path) -> None:
+    """`evaluate` documents "Never raises", and `main` has no try/except.
+
+    `md_budget.tracked_files` raises `GitEnumerationError` (a `RuntimeError`)
+    when git cannot be asked. `RuntimeError` is not in the except tuple by
+    default, so the exception escaped `evaluate`, escaped `main`, and left the
+    PreToolUse hook with no verdict at all — which a hook harness reads as "did
+    not run", i.e. fail-OPEN, the exact inverse of the documented fail-CLOSED.
+    """
+    not_a_repo = tmp_path / "bare"
+    not_a_repo.mkdir()
+    (not_a_repo / "CLAUDE.md").write_text("# x\n", encoding="utf-8")
+
+    verdict = guard.evaluate(
+        not_a_repo,
+        "Write",
+        {
+            "file_path": str(not_a_repo / "CLAUDE.md"),
+            "content": _over_budget_rule(),
+        },
+    )
+
+    assert verdict.deny is True
+    assert "GitEnumerationError" in (verdict.reason or "")
+
+
+def test_a_healthy_repo_is_still_decided_on_its_budget(tmp_path: Path) -> None:
+    """The control arm: a guard hard-wired to deny would pass the test above."""
+    root = _repo(tmp_path, {"CLAUDE.md": "# x\n"})
+
+    verdict = guard.evaluate(
+        root,
+        "Write",
+        {"file_path": str(root / "CLAUDE.md"), "content": "# small\n"},
+    )
+
+    assert verdict.deny is False
+    assert "GitEnumerationError" not in (verdict.reason or "")
+
+
+def test_check_md_budget_returns_not_run_rather_than_raising(tmp_path: Path) -> None:
+    """Its docstring promises "Returns rather than raises".
+
+    A git failure is the same "could not run" class as `counted == 0`, so it
+    gets the same rc and a rendered message instead of a traceback out of the
+    `md_size_budget` hk step.
+    """
+    not_a_repo = tmp_path / "bare"
+    not_a_repo.mkdir()
+
+    result = md_budget.check_md_budget(not_a_repo)
+
+    # `Result` is a union of Ok/Err/External, so narrow before reading either
+    # attribute — and asserting the variant IS part of the claim.
+    assert isinstance(result, Err)
+    assert result.rc == Rc.NOT_RUN
+    assert "COULD NOT ENUMERATE" in result.message
