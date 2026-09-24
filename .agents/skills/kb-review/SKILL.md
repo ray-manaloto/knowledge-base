@@ -124,16 +124,16 @@ That is a question about the diff, **not a constant** — ask it every time:
 
 | Implemented by | Cold lane | Family |
 |---|---|---|
-| Claude (the usual case) | `fable-orchestrator:codex-reviewer` | OpenAI |
+| Claude (the usual case) | `cold:codex-astra` — `kb-codex-astra-reviewer` / `mise run kb-codex -- --review` | OpenAI |
 | `codex` (this repo's declared implementer lane) | `antigravity:review` | Google |
-| `antigravity` | `fable-orchestrator:codex-reviewer` | OpenAI |
+| `antigravity` | `cold:codex-astra` | OpenAI |
 
-The middle row is not hypothetical: `.claude/CLAUDE.md` declares
-`fable-orchestrator: implementation lane = codex`, so a branch built through the
-orchestrator flow is **codex-authored**, and routing it to `codex-reviewer` buys
-a same-family read while the receipt says `cold:codex` — the exact
-false-cross-family claim the fallback chain is careful about. Hard-coding "Claude
-wrote it" made that the default. Check `git log --format='%an %s'` over the range
+The middle row is not hypothetical: `.claude/CLAUDE.md` names codex as the
+implementer lane, so a branch built through the orchestrator flow is
+**codex-authored**, and routing it to a codex reviewer buys a same-family read
+while the receipt says `cold:codex-astra` — the exact false-cross-family claim
+the fallback chain is careful about. Hard-coding "Claude wrote it" made that the
+default. Check `git log --format='%an %s'` over the range
 and the session's declared lane before choosing.
 
 Review it **by ref and COLD** — hand it the SHA and nothing about what the change
@@ -155,25 +155,23 @@ cold slot, never two lanes.** The one-lane cap above is unchanged, and so is
 everything else — same METHOD paragraph, same scope, same two-round bound, same
 receipt. Only the model and the effort differ.
 
-| | `cold:codex` (default) | `cold:codex-astra` |
+| | `cold:codex-astra` (default since knowledge-base#794) | `cold:codex` |
 |---|---|---|
-| Model | `gpt-5.6-sol` | `gpt-6-astra` |
+| Model | `gpt-6-astra` | `gpt-5.6-sol` |
 | Report file | `review-<sha>-cold.md` | `review-<sha>-cold.md` — the SAME name |
 
 The identical filename is not a convention to remember, it is what
 `review.report_path` computes: it runs the lane through `_lane_prefix`
-(`review.py:200-202`, called at `review.py:620`), which strips everything after
+(`review.py:200`, called at `review.py:644` inside `report_path`), which strips everything after
 the first `:`. Run against all three spellings, `cold` / `cold:codex` /
 `cold:codex-astra` all resolve to `review-<sha>-cold.md`. So **no change to
 `LANES` and no new receipt schema** — `--lanes cold:codex-astra` is already legal.
 
-**It is REQUESTED, never detected.** Step 2 deleted a per-diff routing table
-because deciding lanes per diff is what cost 2.93M tokens; do not rebuild that
-table one layer deeper. A human or the orchestrator asks for Astra by name. The
-guidance for asking — not a trigger the skill evaluates — is a reviewed scope
-past roughly **20 files or 1,000 changed lines**, or a diff that changes **two or
-more interacting guards, gates or modules**. Below that, `cold:codex` is the
-answer and the burden is on whoever wants otherwise.
+**Why Astra is the default (knowledge-base#794):** `cold:codex` ran through the
+removed fable-orchestrator plugin; `cold:codex-astra` runs through this repo's own
+`kb-codex --review`, the one path that records codex evidence. Request `cold:codex`
+(same call, `--model gpt-5.6-sol`) by name for a small diff, or when Astra
+refuses. No per-diff routing table: the variant is REQUESTED, never detected.
 
 **The family rule is unchanged and Astra does not bend it.** `gpt-6-astra` is
 still OpenAI/codex family. It may stand in for `cold:codex` — Claude- or
@@ -336,7 +334,7 @@ is deliberately too few to count; a 7-hex run matches ordinary prose by accident
 
 ```bash
 mise run kb-review-receipt -- \
-  --lanes cold:codex \
+  --lanes cold:codex-astra \
   --skipped standards:by-policy-one-lane,spec:by-policy-one-lane,silent-failure:by-policy-one-lane \
   --fixed-point <the same fixed point you reviewed against> \
   --findings <n> --blocking <n>

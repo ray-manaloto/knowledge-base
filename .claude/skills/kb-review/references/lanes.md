@@ -20,8 +20,8 @@ skill chooses per-diff any more — that table was the thing removed.
 
 Which lane that is depends on who wrote the diff; **SKILL.md step 2 owns the
 routing table and this file defers to it.** Claude-authored (the usual case) →
-`fable-orchestrator:codex-reviewer`; codex-authored — which this project's
-Claude config makes the default for orchestrator-driven work — →
+`cold:codex-astra` (`kb-codex --review`, below); codex-authored — which this
+project's Claude config makes the default for orchestrator-driven work — →
 `antigravity:review`.
 
 This section used to name `codex-reviewer` unconditionally, in its heading and
@@ -236,7 +236,7 @@ of one formatting hazard, so spell issue numbers out in prose here.
 **Step 2 is not unconditionally cross-family, and this table said it was.** There
 are two CLI lanes and three possible authors. When Claude wrote the diff, step 1
 is codex and step 2 is antigravity — both cross-family, and the old label held.
-But this project's Claude config declares `implementation lane = codex`, so an
+But this project's Claude config names codex as the implementation lane, so an
 orchestrator-driven branch is **codex-authored**: step 1 is then antigravity and
 step 2 is codex, which is the author's own family. Falling through to it and
 recording `cold:codex` makes the same false cross-family claim that step 3's
@@ -254,9 +254,9 @@ it is not the cross-family check the lane is named for, and a receipt that
 implies otherwise is a lie told to a future reader.
 
 Both CLIs are pinned in `mise.toml` (`codex`, `antigravity-cli`) and auth is
-per-user, so "installed" is not "authenticated". The plugin agents return a
-structured error rather than substituting themselves; treat that error as
-"advance the chain", not as "no findings".
+per-user, so "installed" is not "authenticated". A lane that cannot run returns
+an error rather than substituting itself; treat that error as "advance the
+chain", not as "no findings".
 
 ### Two shapes in this repo that are DELIBERATE
 

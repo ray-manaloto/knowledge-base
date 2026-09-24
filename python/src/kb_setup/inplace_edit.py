@@ -27,7 +27,7 @@ The consequence is a silent-failure channel of exactly the shape
 possibly-broken code with nothing saying so, until a later ``mise run lint`` or
 an unrelated Edit happens to surface it.
 
-WHY A DENY. `fable-orchestrator:fable-advisor` proposed this guard on
+WHY A DENY. The fable-orchestrator plugin's Fable advisor proposed this guard on
 2026-09-02 and it was the ONE mechanism it would build (it argued explicitly
 *against* a broader grep/sed -> LSP deny). The caller refused to build it at the
 time, because the advisor's justification cited ``discover-plugins.md:82`` for a

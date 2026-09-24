@@ -5,11 +5,12 @@
 // with the four agent definitions in `.claude/agents/`:
 //   kb-tool-researcher · kb-adversarial-verifier · kb-synthesist · kb-corpus-curator
 //
-// Cross-family review deliberately does NOT get its own agent file. The
-// `fable-orchestrator` plugin already ships `codex-reviewer` (GPT-5.6 Sol) and
-// `antigravity` ships a Gemini lane; writing a third would be reinventing a tool
-// feature, which `use-tool-builtins.md` exists to prevent. This script ROUTES to
-// them instead, and that is the only place the routing lives.
+// Cross-family review routes to this repo's own `kb-codex-astra-reviewer`
+// (gpt-6-astra via the codex CLI): the researcher/verifier/synthesist lanes are
+// Claude-authored, so the cold lens must be a different model family. It used to
+// dispatch a plugin reviewer whose only copy was a plugin cache that can be
+// garbage-collected (knowledge-base#793); `tests/test_workflow_agent_roster.py`
+// now fails any workflow that names an agent this repo does not declare.
 //
 // Invoke (from a Claude session) — by scriptPath, NEVER by name. A `name:`
 // resolves to a STALE CACHED COPY (#13, measured: kb-extract.js was edited,
@@ -52,6 +53,11 @@ if (typeof cfg === 'string') {
 }
 const tools = cfg.tools || []
 const reportDir = cfg.reportDir || 'docs/research/reports'
+// Per-tool scratch for the codex review lane (its KB_LANE). One directory per
+// tool key; pass `laneRoot` per run when two runs may overlap.
+const laneRoot = cfg.laneRoot || '.agent/kb/lanes/kb-tool-review'
+// An absolute root is used as-is; a relative one is anchored at the checkout.
+const laneBase = laneRoot.startsWith('/') ? laneRoot : `$PWD/${laneRoot}`
 if (!tools.length) throw new Error('kb-tool-review: args.tools is required and must be non-empty')
 
 const CLAIMS_SCHEMA = {
@@ -181,11 +187,14 @@ const perTool = await pipeline(
     if (!out) return null
     const surviving = out.verdicts.filter((v) => !v.verdict?.refuted)
     return agent(
-      `Cold review of the ${t.key} gap analysis at ${reportDir}. You have NOT been ` +
+      `ARTIFACT REVIEW (your "Artifact review" section — not a diff, no --review, ` +
+        `no receipt). Author family: Anthropic (Claude researcher/verifier lanes). ` +
+        `KB_LANE=${laneBase}/review-${t.key}. ` +
+        `Cold review of the ${t.key} gap analysis at ${reportDir}. You have NOT been ` +
         `told what it is supposed to conclude, deliberately. ${surviving.length} claims ` +
         `survived adversarial verification. Report findings as severity + one-line ` +
         `claim + file:line; cite every claim or label it unverified.`,
-      { agentType: 'fable-orchestrator:codex-reviewer', label: `review:${t.key}`, phase: 'Review' },
+      { agentType: 'kb-codex-astra-reviewer', label: `review:${t.key}`, phase: 'Review' },
     ).then((review) => ({ ...out, review, surviving }))
   },
 )

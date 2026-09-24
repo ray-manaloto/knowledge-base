@@ -192,7 +192,6 @@
   },
   "enabledPlugins": {
     "planning-with-files@planning-with-files": true,
-    "fable-orchestrator@fable-orchestrator": true,
     "antigravity@antigravity-for-claude-code": true,
     "astral@astral-sh": true,
     "mattpocock-skills@mattpocock": true,
@@ -219,12 +218,6 @@
       "source": {
         "source": "github",
         "repo": "OthmanAdi/planning-with-files"
-      }
-    },
-    "fable-orchestrator": {
-      "source": {
-        "source": "github",
-        "repo": "mar3co/fable-orchestrator"
       }
     },
     "antigravity-for-claude-code": {

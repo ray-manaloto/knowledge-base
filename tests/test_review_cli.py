@@ -326,6 +326,40 @@ def test_reviewer_pin_drift_is_refused_before_any_write(
     assert not review.receipt_path(repo, "a" * 40).exists()
 
 
+def test_reviewer_pin_drift_is_refused_for_the_astra_variant(
+    repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FAIL arm: `cold:codex-astra` — the default lane since #794 — is checked too."""
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    _pin_codex(repo, "1.0.0")
+    monkeypatch.setattr(sync, "observed_version", lambda *_a, **_kw: "2.0.0")
+    lanes = "standards,spec,cold:codex-astra,silent-failure"
+    assert _run(repo, "--lanes", lanes, "--blocking", "0") == 2
+    assert "pins codex 1.0.0" in capsys.readouterr().err
+    assert not review.receipt_path(repo, "a" * 40).exists()
+
+
+def test_reviewer_pin_drift_is_refused_when_the_table_is_not_the_mise_key(
+    repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FAIL arm in THIS repo's real shape: `[tool.codex]`, `mise_key = "npm:@openai/codex"`.
+
+    A lookup on `mise_key` alone never found that row, so the gate never fired
+    for any codex lane outside the `_pin_codex` fixture.
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    (repo / "mise.toml").write_text('[tools]\n"npm:@openai/codex" = "1.0.0"\n', encoding="utf-8")
+    (repo / "currency.toml").write_text(
+        '[tool.codex]\nmise_key = "npm:@openai/codex"\nbinary = "codex"\n', encoding="utf-8"
+    )
+    monkeypatch.setattr(sync, "observed_version", lambda *_a, **_kw: "2.0.0")
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 2
+    err = capsys.readouterr().err
+    assert "codex 2.0.0" in err
+    assert "mise use npm:@openai/codex@2.0.0" in err
+    assert not review.receipt_path(repo, "a" * 40).exists()
+
+
 def test_reviewer_pin_check_ignores_a_lane_with_no_variant(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
