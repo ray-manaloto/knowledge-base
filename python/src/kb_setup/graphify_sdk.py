@@ -1304,6 +1304,10 @@ _UNSUPPORTED_LANGUAGE_SUFFIXES = frozenset(
         ".cbl",
         ".cfg",
         ".cmd",
+        # Shell launchers, planning prompts and mirror lists occur in pinned
+        # sources but Graphify has no extractor for these suffixes. Count their
+        # loss instead of treating them as non-source or blocking the census.
+        ".command",
         ".conf",
         ".Processor",
         ".cpy",
@@ -1323,9 +1327,11 @@ _UNSUPPORTED_LANGUAGE_SUFFIXES = frozenset(
         ".jinja2",
         ".json5",
         ".kdl",
+        ".list",
         ".mdc",
         ".nix",
         ".pkl",
+        ".prompt",
         ".proto",
         ".pyi",
         ".scm",

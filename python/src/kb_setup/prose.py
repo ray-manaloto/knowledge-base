@@ -40,7 +40,7 @@ Measured breakdown of this corpus:
 
 Dropping ``file_type == "code"`` as well would delete those last 10 — nodes the
 doc-extraction wave produced *about* code, one of them from
-``fable-orchestrator.md``, which is a golden-set target. `_origin` is
+``fable5-orchestrator.md``, which is a golden-set target. `_origin` is
 provenance and is the thing that actually means "this came out of the AST
 extractor"; `file_type` is a label the extractor also applies to prose.
 """

@@ -68,7 +68,7 @@ the same call plus `--add-dir "$HOME/Library/Caches"` -> **rc=0**, clean output.
 
 This **refutes the standing note** that a codex lane cannot run this repo's gates
 at all (memory `codex-lane-cannot-write-agents-or-run-uv-gates`, measured
-2026-08-30 through the since-removed fable-orchestrator lane wrapper). The uv half was a
+2026-08-30 through an earlier lane wrapper). The uv half was a
 missing flag, not a sandbox wall. The `.agents/` half of that note is untouched
 and still stands.
 

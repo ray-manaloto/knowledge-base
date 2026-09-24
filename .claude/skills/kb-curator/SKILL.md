@@ -41,6 +41,7 @@ The task map:
 | pin a NEW repo source | `mise run kb-manifest-add -- <url> [--name N --ref R --kind K]` | ~~hand-write a `.manifest`~~ |
 | add a URL (page/blog/article/video) | `mise run kb-add -- <url> [--author NAME]` | ~~`graphify add`~~ |
 | rebuild from committed inputs | `mise run kb-build` | ~~`graphify extract`/`merge-graphs`~~ |
+| diagnose one pinned source before a build retry | `mise run kb-detect-census -- --source <name>` | ~~repeat a full build to rediscover the same preflight failure~~ |
 | advance a repo source | `mise run kb-update -- <name>` | ~~`graphify update`~~ |
 | managed prose extract N sources | `mise run kb-graphify-ingest -- REQUEST.json` (see **`kb-graphify-ingest`**) | ~~the retired `kb-extract` Workflow~~ |
 | combine + validate extraction chunks | `mise run kb-assemble -- <name> <chunk.json>...` | ~~inline python assembly~~ |
@@ -152,6 +153,11 @@ in `sources/REGISTRY.md`.
 2. **Ingest** (via the tasks — never raw graphify).
    - Repo → write the manifest, `mise run kb-build`. A prose-only repo (no code)
      is skipped without aborting — its value comes from the prose step, not AST.
+     If detect preflight refuses unclassified files, retain the failed build
+     receipt, run `mise run kb-detect-census -- --source <name>` for each named
+     source, and verify a matching pin, complete status and zero unresolved paths
+     before another full build. Classify reviewed unsupported source as counted
+     loss; keep a new unknown suffix as a refusal control.
    - URL(s) → `mise run kb-add -- <url>` (batch all; no-key add fetches to `./raw`
      without re-clustering). Video → `mise run kb-add --` then
      `mise run kb-transcribe -- raw/<yt>.m4a`.

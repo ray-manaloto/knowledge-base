@@ -128,8 +128,7 @@ def test_the_redaction_case_skips_without_mise() -> None:
 def test_no_case_is_live() -> None:
     """Every case is offline (knowledge-base#797).
 
-    The only live case was the fable-orchestrator plugin's ``doctor.sh`` at a
-    1.14.0 cache path that no longer existed; it was removed with the plugin.
+    The old live ``doctor.sh`` case used a cache path that no longer existed.
     If a case is ever marked live, the offline gate gets cheaper by doing less,
     which is the wrong direction.
     """

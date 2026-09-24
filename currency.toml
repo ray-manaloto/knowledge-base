@@ -473,7 +473,7 @@ limitation, not a defect to fix here — but tracked so it is not rediscovered f
 build output every time.
 
 Every affected file is data-only `.json` inside a THIRD-PARTY cloned source
-(`sources/agents/`, `sources/ecc/`, `sources/fable-orchestrator/` —
+(`sources/agents/`, `sources/ecc/` —
 `marketplace.json`, `plugin.json`, settings schemas). None is ours, and a data
 file has no AST to extract, so zero nodes is arguably correct. The content we
 actually want IS in the graph by the other path: the committed prose extraction

@@ -14,7 +14,7 @@ source advances. Origin: the Fable-5-orchestrator research program (2026-07-22).
 
 **Status:** `pending` → `manifest` (repo pinned) → `code` (AST ingested) →
 `prose` (host-agent extracted) → `done`; or `deferred` / `tool` (installed & used,
-not just ingested).
+not just ingested) / `retired` (removed from active build inputs; dated evidence kept).
 
 **Kind:** `repo` (github, manifest+clone+AST) · `docs` (sitemap/page prose) ·
 `article` (blog/substack) · `forum` (reddit) · `media` (video → transcript) ·
@@ -32,7 +32,7 @@ not just ingested).
 | 6 | [DannyMac180/fable-advisor](https://github.com/DannyMac180/fable-advisor) | repo | T1 | prose | THE advisor-pattern reference. Prose extracted 2026-07-22 (was never code-ingested — prose-only). |
 | 7 | [Cjbuilds/Codex-Orchestration](https://github.com/Cjbuilds/Codex-Orchestration) | repo | T1 | prose | Codex handoff / orchestration. Code + prose extracted 2026-07-22. |
 | 8 | [Rylaa/fable5-orchestrator](https://github.com/Rylaa/fable5-orchestrator) | repo | T1 | prose | Fable-5 orchestrator + dynamic-workflow instructions. Code + prose extracted 2026-07-22. |
-| 9 | [mar3co/fable-orchestrator](https://github.com/mar3co/fable-orchestrator) | repo | T1 | prose | Fable orchestrator. Code + prose extracted 2026-07-22. |
+| 9 | Retired historical source | repo | T1 | retired | Remote source became unavailable; removed from deterministic build inputs 2026-09-24. Dated extraction evidence remains committed. |
 | 10 | [advisor-executor-pattern (mindstudio)](https://www.mindstudio.ai/blog/advisor-executor-pattern-claude-code-fable-5) | article | T1 | prose | THE advisor/executor decision. Extracted 2026-07-22. ⚠️ **THAT EXTRACTION WAS TRUNCATED, and it is this corpus's first PROVEN casualty of `kb-add` (#200).** Re-fetched losslessly 2026-08-06 at **17,161 chars**; the 18 nodes in `orchestrator-repos-docs.json` under `source_file = mindstudio-advisor-executor.md` reach only **54%** of the article, with **0 of 17 located concepts past the 60% mark**. Control arm: **16 headings** live past 60% — `## Common Mistakes and How to Avoid Them` and its four named anti-patterns (*Asking the Advisor to Do Too Much*, *Under-Specifying the Executor Prompt*, *Skipping the Structured Output Step*, *Using the Executor for Decision-Making*), 6 FAQ entries and `## Key Takeaways` — and the graph has nothing from any of them. Second control, same batch and path: `linas-fable5-fallback.md` is only 3,140 chars (under the cap), reaches **94%**, and is CLEAN — so the probe discriminates and the mechanism explains the split. **Being re-extracted under the same `source_file` with a chunk-level `supersedes`**, so #189's collision gate replaces the 18 rather than duplicating them. Lossless copy at `sources/media/advisor-executor-claude-code-fable5.md`. |
 | 11 | [asgeirtj/system_prompts_leaks → claude-fable-5.md](https://github.com/asgeirtj/system_prompts_leaks/blob/main/Anthropic/claude-fable-5.md) | repo | T1 | prose | Fable-5 system-prompt leak (behavioral priors). Distilled 2026-07-22. |
 | 12 | [linas.substack — Fable-5-lite/Opus-4.8](https://linas.substack.com/p/unlock-claude-fable-5-lite-opus-48) | article | T1 | prose | Fable-5→Opus-4.8 fallback pattern. Extracted 2026-07-22. |
@@ -243,7 +243,7 @@ crowding prose out of the query budget (#12). `kind = docs` is the path.
 
 - **2026-07-22 — code layer ingested (free AST, no tokens).** 10 repos code-ingested
   into the aggregate graph (60,893 nodes / 133,003 edges / 2,351 communities):
-  deer-flow, skillopt, codex-orchestration, fable5-orchestrator, fable-orchestrator,
+  deer-flow, skillopt, codex-orchestration, fable5-orchestrator, retired source #9,
   system-prompts-leaks, last30days-skill, awesome-claude-code, claude-plugins-community,
   ecc (+ graphify). **fable-advisor** skipped — prose-only, awaiting the wave.
   Query + MCP (10 tools) verified. Clean `kb-build` reproduces end-to-end.
@@ -313,7 +313,7 @@ crowding prose out of the query budget (#12). `kind = docs` is the path.
   - **Repos + articles** (`sources/extractions/orchestrator-repos-docs.json`, **261 nodes / 282
     edges**): fable-advisor (#6, prose-only, first ingest — the architect/advisor-executor
     routing doctrine: cheapest-adequate-lane table, cost discipline, five-part spec contract,
-    cross-vendor review, verify-before-done), fable5-orchestrator (#8), fable-orchestrator (#9),
+    cross-vendor review, verify-before-done), fable5-orchestrator (#8), retired source #9,
     codex-orchestration (#7), deer-flow (#4), skillopt (#5), last30days-skill (#15),
     claude-fable-5 system-prompt leak (#11, priors distilled), + articles mindstudio
     advisor-executor (#10) & linas Fable-5→Opus-4.8 (#12).

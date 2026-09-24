@@ -19,8 +19,7 @@ The architect emits judgment and specs, never the bulk of the code, and **verifi
 the evidence itself before declaring done** — a lane's self-report is never proof.
 
 - **codex lane** — this repo's `kb-codex-implementer` (a stopgap over `mise run kb-codex -- --write`,
-  GPT-5.6 Sol, `xhigh`). It replaced a plugin implementer when fable-orchestrator was removed
-  (dotfiles#1310).
+  GPT-5.6 Sol, `xhigh`; see dotfiles#1310).
 - **antigravity lane** — the `antigravity` plugin's `/antigravity:delegate` (Google Antigravity CLI
   `agy`, Gemini 3.x).
 - **Claude fallback** — a Claude Opus subagent (Agent tool, `model: "opus"`), the always-available

@@ -76,14 +76,14 @@ def test_a_prose_node_labelled_code_survives(tmp_path: Path) -> None:
 
     Measured on the real corpus 2026-07-25: ten nodes carry ``file_type ==
     "code"`` with no ``_origin`` — doc-extraction nodes *about* code, one of them
-    from ``fable-orchestrator.md``, which is a golden-set target. Filtering on
+    from ``fable5-orchestrator.md``, which is a golden-set target. Filtering on
     the label as well would delete them, and the topic they belong to would then
     read as unretrievable in the arm built to make it retrievable.
     """
     graph = _graph(
         nodes=[
             _node("sym", _origin="ast", file_type="code", source_file="a.py"),
-            _node("about_code", file_type="code", source_file="fable-orchestrator.md"),
+            _node("about_code", file_type="code", source_file="fable5-orchestrator.md"),
         ]
     )
     derived = _derive(tmp_path, graph)
