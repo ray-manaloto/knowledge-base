@@ -439,6 +439,38 @@ def _reported_responses(events: list[dict]) -> list[dict]:
     return responses
 
 
+def _provider_token_usage(backend: str, events: list[dict]) -> dict:
+    """Record final provider counts, or say explicitly why they are unknown."""
+    event_type = "result" if backend == "claude-cli" else "turn.completed"
+    candidates = [event for event in events if event.get("type") == event_type]
+    if not candidates:
+        return {"status": "unknown", "reason": "provider_usage_event_missing"}
+    usage = candidates[-1].get("usage")
+    if not isinstance(usage, dict):
+        return {"status": "unknown", "reason": "provider_usage_missing"}
+    names = (
+        "input_tokens",
+        "output_tokens",
+        "cache_creation_input_tokens",
+        "cache_read_input_tokens",
+        "cached_input_tokens",
+        "cache_write_input_tokens",
+        "reasoning_output_tokens",
+    )
+    if any(
+        name not in usage or type(usage[name]) is not int or usage[name] < 0
+        for name in ("input_tokens", "output_tokens")
+    ) or any(
+        name in usage and (type(usage[name]) is not int or usage[name] < 0) for name in names[2:]
+    ):
+        return {"status": "unknown", "reason": "provider_usage_invalid"}
+    return {
+        "status": "known",
+        "source_event": event_type,
+        **{name: usage[name] for name in names if name in usage},
+    }
+
+
 def _claude_terminal_bytes(stdout: bytes) -> bytes:
     """Accept only one explicit final result from a Claude event array."""
     envelope = json.loads(stdout.decode("utf-8"))
@@ -488,13 +520,15 @@ def result_parser(backend: str) -> Callable[[dict], dict]:
     """Return a parser for Graphify's Claude envelope or Codex result artifact."""
 
     def parse(process: dict) -> dict:
-        responses = _reported_responses(process.get("provider_events", []))
+        events = process.get("provider_events", [])
+        responses = _reported_responses(events)
+        usage = _provider_token_usage(backend, events)
         reasons = ["complete_response_coverage_unverified"]
         if not responses:
             reasons.append("served_model_identity_missing")
         coverage = {"status": "unproved", "reasons": reasons}
         if process.get("runner_error") in {"timed_out", "timed_out_incomplete_capture"}:
-            return _parsed(None, "timed_out", responses, coverage)
+            return _parsed(None, "timed_out", responses, coverage, usage)
         if process["returncode"] != 0:
             no_response = (
                 not process.get("stdout")
@@ -502,23 +536,29 @@ def result_parser(backend: str) -> Callable[[dict], dict]:
                 and not (process.get("result_artifact") or {}).get("payload")
             )
             return _parsed(
-                None, "failed_before_response" if no_response else "failed", responses, coverage
+                None,
+                "failed_before_response" if no_response else "failed",
+                responses,
+                coverage,
+                usage,
             )
         raw = (
             process["result_artifact"]["payload"]
             if backend == "openai-cli"
             else _claude_terminal_bytes(process["stdout"])
         )
-        return _parsed(_graph_value(raw), "completed", responses, coverage)
+        return _parsed(_graph_value(raw), "completed", responses, coverage, usage)
 
     return parse
 
 
-def _parsed(value: object, completion: str, responses: list[dict], coverage: dict) -> dict:
+def _parsed(
+    value: object, completion: str, responses: list[dict], coverage: dict, usage: dict
+) -> dict:
     return {
         "value": value,
         "completion": completion,
-        "usage": {},
+        "usage": usage,
         "observations": [],
         "responses": responses,
         "coverage": coverage,

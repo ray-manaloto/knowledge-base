@@ -328,6 +328,97 @@ def test_provider_event_capture_preserves_every_array_event() -> None:
     assert graphify_execution._provider_events(json.dumps(events).encode()) == events
 
 
+def test_claude_final_result_usage_is_recorded_without_inference() -> None:
+    chunk = {"nodes": [], "edges": []}
+    events = [
+        {"type": "assistant", "usage": {"input_tokens": 999, "output_tokens": 999}},
+        {
+            "type": "result",
+            "subtype": "success",
+            "is_error": False,
+            "result": json.dumps(chunk),
+            "usage": {
+                "input_tokens": 4,
+                "output_tokens": 12,
+                "cache_creation_input_tokens": 100,
+                "cache_read_input_tokens": 20,
+            },
+        },
+    ]
+    parsed = graphify_execution.result_parser("claude-cli")(
+        {"returncode": 0, "stdout": json.dumps(events).encode(), "provider_events": events}
+    )
+    assert parsed["completion"] == "completed"
+    assert parsed["usage"] == {
+        "status": "known",
+        "source_event": "result",
+        "input_tokens": 4,
+        "output_tokens": 12,
+        "cache_creation_input_tokens": 100,
+        "cache_read_input_tokens": 20,
+    }
+
+
+def test_codex_completed_turn_usage_is_recorded_even_when_model_is_unreported() -> None:
+    chunk = {"nodes": [], "edges": []}
+    payload = json.dumps(chunk).encode()
+    parsed = graphify_execution.result_parser("openai-cli")(
+        {
+            "returncode": 0,
+            "stdout": b"",
+            "result_artifact": {"payload": payload},
+            "provider_events": [
+                {"type": "item.completed", "usage": {"input_tokens": 999}},
+                {
+                    "type": "turn.completed",
+                    "usage": {
+                        "input_tokens": 29675,
+                        "output_tokens": 7860,
+                        "cached_input_tokens": 0,
+                        "reasoning_output_tokens": 1552,
+                    },
+                },
+            ],
+        }
+    )
+    assert parsed["completion"] == "completed"
+    assert parsed["usage"] == {
+        "status": "known",
+        "source_event": "turn.completed",
+        "input_tokens": 29675,
+        "output_tokens": 7860,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 1552,
+    }
+    assert parsed["responses"] == []
+
+
+@pytest.mark.parametrize("bad_count", [None, True, -1, "7"])
+def test_invalid_provider_usage_is_explicitly_unknown(bad_count: object) -> None:
+    parsed = graphify_execution.result_parser("openai-cli")(
+        {
+            "returncode": 1,
+            "stdout": b"",
+            "provider_events": [
+                {
+                    "type": "turn.completed",
+                    "usage": {"input_tokens": 2, "output_tokens": bad_count},
+                }
+            ],
+        }
+    )
+    assert parsed["completion"] == "failed"
+    assert parsed["usage"] == {"status": "unknown", "reason": "provider_usage_invalid"}
+
+
+def test_timeout_without_usage_event_is_explicitly_unknown() -> None:
+    parsed = graphify_execution.result_parser("claude-cli")(
+        {"runner_error": "timed_out", "returncode": -9, "stdout": b"", "provider_events": []}
+    )
+    assert parsed["completion"] == "timed_out"
+    assert parsed["usage"] == {"status": "unknown", "reason": "provider_usage_event_missing"}
+
+
 @pytest.mark.parametrize(
     "events",
     [
