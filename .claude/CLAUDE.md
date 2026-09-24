@@ -51,17 +51,18 @@ through 2026-08-27, the same kind of ordinary tooling and none needing its own
 note: `codex@openai-codex`, `mcp2cli@claude-community`, `eli5@claude-community`,
 `astral@astral-sh`, `mattpocock-skills@mattpocock`, `firecrawl@firecrawl`,
 `exa@exa`, `context7@context7-marketplace`, `last30days@last30days-skill`,
-`i-have-adhd@i-have-adhd`, `ponytail@ponytail`.
+`i-have-adhd@i-have-adhd` (`ponytail@ponytail` was also enabled then; removed 2026-09-24).
 
 **Stop reading this paragraph for a count — it is a history, not an inventory,
 and the count next to it has now drifted stale four times** ("Nine" until
 2026-08-23 → stale by three → bolded as 12 → stale by six → 18, stale by one on 2026-08-27), each time by being
 quoted instead of measured. `.claude/settings.json` currently declares
-**21** plugins `true` in `enabledPlugins` — re-derive, never quote:
+**19** plugins `true` in `enabledPlugins` — re-derive, never quote:
 `jq '.enabledPlugins | to_entries | map(select(.value)) | length' .claude/settings.json`. That is not the same as how many actually run:
-`.claude/settings.local.json` overrides two of the 19 back to `false`
-(`claude-md-management@claude-plugins-official`, `mise@brentmitchell25`), so the
-**effective** count is **17** (re-measured 2026-08-27; `plugin-dev` was added) — `jq -s '(.[0].enabledPlugins + (.[1].enabledPlugins // {})) | to_entries | map(select(.value)) | length' .claude/settings.json .claude/settings.local.json`. Both numbers feed
+`.claude/settings.local.json` overrides three of the 19 back to `false`
+(`claude-md-management@claude-plugins-official`, `mise@brentmitchell25`,
+`aggregated-research@ray-manaloto`), so the **effective** count is **16**
+(re-measured 2026-09-24, after ponytail was removed) — `jq -s '(.[0].enabledPlugins + (.[1].enabledPlugins // {})) | to_entries | map(select(.value)) | length' .claude/settings.json .claude/settings.local.json`. Both numbers feed
 `md-size-budgets.md` § the skill-listing budget, which scales with whichever a
 session actually loads.
 
