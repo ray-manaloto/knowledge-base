@@ -4,8 +4,8 @@ description: >-
   Unified cross-vendor routing doctrine for the Fable-5 architect: which executor
   lane (codex / antigravity / Claude-fallback) and reasoning-effort a delegated
   implementation subtask should run at, and how to fall back on exhaustion. Use
-  whenever you are orchestrating with the adopted fable-orchestrator + antigravity
-  plugins and must decide where to route a spec, how to review it cross-family, or
+  whenever you are orchestrating codex and antigravity lanes from this repo and
+  must decide where to route a spec, how to review it cross-family, or
   what to do when a lane is unavailable. Ground every decision in the KB graph
   first (`mise run kb-query`). The Claude architect always plans + verifies; only
   execution is delegated.
@@ -13,12 +13,14 @@ description: >-
 
 # orchestrator-routing — Fable-5 architect + codex + antigravity lanes
 
-The adopted plugins each cover one vendor lane; this doctrine unifies them so the
+Each lane covers one vendor; this doctrine unifies them so the
 **Fable-5 architect** routes across **both** and keeps a Claude terminal fallback.
 The architect emits judgment and specs, never the bulk of the code, and **verifies
 the evidence itself before declaring done** — a lane's self-report is never proof.
 
-- **codex lane** — `fable-orchestrator`'s `codex-implementer` (GPT-5.6 Sol, high reasoning).
+- **codex lane** — this repo's `kb-codex-implementer` (a stopgap over `mise run kb-codex -- --write`,
+  GPT-5.6 Sol, `xhigh`). It replaced a plugin implementer when fable-orchestrator was removed
+  (dotfiles#1310).
 - **antigravity lane** — the `antigravity` plugin's `/antigravity:delegate` (Google Antigravity CLI
   `agy`, Gemini 3.x).
 - **Claude fallback** — a Claude Opus subagent (Agent tool, `model: "opus"`), the always-available
@@ -27,7 +29,7 @@ the evidence itself before declaring done** — a lane's self-report is never pr
 ## Ground the decision in the graph FIRST
 
 Before any non-trivial routing/fallback call, query this repo's KB graph — the doctrine was extracted
-into it from fable-advisor / fable-orchestrator / the migration + fallback sources:
+into it from the ingested advisor/orchestrator, migration and fallback sources:
 
 ```
 mise run kb-query -- "advisor executor routing: cheapest adequate lane, five-part spec, Fable-5 to Opus fallback"
@@ -75,10 +77,12 @@ architect emits the fewest tokens (specs + verdicts); the CLI lanes emit the mos
 
 ## The spec contract (context-free delegation)
 
-Every delegated subtask carries a self-contained **six-part spec** — Objective, Files, Interfaces,
-Constraints, Verification (a runnable command that proves it), Commit ownership — so the executor
-implements without the architect's conversation. `fable-orchestrator` supplies this; match it for the
-antigravity lane.
+Every delegated subtask carries a self-contained **seven-part spec** — Objective, Files, Interfaces,
+Constraints, Verification (a runnable command that proves it), Commit ownership, and a closing
+**PREMISES** block (one cited row per factual claim: `L` literal, `I` interface, `P` precedent, `E`
+emission, `A` assumption) — so the executor implements without the architect's conversation. A spec
+that emits (telemetry, errors, events) or touches security, concurrency or migrations goes to
+`premise-verifier` before dispatch. The same contract applies to every lane.
 
 ## Cross-family review
 
@@ -101,7 +105,7 @@ Verification and review do **not** relax under fallback — a substitute lane ma
 
 ## codex sandbox limits (know these before you dispatch, not mid-round)
 
-Two limits are inherent to the `codex-implementer` sandbox, not lane bugs — expect
+Two limits are inherent to a `workspace-write` codex sandbox (`kb-codex-implementer`), not lane bugs — expect
 them rather than rediscovering them:
 
 1. **`workspace-write` cannot create new git refs/branches.** An early attempt

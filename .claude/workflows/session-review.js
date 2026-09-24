@@ -1119,7 +1119,7 @@ const refutedWhole = (r) => ({
 
 // Fable for judgment, Opus if Fable is gone — and never silently.
 //
-// The caller owns this fallback, per `kb-advisor.md`: "you never silently become a
+// The caller owns this fallback, per `claude-advisor.md`: "you never silently become a
 // different model, and a run that fell back should say so in its output". `agent()`
 // returns null when a subagent dies on a terminal error after retries, which is the
 // signal to re-dispatch.
