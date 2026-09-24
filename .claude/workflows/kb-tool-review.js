@@ -56,6 +56,8 @@ const reportDir = cfg.reportDir || 'docs/research/reports'
 // Per-tool scratch for the codex review lane (its KB_LANE). One directory per
 // tool key; pass `laneRoot` per run when two runs may overlap.
 const laneRoot = cfg.laneRoot || '.agent/kb/lanes/kb-tool-review'
+// An absolute root is used as-is; a relative one is anchored at the checkout.
+const laneBase = laneRoot.startsWith('/') ? laneRoot : `$PWD/${laneRoot}`
 if (!tools.length) throw new Error('kb-tool-review: args.tools is required and must be non-empty')
 
 const CLAIMS_SCHEMA = {
@@ -187,7 +189,7 @@ const perTool = await pipeline(
     return agent(
       `ARTIFACT REVIEW (your "Artifact review" section — not a diff, no --review, ` +
         `no receipt). Author family: Anthropic (Claude researcher/verifier lanes). ` +
-        `KB_LANE=$PWD/${laneRoot}/review-${t.key}. ` +
+        `KB_LANE=${laneBase}/review-${t.key}. ` +
         `Cold review of the ${t.key} gap analysis at ${reportDir}. You have NOT been ` +
         `told what it is supposed to conclude, deliberately. ${surviving.length} claims ` +
         `survived adversarial verification. Report findings as severity + one-line ` +

@@ -121,8 +121,11 @@ mise run kb-codex -- \
 `method.txt` names the report paths, asks for findings as severity + one-line
 claim + file:line (or "unverified"), and says nothing about what the analysis is
 supposed to conclude. The tree-unchanged fingerprint and the refusal handling
-below apply unchanged. Return the review text; no receipt is written, because
-this is not a `kb-review` of a branch.
+below apply unchanged. Return the review text and persist it ONLY at
+`$KB_LANE/review.md`: never at `.agent/kb/review/reports/review-<SHA>-cold.md`
+and no receipt — that path belongs to a `kb-review` of a branch, and an artifact
+review written there would stand in for a branch review nobody ran. The
+"Write the report to disk" and receipt sections below are diff-mode only.
 
 ## How you actually review: one bounded, backgrounded lane
 
@@ -324,6 +327,8 @@ receipt claims coverage nobody earned — and rc 124 is its own case: the lane r
 a SUBSET, so name what it did not reach.
 
 ## Write the report to disk BEFORE you return
+
+(Diff mode only. In artifact mode the report is `$KB_LANE/review.md`, above.)
 
 As soon as the lane finishes, make sure
 `.agent/kb/review/reports/review-<HEAD SHA>-cold.md` exists, is non-empty, and
