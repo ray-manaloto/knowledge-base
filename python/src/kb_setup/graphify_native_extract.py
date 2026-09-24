@@ -220,12 +220,17 @@ runs; it is a one-line wiring check, not a real extraction.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import math
 import os
 import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from kb_setup import events
+import msgspec
+
+from kb_setup import events, graphify_health
 from kb_setup.graphify_env import (
     assert_pinned_graphify,
     clean_env,
@@ -265,7 +270,7 @@ DEFAULT_OUT = ".agent/kb/native-extract"
 #: Note it deliberately DIFFERS from graphify's own `claude-cli` default
 #: (`claude-code-plan`): overriding that is the point of setting the variable at
 #: all, and the paragraph above is why this identifier and not another.
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = "opus"
 
 #: `claude-cli`'s env keys, kept ONLY as the expected value in tests that assert
 #: what the default backend resolves to. Production code must call
@@ -306,6 +311,8 @@ class Options:
     out: Path
     token_budget: int | None = None
     max_concurrency: int | None = None
+    max_attempts: int = 8
+    total_timeout_seconds: float = 1800.0
     allow_parallel_claude_cli: bool = False
     #: The extraction backend, and with it the model/parallel env keys — ONE
     #: coupled choice (`backend_env_keys`), never three that can drift apart.
@@ -315,6 +322,8 @@ class Options:
     #: default here. `resolve_model` turns the absence into the right answer per
     #: backend — including "say nothing", which no non-empty default can express.
     model: str = ""
+    #: Empty delegates to the managed profile's backend-specific default.
+    effort: str = ""
     dry_run: bool = False
     cluster: bool = False
     artifacts: bool = False
@@ -411,7 +420,13 @@ _VALUE_FLAGS = {
     "--target": ("target", lambda root, _f, raw: root / raw),
     "--token-budget": ("token_budget", lambda _r, f, raw: _parse_positive_int(f, raw)),
     "--max-concurrency": ("max_concurrency", lambda _r, f, raw: _parse_positive_int(f, raw)),
+    "--max-attempts": ("max_attempts", lambda _r, f, raw: _parse_positive_int(f, raw)),
+    "--total-timeout-seconds": (
+        "total_timeout_seconds",
+        lambda _r, f, raw: _parse_positive_float(f, raw),
+    ),
     "--model": ("model", lambda _r, _f, raw: raw),
+    "--effort": ("effort", lambda _r, _f, raw: raw),
     "--backend": ("backend", lambda _r, _f, raw: raw),
 }
 
@@ -463,6 +478,16 @@ def _parse_positive_int(flag: str, raw: str) -> int:
         raise _UsageError(f"{flag} must be an integer (got {raw!r})") from exc
     if value <= 0:
         raise _UsageError(f"{flag} must be > 0 (got {value})")
+    return value
+
+
+def _parse_positive_float(flag: str, raw: str) -> float:
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise _UsageError(f"{flag} must be a finite positive number") from exc
+    if not math.isfinite(value) or value <= 0:
+        raise _UsageError(f"{flag} must be a finite positive number")
     return value
 
 
@@ -835,14 +860,139 @@ def _run_real(repo_root: Path, exe: str, opts: Options) -> int:
     # version is the exact hazard `assert_pinned_graphify` exists to refuse
     # before any writer touches disk.
     assert_pinned_graphify(repo_root)
-    argv = resolve_argv(exe, opts)
-    env = resolve_env(opts)
-    print(f"[graphify-native-extract] $ {' '.join(argv)}")
-    # No capture_output: stdio is inherited so a human watching sees graphify's
-    # own progress output live, exactly like `merge_chunk`'s subprocess call.
-    # No timeout: the caller bounds this (long-running-command-hangs.md).
-    result = subprocess.run([*argv], cwd=repo_root, env=env, check=False)
-    return result.returncode
+    del exe
+    from kb_setup import graphify_execution, graphify_sdk
+
+    budget = graphify_execution.ExecutionBudget(
+        max_attempts=opts.max_attempts, total_seconds=opts.total_timeout_seconds
+    )
+    target = opts.target.resolve(strict=True)
+    run_root = graphify_execution.allocate_run_root(repo_root)
+    profile = graphify_execution.resolve_profile(
+        opts.backend,
+        graphify_execution.ProfileSelection(
+            model=resolve_model(opts) or None,
+            effort=opts.effort or None,
+            environment=dict(os.environ),
+        ),
+    )
+    detection, detection_receipt = graphify_sdk.observe_detect(
+        target,
+        source_name=target.name,
+        coverage_policy=graphify_health.SourceCoveragePolicy(),
+    )
+    graphify_execution.atomic_bytes(
+        run_root / "detection-receipt.json", msgspec.json.encode(detection_receipt)
+    )
+    graphify_health.require_complete(detection_receipt)
+    groups = detection.get("files", {})
+    code_files = [Path(path) for path in groups.get("code", [])]
+    semantic_files = [
+        Path(path)
+        for kind in ("document", "paper", "image", "video")
+        for path in groups.get(kind, [])
+    ]
+    if not code_files and not semantic_files:
+        raise ValueError("deep target has no detected code or semantic source files")
+    source_inventory = [
+        {"path": path.relative_to(target).as_posix(), "sha256": _source_sha256(path)}
+        for path in sorted([*code_files, *semantic_files])
+    ]
+    context = graphify_execution.build_run_context(
+        graphify_execution.RunContextSpec(
+            run_root=run_root,
+            repo_root=repo_root,
+            source_bytes=json.dumps(source_inventory, sort_keys=True).encode(),
+            source_scope=[item["path"] for item in source_inventory],
+            prompt="graphify public deep extraction prompt",
+            profile=profile,
+            stage_id="deep:corpus",
+        )
+    )
+    runner = graphify_execution.CapturedProcessRunner(
+        run_root,
+        graphify_execution.safe_child_environment(resolve_env(opts), backend=profile["backend"]),
+        environment_overrides=graphify_execution.child_environment_override_evidence(
+            profile["backend"]
+        ),
+        budget=budget,
+    )
+    sink = graphify_execution.DurableReceiptSink(run_root)
+    attachment_snapshot_root = run_root / "attachments"
+    semantic = graphify_sdk.extract_corpus_parallel_public(
+        semantic_files,
+        backend=profile["backend"],
+        model=profile["model"],
+        root=target,
+        token_budget=opts.token_budget or 60_000,
+        max_concurrency=opts.max_concurrency or 4,
+        deep_mode=True,
+        cache_root=opts.out / _GRAPHIFY_OUT_NAME,
+        effort=profile["effort"],
+        execution_profile=graphify_execution.public_profile_request(profile),
+        run_context=context,
+        process_runner=runner,
+        receipt_sink=sink,
+        attachment_stager=graphify_execution.CapturedRasterStager(attachment_snapshot_root, target),
+        attachment_snapshot_root=attachment_snapshot_root,
+    )
+    failed_chunks = int(semantic.get("failed_chunks", 0))
+    empty_semantic = bool(semantic_files) and not semantic.get("nodes")
+    if failed_chunks or empty_semantic:
+        partial_path = run_root / "partial-semantic.json"
+        state_path = run_root / "run-state.json"
+        graphify_execution.atomic_bytes(
+            partial_path,
+            json.dumps(semantic, sort_keys=True, indent=2, ensure_ascii=False).encode() + b"\n",
+        )
+        graphify_execution.atomic_bytes(
+            state_path,
+            json.dumps(
+                {
+                    "completion": "incomplete",
+                    "failed_chunks": failed_chunks,
+                    "empty_semantic": empty_semantic,
+                    "partial_semantic_ref": str(partial_path),
+                },
+                sort_keys=True,
+                indent=2,
+            ).encode()
+            + b"\n",
+        )
+        print(
+            f"[graphify-native-extract] incomplete: {failed_chunks} semantic chunk(s) "
+            f"failed, empty_semantic={empty_semantic}; retained partial result at {partial_path}"
+        )
+        return Rc.FINDINGS
+    ast = graphify_sdk.extract_public(
+        code_files,
+        cache_root=opts.out / _GRAPHIFY_OUT_NAME,
+        root=target,
+    )
+    graph = graphify_sdk.build_public([ast, semantic], root=target)
+    communities = graphify_sdk.cluster_public(graph)
+    labels = graphify_sdk.label_communities_by_hub_public(graph, communities)
+    graph_path = _cluster_graph_json(opts)
+    graph_path.parent.mkdir(parents=True, exist_ok=True)
+    wrote = graphify_sdk.to_json_public(
+        graph,
+        communities,
+        str(graph_path),
+        force=True,
+        community_labels=labels,
+    )
+    if not wrote:
+        return Rc.FINDINGS
+    print(
+        f"[graphify-native-extract] wrote {graph_path} via managed public SDK; "
+        f"run evidence: {run_root}"
+    )
+    return Rc.OK
+
+
+def _source_sha256(path: Path) -> str:
+    """Hash a detected deep-extraction input for the run's corpus identity."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _dispatch_cluster(repo_root: Path, exe: str, opts: Options) -> int:
@@ -946,17 +1096,31 @@ def native_extract_main(repo_root: Path, argv: list[str]) -> int:
     three confirmed defects a caller of EITHER path was accepting while the
     CLI subcommand was closed and the only way in was a direct import.
     """
+    usage = (
+        "[--out DIR] [--target DIR] [--token-budget N] [--max-concurrency N] "
+        "[--max-attempts N] [--total-timeout-seconds N] "
+        "[--model NAME] [--effort LEVEL] [--backend NAME] "
+        "[--allow-parallel-claude-cli] [--cluster] [--artifacts [VIEW...]] [--dry-run]"
+    )
+    if argv == ["--help"]:
+        print(
+            "Usage: mise run kb-graphify-native-extract -- " + usage + "\n"
+            "Defaults: claude-cli model=opus effort=xhigh; "
+            "openai-cli model=gpt-5.6-sol effort=high.\n"
+            "Subscription CLIs only; provider API credentials are refused."
+        )
+        return Rc.OK
     try:
         opts = _parse(repo_root, argv)
     except _UsageError as exc:
-        print(
-            f"[graphify-native-extract] {exc}. Accepted argv: "
-            "[--out DIR] [--target DIR] [--token-budget N] [--max-concurrency N] "
-            "[--model NAME] [--backend NAME] [--allow-parallel-claude-cli] [--cluster] "
-            "[--artifacts [VIEW...]] [--dry-run]"
-        )
+        print(f"[graphify-native-extract] {exc}. Accepted argv: " + usage)
         return Rc.BAD_REQUEST
 
+    return _dispatch_options(repo_root, opts)
+
+
+def _dispatch_options(repo_root: Path, opts: Options) -> int:
+    """Validate resolved options and dispatch exactly one native operation."""
     out_problem = _refuse_out(repo_root, opts)
     if out_problem:
         events.fail("graphify_native_extract.unsafe_out", out_problem)

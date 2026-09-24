@@ -17,7 +17,7 @@ from pathlib import Path
 
 import msgspec
 
-from kb_setup import graph
+from kb_setup import graph, graphify_health
 from kb_setup import manifest as source_manifests
 
 
@@ -240,12 +240,12 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.57"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.67"
 # FORKED 2026-08-24: this names WHAT RUNS, so it followed the pin onto the fork
 # (`currency.toml` binds it with `tracks = "manifest"`). Contrast the semantic
 # corpus/slice constants, which are snapshot identities of completed runs and
 # correctly hold at the upstream base `v0.9.48`.
-_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.57"
+_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.67-41c1be2a"
 
 #: The public spelling of the version above, for the ONE cross-module consumer:
 #: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
@@ -289,18 +289,18 @@ _LPK_FILE_ID = _LPK_COLLISION_ID
 _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
-    "sdk_fingerprint_sha256": "153870e2a461b346aeba87bbd1e64aaf6e03e9e53a47146b329bcd08631067dc",
+    "sdk_fingerprint_sha256": "2d4ae00ba0714f3505b5db529b5c6cbeaa345acc88f30fd7b687d32d6e8f21ad",
     # FORKED 2026-08-24: a git-locked dependency has NO wheel and NO sdist, so
     # the two hashes that used to live here cannot exist and their absence is
     # not a gap to paper over. `git_commit` is the substitute and it is a
     # STRONGER identity — a wheel hash names a built artifact, a resolved
     # commit names the source tree it was built from. Reverts to the wheel/sdist
     # pair when #2981 merges and the pin returns to PyPI.
-    "git_commit": "3c9b930f386f80c393fe658e1afb685030828c6a",
+    "git_commit": "41c1be2a63088b9302e1bd31dccffdc48cb87c27",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="3c9b930f386f80c393fe658e1afb685030828c6a",
+    source_commit="41c1be2a63088b9302e1bd31dccffdc48cb87c27",
     # RE-DERIVED 2026-09-10 from the pinned commit, not carried forward. The
     # 0.9.57 pin move advanced `source_commit` and left BOTH of these describing
     # `157a957e`, and all eight gates passed over it — `mise run
@@ -310,8 +310,8 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # digests the catalog's canonical encoding, so fixing a stale catalog entry
     # changes it again. Measured across this fix: `a52e4f6e…` before the entry
     # was corrected, `0444f055…` after. Derive it LAST.
-    source_tree="8fae076d840491419ab39fc05f0860007c0dcffe",
-    catalog_sha256="0444f055bbfb4d4e68015accb90ab284553b96ddc90cf6764be29ea0a67b0ca8",
+    source_tree="3ec9820965ac80873835599e842bbde9ac655042",
+    catalog_sha256="0f2d1ea9821f9b03644ccd9db880061cb3db6cd746c29cc21617eb3c1db74b34",
     # RE-DERIVED 2026-09-10, and it was the SIXTH stranded value — found only
     # after `kb-graphify-catalog`'s first version reported five and called that
     # the whole set. 880 members at the pinned commit.
@@ -325,7 +325,7 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     #
     # Corroborated: an independent derivation in the previous session produced
     # this same digest and the same 880-member count.
-    source_manifest_sha256="440c88c28053ddd5a42371fdac8970b4781c48a9294f8addb494c24ee37e43d1",
+    source_manifest_sha256="3b8cf5fd503984f9d56f767f0a4d36c9712b5d43250c66eb977c0c633127fa18",
     # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
     # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
     # RE-DERIVED by a real build against the installed 0.9.47, never carried
@@ -362,7 +362,11 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # newly detected file was also extracted, so the gap between the two counts
     # is UNCHANGED at 8 and no warning was emitted — the check that a
     # backend-only fork has not altered EXTRACTION behaviour.
-    detected_count=471,
+    # RE-DERIVED 2026-09-24 from the installed 0.9.67 fork at 41c1be2a by
+    # `kb-graphify-baseline build`: observed 550 detected and 542 extracted.
+    # The eight-file gap is unchanged; the first candidate's direct failure
+    # was the old authority pair (471, 463), retained in the goal evidence.
+    detected_count=550,
     # FORKED 2026-08-24, then REBASED onto upstream v0.9.49 the same day:
     # 429 -> 450 detected, 421 -> 442 extracted. RE-DERIVED
     # by a real `kb-graphify-baseline build` against the INSTALLED fork, never
@@ -396,7 +400,7 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # All three drifted authority values came from the build's own OBSERVED vs
     # ACCEPTED diagnostic (#373) rather than a hand derivation — which is the
     # thing that note says it exists to prevent, and it worked.
-    extracted_count=463,
+    extracted_count=542,
 )
 
 
@@ -1855,6 +1859,32 @@ def certify_controls(source: Path, catalog: DispositionCatalog) -> ControlsRecei
     )
 
 
+def _detection_census(
+    source: Path,
+    catalog: DispositionCatalog,
+    detection: dict,
+    receipt: graphify_health.GraphifyReceipt,
+) -> graph.SourceCensusReceipt:
+    """Retain complete path evidence instead of the receipt's bounded display list."""
+    unclassified = graph.graphify_sdk_paths(source, detection.get("unclassified", []))
+    ignored = graph.graphify_sdk_paths(source, detection.get("ignored", []))
+    return graph.SourceCensusReceipt(
+        source="graphify",
+        kind="code",
+        status=receipt.state.value,
+        declared_pin=catalog.source_commit,
+        resolved_commit=catalog.source_commit,
+        tree_digest=catalog.source_tree,
+        categories=tuple(sorted(receipt.reasons)),
+        detected_count=receipt.detected_sources,
+        unclassified_count=len(unclassified),
+        ignored_count=len(ignored),
+        unclassified=tuple(graph.source_path_evidence(source, path) for path in unclassified),
+        ignored=tuple(graph.source_path_evidence(source, path) for path in ignored),
+        stderr=receipt.stderr,
+    )
+
+
 def build_from_snapshot(
     source: Path,
     output: Path,
@@ -1891,26 +1921,7 @@ def build_from_snapshot(
             optional_ignored_paths=ignored_paths,
         ),
     )
-    census = graph.SourceCensusReceipt(
-        source="graphify",
-        kind="code",
-        status=detection_receipt.state.value,
-        declared_pin=catalog.source_commit,
-        resolved_commit=catalog.source_commit,
-        tree_digest=catalog.source_tree,
-        categories=tuple(sorted(detection_receipt.reasons)),
-        detected_count=detection_receipt.detected_sources,
-        unclassified_count=len(detection_receipt.unclassified_paths),
-        ignored_count=len(detection_receipt.ignored_paths),
-        unclassified=tuple(
-            graph.source_path_evidence(source, path)
-            for path in detection_receipt.unclassified_paths
-        ),
-        ignored=tuple(
-            graph.source_path_evidence(source, path) for path in detection_receipt.ignored_paths
-        ),
-        stderr=detection_receipt.stderr,
-    )
+    census = _detection_census(source, catalog, detection, detection_receipt)
     disposition = verify_dispositions(
         source,
         catalog,

@@ -14,6 +14,7 @@ never set the variable — so each strip arm SETS the variable first.
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -189,9 +190,42 @@ def test_gate_passes_silently_on_a_match(
     from kb_setup import graphify_sdk
 
     monkeypatch.setattr(graphify_sdk, "assert_public_sdk", lambda _version: None)
+    monkeypatch.setattr(graphify_env, "assert_installed_graphify_origin", lambda _root: None)
 
     assert graphify_env.assert_pinned_graphify(tmp_path) is None
     assert capsys.readouterr().err == ""
+
+
+def test_installed_fork_origin_matches_real_locked_environment() -> None:
+    graphify_env.assert_installed_graphify_origin(Path(__file__).resolve().parents[1])
+
+
+@pytest.mark.parametrize("failure", ["wrong-commit", "editable"])
+def test_installed_fork_origin_rejects_substitution(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    class FakeDistribution:
+        def read_text(self, name: str) -> str:
+            assert name == "direct_url.json"
+            origin = {
+                "url": "https://github.com/ray-manaloto/graphify",
+                "vcs_info": {
+                    "vcs": "git",
+                    "commit_id": "0" * 40
+                    if failure == "wrong-commit"
+                    else "41c1be2a63088b9302e1bd31dccffdc48cb87c27",
+                    "requested_revision": "41c1be2a63088b9302e1bd31dccffdc48cb87c27",
+                },
+            }
+            if failure == "editable":
+                origin["dir_info"] = {"editable": True}
+            return json.dumps(origin)
+
+    monkeypatch.setattr(
+        graphify_env.importlib.metadata, "distribution", lambda _name: FakeDistribution()
+    )
+    with pytest.raises(SystemExit, match="REFUSING local/editable or wrong-commit"):
+        graphify_env.assert_installed_graphify_origin(Path(__file__).resolve().parents[1])
 
 
 def test_gate_refuses_when_it_cannot_compare(

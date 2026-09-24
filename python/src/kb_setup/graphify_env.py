@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import importlib.metadata
+import importlib.util
+import json
 import os
 import re
 import shutil
@@ -256,6 +259,44 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
     from kb_setup.graphify_sdk import assert_public_sdk
 
     assert_public_sdk(pinned)
+    assert_installed_graphify_origin(root)
+
+
+def assert_installed_graphify_origin(repo_root: Path) -> None:
+    """Refuse a local/editable or wrong-commit Graphify despite matching version."""
+    try:
+        with (repo_root / "pyproject.toml").open("rb") as stream:
+            source = tomllib.load(stream)["tool"]["uv"]["sources"]["graphifyy"]
+        expected_url = source["git"]
+        expected_sha = source["rev"]
+        exact_revision = bool(re.fullmatch(r"[0-9a-f]{40}", expected_sha))
+        dist = importlib.metadata.distribution("graphifyy")
+        raw = dist.read_text("direct_url.json")
+        installed = json.loads(raw) if raw else {}
+        info = installed.get("vcs_info") or {}
+        spec = importlib.util.find_spec("graphify")
+        origin = Path(spec.origin).resolve(strict=True) if spec and spec.origin else None
+        venv = (repo_root / ".venv").resolve(strict=True)
+        matches = (
+            exact_revision
+            and installed.get("url") == expected_url
+            and info.get("vcs") == "git"
+            and info.get("commit_id") == expected_sha
+            and info.get("requested_revision") == expected_sha
+            and "dir_info" not in installed
+            and origin is not None
+            and origin.is_relative_to(venv)
+        )
+    except (
+        OSError,
+        KeyError,
+        ValueError,
+        TypeError,
+        importlib.metadata.PackageNotFoundError,
+    ) as exc:
+        raise SystemExit("[graphify] REFUSING unverified installed fork origin") from exc
+    if not matches:
+        raise SystemExit("[graphify] REFUSING local/editable or wrong-commit Graphify origin")
 
 
 def _imports_graphify(py: Path) -> bool:

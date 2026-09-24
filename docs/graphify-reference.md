@@ -7,6 +7,20 @@ sources: `sources/graphify/` (README, ARCHITECTURE.md, docs/, pyproject.toml, te
 the CLI (`graphify --help`), and this repo's own graph. **For command syntax, the
 README's Full Command Reference is authoritative; this doc is the mental model.**
 
+## Current KB managed routes
+
+The KB lock is Graphify 0.9.61 from the exact fork commit in
+`sources/graphify.manifest` and `uv.lock`. NORMAL uses
+`mise run kb-graphify-ingest -- REQUEST.json`; DEEP uses
+`mise run kb-graphify-native-extract -- --target DIR --out DIR --backend NAME`.
+Both use explicit subscription CLI profiles: Claude opus/xhigh or Codex
+gpt-5.6-sol/high, reject hidden API authentication, retain byte captures and
+receipts, and write isolated outputs. Review NORMAL scratch chunks before
+committing/merging them; DEEP does not overwrite the aggregate graph.
+The host-agent-only and non-Claude prohibitions below are historical context,
+not the managed route policy. Older measurements are scoped to their recorded
+version/backend and do not certify these routes or complete response coverage.
+
 ## Pipeline
 
 `detect() → extract() → build_graph() → cluster() → analyze() → report() → export()`

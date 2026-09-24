@@ -29,12 +29,19 @@ from typing import TYPE_CHECKING
 
 import msgspec
 from graphify.build import build, build_from_json, build_merge
+from graphify.cache import check_semantic_cache, save_semantic_cache
+from graphify.cluster import cluster, label_communities_by_hub
 from graphify.detect import detect, detect_incremental
+from graphify.execution import build_cli_invocation, resolve_execution_profile, run_cli_invocation
 from graphify.export import prune_dangling_edges, to_json
 from graphify.extract import collect_files, extract
 from graphify.extractors.json_config import extract_json
 from graphify.llm import extract_corpus_parallel
 from graphify.manifest_ingest import extract_package_manifest, is_package_manifest_path
+from graphify.raster import (
+    stage_ephemeral_raster_attachments,
+    verify_raster_snapshot_ack,
+)
 from graphify.reflect import build_learning_overlay, reflect
 
 from kb_setup.generated.reviewed_classification import ReviewedClassification
@@ -83,7 +90,10 @@ _PUBLIC_SYMBOLS = (
         "graphify.build.build",
         build,
         "(extractions: 'list[dict]', *, directed: 'bool' = False, dedup: 'bool' = True, "
-        "dedup_llm_backend: 'str | None' = None, root: 'str | Path | None' = None) -> "
+        "dedup_llm_backend: 'str | None' = None, dedup_llm_model: 'str | None' = None, "
+        "dedup_llm_effort: 'str | None' = None, root: 'str | Path | None' = None, "
+        "protected_ids: \"'set[str] | None'\" = None, execution_profile: 'dict | None' = None, "
+        "run_context: 'dict | None' = None, process_runner=None, receipt_sink=None) -> "
         "'nx.Graph'",
     ),
     PublicSymbol(
@@ -114,8 +124,11 @@ _PUBLIC_SYMBOLS = (
         build_merge,
         "(new_chunks: 'list[dict]', graph_path: 'str | Path | None' = None, prune_sources: "
         "'list[str] | None' = None, *, directed: 'bool | None' = None, dedup: 'bool' = True, "
-        "dedup_llm_backend: 'str | None' = None, root: 'str | Path | None' = None, "
-        "ast_sources: \"'Iterable[str | Path] | None'\" = None) -> "
+        "dedup_llm_backend: 'str | None' = None, dedup_llm_model: 'str | None' = None, "
+        "dedup_llm_effort: 'str | None' = None, root: 'str | Path | None' = None, "
+        "ast_sources: \"'Iterable[str | Path] | None'\" = None, execution_profile: "
+        "'dict | None' = None, run_context: 'dict | None' = None, process_runner=None, "
+        "receipt_sink=None) -> "
         "'nx.Graph'",
     ),
     PublicSymbol(
@@ -178,24 +191,95 @@ _PUBLIC_SYMBOLS = (
         prune_dangling_edges,
         "(graph_data: 'dict') -> 'tuple[dict, int]'",
     ),
+    PublicSymbol(
+        "graphify.cluster.cluster",
+        cluster,
+        "(G: 'nx.Graph', resolution: 'float' = 1.0, exclude_hubs_percentile: "
+        "'float | None' = None) -> 'dict[int, list[str]]'",
+    ),
+    PublicSymbol(
+        "graphify.cluster.label_communities_by_hub",
+        label_communities_by_hub,
+        "(G: 'nx.Graph', communities: 'dict[int, list[str]]') -> 'dict[int, str]'",
+    ),
+    PublicSymbol(
+        "graphify.execution.resolve_execution_profile",
+        resolve_execution_profile,
+        "(backend: 'str | None', model: 'str | None', effort: 'str | None', *, "
+        "execution_profile: 'dict | None' = None, purpose: 'str', environment: "
+        "'Mapping[str, str] | None' = None) -> 'dict'",
+    ),
+    PublicSymbol(
+        "graphify.execution.build_cli_invocation",
+        build_cli_invocation,
+        "(prompt: 'str', *, purpose: 'str', max_tokens: 'int', deep_mode: 'bool' = False, "
+        "attachments: 'list[dict] | None' = None, profile: 'dict', output_path: "
+        "'Path | None' = None, project_root: 'Path | None' = None, cwd: 'Path | None' = None, "
+        "legacy_mcp_args: 'list[str] | None' = None) -> 'dict'",
+    ),
+    PublicSymbol(
+        "graphify.execution.run_cli_invocation",
+        run_cli_invocation,
+        "(invocation: 'dict', *, run_context: 'dict | None' = None, process_runner: "
+        "'Callable[[dict], dict] | None' = None, result_parser: 'Callable[[dict], dict] | None' "
+        "= None, receipt_sink: 'Callable[[dict], dict] | None' = None) -> 'dict'",
+    ),
+    PublicSymbol(
+        "graphify.cache.check_semantic_cache",
+        check_semantic_cache,
+        "(files: 'list[str]', root: 'Path' = PosixPath('.'), mode: 'str | None' = None, "
+        "prompt: \"'str | Path | None'\" = None, prompt_file: \"'str | Path | None'\" = "
+        "None, cache_root: \"'Path | None'\" = None, *, execution_profile: 'dict | None' = "
+        "None, run_context: 'dict | None' = None, cache_evidence_out: 'list[dict] | None' = "
+        "None, attachment_compatibility: 'Mapping[str, str] | None' = None) -> "
+        "'tuple[list[dict], list[dict], list[dict], list[str]]'",
+    ),
+    PublicSymbol(
+        "graphify.cache.save_semantic_cache",
+        save_semantic_cache,
+        "(nodes: 'list[dict]', edges: 'list[dict]', hyperedges: 'list[dict] | None' = None, "
+        "root: 'Path' = PosixPath('.'), merge_existing: 'bool' = False, allowed_source_files: "
+        "'Iterable[str | Path] | None' = None, mode: 'str | None' = None, prompt: "
+        "\"'str | Path | None'\" = None, prompt_file: \"'str | Path | None'\" = None, "
+        "partial_source_files: 'Iterable[str | Path] | None' = None, cache_root: "
+        "\"'Path | None'\" = None, *, execution_profile: 'dict | None' = None, run_context: "
+        "'dict | None' = None, producer_receipt: 'dict | list[dict] | None' = None, "
+        "attachment_compatibility: 'Mapping[str, str] | None' = None) -> 'int'",
+    ),
 )
 
-# Graphify's semantic module is not part of the deterministic baseline's public
-# compatibility fingerprint. Issue #300 nevertheless needs one exact SDK seam:
-# the non-underscore corpus function is the only callable that both exercises
-# Graphify's real claude-cli route and lets the caller set adaptive retries to
-# zero. Keep its reviewed contract separate so extending semantic evidence does
-# not re-authorize the already-landed #299 deterministic candidate.
+# Graphify's semantic and raster modules are not part of the deterministic
+# baseline's public compatibility fingerprint. Keep their reviewed contracts
+# together so deep extraction and its retained raster transport fail closed on
+# signature drift without re-authorizing the landed deterministic candidate.
 _SEMANTIC_SYMBOLS = (
     PublicSymbol(
         "graphify.llm.extract_corpus_parallel",
         extract_corpus_parallel,
-        "(files: 'list[Path]', backend: 'str' = 'kimi', api_key: 'str | None' = None, "
+        "(files: 'list[Path]', backend: 'str | None' = None, api_key: 'str | None' = None, "
         "model: 'str | None' = None, root: 'Path' = PosixPath('.'), chunk_size: 'int' = 20, "
         "on_chunk_done: 'Callable | None' = None, token_budget: 'int | None' = 60000, "
         "max_concurrency: 'int' = 4, max_retry_depth: 'int | None' = None, "
         "deep_mode: 'bool' = False, "
-        "cache_root: \"'Path | None'\" = None) -> 'dict'",
+        "cache_root: \"'Path | None'\" = None, *, effort: 'str | None' = None, "
+        "execution_profile: 'dict | None' = None, run_context: 'dict | None' = None, "
+        "process_runner: 'Callable | None' = None, receipt_sink: 'Callable | None' = None, "
+        "attachment_stager: 'Callable[[dict], Mapping] | None' = None, "
+        "attachment_snapshot_root: 'Path | None' = None, attachment_compatibility: "
+        "'Mapping[str, str] | None' = None, _prepared_raster_request: 'Mapping | None' = None) "
+        "-> 'dict'",
+    ),
+    PublicSymbol(
+        "graphify.raster.stage_ephemeral_raster_attachments",
+        stage_ephemeral_raster_attachments,
+        "(source_records: 'Sequence[Mapping[str, Any]]', *, root: "
+        "'str | os.PathLike[str]') -> 'Iterator[list[dict[str, Any]]]'",
+    ),
+    PublicSymbol(
+        "graphify.raster.verify_raster_snapshot_ack",
+        verify_raster_snapshot_ack,
+        "(acknowledgment: 'Mapping[str, Any]', *, source_record: 'Mapping[str, Any]', "
+        "snapshot_root: 'str | os.PathLike[str]') -> 'dict[str, Any]'",
     ),
 )
 
@@ -245,6 +329,24 @@ def assert_semantic_sdk(expected_version: str) -> None:
             "Graphify semantic SDK contract failed; review the release before inference:\n"
             f"{details}"
         )
+
+
+# Public aliases keep call sites behind this reviewed module while preserving
+# Graphify's exact callable types for the static checker.
+resolve_execution_profile_public = resolve_execution_profile
+build_cli_invocation_public = build_cli_invocation
+run_cli_invocation_public = run_cli_invocation
+check_semantic_cache_public = check_semantic_cache
+save_semantic_cache_public = save_semantic_cache
+extract_corpus_parallel_public = extract_corpus_parallel
+stage_ephemeral_raster_attachments_public = stage_ephemeral_raster_attachments
+verify_raster_snapshot_ack_public = verify_raster_snapshot_ack
+detect_public = detect
+extract_public = extract
+build_public = build
+cluster_public = cluster
+label_communities_by_hub_public = label_communities_by_hub
+to_json_public = to_json
 
 
 def contract_errors(expected_version: str) -> tuple[str, ...]:

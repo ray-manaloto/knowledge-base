@@ -817,6 +817,10 @@ run = "uv run kb-setup graphify-baseline"
 [tasks.kb-graphify-native-extract]
 description = "graphify's OWN native deep extraction over the pinned sources/graphify clone; --cluster re-clusters an existing --out tree; --artifacts [view...] regenerates derived views (wiki/graphml/svg/...) over it"
 run = "uv run kb-setup graphify-native-extract"
+
+[tasks.kb-graphify-ingest]
+description = "NORMAL source ingestion through the captured Graphify CLI adapter"
+run = "uv run kb-setup graphify-ingest"
 # UNPARKED 2026-08-26, together with the `cli.py` dispatch — the two are one
 # gesture, exactly as the park's own note required.
 #
