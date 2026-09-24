@@ -4,3 +4,5 @@ ref = main
 commit = c3f3a6681791f6c6d870e8e437ecfe4e8500e377
 kind = code
 scope = study
+build = skip
+skip_reason = 2026-09-24 exact-pin extraction census found seven external R/Solidity symbol nodes without source_file under Graphify v0.9.67; provenance validation fails closed, so this study graph is omitted visibly. Clear only after external-symbol provenance is corrected and a fresh exact-pin census plus study-graph review pass; the gitignored clone is not an accepted graph.

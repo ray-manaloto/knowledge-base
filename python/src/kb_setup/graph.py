@@ -746,59 +746,12 @@ _EXPECTED_PARTIAL_EXTRACTION = (
     ),
 )
 
-# Files in a language graphify has NO AST extractor for (#1689). Separate from
-# `_EXPECTED_PARTIAL_EXTRACTION` above because the two expire on different
-# events: a partial extraction changes when the FILE or the grammar changes,
-# while these change only when UPSTREAM ships an extractor.
-#
-# Upstream state, verified 2026-08-20 against the tracker AND the installed
-# 0.9.48, because the tracker alone has already been wrong about this once:
-#   * #1689 is OPEN and is exactly this warning. The maintainer shipped the
-#     warning itself in v8 (377dc7f) and said the extractor "is the natural
-#     follow-up".
-#   * #2116 ("Native Tree-sitter Support for R") is CLOSED as COMPLETED and
-#     nothing shipped — a commenter documented the same thing at 0.9.27.
-#   * The installed 0.9.48 has 30 files in `graphify/extractors/` and no `r.py`
-#     (the r-prefixed ones are razor, resolution, rust). The gap is real at the
-#     version we run, which is the only version whose behaviour this gates.
-# So the loss below is accepted as CURRENT, never as permanent: the zero-node
-# check in `approve_unsupported_language_warning` expires each entry the moment
-# an extractor lands, and the build reports that rather than absorbing it.
-_EXPECTED_UNSUPPORTED_LANGUAGE = (
-    # code-review-graph is a multi-language parser and carries one fixture per
-    # language it claims to handle. These two are its R pair, and R is precisely
-    # the language #1689 was filed about.
-    #
-    # MEASURED from the sub-graph, control-armed: 53 other `tests/fixtures/*`
-    # files ARE present in it, so a zero here is an absence and not a broken
-    # probe.
-    graphify_health.ExpectedUnsupportedLanguage(
-        source_name="code-review-graph",
-        relative_path="tests/fixtures/sample.R",
-        content_sha256="3e3d48a842d2fcf26d288fda088a1fe0f218165b8f1a01b1b899fbf401e7613b",
-        pinned_commit="c3f3a6681791f6c6d870e8e437ecfe4e8500e377",
-        language=".r",
-        lost_symbols=6,
-        reason=(
-            "graphify has no tree-sitter-r dispatch (#1689), so this 30-line CRAN-style "
-            "fixture contributes zero nodes; add(), multiply(), MyClass, greet(), "
-            "get_age() and process_data() are all absent"
-        ),
-    ),
-    graphify_health.ExpectedUnsupportedLanguage(
-        source_name="code-review-graph",
-        relative_path="tests/fixtures/test_sample.R",
-        content_sha256="2c643bf1eb0749fe0af797b46c119325f62169bb06763f42054b81f1fa0fb702",
-        pinned_commit="c3f3a6681791f6c6d870e8e437ecfe4e8500e377",
-        language=".r",
-        lost_symbols=1,
-        reason=(
-            "the R half of code-review-graph's test-detection fixtures; no tree-sitter-r "
-            "dispatch (#1689), so test_add() is absent. The testthat block is a call, "
-            "not a definition, and is not counted as loss"
-        ),
-    ),
-)
+# The v0.9.67 fork now has an R extractor. The old code-review-graph R
+# unsupported-language approvals from 0.9.48 are obsolete, and that source is
+# explicitly skipped until its new external-symbol provenance warnings are
+# resolved. Keep the inventory empty so a future unsupported-language warning
+# cannot inherit a stale R exception.
+_EXPECTED_UNSUPPORTED_LANGUAGE: tuple[graphify_health.ExpectedUnsupportedLanguage, ...] = ()
 
 # The tool whose artifacts `kb-build` produces. Named explicitly so a
 # multi-tool currency.toml cannot silently stamp the wrong tool.
