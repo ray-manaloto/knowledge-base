@@ -296,8 +296,9 @@ class Receipt:
 #: `cold:<variant>` names an external reviewer CLI; maps the variant a lane
 #: entry carries to the `currency.toml` tool table (`[tool.<mise_key>]`) that
 #: pins it. `.claude/skills/kb-review/SKILL.md`'s cross-family table has two
-#: external lanes — `cold:codex-astra` via `kb-codex --review` (records `codex`;
-#: it replaced the removed fable-orchestrator plugin's reviewer, #794) and
+#: external lanes — `cold:codex-astra` via `kb-codex --review` (records the
+#: `codex-astra` variant, which this map resolves to the `codex` table; it
+#: replaced the removed fable-orchestrator plugin's reviewer, #794) and
 #: `antigravity:review` (Google's plugin). The skill's only literal worked
 #: example anywhere in this repo is `cold:codex`; no `cold:antigravity`
 #: receipt has ever been written, so there is no precedent for which spelling
@@ -307,6 +308,7 @@ class Receipt:
 #: A variant not in this map is not drift — see :func:`_reviewer_pin_gap`.
 _REVIEWER_CLI_MISE_KEYS: dict[str, str] = {
     "codex": "codex",
+    "codex-astra": "codex",
     "antigravity": "antigravity-cli",
     "antigravity-cli": "antigravity-cli",
     "agy": "antigravity-cli",
@@ -376,7 +378,10 @@ def _reviewer_pin_gap(repo_root: Path, data: dict[str, Any]) -> str | None:
         if not sep or variant not in _REVIEWER_CLI_MISE_KEYS:
             continue
         mise_key = _REVIEWER_CLI_MISE_KEYS[variant]
-        spec = next((s for s in specs if s.mise_key == mise_key), None)
+        # Match the `[tool.<name>]` TABLE as well as its `mise_key`: this repo's
+        # codex row is `[tool.codex]` with `mise_key = "npm:@openai/codex"`, so
+        # a `mise_key`-only match never found it and the check never fired.
+        spec = next((s for s in specs if mise_key in (s.name, s.mise_key)), None)
         if spec is None or not spec.applies_here():
             continue
         pinned, _extras = sync.pinned_version(repo_root, spec)
@@ -387,10 +392,10 @@ def _reviewer_pin_gap(repo_root: Path, data: dict[str, Any]) -> str | None:
             continue  # not installed, unreadable, or in sync — none is drift.
         return (
             f"lane {entry!r} ran {spec.binary} {observed}, but mise.toml pins "
-            f"{mise_key} {pinned} — a drifted reviewer binary is a stale review. "
-            f"Sync them: `mise use {mise_key}@{observed}` if {observed} is the "
+            f"{spec.mise_key} {pinned} — a drifted reviewer binary is a stale review. "
+            f"Sync them: `mise use {spec.mise_key}@{observed}` if {observed} is the "
             f"version you meant to review with (review its release notes "
-            f"first), or reinstall {mise_key}@{pinned} if it is not"
+            f"first), or reinstall {spec.mise_key}@{pinned} if it is not"
         )
     return None
 
