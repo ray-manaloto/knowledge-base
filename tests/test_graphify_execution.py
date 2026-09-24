@@ -226,7 +226,9 @@ def test_runner_timeout_tolerates_child_exit_during_killpg(
         ],
         "stdin": b"",
         "cwd": str(tmp_path),
-        "timeout_seconds": 0.05,
+        # Allow interpreter startup under parallel test load; the child still
+        # sleeps longer than this bound, so the timeout path remains mandatory.
+        "timeout_seconds": 2.0,
         "output_contract": "stdout-json-envelope",
         "requested_profile": {"binary_expectation": _identity(python)},
     }
