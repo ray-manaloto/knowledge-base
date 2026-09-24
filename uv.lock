@@ -655,7 +655,7 @@ wheels = [
 [[package]]
 name = "graphifyy"
 version = "0.9.67"
-source = { git = "https://github.com/ray-manaloto/graphify?rev=51237d458b1f5339d43df8a1c19bc20c29e7a0f8#51237d458b1f5339d43df8a1c19bc20c29e7a0f8" }
+source = { git = "https://github.com/ray-manaloto/graphify?rev=d629754669702a305014f1fba844481e6c0ab537#d629754669702a305014f1fba844481e6c0ab537" }
 dependencies = [
     { name = "networkx" },
     { name = "numpy" },
@@ -1100,7 +1100,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=1.0.0" },
-    { name = "graphifyy", extras = ["all"], git = "https://github.com/ray-manaloto/graphify?rev=51237d458b1f5339d43df8a1c19bc20c29e7a0f8" },
+    { name = "graphifyy", extras = ["all"], git = "https://github.com/ray-manaloto/graphify?rev=d629754669702a305014f1fba844481e6c0ab537" },
     { name = "httpx2", specifier = ">=2.12.0" },
     { name = "msgspec", specifier = "==0.21.1" },
     { name = "skillopt", git = "https://github.com/microsoft/SkillOpt?rev=93bdf3d770b99128daf35278218e5a666fe392f3" },

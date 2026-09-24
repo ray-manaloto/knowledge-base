@@ -213,8 +213,8 @@ def test_installed_fork_origin_rejects_substitution(
                     "vcs": "git",
                     "commit_id": "0" * 40
                     if failure == "wrong-commit"
-                    else "51237d458b1f5339d43df8a1c19bc20c29e7a0f8",
-                    "requested_revision": "51237d458b1f5339d43df8a1c19bc20c29e7a0f8",
+                    else "d629754669702a305014f1fba844481e6c0ab537",
+                    "requested_revision": "d629754669702a305014f1fba844481e6c0ab537",
                 },
             }
             if failure == "editable":

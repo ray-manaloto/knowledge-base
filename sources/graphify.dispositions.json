@@ -2,8 +2,8 @@
   "schema_version": 1,
   "source": "graphify",
   "source_ref": "codex/pwf-deep-coverage-20260924",
-  "source_commit": "51237d458b1f5339d43df8a1c19bc20c29e7a0f8",
-  "source_tree": "bc9fe617adb71fb2500b5fbb393d08be49d378d5",
+  "source_commit": "d629754669702a305014f1fba844481e6c0ab537",
+  "source_tree": "27a241e66d4298e07f0b4ea6b2e376b9914ddef3",
   "entries": [
     {
       "path": ".dockerignore",
