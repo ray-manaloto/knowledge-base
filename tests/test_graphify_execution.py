@@ -319,6 +319,74 @@ def test_claude_terminal_array_uses_only_unique_final_result() -> None:
     assert parsed["coverage"]["status"] == "unproved"
 
 
+def test_claude_invocation_confinement_records_actual_argv_without_mutating_builder() -> None:
+    original = {"backend": "claude-cli", "argv": ["/fixture/claude", "-p", "--model", "opus"]}
+    restricted = graphify_execution.restrict_claude_invocation(original)
+    assert original["argv"] == ["/fixture/claude", "-p", "--model", "opus"]
+    assert restricted["argv"] == [
+        *original["argv"],
+        "--safe-mode",
+        "--tools",
+        "Read",
+    ]
+    assert graphify_execution.restrict_claude_invocation({"backend": "openai-cli"}) == {
+        "backend": "openai-cli"
+    }
+    with pytest.raises(ValueError, match="already supplies"):
+        graphify_execution.restrict_claude_invocation(restricted)
+
+
+@pytest.mark.parametrize(
+    ("terminal", "expected_completion"),
+    [
+        ('{"nodes": [], "edges": []}', "completed"),
+        ('```json\n{"nodes": [], "edges": []}\n```', "completed"),
+        ('before\n```json\n{"nodes": [], "edges": []}\n```', "failed"),
+        ('```json\n{"nodes": [], "edges": []}\n```\nafter', "failed"),
+        ('```json\n{"nodes": [], "edges": []}\n```\n```', "failed"),
+        ('{"nodes": []}', "failed"),
+    ],
+)
+def test_claude_final_graph_accepts_only_plain_or_exact_single_fence(
+    terminal: str, expected_completion: str
+) -> None:
+    event = {
+        "type": "result",
+        "subtype": "success",
+        "is_error": False,
+        "result": terminal,
+        "usage": {"input_tokens": 3, "output_tokens": 5},
+    }
+    parsed = graphify_execution.result_parser("claude-cli")(
+        {"returncode": 0, "stdout": json.dumps([event]).encode(), "provider_events": [event]}
+    )
+    assert parsed["completion"] == expected_completion
+    assert (parsed["value"] is not None) == (expected_completion == "completed")
+    assert parsed["usage"]["input_tokens"] == 3
+    if expected_completion == "failed":
+        assert "terminal_graph_invalid" in parsed["coverage"]["reasons"]
+
+
+def test_claude_nonterminal_graph_cannot_rescue_invalid_final_result() -> None:
+    events = [
+        {"type": "assistant", "message": {"content": '{"nodes": [], "edges": []}'}},
+        {
+            "type": "result",
+            "subtype": "success",
+            "is_error": False,
+            "result": "The graph was provided above.",
+            "usage": {"input_tokens": 11, "output_tokens": 7},
+        },
+    ]
+    parsed = graphify_execution.result_parser("claude-cli")(
+        {"returncode": 0, "stdout": json.dumps(events).encode(), "provider_events": events}
+    )
+    assert parsed["completion"] == "failed"
+    assert parsed["value"] is None
+    assert parsed["usage"]["output_tokens"] == 7
+    assert "terminal_graph_invalid" in parsed["coverage"]["reasons"]
+
+
 def test_provider_event_capture_preserves_every_array_event() -> None:
     events = [
         {"type": "system", "subtype": "init"},
@@ -431,18 +499,6 @@ def test_timeout_without_usage_event_is_explicitly_unknown() -> None:
         [
             {"type": "result", "result": '{"nodes": []}'},
             {"type": "assistant", "message": "after terminal"},
-        ],
-        [
-            {"type": "assistant", "message": {"content": '{"nodes": []}'}},
-            {"type": "result", "subtype": "success", "result": "The chunk is delivered."},
-        ],
-        [
-            {
-                "type": "result",
-                "subtype": "success",
-                "is_error": False,
-                "result": '{"nodes": []}',
-            }
         ],
     ],
 )

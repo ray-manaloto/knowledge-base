@@ -50,6 +50,7 @@ _API_AUTH_NAMES = frozenset(
     }
 )
 _PRIVATE_FILE_MODE = 0o600
+_SINGLE_FENCE_MARKER_COUNT = 2
 
 
 def _canonical(value: object) -> bytes:
@@ -516,6 +517,29 @@ def _graph_value(raw: bytes) -> dict:
     return value
 
 
+def _claude_graph_value(raw: bytes) -> dict:
+    """Allow only an exact, single JSON fence around the final Claude graph."""
+    if (
+        raw.startswith(b"```json\n")
+        and raw.endswith(b"\n```")
+        and raw.count(b"```") == _SINGLE_FENCE_MARKER_COUNT
+    ):
+        raw = raw[len(b"```json\n") : -len(b"\n```")]
+    return _graph_value(raw)
+
+
+def restrict_claude_invocation(invocation: dict) -> dict:
+    """Confine a managed Claude extraction while recording its actual argv."""
+    if invocation.get("backend") != "claude-cli":
+        return invocation
+    argv = invocation.get("argv")
+    if not isinstance(argv, list) or not argv or not all(isinstance(arg, str) for arg in argv):
+        raise ValueError("managed Claude invocation requires a nonempty argv")
+    if any(arg in {"--safe-mode", "--tools"} for arg in argv):
+        raise ValueError("managed Claude invocation already supplies confinement flags")
+    return {**invocation, "argv": [*argv, "--safe-mode", "--tools", "Read"]}
+
+
 def result_parser(backend: str) -> Callable[[dict], dict]:
     """Return a parser for Graphify's Claude envelope or Codex result artifact."""
 
@@ -547,7 +571,17 @@ def result_parser(backend: str) -> Callable[[dict], dict]:
             if backend == "openai-cli"
             else _claude_terminal_bytes(process["stdout"])
         )
-        return _parsed(_graph_value(raw), "completed", responses, coverage, usage)
+        try:
+            value = _graph_value(raw) if backend == "openai-cli" else _claude_graph_value(raw)
+        except ValueError, TypeError:
+            return _parsed(
+                None,
+                "failed",
+                responses,
+                {"status": "unproved", "reasons": [*reasons, "terminal_graph_invalid"]},
+                usage,
+            )
+        return _parsed(value, "completed", responses, coverage, usage)
 
     return parse
 

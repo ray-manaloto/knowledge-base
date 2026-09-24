@@ -106,9 +106,15 @@ def test_cache_miss_uses_identical_prompt_for_lookup_invoke_and_save(
 
     def build(prompt: str, **kwargs: object) -> dict:
         seen["invoke"] = prompt
-        return {"timeout_seconds": None}
+        return {"timeout_seconds": None, "backend": "claude-cli", "argv": ["/fixture/claude"]}
 
     def run(*args: object, **kwargs: object) -> dict:
+        assert cast("dict[str, object]", args[0])["argv"] == [
+            "/fixture/claude",
+            "--safe-mode",
+            "--tools",
+            "Read",
+        ]
         return {
             "value": chunk,
             "receipt": {

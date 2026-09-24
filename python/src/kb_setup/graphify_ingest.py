@@ -340,6 +340,7 @@ def ingest_source(
         project_root=repo_root,
         cwd=repo_root,
     )
+    invocation = graphify_execution.restrict_claude_invocation(invocation)
     invocation["timeout_seconds"] = timeout_seconds
     runner = process_runner or graphify_execution.CapturedProcessRunner(
         actual_run_root,
