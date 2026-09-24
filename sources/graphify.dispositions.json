@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source": "graphify",
-  "source_ref": "kb-pin/openai-cli-backend-v0.9.67-41c1be2a",
-  "source_commit": "41c1be2a63088b9302e1bd31dccffdc48cb87c27",
-  "source_tree": "3ec9820965ac80873835599e842bbde9ac655042",
+  "source_ref": "kb-pin/openai-cli-backend-v0.9.67-a33e8e24",
+  "source_commit": "a33e8e24944a79326f7628a60979dd305c236157",
+  "source_tree": "50d04acadf0ca1e2eb680893d456fd903f32a80e",
   "entries": [
     {
       "path": ".dockerignore",

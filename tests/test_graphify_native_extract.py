@@ -24,6 +24,7 @@ import pytest
 from kb_setup import artifacts, graphify_execution, graphify_health, graphify_sdk
 from kb_setup import graphify_native_extract as gne
 from kb_setup.result import Rc
+from PIL import Image
 
 
 def _make_target(repo_root: Path) -> Path:
@@ -718,6 +719,11 @@ def test_run_real_uses_managed_sdk_with_kb_project_root(tmp_path, monkeypatch) -
         return {"nodes": [{"id": "concept"}], "edges": [], "hyperedges": []}
 
     monkeypatch.setattr(graphify_sdk, "observe_detect", detect)
+    monkeypatch.setattr(
+        graphify_sdk,
+        "check_semantic_cache_public",
+        lambda files, **_kwargs: ([], [], [], files),
+    )
     monkeypatch.setattr(graphify_sdk, "extract_corpus_parallel_public", deep)
     monkeypatch.setattr(
         graphify_sdk,
@@ -745,15 +751,274 @@ def test_run_real_uses_managed_sdk_with_kb_project_root(tmp_path, monkeypatch) -
     assert context_seen.repo_root == tmp_path
     assert profile_seen.model == "opus"
     assert profile_seen.effort == "xhigh"
-    assert observed["detect_root"] == target
+    assert observed["detect_root"] == deep_seen["root"] == target
     assert observed["deep_files"] == [source]
     assert (run_root / "detection-receipt.json").is_file()
-    assert deep_seen["root"] == target
     _assert_managed_profile_forwarding(context_seen, deep_seen, profile)
     assert deep_seen["run_context"] == {
         "project_root": str(tmp_path),
         "cwd": str(tmp_path),
     }
+
+
+def test_run_real_deep_cache_hit_skips_cli_and_keeps_original_producer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "subset"
+    target.mkdir()
+    source = target / "README.md"
+    source.write_text("# Cached decision\n")
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    producer = {"receipt_id": "original-producer", "completion": "completed"}
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(gne, "assert_pinned_graphify", lambda _root: None)
+    monkeypatch.setattr(graphify_execution, "allocate_run_root", lambda _root: run_root)
+    monkeypatch.setattr(
+        graphify_execution,
+        "resolve_profile",
+        lambda *_args, **_kwargs: {
+            "_explicit": True,
+            "backend": "openai-cli",
+            "model": "gpt-5.6-sol",
+            "effort": "high",
+        },
+    )
+    monkeypatch.setattr(
+        graphify_execution,
+        "build_run_context",
+        lambda _spec: {"project_root": str(tmp_path), "cwd": str(tmp_path)},
+    )
+    monkeypatch.setattr(
+        graphify_sdk,
+        "observe_detect",
+        lambda *_args, **_kwargs: (
+            {"files": {"code": [], "document": [str(source)]}},
+            _complete_detect_receipt(),
+        ),
+    )
+
+    def cache_lookup(files: list[str], **kwargs: object) -> tuple[list, list, list, list[str]]:
+        observed["cache_kwargs"] = kwargs
+        cast("list[dict]", kwargs["cache_evidence_out"]).append(
+            {"compatibility_fingerprint": "compatible", "producer_receipts": [producer]}
+        )
+        return ([{"id": "cached", "source_file": str(source)}], [], [], [])
+
+    def unexpected(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("compatible deep cache must not launch extraction")
+
+    def build(parts: list[dict], **_kwargs: object) -> str:
+        observed["semantic"] = parts[1]
+        return "graph"
+
+    monkeypatch.setattr(graphify_sdk, "check_semantic_cache_public", cache_lookup)
+    monkeypatch.setattr(graphify_sdk, "extract_corpus_parallel_public", unexpected)
+    monkeypatch.setattr(graphify_sdk, "extract_public", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(graphify_sdk, "build_public", build)
+    monkeypatch.setattr(graphify_sdk, "cluster_public", lambda _graph: {})
+    monkeypatch.setattr(graphify_sdk, "label_communities_by_hub_public", lambda *_args: {})
+    monkeypatch.setattr(graphify_sdk, "to_json_public", lambda *_args, **_kwargs: True)
+    assert (
+        gne._run_real(
+            tmp_path, "/unused/graphify", gne.Options(target=target, out=tmp_path / "out")
+        )
+        == Rc.OK
+    )
+    assert cast("dict", observed["semantic"])["nodes"][0]["id"] == "cached"
+    cache_kwargs = cast("dict[str, object]", observed["cache_kwargs"])
+    assert cache_kwargs["mode"] == "deep"
+    assert cache_kwargs["prompt"] == graphify_sdk.extraction_system_prompt_public(deep=True)
+    retained = json.loads((run_root / "semantic-cache-evidence.json").read_text())
+    assert retained["uncached"] == []
+    assert retained["cache_evidence"][0]["producer_receipts"] == [producer]
+
+
+def test_run_real_raster_preflight_identity_reaches_cache_and_extraction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "subset"
+    target.mkdir()
+    image = target / "pixels.png"
+    Image.new("RGB", (2, 2), (240, 20, 30)).save(image)
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(gne, "assert_pinned_graphify", lambda _root: None)
+    monkeypatch.setattr(graphify_execution, "allocate_run_root", lambda _root: run_root)
+    monkeypatch.setattr(
+        graphify_execution,
+        "resolve_profile",
+        lambda *_args, **_kwargs: {
+            "_explicit": True,
+            "backend": "openai-cli",
+            "model": "gpt-5.6-sol",
+            "effort": "high",
+        },
+    )
+    monkeypatch.setattr(
+        graphify_execution,
+        "build_run_context",
+        lambda _spec: {"project_root": str(tmp_path), "cwd": str(tmp_path)},
+    )
+    monkeypatch.setattr(
+        graphify_sdk,
+        "observe_detect",
+        lambda *_args, **_kwargs: (
+            {"files": {"code": [], "image": [str(image)]}},
+            _complete_detect_receipt(),
+        ),
+    )
+
+    def cache_lookup(files: list[str], **kwargs: object) -> tuple[list, list, list, list[str]]:
+        observed["cache_compatibility"] = kwargs["attachment_compatibility"]
+        return [], [], [], files
+
+    def deep(files: list[Path], **kwargs: object) -> dict:
+        observed["extract_compatibility"] = kwargs["attachment_compatibility"]
+        assert files == [image]
+        return {
+            "nodes": [{"id": "pixel", "source_file": str(image)}],
+            "edges": [],
+            "hyperedges": [],
+            "failed_chunks": 0,
+            "uncovered_files": [],
+        }
+
+    monkeypatch.setattr(graphify_sdk, "check_semantic_cache_public", cache_lookup)
+    monkeypatch.setattr(graphify_sdk, "extract_corpus_parallel_public", deep)
+    monkeypatch.setattr(graphify_sdk, "extract_public", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(graphify_sdk, "build_public", lambda *_args, **_kwargs: "graph")
+    monkeypatch.setattr(graphify_sdk, "cluster_public", lambda _graph: {})
+    monkeypatch.setattr(graphify_sdk, "label_communities_by_hub_public", lambda *_args: {})
+    monkeypatch.setattr(graphify_sdk, "to_json_public", lambda *_args, **_kwargs: True)
+    assert (
+        gne._run_real(
+            tmp_path, "/unused/graphify", gne.Options(target=target, out=tmp_path / "out")
+        )
+        == Rc.OK
+    )
+    cache_compatibility = cast("dict[str, str]", observed["cache_compatibility"])
+    assert len(cache_compatibility) == 1
+    assert observed["extract_compatibility"] == cache_compatibility
+    retained = json.loads((run_root / "semantic-cache-evidence.json").read_text())
+    assert len(retained["raster_preflight_batches"]) == 1
+
+
+def test_run_real_refuses_semantic_signature_drift_before_writing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(gne, "assert_pinned_graphify", lambda _root: None)
+    monkeypatch.setattr(
+        graphify_sdk,
+        "assert_semantic_sdk",
+        lambda _version: (_ for _ in ()).throw(RuntimeError("drift")),
+    )
+    monkeypatch.setattr(
+        graphify_execution,
+        "allocate_run_root",
+        lambda _root: (_ for _ in ()).throw(AssertionError("must not allocate")),
+    )
+    with pytest.raises(RuntimeError, match="drift"):
+        gne._run_real(
+            tmp_path,
+            "/unused/graphify",
+            gne.Options(target=tmp_path / "subset", out=tmp_path / "out"),
+        )
+
+
+@pytest.mark.parametrize("fresh_outcome", ["covered", "omitted", "partial"])
+def test_run_real_deep_partial_cache_extracts_only_missing_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh_outcome: str
+) -> None:
+    fresh_omitted = fresh_outcome == "omitted"
+    fresh_partial = fresh_outcome == "partial"
+    target = tmp_path / "subset"
+    target.mkdir()
+    cached = target / "cached.md"
+    missing = target / "missing.md"
+    cached.write_text("# Cached\n")
+    missing.write_text("# Missing\n")
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(gne, "assert_pinned_graphify", lambda _root: None)
+    monkeypatch.setattr(graphify_execution, "allocate_run_root", lambda _root: run_root)
+    monkeypatch.setattr(
+        graphify_execution,
+        "resolve_profile",
+        lambda *_args, **_kwargs: {
+            "_explicit": True,
+            "backend": "openai-cli",
+            "model": "gpt-5.6-sol",
+            "effort": "high",
+        },
+    )
+    monkeypatch.setattr(
+        graphify_execution,
+        "build_run_context",
+        lambda _spec: {"project_root": str(tmp_path), "cwd": str(tmp_path)},
+    )
+    monkeypatch.setattr(
+        graphify_sdk,
+        "observe_detect",
+        lambda *_args, **_kwargs: (
+            {"files": {"code": [], "document": [str(cached), str(missing)]}},
+            _complete_detect_receipt(),
+        ),
+    )
+    monkeypatch.setattr(
+        graphify_sdk,
+        "check_semantic_cache_public",
+        lambda _files, **_kwargs: (
+            [{"id": "old", "source_file": str(cached)}],
+            [],
+            [],
+            [str(missing)],
+        ),
+    )
+
+    def deep(files: list[Path], **_kwargs: object) -> dict:
+        observed["dispatched"] = files
+        return {
+            "nodes": [] if fresh_omitted else [{"id": "new", "source_file": str(missing)}],
+            "edges": [],
+            "hyperedges": [],
+            "failed_chunks": 0,
+            "uncovered_files": [str(missing)] if fresh_omitted else [],
+            "_partial_files": [str(missing)] if fresh_partial else [],
+        }
+
+    def build(parts: list[dict], **_kwargs: object) -> str:
+        observed["semantic"] = parts[1]
+        return "graph"
+
+    monkeypatch.setattr(graphify_sdk, "extract_corpus_parallel_public", deep)
+    monkeypatch.setattr(graphify_sdk, "extract_public", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(graphify_sdk, "build_public", build)
+    monkeypatch.setattr(graphify_sdk, "cluster_public", lambda _graph: {})
+    monkeypatch.setattr(graphify_sdk, "label_communities_by_hub_public", lambda *_args: {})
+    monkeypatch.setattr(graphify_sdk, "to_json_public", lambda *_args, **_kwargs: True)
+    result = gne._run_real(
+        tmp_path, "/unused/graphify", gne.Options(target=target, out=tmp_path / "out")
+    )
+    assert result == (Rc.FINDINGS if fresh_omitted or fresh_partial else Rc.OK)
+    assert observed["dispatched"] == [missing]
+    if fresh_omitted or fresh_partial:
+        state = json.loads((run_root / "run-state.json").read_text())
+        if fresh_omitted:
+            assert state["uncovered_files"] == [str(missing)]
+        else:
+            assert state["partial_files"] == [str(missing)]
+        partial = json.loads((run_root / "partial-semantic.json").read_text())
+        assert [node["id"] for node in partial["nodes"]] == (
+            ["old"] if fresh_omitted else ["old", "new"]
+        )
+    else:
+        assert [node["id"] for node in cast("dict", observed["semantic"])["nodes"]] == [
+            "old",
+            "new",
+        ]
 
 
 def test_run_real_retains_partial_semantic_result_and_stops_on_failed_chunks(
@@ -799,6 +1064,11 @@ def test_run_real_retains_partial_semantic_result_and_stops_on_failed_chunks(
         graphify_sdk,
         "extract_corpus_parallel_public",
         lambda *_args, **_kwargs: semantic,
+    )
+    monkeypatch.setattr(
+        graphify_sdk,
+        "check_semantic_cache_public",
+        lambda files, **_kwargs: ([], [], [], files),
     )
 
     def unexpected(*_args: object, **_kwargs: object) -> object:

@@ -36,7 +36,11 @@ from graphify.execution import build_cli_invocation, resolve_execution_profile, 
 from graphify.export import prune_dangling_edges, to_json
 from graphify.extract import collect_files, extract
 from graphify.extractors.json_config import extract_json
-from graphify.llm import extract_corpus_parallel
+from graphify.llm import (
+    extract_corpus_parallel,
+    extraction_system_prompt,
+    preflight_raster_cache_admission,
+)
 from graphify.manifest_ingest import extract_package_manifest, is_package_manifest_path
 from graphify.raster import (
     stage_ephemeral_raster_attachments,
@@ -254,6 +258,16 @@ _PUBLIC_SYMBOLS = (
 # signature drift without re-authorizing the landed deterministic candidate.
 _SEMANTIC_SYMBOLS = (
     PublicSymbol(
+        "graphify.llm.extraction_system_prompt",
+        extraction_system_prompt,
+        "(*, deep: 'bool' = False) -> 'str'",
+    ),
+    PublicSymbol(
+        "graphify.llm.preflight_raster_cache_admission",
+        preflight_raster_cache_admission,
+        "(files: 'Sequence[Path | FileSlice]', *, root: 'Path') -> 'dict'",
+    ),
+    PublicSymbol(
         "graphify.llm.extract_corpus_parallel",
         extract_corpus_parallel,
         "(files: 'list[Path]', backend: 'str | None' = None, api_key: 'str | None' = None, "
@@ -339,6 +353,8 @@ run_cli_invocation_public = run_cli_invocation
 check_semantic_cache_public = check_semantic_cache
 save_semantic_cache_public = save_semantic_cache
 extract_corpus_parallel_public = extract_corpus_parallel
+extraction_system_prompt_public = extraction_system_prompt
+preflight_raster_cache_admission_public = preflight_raster_cache_admission
 stage_ephemeral_raster_attachments_public = stage_ephemeral_raster_attachments
 verify_raster_snapshot_ack_public = verify_raster_snapshot_ack
 detect_public = detect

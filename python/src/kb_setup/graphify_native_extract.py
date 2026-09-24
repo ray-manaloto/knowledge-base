@@ -863,6 +863,9 @@ def _run_real(repo_root: Path, exe: str, opts: Options) -> int:
     del exe
     from kb_setup import graphify_execution, graphify_sdk
 
+    # The general pin check covers deterministic SDK symbols and installed
+    # origin. Semantic extraction has a separate reviewed signature contract.
+    graphify_sdk.assert_semantic_sdk(graphify_sdk.running_sdk_version())
     budget = graphify_execution.ExecutionBudget(
         max_attempts=opts.max_attempts, total_seconds=opts.total_timeout_seconds
     )
@@ -919,26 +922,75 @@ def _run_real(repo_root: Path, exe: str, opts: Options) -> int:
     )
     sink = graphify_execution.DurableReceiptSink(run_root)
     attachment_snapshot_root = run_root / "attachments"
-    semantic = graphify_sdk.extract_corpus_parallel_public(
-        semantic_files,
-        backend=profile["backend"],
-        model=profile["model"],
-        root=target,
-        token_budget=opts.token_budget or 60_000,
-        max_concurrency=opts.max_concurrency or 4,
-        deep_mode=True,
-        cache_root=opts.out / _GRAPHIFY_OUT_NAME,
-        effort=profile["effort"],
-        execution_profile=graphify_execution.public_profile_request(profile),
-        run_context=context,
-        process_runner=runner,
-        receipt_sink=sink,
-        attachment_stager=graphify_execution.CapturedRasterStager(attachment_snapshot_root, target),
-        attachment_snapshot_root=attachment_snapshot_root,
+    public_profile = graphify_execution.public_profile_request(profile)
+    semantic_cache = opts.out / _GRAPHIFY_OUT_NAME
+    raster_admission = graphify_sdk.preflight_raster_cache_admission_public(
+        semantic_files, root=target
     )
-    failed_chunks = int(semantic.get("failed_chunks", 0))
+    attachment_compatibility = raster_admission["attachment_compatibility"]
+    cache_evidence: list[dict] = []
+    cached_nodes, cached_edges, cached_hyperedges, uncached_files = (
+        graphify_sdk.check_semantic_cache_public(
+            [str(path) for path in semantic_files],
+            root=target,
+            mode="deep",
+            prompt=graphify_sdk.extraction_system_prompt_public(deep=True),
+            cache_root=semantic_cache,
+            execution_profile=public_profile,
+            run_context=context,
+            cache_evidence_out=cache_evidence,
+            attachment_compatibility=attachment_compatibility,
+        )
+    )
+    graphify_execution.atomic_bytes(
+        run_root / "semantic-cache-evidence.json",
+        json.dumps(
+            {
+                "requested": [str(path) for path in semantic_files],
+                "uncached": uncached_files,
+                "cache_evidence": cache_evidence,
+                "raster_preflight_batches": raster_admission["preflight_batches"],
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+        ).encode()
+        + b"\n",
+    )
+    fresh: dict = (
+        graphify_sdk.extract_corpus_parallel_public(
+            [Path(path) for path in uncached_files],
+            backend=profile["backend"],
+            model=profile["model"],
+            root=target,
+            token_budget=opts.token_budget or 60_000,
+            max_concurrency=opts.max_concurrency or 4,
+            deep_mode=True,
+            cache_root=semantic_cache,
+            effort=profile["effort"],
+            execution_profile=public_profile,
+            run_context=context,
+            process_runner=runner,
+            receipt_sink=sink,
+            attachment_stager=graphify_execution.CapturedRasterStager(
+                attachment_snapshot_root, target
+            ),
+            attachment_snapshot_root=attachment_snapshot_root,
+            attachment_compatibility=attachment_compatibility,
+        )
+        if uncached_files
+        else {"nodes": [], "edges": [], "hyperedges": [], "failed_chunks": 0}
+    )
+    failed_chunks = int(fresh.get("failed_chunks", 0))
+    uncovered_files = list(fresh.get("uncovered_files", []))
+    partial_files = list(fresh.get("_partial_files", []))
+    semantic = {
+        **fresh,
+        "nodes": [*cached_nodes, *fresh.get("nodes", [])],
+        "edges": [*cached_edges, *fresh.get("edges", [])],
+        "hyperedges": [*cached_hyperedges, *fresh.get("hyperedges", [])],
+    }
     empty_semantic = bool(semantic_files) and not semantic.get("nodes")
-    if failed_chunks or empty_semantic:
+    if failed_chunks or uncovered_files or partial_files or empty_semantic:
         partial_path = run_root / "partial-semantic.json"
         state_path = run_root / "run-state.json"
         graphify_execution.atomic_bytes(
@@ -951,6 +1003,8 @@ def _run_real(repo_root: Path, exe: str, opts: Options) -> int:
                 {
                     "completion": "incomplete",
                     "failed_chunks": failed_chunks,
+                    "uncovered_files": uncovered_files,
+                    "partial_files": partial_files,
                     "empty_semantic": empty_semantic,
                     "partial_semantic_ref": str(partial_path),
                 },
@@ -961,7 +1015,9 @@ def _run_real(repo_root: Path, exe: str, opts: Options) -> int:
         )
         print(
             f"[graphify-native-extract] incomplete: {failed_chunks} semantic chunk(s) "
-            f"failed, empty_semantic={empty_semantic}; retained partial result at {partial_path}"
+            f"failed, {len(uncovered_files)} uncovered source(s), "
+            f"{len(partial_files)} partial source(s), "
+            f"empty_semantic={empty_semantic}; retained partial result at {partial_path}"
         )
         return Rc.FINDINGS
     ast = graphify_sdk.extract_public(
