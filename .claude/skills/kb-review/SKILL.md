@@ -162,7 +162,7 @@ receipt. Only the model and the effort differ.
 
 The identical filename is not a convention to remember, it is what
 `review.report_path` computes: it runs the lane through `_lane_prefix`
-(`review.py:200-202`, called at `review.py:620`), which strips everything after
+(`review.py:200`, called at `review.py:644` inside `report_path`), which strips everything after
 the first `:`. Run against all three spellings, `cold` / `cold:codex` /
 `cold:codex-astra` all resolve to `review-<sha>-cold.md`. So **no change to
 `LANES` and no new receipt schema** — `--lanes cold:codex-astra` is already legal.

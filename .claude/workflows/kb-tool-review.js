@@ -53,6 +53,9 @@ if (typeof cfg === 'string') {
 }
 const tools = cfg.tools || []
 const reportDir = cfg.reportDir || 'docs/research/reports'
+// Per-tool scratch for the codex review lane (its KB_LANE). One directory per
+// tool key; pass `laneRoot` per run when two runs may overlap.
+const laneRoot = cfg.laneRoot || '.agent/kb/lanes/kb-tool-review'
 if (!tools.length) throw new Error('kb-tool-review: args.tools is required and must be non-empty')
 
 const CLAIMS_SCHEMA = {
@@ -182,7 +185,10 @@ const perTool = await pipeline(
     if (!out) return null
     const surviving = out.verdicts.filter((v) => !v.verdict?.refuted)
     return agent(
-      `Cold review of the ${t.key} gap analysis at ${reportDir}. You have NOT been ` +
+      `ARTIFACT REVIEW (your "Artifact review" section — not a diff, no --review, ` +
+        `no receipt). Author family: Anthropic (Claude researcher/verifier lanes). ` +
+        `KB_LANE=$PWD/${laneRoot}/review-${t.key}. ` +
+        `Cold review of the ${t.key} gap analysis at ${reportDir}. You have NOT been ` +
         `told what it is supposed to conclude, deliberately. ${surviving.length} claims ` +
         `survived adversarial verification. Report findings as severity + one-line ` +
         `claim + file:line; cite every claim or label it unverified.`,

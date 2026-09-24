@@ -831,7 +831,7 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
     if not lanes:
         print(
             "review-receipt: --lanes is required, comma-separated "
-            "(e.g. standards,spec,cold:codex,silent-failure)",
+            "(e.g. cold:codex-astra, the default cold lane since #794)",
             file=sys.stderr,
         )
         return 2

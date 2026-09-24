@@ -41,15 +41,21 @@ cat "$KB_LANE/spec.md" | mise run kb-codex -- --write \
   --model gpt-5.6-sol \
   --effort xhigh \
   --timeout 3000 \
-  --output "$KB_LANE/codex-final.md"
+  --output "$KB_LANE/codex-final.md" \
+  > "$KB_LANE/lane.log" 2>&1; echo "rc=$?" > "$KB_LANE/lane.rc"
 ```
 
 Add `--network` only when the spec's verification fetches (`kb-build`,
 `kb-update`, `gh`, `git ls-remote`); without it the sandbox has no egress and a
 fetch fails with a message that reads like a transient outage.
 
-`--output` is written only when the lane exits. A "timed out" or empty result is
-not a result until you have checked the process and the file.
+Run it as a **background** call and poll: an `xhigh` implementation routinely
+outlasts the harness's ~600s cap on a single foreground Bash call, which would
+kill the lane mid-write and leave a half-applied tree. Poll in successive calls
+(`$KB_LANE/lane.rc` appears when the lane exits; read the real rc there), each
+well under 600s.
+`--output` is written only when the lane exits, so a "timed out" or empty result
+is not a result until you have checked the process and the file.
 
 ## After the lane exits
 

@@ -75,7 +75,7 @@ later project-local adapter slice, so `/skillopt-sleep` is intentionally unavail
 
 - **Route with the graph.** Before a non-trivial routing/fallback decision, ground it in this repo's
   KB graph: `mise run kb-query -- "<routing question>"` (the doctrine lives there — advisor/executor,
-  cheapest-adequate lane, five-part spec, Fable-5→Opus fallback). See
+  cheapest-adequate lane, the corpus's five-part spec (this repo's contract is seven-part), Fable-5→Opus fallback). See
   `.claude/skills/orchestrator-routing/SKILL.md` for the unified 3-lane doctrine.
 - **Lanes**: `codex` (GPT-5.6 Sol) for correctness-critical work; `antigravity` (Gemini 3.x) for
   broad/mechanical or a second-opinion; cross-family review keeps the reviewer a different family

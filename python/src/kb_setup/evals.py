@@ -51,10 +51,6 @@ from pathlib import Path
 #: this is not a reachability probe.
 DEFAULT_TIMEOUT = 60
 
-#: The live lane checks each send one real API call, which is slow enough that
-#: the offline default must never wait on them.
-LIVE_TIMEOUT = 300
-
 #: Shortest redacted value that cannot plausibly collide with ordinary output.
 #: mise redacts by literal substring match over every line a task prints, so a
 #: short value in the redaction set corrupts unrelated text: a redacted ``1``

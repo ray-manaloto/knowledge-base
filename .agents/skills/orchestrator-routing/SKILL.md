@@ -1,7 +1,7 @@
 ---
 name: orchestrator-routing
 description: >-
-  Unified cross-vendor routing doctrine for the Fable-5 architect: which executor
+  Unified cross-vendor routing doctrine for the architect (the session model): which executor
   lane (codex / antigravity / Claude-fallback) and reasoning-effort a delegated
   implementation subtask should run at, and how to fall back on exhaustion. Use
   whenever you are orchestrating codex and antigravity lanes from this repo and
@@ -11,10 +11,10 @@ description: >-
   execution is delegated.
 ---
 
-# orchestrator-routing — Fable-5 architect + codex + antigravity lanes
+# orchestrator-routing — the architect + codex + antigravity lanes
 
 Each lane covers one vendor; this doctrine unifies them so the
-**Fable-5 architect** routes across **both** and keeps a Claude terminal fallback.
+**architect** (whatever model the session runs; default Opus 5) routes across **both** and keeps a Claude terminal fallback.
 The architect emits judgment and specs, never the bulk of the code, and **verifies
 the evidence itself before declaring done** — a lane's self-report is never proof.
 
@@ -70,7 +70,7 @@ flag the tension — do not let an advisory tag downgrade a correctness route.
 | Correctness-critical: concurrency, auth/security, migrations, subtle state, anything the spec can't fully pin | **codex** | high |
 | Broad/mechanical, spec-fully-determined, or a second-opinion implementation for cross-vendor diversity | **antigravity** (Gemini 3.x) | medium–high |
 | Both CLI lanes unavailable, or the task must stay in-family | **Claude Opus** subagent | high |
-| Judgment / architecture / decomposition / final verification | **stays with the Fable-5 architect** | — |
+| Judgment / architecture / decomposition / final verification | **stays with the architect** | — |
 
 Prefer a cheaper lane at higher effort over an expensive one at low effort. Cost discipline: the
 architect emits the fewest tokens (specs + verdicts); the CLI lanes emit the most (code).

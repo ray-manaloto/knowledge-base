@@ -364,6 +364,9 @@ def test_report_path_strips_the_lane_variant(tmp_path: Path) -> None:
     """
     assert review.report_path(tmp_path, _SHA, "cold:codex").name == f"review-{_SHA}-cold.md"
     assert review.report_path(tmp_path, _SHA, "cold").name == f"review-{_SHA}-cold.md"
+    # The default since knowledge-base#794 resolves to the same file, so receipts
+    # recorded as `cold:codex` before the default moved still bind (#794).
+    assert review.report_path(tmp_path, _SHA, "cold:codex-astra").name == f"review-{_SHA}-cold.md"
 
 
 def test_require_base_rejects_a_partial_range(
