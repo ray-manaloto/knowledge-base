@@ -611,45 +611,6 @@ def test_the_probe_never_prints_the_redacted_values(monkeypatch: pytest.MonkeyPa
     assert leaked not in evals.mise_redaction_legible().detail  # unparsable path
 
 
-# --- doctor.sh shim -----------------------------------------------------------
-
-
-def test_doctor_skips_loudly_when_the_script_is_absent(tmp_path: Path) -> None:
-    """The plugin cache path is version-pinned and can vanish on GC.
-
-    A silent skip here would be the inert declaration again: lane health
-    "checked" by a check that never ran.
-    """
-    out = evals.doctor_health(tmp_path / "nope" / "doctor.sh")
-    assert out.verdict is evals.Verdict.SKIP
-    assert "doctor.sh not found" in out.detail
-    assert "reinstall" in out.detail
-
-
-def test_doctor_reports_a_failing_script_as_fail(tmp_path: Path) -> None:
-    """CONTROL ARM: a doctor run that reports failures must be FAIL, not SKIP.
-
-    Absent-script and failing-script are different states and the runner must
-    not conflate them — one is "we could not look", the other is "we looked and
-    a lane is broken".
-    """
-    script = tmp_path / "doctor.sh"
-    script.write_text("#!/usr/bin/env bash\necho '0 ok, 0 warnings, 1 failures'\nexit 1\n")
-    out = evals.doctor_health(script)
-    assert out.verdict is evals.Verdict.FAIL
-    assert "rc=1" in out.detail
-    assert "1 failures" in out.detail
-
-
-def test_doctor_reports_a_clean_script_as_pass(tmp_path: Path) -> None:
-    """The positive arm, so the two above cannot pass on an always-FAIL shim."""
-    script = tmp_path / "doctor.sh"
-    script.write_text("#!/usr/bin/env bash\necho '3 ok, 1 warnings, 0 failures'\nexit 0\n")
-    out = evals.doctor_health(script)
-    assert out.verdict is evals.Verdict.PASS
-    assert "rc=0" in out.detail
-
-
 # --- declared-vs-installed reconciliation -------------------------------------
 
 

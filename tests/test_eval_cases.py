@@ -59,7 +59,6 @@ def test_the_expected_cases_are_declared() -> None:
         "tier1.graphify-resolves",
         "tier1.graph-answers",
         "tier1.mise-redaction-legible",
-        "tier1.lane-health",
         "tier2.guard-fixtures",
         "tier2.graph-first-fixtures",
         "tier2.kb-retrieval",
@@ -126,13 +125,15 @@ def test_the_redaction_case_skips_without_mise() -> None:
     assert outcome.verdict is evals.Verdict.SKIP
 
 
-def test_only_the_doctor_case_is_live() -> None:
-    """`doctor.sh` has NO offline mode — it is the live half, entirely.
+def test_no_case_is_live() -> None:
+    """Every case is offline (knowledge-base#797).
 
-    If another case is ever marked live, the offline gate gets cheaper by doing
-    less, which is the wrong direction.
+    The only live case was the fable-orchestrator plugin's ``doctor.sh`` at a
+    1.14.0 cache path that no longer existed; it was removed with the plugin.
+    If a case is ever marked live, the offline gate gets cheaper by doing less,
+    which is the wrong direction.
     """
-    assert [c.name for c in _cases() if c.live] == ["tier1.lane-health"]
+    assert [c.name for c in _cases() if c.live] == []
 
 
 # --- the tier-2 fixture corpus ------------------------------------------------

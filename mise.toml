@@ -168,9 +168,9 @@ gh = "2.98.0"
 # a host old enough to lack a porcelain flag `kb_setup` uses — accepted as
 # unguarded, because the alternative does not exist.
 
-# Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
-# (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
-# (yuting0624/antigravity-for-claude-code). `antigravity-cli`'s canonical mise
+# Cross-vendor executor-lane CLIs: codex (this repo's own kb-codex lanes; the
+# fable-orchestrator plugin that once drove it was removed, dotfiles#1310) + the
+# antigravity plugin (yuting0624/antigravity-for-claude-code). `antigravity-cli`'s canonical mise
 # registry short name (https://mise.jdx.dev/registry.html) is
 # `aqua:google-antigravity/antigravity-cli` (Google's current agentic CLI,
 # exposes Gemini 3.x; ships both `antigravity` and the `agy` symlink the
@@ -445,15 +445,13 @@ run = "uv run pytest tests/ -x -q -n auto"
 timeout = "25m"
 
 [tasks.eval]
-description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor, `-- --slow` retrieval"
+description = "Eval harness: tiers 1+2 (offline, gated). `-- --slow` retrieval"
 # Tier 0 is `hk`/contracts. Tier 1 — does what we DECLARE actually RESOLVE?
 # Tier 2 — does the WIRED guard DECIDE correctly? (a fixture table of
 # (command, expected decision) rows, both directions), and does the graph
 # RETRIEVE what it holds? (a golden set of query pairs, recall@k). One command
 # per ENGINE: tiers 1+2 share the runner, so they share the command. Offline and
-# fast by default so it can join the ship gates for free. Two opt-in axes, on
-# purpose: `--live` shells out to the fable-orchestrator plugin's doctor.sh,
-# which has no offline mode and spends one real API call per installed lane;
+# fast by default so it can join the ship gates for free. One opt-in axis:
 # `--slow` runs the free-but-~3-minute golden retrieval set (advisory — it
 # reports recall@k against the live graph, it does not gate on it). Logic in
 # kb_setup.evals (shared with dotfiles) + kb_setup.eval_cases (this repo's cases).

@@ -3,9 +3,8 @@
 
 The runner (:mod:`kb_setup.evals`) is shared; the CASES are per-repo, because
 what "resolves" means differs. Here it means: the orchestration lanes the
-doctrine names are reachable or their degradation is written down, the plugin's
-own lane doctor can be reached, and the graph — this repo's entire reason to
-exist — actually answers.
+doctrine names are reachable or their degradation is written down, and the
+graph — this repo's entire reason to exist — actually answers.
 
 Tier 2 asks the next question again: not *does the guard exist* (tier 0's
 contract) and not *is it wired* (the settings.json hook), but **does the wired
@@ -45,13 +44,6 @@ DECLARED_LANES = ("codex", "agy", "grok")
 
 #: Tokens whose presence constitutes "the degradation path is written down".
 FALLBACK_TOKENS = ("fallback", "not installed")
-
-#: The plugin's own lane doctor. Version-pinned inside the plugin cache, so it
-#: can vanish on plugin GC — which is why the probe SKIPs loudly rather than
-#: silently when it is absent.
-DOCTOR_SCRIPT = Path.home().joinpath(
-    ".claude/plugins/cache/fable-orchestrator/fable-orchestrator/1.14.0/scripts/doctor.sh"
-)
 
 #: A question the corpus must be able to answer at all. Deliberately NOT phrased
 #: by echoing node labels — a label-echoing query grades lexical overlap and
@@ -714,19 +706,6 @@ def _broken_graph_canary() -> evals.Outcome:
         return evals.graphify_canary(root, CANARY_QUESTION, timeout=30)
 
 
-def _broken_doctor() -> evals.Outcome:
-    """Control arm: a doctor script that reports a failing lane.
-
-    Distinct from the absent-script case on purpose. "We could not look" (SKIP)
-    and "we looked and a lane is broken" (FAIL) must never collapse into each
-    other, so the control exercises the second.
-    """
-    with tempfile.TemporaryDirectory() as tmp:
-        script = Path(tmp) / "doctor.sh"
-        script.write_text("#!/usr/bin/env bash\necho '0 ok, 0 warnings, 1 failures'\nexit 1\n")
-        return evals.doctor_health(script, timeout=30)
-
-
 #: Name of the short redacted value :func:`_redaction_collision_control` plants.
 #: The control's FAIL detail must NAME it, which is what proves the canary loaded
 #: rather than the arm having tripped over some short host secret.
@@ -818,9 +797,8 @@ def _retrieval_precondition(repo_root: Path) -> evals.Outcome | None:
     return None
 
 
-def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.Case]:
+def cases(repo_root: Path) -> list[evals.Case]:
     """Build this repo's tier-1 cases."""
-    doctor = doctor_script if doctor_script is not None else DOCTOR_SCRIPT
     fallback_doc = repo_root / ".claude" / "CLAUDE.md"
 
     return [
@@ -905,19 +883,6 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             # It was restated in four (here, that comment, the probe docstring,
             # and a test name) until the standards lane counted them.
             gated=False,
-        ),
-        evals.Case(
-            name="tier1.lane-health",
-            description=(
-                "the plugin's own doctor.sh reports every installed lane "
-                "authenticated with model access"
-            ),
-            probe=lambda: evals.doctor_health(doctor),
-            control=_broken_doctor,
-            # doctor.sh has NO offline mode: whenever a lane's CLI is present it
-            # fires a real API call. So this is the live half, entirely, and can
-            # never join the free gated tier — it runs only under --live.
-            live=True,
         ),
         evals.Case(
             name="tier2.kb-retrieval",

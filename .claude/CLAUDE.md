@@ -26,33 +26,23 @@ PRs are opened and merged with `mise run kb-ship` / `mise run kb-land`, never
 `gh pr create` / `gh pr merge`. Read-only `gh pr view` / `gh pr checks` stay
 fine — `gh pr view` is how you resolve whether a bare `#42` is an issue or a PR.
 
-# Cross-vendor orchestration (Fable-5 architect + executor lanes)
+# Cross-vendor orchestration (architect + executor lanes)
 
-- Without being reminded, on ANY session model: non-trivial implementation runs the fable-orchestrator architect-as-orchestrator flow — invoke the fable-orchestrator:orchestration skill before delegating and follow it as authoritative for routing, verification, review tiers, and advisor consults.
 - Without being reminded, on ANY session model: non-trivial implementation runs the architect-as-orchestrator flow — invoke this repo's routing-doctrine skill (`codex-sdlc-team` in dotfiles, `orchestrator-routing` in knowledge-base) before delegating and follow it as authoritative for routing, the spec contract, review tiers, and advisor escalation.
-- fable-orchestrator: implementation lane = codex
-- fable-orchestrator: codex effort = xhigh
-- fable-orchestrator: **always consult an advisor before any `codex-implementer` dispatch** (Ray, 2026-08-27, verbatim in `docs/direction/2026-08-27-ray-directives.md`, originally naming the plugin's Fable advisor). **Three** advisors are live: `kb-codex-advisor` (gpt-5.6-sol/xhigh, spends no Claude tokens) is the DEFAULT and the only one for the guard/secret surface; `kb-codex-astra-advisor` (gpt-6-astra, 2.5× the cost) for a decision whose risk is in the INTERACTION between subsystems — take it when ≥2 hold of: 3+ interacting subsystems with the risk in their interaction · hard to reverse with no cheap probe · two cheaper-lane attempts already failed · constraints known to conflict; plus `claude-advisor` (Fable, escalation-only: the codex advisor failed or returned empty, the problem resisted two attempts after a codex verdict, or Ray names it; Opus fallback by the caller).
+- **Always consult an advisor before any codex implementer dispatch** (`kb-codex-implementer`) (Ray, 2026-08-27, verbatim in `docs/direction/2026-08-27-ray-directives.md`, originally naming the plugin's Fable advisor). **Three** advisors are live: `kb-codex-advisor` (gpt-5.6-sol/xhigh, spends no Claude tokens) is the DEFAULT and the only one for the guard/secret surface; `kb-codex-astra-advisor` (gpt-6-astra, 2.5× the cost) for a decision whose risk is in the INTERACTION between subsystems — take it when ≥2 hold of: 3+ interacting subsystems with the risk in their interaction · hard to reverse with no cheap probe · two cheaper-lane attempts already failed · constraints known to conflict; plus `claude-advisor` (Fable, escalation-only: the codex advisor failed or returned empty, the problem resisted two attempts after a codex verdict, or Ray names it; Opus fallback by the caller).
 - **Lane preference (Ray, 2026-09-01, replacing the dated ration below): prefer codex lanes; escalate to Fable/Opus only when a problem needs reasoning codex cannot close.** A preference, not a ban — and deliberately carrying **no date**, because the thing it replaces failed by carrying one.
 
   **What it replaces, and why the date is gone.** From 2026-08-31 this block read *"Until the Claude subscription resets, that advisor is this repo's own `kb-codex-advisor`"* — Ray, verbatim: *"claude subscription tokens are running out / until they reset on wednesday have all work done by codex lanes / replace fable-adviser w a codex adviser using the model/effort of gpt-5.6-sol/xhigh"*. That reset has landed; the weekly window is full again. The rule was correct and became false on a clock **nothing in this repo watches** — a `/session-resume` had to catch that the "expired" line had not expired yet, and this rewrite had to catch that it now had. A conditional rule cannot go stale that way, which is the whole reason this one is conditional.
 
-The first line is the **trigger**, and it is **deliberately UN-gated** (Ray, 2026-08-24).
-The plugin ships it Fable-gated — its changelog: *"sessions on other models skip the flow
-instead of running an architect pattern their model wasn't chosen for"* — and its setup
-wizard writes that form. Default `/model` here is **Opus 5**, so the gated line was false in
-every session and the flow **never once armed**; the handoffs' "treat it as armed regardless"
-was a workaround for a line nobody had read against the session model. Two consequences to
-know: `/fable-orchestrator:setup` recognises an unconditional trigger as a shape to
-*upgrade away from* and will offer to re-gate it — **decline**; and invoking
-`/fable-orchestrator:orchestration` by hand remains valid and is what the plugin documents
-for anyone without an always-on line. `grok` CLI is not installed → `codex` is the only
-viable fixed mode.
+The first line is the **trigger**, **deliberately UN-gated** (Ray, 2026-08-24): default
+`/model` here is **Opus 5**, so a Fable-gated trigger was false in every session and the flow
+stayed dormant. It is rule-synced byte-for-byte with dotfiles and names each repo's own
+routing-doctrine skill; it replaced the fable-orchestrator plugin's trigger when that plugin
+was removed from both repos (spec dotfiles#1310). `grok` CLI is not installed → codex is the
+implementation lane (`kb-codex-implementer`, a stopgap), reviewed cross-family per `kb-review`.
 
-Adopted plugins (enabled in `.claude/settings.json`): `fable-orchestrator@fable-orchestrator`
-(Claude/Fable-5 architect + `codex` implementer lane + cross-family reviewers + supervisor + terminal
-Opus fallback) and `antigravity@antigravity-for-claude-code` (Google Antigravity/Gemini 3.x lane via
-`agy`). The Claude architect plans and **verifies evidence** before "done"; only execution is delegated.
+Adopted plugin (enabled in `.claude/settings.json`): `antigravity@antigravity-for-claude-code`
+(Google Antigravity/Gemini 3.x lane via `agy`). The Claude architect plans and **verifies evidence** before "done"; only execution is delegated.
 
 Four were enabled 2026-08-03 without needing a note here — `pr-review-toolkit`,
 `skill-creator`, `claude-md-management` (all `@claude-plugins-official`) and

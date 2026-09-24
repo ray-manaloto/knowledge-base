@@ -267,7 +267,7 @@ def cli_present(name: str) -> Outcome:
     """Does ``name`` resolve on PATH?
 
     Resolution, not invocation: a lane's CLI existing is the cheap half, and
-    whether it is authenticated is the live half (:func:`doctor_health`).
+    whether it is authenticated is a live question no offline probe can answer.
     """
     path = shutil.which(name)
     if path:
@@ -484,40 +484,6 @@ def graphify_canary(
     if not out.strip():
         return fail("graphify query rc=0 but returned NOTHING — resolves, answers nothing")
     return ok(f"graphify query rc=0, {len(out.strip())} bytes returned")
-
-
-def doctor_health(script: Path, *, timeout: int = LIVE_TIMEOUT) -> Outcome:
-    """Shell out to the fable-orchestrator plugin's own ``doctor.sh``.
-
-    ``use-tool-builtins.md`` hard gate: doctor already does lane presence plus
-    LIVE auth and model access per CLI, and ships a permission canary whose pass
-    condition is a nonce the model can only produce by actually executing a
-    command. That canary is the control-arm principle at framework level and is
-    better than anything reimplemented here.
-
-    THIS IS THE LIVE HALF, ENTIRELY. doctor takes no flags and has no offline
-    mode: whenever a lane's CLI is present it fires a real API call. So it can
-    never be part of the free, gated tier — the offline probes above are.
-
-    It exits ``[ FAIL -eq 0 ]``, so warnings pass and only a live-check failure
-    fails; an absent CLI is a warning by its design, which is the right reading
-    (a lane that is not installed degrades, per :func:`declared_lanes_reconcile`).
-
-    SKIPs LOUDLY when the script is absent. Its path is version-pinned inside
-    the plugin cache and can vanish on plugin GC, so "not there" must never be
-    silent — a silently-skipped lane check is the inert declaration again.
-    """
-    if not script.is_file():
-        return skip(
-            f"doctor.sh not found at {script} — the plugin cache is version-pinned "
-            f"and can vanish on GC; reinstall the fable-orchestrator plugin to "
-            f"restore lane health checks"
-        )
-    rc, out = run_command(["bash", str(script)], timeout=timeout)
-    tail = " | ".join(line.strip() for line in out.strip().splitlines()[-3:])
-    if rc != 0:
-        return fail(f"doctor.sh rc={rc}: {tail}")
-    return ok(f"doctor.sh rc=0: {tail}")
 
 
 # --- tier 2: guard fixture tables ---------------------------------------------

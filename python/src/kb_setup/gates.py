@@ -107,9 +107,8 @@ SHA_ABBREV = 12
 #: The local gates every PR must pass before it is pushed — moved here from `pr`
 #: (where it was `GATES`) so the ship path and `kb-gates` cannot drift into two
 #: lists. `eval` is tiers 1+2 — reachability probes plus the guard fixture table,
-#: offline and fast only, so it costs nothing here. Its two opt-in halves run on
-#: demand: `-- --live` for the lane doctor (one API call per installed lane) and
-#: `-- --slow` for the golden retrieval set (~3 min, advisory — it reports
+#: offline and fast only, so it costs nothing here. Its opt-in half runs on
+#: demand: `-- --slow` for the golden retrieval set (~3 min, advisory — it reports
 #: recall@k, it does not gate).
 #:
 #: NOT EVERY OFFLINE CASE IS BINDING, and this comment used to imply otherwise by
