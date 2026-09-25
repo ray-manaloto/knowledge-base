@@ -81,6 +81,14 @@ them with the existing task:
 mise run kb-assemble -- <name> .agent/kb/graphify-ingest/scratch/my-run/*.json
 ```
 
+For a cold/warm acceptance case, freeze the request and each source's SHA-256
+before running the task. Check that every source key is lowercase and listed in
+the frozen request before a paid call. On cold success, copy and hash each
+chunk and finalized producer receipt before starting a warm replay. A matching
+warm run must produce byte-identical chunks, retain the original producer
+receipts, and create no new extraction attempts. A changed request or source
+needs a separately frozen attempt; an incomplete or failed pair is not a pass.
+
 ## DEEP: one pinned corpus through the native public SDK pipeline
 
 Use the existing native output root and make the backend selection explicit:
@@ -101,5 +109,6 @@ extractor. Omit model/effort to use the same backend defaults shown above.
 
 DEEP uses Graphify's public detect, AST, semantic extraction, build, cluster,
 hub-label, and serialization APIs. The source corpus root selects input bytes;
-the knowledge-base root remains the CLI project/CWD so repository configuration
-and receipts retain the correct authority.
+the knowledge-base root remains the project and run-context identity. Claude
+uses the KB cwd. Isolated OpenAI execution uses a temporary neutral child cwd
+with `--ignore-user-config` while receipts retain the KB project identity.

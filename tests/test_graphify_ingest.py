@@ -485,7 +485,10 @@ def test_valid_task_owned_runtime_families_write_only_expected_output(
     assert not (tmp_path / ".agent" / "evidence").exists()
 
 
-def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(tmp_path: Path) -> None:
+@pytest.mark.parametrize("backend", ["claude-cli", "openai-cli"])
+def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(
+    tmp_path: Path, backend: str
+) -> None:
     """Compose real profile/cache/invocation APIs; fake only external process I/O."""
     source_path = tmp_path / "source.md"
     source_path.write_text("all source bytes")
@@ -493,26 +496,33 @@ def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(tmp_path: Path) 
     chunk = _chunk("source.md")
     calls: list[dict] = []
     profile = graphify_execution.resolve_profile(
+        backend,
         selection=graphify_execution.ProfileSelection(
             environment={},
-            identity={"path": "/fixture/claude", "sha256": "a" * 64, "version": "fixture"},
-        )
+            identity={"path": f"/fixture/{backend}", "sha256": "a" * 64, "version": "fixture"},
+        ),
     )
     original = json.loads(json.dumps(profile))
 
     def runner(request: dict) -> dict:
         calls.append(request)
+        payload = json.dumps({**chunk, "input_tokens": 0, "output_tokens": 0}).encode()
         envelope = {
             "type": "result",
-            "result": json.dumps(chunk),
+            "result": payload.decode(),
             "model": request["requested_profile"]["model"],
             "response_id": f"fixture-response-{len(calls)}",
         }
-        stdout = json.dumps(envelope).encode()
+        stdout = json.dumps(envelope).encode() if backend == "claude-cli" else b""
         capture = tmp_path / f"process-{len(calls)}"
-        stdout_path, stderr_path = capture / "stdout.bin", capture / "stderr.bin"
+        stdout_path, stderr_path, result_path = (
+            capture / "stdout.bin",
+            capture / "stderr.bin",
+            capture / "result.bin",
+        )
         graphify_execution.atomic_bytes(stdout_path, stdout)
         graphify_execution.atomic_bytes(stderr_path, b"")
+        graphify_execution.atomic_bytes(result_path, payload)
         return {
             "returncode": 0,
             "stdout": stdout,
@@ -522,7 +532,16 @@ def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(tmp_path: Path) 
             "finalized": True,
             "binary": request["requested_profile"]["binary_expectation"],
             "raw_capture_refs": {"stdout": str(stdout_path), "stderr": str(stderr_path)},
-            "provider_events": [envelope],
+            "provider_events": [envelope] if backend == "claude-cli" else [],
+            "result_artifact": {
+                "requested_path": request["output_path"],
+                "payload": payload,
+                "byte_count": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "raw_ref": str(result_path),
+                "eof": True,
+                "finalized": True,
+            },
             "runner_error": None,
         }
 
@@ -544,17 +563,26 @@ def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(tmp_path: Path) 
     assert cold["cached"] is False
     assert len(calls) == 1
     assert json.loads(Path(cold["output"]).read_text()) == chunk
+    cold_bytes = Path(cold["output"]).read_bytes()
     warm = ingest("warm", profile)
     assert warm["cached"] is True
     assert len(calls) == 1
     assert json.loads(Path(warm["output"]).read_text()) == chunk
+    assert Path(warm["output"]).read_bytes() == cold_bytes
     assert warm["cache_evidence"]
+    assert cold["receipt_id"] in {
+        receipt["receipt_id"]
+        for item in warm["cache_evidence"]
+        for receipt in item["producer_receipts"]
+    }
+    assert not list(Path(warm["run_root"]).rglob("attempts/*"))
     other = graphify_execution.resolve_profile(
+        backend,
         selection=graphify_execution.ProfileSelection(
-            effort="high",
+            effort="medium" if backend == "openai-cli" else "high",
             environment={},
-            identity={"path": "/fixture/claude", "sha256": "a" * 64, "version": "fixture"},
-        )
+            identity={"path": f"/fixture/{backend}", "sha256": "a" * 64, "version": "fixture"},
+        ),
     )
     cross_profile = ingest("cross-profile", other)
     assert cross_profile["cached"] is False

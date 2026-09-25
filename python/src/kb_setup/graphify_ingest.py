@@ -365,7 +365,12 @@ def ingest_source(
                 fallback_result["primary_run_root"] = str(actual_run_root)
                 return fallback_result
         raise RuntimeError(f"managed extraction did not complete: {receipt['completion']}")
-    chunk = attempt["value"]
+    value = attempt["value"]
+    chunk = {
+        "nodes": value["nodes"],
+        "edges": value["edges"],
+        "hyperedges": value.get("hyperedges", []),
+    }
     _require_valid(chunk, source.key)
     graphify_sdk.save_semantic_cache_public(
         chunk["nodes"],
