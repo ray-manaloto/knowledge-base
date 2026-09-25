@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source": "graphify",
-  "source_ref": "codex/pwf-deep-coverage-20260924",
-  "source_commit": "49d5dd18891f3e7e04e54c06afb2b7718c36b71d",
-  "source_tree": "81f2383537b83c461d6a843a61868b0a8d7516d7",
+  "source_ref": "kb-openai-cli-backend-v0.9.67-de57710f",
+  "source_commit": "de57710fb020619a1f436c1b538cf9a410f629bc",
+  "source_tree": "ddf0cce3c84666a16ffed540f4bafba4dd4a5512",
   "entries": [
     {
       "path": ".dockerignore",

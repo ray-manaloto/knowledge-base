@@ -245,7 +245,7 @@ _ACCEPTED_GRAPHIFY_VERSION = "0.9.67"
 # (`currency.toml` binds it with `tracks = "manifest"`). Contrast the semantic
 # corpus/slice constants, which are snapshot identities of completed runs and
 # correctly hold at the upstream base `v0.9.48`.
-_ACCEPTED_GRAPHIFY_REF = "codex/pwf-deep-coverage-20260924"
+_ACCEPTED_GRAPHIFY_REF = "kb-openai-cli-backend-v0.9.67-de57710f"
 
 #: The public spelling of the version above, for the ONE cross-module consumer:
 #: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
@@ -296,11 +296,11 @@ _ACCEPTED_RUNTIME_HASHES = {
     # STRONGER identity — a wheel hash names a built artifact, a resolved
     # commit names the source tree it was built from. Reverts to the wheel/sdist
     # pair when #2981 merges and the pin returns to PyPI.
-    "git_commit": "49d5dd18891f3e7e04e54c06afb2b7718c36b71d",
+    "git_commit": "de57710fb020619a1f436c1b538cf9a410f629bc",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="49d5dd18891f3e7e04e54c06afb2b7718c36b71d",
+    source_commit="de57710fb020619a1f436c1b538cf9a410f629bc",
     # RE-DERIVED 2026-09-10 from the pinned commit, not carried forward. The
     # 0.9.57 pin move advanced `source_commit` and left BOTH of these describing
     # `157a957e`, and all eight gates passed over it — `mise run
@@ -310,8 +310,8 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # digests the catalog's canonical encoding, so fixing a stale catalog entry
     # changes it again. Measured across this fix: `a52e4f6e…` before the entry
     # was corrected, `0444f055…` after. Derive it LAST.
-    source_tree="81f2383537b83c461d6a843a61868b0a8d7516d7",
-    catalog_sha256="d6fdbcac818aea5f9fbad837b7f7c4f6157b369613bcce1101d3d17c8fa911e9",
+    source_tree="ddf0cce3c84666a16ffed540f4bafba4dd4a5512",
+    catalog_sha256="6e3c2a07b66d903b21f1116884c1d0d054e9b934b31bc318e9c7148d8d7ba0fc",
     # RE-DERIVED 2026-09-10, and it was the SIXTH stranded value — found only
     # after `kb-graphify-catalog`'s first version reported five and called that
     # the whole set. Its then-pinned commit had 880 members.
@@ -326,7 +326,7 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # Corroborated: an independent derivation in the previous session produced
     # this same digest and the same 880-member count at that earlier pin.
     # The 93c019a5 source manifest contains 956 members.
-    source_manifest_sha256="063f8b1a8355e7fc01319e29a1cabf73c83a6c65a5948f0986eaafcf747b158b",
+    source_manifest_sha256="e2b4b2925a0a8f3ed04b1156ee34391c55ed745ec3312f3372b5597bcf57577b",
     # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
     # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
     # RE-DERIVED by a real build against the installed 0.9.47, never carried
@@ -367,7 +367,9 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # `kb-graphify-baseline build`: observed 550 detected and 542 extracted.
     # The eight-file gap is unchanged; the first candidate's direct failure
     # was the old authority pair (471, 463), retained in the goal evidence.
-    detected_count=550,
+    # 0611a789 adds graphify/provenance.py and its regression test: +2/+2
+    # against the installed fork, measured by the deterministic baseline build.
+    detected_count=552,
     # FORKED 2026-08-24, then REBASED onto upstream v0.9.49 the same day:
     # 429 -> 450 detected, 421 -> 442 extracted. RE-DERIVED
     # by a real `kb-graphify-baseline build` against the INSTALLED fork, never
@@ -401,7 +403,7 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # All three drifted authority values came from the build's own OBSERVED vs
     # ACCEPTED diagnostic (#373) rather than a hand derivation — which is the
     # thing that note says it exists to prevent, and it worked.
-    extracted_count=542,
+    extracted_count=544,
 )
 
 
