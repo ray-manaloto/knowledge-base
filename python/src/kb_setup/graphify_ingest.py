@@ -181,6 +181,10 @@ DEPENDENT -> DEPENDENCY; enables/defines/mitigates/verifies/routes_to is ACTOR -
 contrasts_with is symmetric in meaning but must be emitted exactly once. Decide each edge
 from the source; never batch-flip a relation type.
 
+ORDERED SOURCE FACTS: when the source explicitly states stages or steps in sequence,
+emit EXTRACTED precedes edges from each stage to its immediate successor. Hyperedge
+membership does not encode order. Never infer a sequence from a grouping or call graph.
+
 HYPEREDGE object (exact keys):
   id               : snake_case, MUST start with "{source.key}_".
   label            : short human name of the shared concept.
