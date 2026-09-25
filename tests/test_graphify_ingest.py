@@ -494,6 +494,14 @@ def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(
     source_path.write_text("all source bytes")
     task_root = tmp_path / ".agent" / "kb" / "graphify-ingest"
     chunk = _chunk("source.md")
+    chunk["nodes"][0]["source_provenance"] = [
+        {
+            "node_id": chunk["nodes"][0]["id"],
+            "source_file": "source.md",
+            "definition_file": "source.md",
+            "source_location": "L1",
+        }
+    ]
     calls: list[dict] = []
     profile = graphify_execution.resolve_profile(
         backend,
@@ -759,7 +767,26 @@ def test_cached_source_mapping_rejects_other_identities(tmp_path: Path, source_f
 def test_cached_source_mapping_preserves_metadata_and_input_across_buckets(tmp_path: Path) -> None:
     staged = tmp_path / "cache-input" / "graphify" / "README.md"
     chunk = {
-        "nodes": [{"id": "node", "source_file": str(staged), "rationale": "literal evidence"}],
+        "nodes": [
+            {
+                "id": "node",
+                "source_file": str(staged),
+                "rationale": "literal evidence",
+                "source_provenance": [
+                    {
+                        "node_id": "node",
+                        "source_file": str(staged),
+                        "definition_file": str(staged),
+                        "source_location": "L1",
+                    },
+                    {
+                        "node_id": "other",
+                        "source_file": str(tmp_path / "cache-input" / "other.md"),
+                        "definition_file": "/outside/definition.md",
+                    },
+                ],
+            }
+        ],
         "edges": [
             {"source": "node", "target": "other", "source_file": str(staged), "confidence": 1}
         ],
@@ -773,7 +800,24 @@ def test_cached_source_mapping_preserves_metadata_and_input_across_buckets(tmp_p
     )
     assert portable == {
         "nodes": [
-            {"id": "node", "source_file": "graphify/README.md", "rationale": "literal evidence"}
+            {
+                "id": "node",
+                "source_file": "graphify/README.md",
+                "rationale": "literal evidence",
+                "source_provenance": [
+                    {
+                        "node_id": "node",
+                        "source_file": "graphify/README.md",
+                        "definition_file": "graphify/README.md",
+                        "source_location": "L1",
+                    },
+                    {
+                        "node_id": "other",
+                        "source_file": "other.md",
+                        "definition_file": "/outside/definition.md",
+                    },
+                ],
+            }
         ],
         "edges": [
             {

@@ -443,18 +443,60 @@ def _run_uncached_cli(
         )
 
 
+def _portable_cached_record(
+    record: dict, *, staged_root: Path, staged_source: Path, source_file: str, primary: bool
+) -> dict:
+    """Restore only paths the public cache anchored under this run's input root."""
+    copied = dict(record)
+    if primary and copied.get("source_file") not in (None, source_file, str(staged_source)):
+        raise ValueError("cached source_file does not match the staged source identity")
+    for field in ("source_file", "definition_file"):
+        value = copied.get(field)
+        if not isinstance(value, str) or not Path(value).is_absolute():
+            continue
+        try:
+            relative = Path(value).relative_to(staged_root)
+        except ValueError:
+            continue
+        if not relative.parts:
+            raise ValueError(f"cached {field} names the staging root, not a source")
+        copied[field] = relative.as_posix()
+    return copied
+
+
 def _portable_cached_chunk(chunk: dict, *, staged_source: Path, source_file: str) -> dict:
-    """Undo only the public cache's known re-anchoring of this staged source."""
+    """Undo the public cache's re-anchoring without changing source identities."""
+    staged_root = staged_source
+    for _ in Path(source_file).parts:
+        staged_root = staged_root.parent
+    if staged_root / source_file != staged_source:
+        raise ValueError("staged source does not match the requested source identity")
+
     portable = {}
     for bucket in ("nodes", "edges", "hyperedges"):
         items = []
         for item in chunk[bucket]:
-            copied = dict(item)
-            cached_source = copied.get("source_file")
-            if cached_source is not None:
-                if cached_source not in (source_file, str(staged_source)):
-                    raise ValueError("cached source_file does not match the staged source identity")
-                copied["source_file"] = source_file
+            copied = _portable_cached_record(
+                item,
+                staged_root=staged_root,
+                staged_source=staged_source,
+                source_file=source_file,
+                primary=True,
+            )
+            provenance = copied.get("source_provenance")
+            if isinstance(provenance, list):
+                copied["source_provenance"] = [
+                    _portable_cached_record(
+                        entry,
+                        staged_root=staged_root,
+                        staged_source=staged_source,
+                        source_file=source_file,
+                        primary=False,
+                    )
+                    if isinstance(entry, dict)
+                    else entry
+                    for entry in provenance
+                ]
             items.append(copied)
         portable[bucket] = items
     return portable
