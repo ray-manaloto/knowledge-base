@@ -296,11 +296,11 @@ _ACCEPTED_RUNTIME_HASHES = {
     # STRONGER identity — a wheel hash names a built artifact, a resolved
     # commit names the source tree it was built from. Reverts to the wheel/sdist
     # pair when #2981 merges and the pin returns to PyPI.
-    "git_commit": "d629754669702a305014f1fba844481e6c0ab537",
+    "git_commit": "49d5dd18891f3e7e04e54c06afb2b7718c36b71d",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="d629754669702a305014f1fba844481e6c0ab537",
+    source_commit="49d5dd18891f3e7e04e54c06afb2b7718c36b71d",
     # RE-DERIVED 2026-09-10 from the pinned commit, not carried forward. The
     # 0.9.57 pin move advanced `source_commit` and left BOTH of these describing
     # `157a957e`, and all eight gates passed over it — `mise run
@@ -310,8 +310,8 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # digests the catalog's canonical encoding, so fixing a stale catalog entry
     # changes it again. Measured across this fix: `a52e4f6e…` before the entry
     # was corrected, `0444f055…` after. Derive it LAST.
-    source_tree="27a241e66d4298e07f0b4ea6b2e376b9914ddef3",
-    catalog_sha256="0e14bd9d853c82bf5484ed890e9adbf25f659f3ef39f03896aa4ceb86ad626f9",
+    source_tree="81f2383537b83c461d6a843a61868b0a8d7516d7",
+    catalog_sha256="d6fdbcac818aea5f9fbad837b7f7c4f6157b369613bcce1101d3d17c8fa911e9",
     # RE-DERIVED 2026-09-10, and it was the SIXTH stranded value — found only
     # after `kb-graphify-catalog`'s first version reported five and called that
     # the whole set. Its then-pinned commit had 880 members.
@@ -326,7 +326,7 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # Corroborated: an independent derivation in the previous session produced
     # this same digest and the same 880-member count at that earlier pin.
     # The 93c019a5 source manifest contains 956 members.
-    source_manifest_sha256="0f4f50b4b35336648dda7b14572f08ac64b43ed01c3566317847a2c3c90a4a57",
+    source_manifest_sha256="063f8b1a8355e7fc01319e29a1cabf73c83a6c65a5948f0986eaafcf747b158b",
     # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
     # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
     # RE-DERIVED by a real build against the installed 0.9.47, never carried

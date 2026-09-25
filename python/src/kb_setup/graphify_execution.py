@@ -130,7 +130,7 @@ def resolve_profile(backend: str = "claude-cli", selection: ProfileSelection | N
         "cli_policy": {
             "project_configuration": "inherit",
             "session_persistence": "retain",
-            "mcp": "inherit",
+            "mcp": "ignore-user-config" if backend == "openai-cli" else "inherit",
             "sandbox": "read-only",
         },
         "identity_policy": {

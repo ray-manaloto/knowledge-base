@@ -149,6 +149,6 @@
 # Re-measure `v8` before assuming this still holds; upstream ships near-daily.
 url = https://github.com/ray-manaloto/graphify
 ref = codex/pwf-deep-coverage-20260924
-commit = d629754669702a305014f1fba844481e6c0ab537
+commit = 49d5dd18891f3e7e04e54c06afb2b7718c36b71d
 kind = code
 added = 2026-07-21

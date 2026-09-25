@@ -41,6 +41,9 @@ def test_managed_profile_defaults(backend: str, model: str, effort: str) -> None
         effort,
     )
     assert profile["identity_policy"]["required_per_response"] is False
+    assert profile["cli_policy"]["mcp"] == (
+        "ignore-user-config" if backend == "openai-cli" else "inherit"
+    )
 
 
 def test_profile_rejects_hidden_api_auth() -> None:
