@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import cast
@@ -560,6 +561,97 @@ def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(tmp_path: Path) 
     assert len(calls) == 2
     assert profile == original
     assert profile["_explicit"] is True
+
+
+@pytest.mark.parametrize("runner_outcome", ["completed", "raises"])
+def test_openai_normal_cold_isolates_cli_cwd_and_retains_project_identity(
+    tmp_path: Path, runner_outcome: str
+) -> None:
+    """Exercise the public cold path without starting a paid CLI process."""
+    source_path = tmp_path / "source.md"
+    source_path.write_text("all source bytes")
+    project_config = tmp_path / ".codex" / "config.toml"
+    project_config.parent.mkdir()
+    project_config.write_text('[mcp_servers.project_fixture]\ncommand = "false"\n')
+    task_root = tmp_path / ".agent" / "kb" / "graphify-ingest"
+    profile = graphify_execution.resolve_profile(
+        "openai-cli",
+        graphify_execution.ProfileSelection(
+            environment={},
+            identity={"path": "/fixture/codex", "sha256": "b" * 64, "version": "fixture"},
+        ),
+    )
+    calls: list[dict] = []
+
+    def runner(invocation: dict) -> dict:
+        calls.append(invocation)
+        cli_cwd = Path(invocation["cwd"])
+        assert cli_cwd.is_dir()
+        assert not cli_cwd.resolve().is_relative_to(tmp_path.resolve())
+        assert invocation["project_root"] == str(tmp_path.resolve())
+        assert "--ignore-user-config" in invocation["argv"]
+        if runner_outcome == "raises":
+            raise RuntimeError("fixture runner failed")
+        raw_root = task_root / "runner-fixture"
+        stdout_path, stderr_path, result_path = (
+            raw_root / "stdout.bin",
+            raw_root / "stderr.bin",
+            raw_root / "result.bin",
+        )
+        payload = json.dumps(_chunk("source.md")).encode()
+        graphify_execution.atomic_bytes(stdout_path, b"")
+        graphify_execution.atomic_bytes(stderr_path, b"")
+        graphify_execution.atomic_bytes(result_path, payload)
+        return {
+            "returncode": 0,
+            "stdout": b"",
+            "stderr": b"",
+            "stdout_eof": True,
+            "stderr_eof": True,
+            "finalized": True,
+            "binary": profile["binary_expectation"],
+            "raw_capture_refs": {"stdout": str(stdout_path), "stderr": str(stderr_path)},
+            "result_artifact": {
+                "requested_path": invocation["output_path"],
+                "payload": payload,
+                "byte_count": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "raw_ref": str(result_path),
+                "eof": True,
+                "finalized": True,
+            },
+            "provider_events": [],
+            "runner_error": None,
+        }
+
+    request = graphify_ingest.IngestSourceRequest(
+        repo_root=tmp_path,
+        scratch_dir=task_root / "scratch" / "cold",
+        source=_source(source_path),
+        captured_at="2026-09-14",
+        profile=profile,
+        run_root=task_root / "runs" / "cold",
+        cache_root=task_root / "cache" / "semantic",
+    )
+    if runner_outcome == "raises":
+        with pytest.raises(RuntimeError, match="fixture runner failed"):
+            graphify_ingest.ingest_source(request, process_runner=runner)
+        run_root = task_root / "runs" / "cold"
+    else:
+        result = graphify_ingest.ingest_source(request, process_runner=runner)
+        assert result["cached"] is False
+        assert json.loads(Path(result["output"]).read_text()) == _chunk("source.md")
+        run_root = Path(result["run_root"])
+    assert len(calls) == 1
+    assert not Path(calls[0]["cwd"]).exists()
+    receipts = list((run_root / "receipts").glob("*.json"))
+    assert len(receipts) == 1
+    receipt = json.loads(receipts[0].read_text())
+    assert receipt["request"]["cwd"] == calls[0]["cwd"]
+    assert receipt["run_context"]["project_root"] == str(tmp_path.resolve())
+    assert receipt["completion"] == (
+        "incomplete_capture" if runner_outcome == "raises" else "completed"
+    )
 
 
 @pytest.mark.parametrize("primary_output", [b"", b"partial-provider-output"])

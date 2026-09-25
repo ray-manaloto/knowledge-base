@@ -6,7 +6,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import tempfile
 from collections.abc import Callable
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path, PurePosixPath
@@ -88,6 +90,14 @@ class IngestSourceRequest:
     timeout_seconds: float = 300.0
     execution_budget: graphify_execution.ExecutionBudget | None = None
     fallback_profile: dict | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _UncachedCliAttempt:
+    request: IngestSourceRequest
+    prompt: str
+    run_root: Path
+    run_context: dict
 
 
 def source_file_for(source: Source) -> str:
@@ -251,7 +261,6 @@ def ingest_source(
     public_profile = graphify_execution.public_profile_request(profile)
     run_root = request.run_root
     cache_root = request.cache_root
-    timeout_seconds = request.timeout_seconds
     source_path = source.path.resolve(strict=True)
     source_bytes = source_path.read_bytes()
     prompt = render_prompt(source, captured_at, source_bytes)
@@ -330,35 +339,10 @@ def ingest_source(
             "output": str(output_path),
             "cache_evidence": cache_evidence,
         }
-    result_path = actual_run_root / "result.json"
-    invocation = graphify_sdk.build_cli_invocation_public(
-        prompt,
-        purpose="extract",
-        max_tokens=60_000,
-        profile=profile,
-        output_path=result_path,
-        project_root=repo_root,
-        cwd=repo_root,
-    )
-    invocation = graphify_execution.restrict_claude_invocation(invocation)
-    invocation["timeout_seconds"] = timeout_seconds
-    runner = process_runner or graphify_execution.CapturedProcessRunner(
-        actual_run_root,
-        graphify_execution.safe_child_environment(backend=profile["backend"]),
-        timeout_seconds,
-        environment_overrides=graphify_execution.child_environment_override_evidence(
-            profile["backend"]
-        ),
-        budget=request.execution_budget
-        or graphify_execution.ExecutionBudget(max_attempts=1, total_seconds=timeout_seconds),
-    )
-    sink = receipt_sink or graphify_execution.DurableReceiptSink(actual_run_root)
-    attempt = graphify_sdk.run_cli_invocation_public(
-        invocation,
-        run_context=context,
-        process_runner=runner,
-        result_parser=graphify_execution.result_parser(profile["backend"]),
-        receipt_sink=sink,
+    attempt = _run_uncached_cli(
+        _UncachedCliAttempt(request, prompt, actual_run_root, context),
+        process_runner=process_runner,
+        receipt_sink=receipt_sink,
     )
     receipt = attempt["receipt"]
     if receipt["completion"] != "completed":
@@ -406,6 +390,52 @@ def ingest_source(
         "receipt_id": receipt["receipt_id"],
         "coverage": receipt["coverage"],
     }
+
+
+def _run_uncached_cli(
+    spec: _UncachedCliAttempt,
+    *,
+    process_runner: Callable[[dict], dict] | None,
+    receipt_sink: Callable[[dict], dict] | None,
+) -> dict:
+    """Keep an isolated CLI workspace alive through execution and receipt publication."""
+    profile = spec.request.profile
+    timeout_seconds = spec.request.timeout_seconds
+    with ExitStack() as workspace:
+        cli_cwd = spec.request.repo_root
+        if profile.get("cli_policy", {}).get("project_configuration") == "isolated":
+            cli_cwd = Path(
+                workspace.enter_context(tempfile.TemporaryDirectory(prefix="kb-graphify-codex-"))
+            )
+        invocation = graphify_sdk.build_cli_invocation_public(
+            spec.prompt,
+            purpose="extract",
+            max_tokens=60_000,
+            profile=profile,
+            output_path=spec.run_root / "result.json",
+            project_root=spec.request.repo_root,
+            cwd=cli_cwd,
+        )
+        invocation = graphify_execution.restrict_claude_invocation(invocation)
+        invocation["timeout_seconds"] = timeout_seconds
+        runner = process_runner or graphify_execution.CapturedProcessRunner(
+            spec.run_root,
+            graphify_execution.safe_child_environment(backend=profile["backend"]),
+            timeout_seconds,
+            environment_overrides=graphify_execution.child_environment_override_evidence(
+                profile["backend"]
+            ),
+            budget=spec.request.execution_budget
+            or graphify_execution.ExecutionBudget(max_attempts=1, total_seconds=timeout_seconds),
+        )
+        sink = receipt_sink or graphify_execution.DurableReceiptSink(spec.run_root)
+        return graphify_sdk.run_cli_invocation_public(
+            invocation,
+            run_context=spec.run_context,
+            process_runner=runner,
+            result_parser=graphify_execution.result_parser(profile["backend"]),
+            receipt_sink=sink,
+        )
 
 
 def _portable_cached_chunk(chunk: dict, *, staged_source: Path, source_file: str) -> dict:
