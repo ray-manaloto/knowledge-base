@@ -93,9 +93,12 @@ gitleaks = "8.30.1"
 # `graph-size` sits at 736 MiB of 1,024" — and both conditions have since moved:
 # kb-build is green at 472,069 nodes and graph-size is 721.2 MiB of 1,024 (70%,
 # 303 MiB headroom, rc 0). That is the value of writing the numbers into a
-# refusal: it can be re-decided rather than re-argued. `build = skip` remains
-# REJECTED — #417 measured that shape producing a stale clone three readers then
-# cited from the wrong version.
+# refusal: it can be re-decided rather than re-argued. The current
+# `sources/agentsview.manifest` deliberately uses `build = skip`: the 2026-09-24
+# exact-pin extraction census found 107 syntax-error files in v0.42.0, so its
+# gitignored clone is not accepted as graph evidence. Clear the skip only after
+# a parser or source correction and a fresh exact-pin census with zero
+# unaccounted warnings, as the manifest's `skip_reason` requires.
 #
 # ⚠️ 0.42.0 does NOT carry the feature we want. `effort` capture for Claude Code
 # AND Codex sessions is upstream PR #1677, merged 2026-09-10, in no release yet.

@@ -524,6 +524,15 @@ def _source(value: object) -> Source:
         raise ValueError(f"source missing required field: {exc.args[0]}") from exc
 
 
+def _require_unique_sources(sources: list[Source]) -> None:
+    """Refuse output-path collisions before runtime setup or provider launch."""
+    seen_keys: set[str] = set()
+    for source in sources:
+        if source.key in seen_keys:
+            raise ValueError(f"duplicate source key: {source.key}")
+        seen_keys.add(source.key)
+
+
 def _fallback_profile(request: dict, environment: dict[str, str], primary: dict) -> dict | None:
     """Resolve an explicitly named alternate before any source can launch."""
     backend = request.get("fallbackBackend")
@@ -560,6 +569,7 @@ def ingest_main(repo_root: Path, argv: list[str]) -> int:
     if not isinstance(sources, list) or not sources:
         raise ValueError("ingest request requires a non-empty sources array")
     parsed_sources = [_source(item) for item in sources]
+    _require_unique_sources(parsed_sources)
     timeout_seconds = float(request.get("timeoutSeconds", 300))
     budget = graphify_execution.ExecutionBudget(
         max_attempts=request.get("maxAttempts", 8),
@@ -586,7 +596,8 @@ def ingest_main(repo_root: Path, argv: list[str]) -> int:
     )
     fallback_profile = _fallback_profile(request, environment, profile)
     results: list[dict] = []
-    state_path = scratch_dir / "run-state.json"
+    # Both shell and Python ``*.json`` match chunks but exclude this sidecar.
+    state_path = scratch_dir / "run-state.jsonl"
 
     def write_state(completion: str, failed_key: str | None = None) -> None:
         graphify_execution.atomic_bytes(

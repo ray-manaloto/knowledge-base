@@ -566,14 +566,14 @@ def result_parser(backend: str) -> Callable[[dict], dict]:
                 coverage,
                 usage,
             )
-        raw = (
-            process["result_artifact"]["payload"]
-            if backend == "openai-cli"
-            else _claude_terminal_bytes(process["stdout"])
-        )
         try:
+            raw = (
+                process["result_artifact"]["payload"]
+                if backend == "openai-cli"
+                else _claude_terminal_bytes(process["stdout"])
+            )
             value = _graph_value(raw) if backend == "openai-cli" else _claude_graph_value(raw)
-        except ValueError, TypeError:
+        except UnicodeDecodeError, ValueError, TypeError:
             return _parsed(
                 None,
                 "failed",

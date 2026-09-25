@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import cast
 
 import pytest
-from kb_setup import graphify_execution, graphify_ingest, graphify_sdk
+from kb_setup import chunks, graphify_execution, graphify_ingest, graphify_sdk
 
 
 def _source(path: Path, **overrides: object) -> graphify_ingest.Source:
@@ -349,6 +349,76 @@ def test_request_with_unsafe_key_fails_before_runtime_or_profile_mutation(
     assert not task_root.exists()
     assert marker.read_text() == "preserve"
     assert list(protected.iterdir()) == [marker]
+
+
+def test_duplicate_source_keys_fail_before_runtime_or_provider_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_path = tmp_path / "source.md"
+    source_path.write_text("source")
+    task_root = tmp_path / ".agent" / "kb" / "graphify-ingest"
+    request = tmp_path / "request.json"
+    source = {"key": "same", "path": str(source_path), "url": "https://example.test/source"}
+    request.write_text(
+        json.dumps(
+            {
+                "capturedAt": "2026-09-25",
+                "scratchDir": str(task_root / "scratch" / "chunks"),
+                "sources": [source, source],
+            }
+        )
+    )
+
+    def unexpected(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("duplicate keys must fail before dependency or provider resolution")
+
+    monkeypatch.setattr(graphify_ingest, "assert_pinned_graphify", unexpected)
+    monkeypatch.setattr(graphify_execution, "resolve_profile", unexpected)
+    monkeypatch.setattr(graphify_ingest, "ingest_source", unexpected)
+    with pytest.raises(ValueError, match="duplicate source key: same"):
+        graphify_ingest.ingest_main(tmp_path, [str(request)])
+    assert not task_root.exists()
+
+
+@pytest.mark.parametrize("key", ["sample", "run-state"])
+def test_run_status_is_excluded_from_documented_chunk_glob(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, key: str
+) -> None:
+    source_path = tmp_path / "source.md"
+    source_path.write_text("source")
+    scratch = tmp_path / ".agent" / "kb" / "graphify-ingest" / "scratch" / "chunks"
+    request = tmp_path / "request.json"
+    request.write_text(
+        json.dumps(
+            {
+                "capturedAt": "2026-09-25",
+                "scratchDir": str(scratch),
+                "sources": [
+                    {
+                        "key": key,
+                        "path": str(source_path),
+                        "url": "https://example.test/source",
+                    }
+                ],
+            }
+        )
+    )
+    monkeypatch.setattr(graphify_ingest, "assert_pinned_graphify", lambda _root: None)
+    monkeypatch.setattr(
+        graphify_execution, "resolve_profile", lambda *_args, **_kwargs: {"backend": "claude-cli"}
+    )
+
+    def write_chunk(spec: graphify_ingest.IngestSourceRequest) -> dict:
+        output = spec.scratch_dir / f"{spec.source.key}.json"
+        output.write_text(json.dumps(_chunk("source.md")))
+        return {"key": spec.source.key, "output": str(output)}
+
+    monkeypatch.setattr(graphify_ingest, "ingest_source", write_chunk)
+    assert graphify_ingest.ingest_main(tmp_path, [str(request)]) == 0
+    assert json.loads((scratch / "run-state.jsonl").read_text())["completion"] == "completed"
+    chunk_paths = sorted(scratch.glob("*.json"))
+    assert [path.name for path in chunk_paths] == [f"{key}.json"]
+    assert chunks.assemble(tmp_path, key, chunk_paths).is_file()
 
 
 def test_outside_scratch_root_is_refused_before_any_write(tmp_path: Path) -> None:

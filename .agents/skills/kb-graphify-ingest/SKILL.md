@@ -61,8 +61,9 @@ mise run kb-graphify-ingest -- /absolute/path/to/request.json
 ```
 
 `capturedAt` is required and must be a real canonical `YYYY-MM-DD` date.
-`key` is one lowercase filesystem-safe component. `sourceFile`, when set, is
-a canonical POSIX relative path: no absolute path, backslash, `.`, `..`,
+`key` is one unique lowercase filesystem-safe component per request.
+`sourceFile`, when set, is a canonical POSIX relative path: no absolute path,
+backslash, `.`, `..`,
 duplicate separator, or trailing separator. Supported kinds are `article`,
 `doc`, `designdoc`, `research_json`, `inventory`, and
 `article_partial`.
@@ -74,8 +75,9 @@ cache may satisfy a source without a provider call; its producer receipt remains
 in the returned cache evidence. A miss records raw stdout/stderr and a durable
 Graphify receipt before semantic output is accepted.
 
-Successful chunks are written beneath the requested scratch directory. Assemble
-them with the existing task:
+Successful chunks are written beneath the requested scratch directory. The
+`run-state.jsonl` sidecar tracks the request and is excluded from the chunk glob.
+Assemble the chunks with the existing task:
 
 ```bash
 mise run kb-assemble -- <name> .agent/kb/graphify-ingest/scratch/my-run/*.json

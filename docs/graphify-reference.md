@@ -9,7 +9,7 @@ README's Full Command Reference is authoritative; this doc is the mental model.*
 
 ## Current KB managed routes
 
-The KB lock is Graphify 0.9.61 from the exact fork commit in
+The KB lock is Graphify 0.9.67 from the exact fork commit in
 `sources/graphify.manifest` and `uv.lock`. NORMAL uses
 `mise run kb-graphify-ingest -- REQUEST.json`; DEEP uses
 `mise run kb-graphify-native-extract -- --target DIR --out DIR --backend NAME`.

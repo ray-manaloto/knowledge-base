@@ -511,10 +511,22 @@ def test_timeout_without_usage_event_is_explicitly_unknown() -> None:
     ],
 )
 def test_claude_terminal_array_rejects_error_ambiguity_and_nonterminal_graph(events: list) -> None:
-    with pytest.raises((ValueError, TypeError), match=r"terminal|error|JSON|arrays"):
-        graphify_execution.result_parser("claude-cli")(
-            {"returncode": 0, "stdout": json.dumps(events).encode(), "provider_events": events}
-        )
+    parsed = graphify_execution.result_parser("claude-cli")(
+        {"returncode": 0, "stdout": json.dumps(events).encode(), "provider_events": events}
+    )
+    assert parsed["completion"] == "failed"
+    assert parsed["value"] is None
+    assert "terminal_graph_invalid" in parsed["coverage"]["reasons"]
+
+
+@pytest.mark.parametrize("stdout", [b"not-json", b"\xff", b'[{"type":"result","is_error":true}]'])
+def test_malformed_claude_terminal_bytes_produce_structured_failure(stdout: bytes) -> None:
+    parsed = graphify_execution.result_parser("claude-cli")(
+        {"returncode": 0, "stdout": stdout, "provider_events": []}
+    )
+    assert parsed["completion"] == "failed"
+    assert parsed["value"] is None
+    assert "terminal_graph_invalid" in parsed["coverage"]["reasons"]
 
 
 def test_claude_leaf_brief_override_preserves_other_routing_and_discovery() -> None:
