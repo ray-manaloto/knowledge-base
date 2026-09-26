@@ -204,6 +204,7 @@ def run_command_split(
     *,
     cwd: Path | None = None,
     timeout: int = DEFAULT_TIMEOUT,
+    env: Mapping[str, str] | None = None,
 ) -> tuple[int, str, str]:
     """Run ``argv``, returning ``(rc, stdout, stderr)`` with the streams SEPARATE.
 
@@ -231,6 +232,7 @@ def run_command_split(
             text=True,
             timeout=timeout,
             cwd=str(cwd) if cwd else None,
+            env=env,
             check=False,
         )
     except subprocess.TimeoutExpired:
@@ -271,7 +273,9 @@ def cli_present(name: str) -> Outcome:
     return fail(f"{name} does not resolve on PATH")
 
 
-def _read_mise_redaction_set(*, cwd: Path | None, timeout: int) -> Mapping[str, object] | Outcome:
+def _read_mise_redaction_set(
+    *, cwd: Path | None, timeout: int, env: Mapping[str, str] | None
+) -> Mapping[str, object] | Outcome:
     """Read ``mise env --redacted --json``, or a SKIP saying why it could not be.
 
     Separated from the judgement so neither half needs seven exits, and so the
@@ -291,7 +295,7 @@ def _read_mise_redaction_set(*, cwd: Path | None, timeout: int) -> Mapping[str, 
     the probe. Armed by the silent-failure review lane in both directions.
     """
     rc, output, _stderr = run_command_split(
-        ["mise", "env", "--redacted", "--json"], cwd=cwd, timeout=timeout
+        ["mise", "env", "--redacted", "--json"], cwd=cwd, timeout=timeout, env=env
     )
     if rc != 0:
         return skip(
@@ -318,6 +322,7 @@ def mise_redaction_legible(
     cwd: Path | None = None,
     floor: int = REDACTION_COLLISION_FLOOR,
     timeout: int = DEFAULT_TIMEOUT,
+    env: Mapping[str, str] | None = None,
 ) -> Outcome:
     """Is every value in mise's redaction set too long to corrupt task output?
 
@@ -366,6 +371,8 @@ def mise_redaction_legible(
         floor: Shortest value considered safe. Defaults to
             :data:`REDACTION_COLLISION_FLOOR`.
         timeout: Seconds to allow the ``mise`` call.
+        env: Explicit environment for the ``mise`` child. ``None`` inherits the
+            current process environment.
 
     Returns:
         SKIP when the set could not be read or did not parse — "we did not look"
@@ -373,7 +380,7 @@ def mise_redaction_legible(
         what it does not hold) or every value clears ``floor``. FAIL otherwise,
         naming the offending variables and the shortest length.
     """
-    entries = _read_mise_redaction_set(cwd=cwd, timeout=timeout)
+    entries = _read_mise_redaction_set(cwd=cwd, timeout=timeout, env=env)
     if isinstance(entries, Outcome):
         return entries
     if not entries:

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -730,10 +731,16 @@ def _redaction_collision_control() -> evals.Outcome:
     all-long host set returns PASS, and PASS from a control means NOT ARMED.
     """
     with tempfile.TemporaryDirectory() as tmp:
-        (Path(tmp) / "mise.toml").write_text(
+        root = Path(tmp)
+        (root / "mise.toml").write_text(
             f'[env]\n{REDACTION_CANARY} = {{ value = "1", redact = true }}\n'
         )
-        return evals.mise_redaction_legible(cwd=Path(tmp))
+        state_dir = root / "mise-state"
+        state_dir.mkdir()
+        return evals.mise_redaction_legible(
+            cwd=root,
+            env={**os.environ, "MISE_STATE_DIR": str(state_dir)},
+        )
 
 
 def _binary_gate(name: str, detail: str) -> evals.Outcome | None:

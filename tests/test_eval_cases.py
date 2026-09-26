@@ -109,6 +109,31 @@ def test_the_redaction_control_arm_really_fails() -> None:
     )
 
 
+def test_the_redaction_control_isolates_mise_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The production control's throwaway config must not enter host mise state."""
+    observed_cwd: list[Path] = []
+    observed_state_dir: list[Path] = []
+    observed_state_dir_existed: list[bool] = []
+
+    def fake_run(_argv: Sequence[str], **kwargs: object) -> tuple[int, str, str]:
+        cwd = kwargs["cwd"]
+        env = kwargs["env"]
+        assert isinstance(cwd, Path)
+        assert isinstance(env, dict)
+        state_dir = Path(env["MISE_STATE_DIR"])
+        observed_cwd.append(cwd)
+        observed_state_dir.append(state_dir)
+        observed_state_dir_existed.append(state_dir.is_dir())
+        return 0, json.dumps({eval_cases.REDACTION_CANARY: "1"}), ""
+
+    monkeypatch.setattr(eval_cases.evals, "run_command_split", fake_run)
+    outcome = eval_cases._redaction_collision_control()
+
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert observed_state_dir == [observed_cwd[0] / "mise-state"]
+    assert observed_state_dir_existed == [True]
+
+
 def test_the_redaction_case_skips_without_mise() -> None:
     """CONTROL ARM: "mise is absent" must not read as "the set is clean".
 
