@@ -274,7 +274,7 @@ def cli_present(name: str) -> Outcome:
 
 
 def _read_mise_redaction_set(
-    *, cwd: Path | None, timeout: int, env: Mapping[str, str] | None
+    *, cwd: Path | None, timeout: int, env: Mapping[str, str] | None = None
 ) -> Mapping[str, object] | Outcome:
     """Read ``mise env --redacted --json``, or a SKIP saying why it could not be.
 

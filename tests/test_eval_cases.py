@@ -15,6 +15,7 @@ time. That is the difference between a red gate and a red gate you understand.
 from __future__ import annotations
 
 import json
+import shutil
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -109,29 +110,29 @@ def test_the_redaction_control_arm_really_fails() -> None:
     )
 
 
-def test_the_redaction_control_isolates_mise_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The production control's throwaway config must not enter host mise state."""
-    observed_cwd: list[Path] = []
-    observed_state_dir: list[Path] = []
-    observed_state_dir_existed: list[bool] = []
+def test_the_redaction_control_is_armed_and_leaves_host_state_alone(
+    monkeypatch: pytest.MonkeyPatch, isolated_mise_state: Path
+) -> None:
+    """Against REAL mise: the control stays armed and never touches host state.
 
-    def fake_run(_argv: Sequence[str], **kwargs: object) -> tuple[int, str, str]:
-        cwd = kwargs["cwd"]
-        env = kwargs["env"]
-        assert isinstance(cwd, Path)
-        assert isinstance(env, dict)
-        state_dir = Path(env["MISE_STATE_DIR"])
-        observed_cwd.append(cwd)
-        observed_state_dir.append(state_dir)
-        observed_state_dir_existed.append(state_dir.is_dir())
-        return 0, json.dumps({eval_cases.REDACTION_CANARY: "1"}), ""
+    The autouse `isolated_mise_state` dir stands in for the host registry. Ambient
+    trust is removed (a bogus trust root), so the arm can only read its canary if
+    it carries its own trust — and it must register its config in its OWN state
+    dir, leaving the stand-in empty.
 
-    monkeypatch.setattr(eval_cases.evals, "run_command_split", fake_run)
+    FAIL arms: drop `MISE_TRUSTED_CONFIG_PATHS` from the control's env -> verdict
+    SKIP; drop its `MISE_STATE_DIR` -> the stand-in gains a tracked-configs link.
+    """
+    if shutil.which("mise") is None:
+        pytest.skip("mise does not resolve on PATH")
+    monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", "/nonexistent-trust-root")
+
     outcome = eval_cases._redaction_collision_control()
 
-    assert outcome.verdict is evals.Verdict.FAIL
-    assert observed_state_dir == [observed_cwd[0] / "mise-state"]
-    assert observed_state_dir_existed == [True]
+    assert outcome.verdict is evals.Verdict.FAIL, outcome.detail
+    assert eval_cases.REDACTION_CANARY in outcome.detail
+    host_links = isolated_mise_state / "tracked-configs"
+    assert not host_links.exists() or not any(host_links.iterdir())
 
 
 def test_the_redaction_case_skips_without_mise() -> None:

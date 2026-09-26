@@ -739,7 +739,15 @@ def _redaction_collision_control() -> evals.Outcome:
         state_dir.mkdir()
         return evals.mise_redaction_legible(
             cwd=root,
-            env={**os.environ, "MISE_STATE_DIR": str(state_dir)},
+            # Its own state dir keeps the throwaway config out of the host's
+            # tracked-configs; its own trust root keeps the arm ARMED on a host
+            # with no ambient `trusted_config_paths` (without it, mise refuses the
+            # untrusted config and the arm reads SKIP — measured 2026-09-26).
+            env={
+                **os.environ,
+                "MISE_STATE_DIR": str(state_dir),
+                "MISE_TRUSTED_CONFIG_PATHS": str(root),
+            },
         )
 
 
