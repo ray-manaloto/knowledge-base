@@ -29,7 +29,7 @@ dependencies = [
   # A subscription-minted CLAUDE_CODE_OAUTH_TOKEN authorizes that endpoint —
   # verified 2026-08-17, 200 for a real model against 404 for a bogus one.
   "anthropic>=1.0.0",
-  "graphifyy[all]==0.9.57",
+  "graphifyy[all]==0.9.67",
   "httpx2>=2.12.0",
   "msgspec==0.21.1",
   "skillopt @ git+https://github.com/microsoft/SkillOpt@93bdf3d770b99128daf35278218e5a666fe392f3",
@@ -300,7 +300,7 @@ cpy = "cpy"
 nativ = "nativ"
 
 [tool.uv.sources]
-graphifyy = { git = "https://github.com/ray-manaloto/graphify", rev = "3c9b930f386f80c393fe658e1afb685030828c6a" }
+graphifyy = { git = "https://github.com/ray-manaloto/graphify", rev = "de57710fb020619a1f436c1b538cf9a410f629bc" }
 
 # Every strict msgspec model generated from a committed schema, as datamodel-codegen's
 # own `--all-jobs`/`--all-jobs --check` batch (0.75.1). Replaces four

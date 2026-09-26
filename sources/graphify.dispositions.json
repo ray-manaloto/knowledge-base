@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source": "graphify",
-  "source_ref": "kb-pin/openai-cli-backend-v0.9.57",
-  "source_commit": "3c9b930f386f80c393fe658e1afb685030828c6a",
-  "source_tree": "8fae076d840491419ab39fc05f0860007c0dcffe",
+  "source_ref": "kb-openai-cli-backend-v0.9.67-de57710f",
+  "source_commit": "de57710fb020619a1f436c1b538cf9a410f629bc",
+  "source_tree": "ddf0cce3c84666a16ffed540f4bafba4dd4a5512",
   "entries": [
     {
       "path": ".dockerignore",
@@ -89,8 +89,24 @@
       "path": "uv.lock",
       "kind": "unsupported-file",
       "reason": "uv lockfile is unsupported by Graphify detection 0.9.42 through 0.9.47",
-      "sha256": "cd9619377edfc6aea4941e6ed37302b9f5624a52fc005df6e6d10f22ec0a537c",
-      "size": 1015799,
+      "sha256": "8b5635d550b5a414bd7cd49110055abe5665e036607bb74145845fe8a5b88adf",
+      "size": 1031889,
+      "file_type": "regular"
+    },
+    {
+      "path": "tests/fixtures/raster/sample.bmp",
+      "kind": "unsupported-file",
+      "reason": "Graphify 0.9.67 does not classify this BMP test fixture as a graph source",
+      "sha256": "970f153e430be851e7ffdc371cd41cfff14990ab3a98eea34d6c0630d30fff71",
+      "size": 70,
+      "file_type": "regular"
+    },
+    {
+      "path": "tests/fixtures/raster/sample.mpo",
+      "kind": "unsupported-file",
+      "reason": "Graphify 0.9.67 does not classify this MPO test fixture as a graph source",
+      "sha256": "e426d9f6f1c7e2e9442c9fd40749730a99d68f29d5bde2d5e4212ca7aab68a20",
+      "size": 1372,
       "file_type": "regular"
     },
     {

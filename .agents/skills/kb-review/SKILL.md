@@ -167,8 +167,7 @@ the first `:`. Run against all three spellings, `cold` / `cold:codex` /
 `cold:codex-astra` all resolve to `review-<sha>-cold.md`. So **no change to
 `LANES` and no new receipt schema** — `--lanes cold:codex-astra` is already legal.
 
-**Why Astra is the default (knowledge-base#794):** `cold:codex` ran through the
-removed fable-orchestrator plugin; `cold:codex-astra` runs through this repo's own
+**Why Astra is the default (knowledge-base#794):** `cold:codex-astra` runs through this repo's own
 `kb-codex --review`, the one path that records codex evidence. Request `cold:codex`
 (same call, `--model gpt-5.6-sol`) by name for a small diff, or when Astra
 refuses. No per-diff routing table: the variant is REQUESTED, never detected.

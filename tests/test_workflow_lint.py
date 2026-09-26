@@ -215,6 +215,16 @@ def test_run_the_real_committed_workflows_is_clean() -> None:
     assert result.code == 0, result.message
 
 
+def test_legacy_kb_extract_only_directs_to_managed_mise_task() -> None:
+    workflow = (
+        Path(__file__).resolve().parent.parent / ".claude" / "workflows" / "kb-extract.js"
+    ).read_text(encoding="utf-8")
+    assert "mise run kb-graphify-ingest -- REQUEST.json" in workflow
+    assert "throw new Error" in workflow
+    assert "agent(" not in workflow
+    assert "parallel(" not in workflow
+
+
 def test_a_root_biome_config_is_reported_rather_than_silently_ignored(tmp_path, capsys) -> None:
     """Report a repo-root biome config rather than silently ignoring it.
 

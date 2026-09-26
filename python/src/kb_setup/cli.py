@@ -79,6 +79,7 @@ def _print_usage() -> int:
         "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | skill-refresh | "
         "guard-inventory-check | guard-codegen | guard-codegen-check | handoff-check [path] | "
+        "graphify-ingest REQUEST.json | "
         "gates [task...] [--stop] | check <path...> | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
@@ -354,6 +355,10 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_native_extract
 
         return graphify_native_extract.native_extract_main(repo_root, rest)
+    if cmd == "graphify-ingest":
+        from kb_setup import graphify_ingest
+
+        return graphify_ingest.ingest_main(repo_root, rest)
     return _dispatch_ops(repo_root, cmd, rest)
 
 

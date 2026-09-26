@@ -297,8 +297,7 @@ class Receipt:
 #: entry carries to the `currency.toml` tool table (`[tool.<mise_key>]`) that
 #: pins it. `.claude/skills/kb-review/SKILL.md`'s cross-family table has two
 #: external lanes — `cold:codex-astra` via `kb-codex --review` (records the
-#: `codex-astra` variant, which this map resolves to the `codex` table; it
-#: replaced the removed fable-orchestrator plugin's reviewer, #794) and
+#: `codex-astra` variant, which this map resolves to the `codex` table) and
 #: `antigravity:review` (Google's plugin). The skill's only literal worked
 #: example anywhere in this repo is `cold:codex`; no `cold:antigravity`
 #: receipt has ever been written, so there is no precedent for which spelling
@@ -440,9 +439,8 @@ def _all_reasons(repo_root: Path, data: dict[str, Any], sha: str) -> str | None:
     enforcement point was exactly this function, and `_run_review` — the only
     place evidence can be collected — is reached by ONE of the four cold review
     lanes (`codex review`, via `cold:codex-astra` — the default since #794).
-    When this was written the default was `cold:codex` through the since-removed
-    fable-orchestrator plugin, so a refusal here would have refused three of
-    four cold lanes, including the default. Phase 2 (gating) is a separate, later ticket, and
+    A refusal here would reject three of four cold lanes, including the
+    default. Phase 2 (gating) is a separate, later ticket, and
     when it lands its check belongs HERE, beside `_evidence_gap` — not in
     `_CHECKS`, which is called `check(data, sha)` with no `repo_root`.
     """

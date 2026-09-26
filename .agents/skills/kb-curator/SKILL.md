@@ -3,7 +3,7 @@ name: kb-curator
 description: >-
   Automate adding a source to this knowledge-base graph and keep the corpus
   self-improving: register in the source backlog, ingest (code=AST free, or
-  prose=host-agent), MERGE into the aggregate graph, re-cluster, label, and —
+  prose=managed subscription CLI), MERGE into the aggregate graph, re-cluster, label, and —
   ALWAYS — record work-memory (`graphify save-result`) and run `graphify reflect`
   so lessons compound across every ingestion. Use this whenever the user wants to
   add/ingest/extract a source into the KB (a GitHub repo, a docs URL or
@@ -41,8 +41,9 @@ The task map:
 | pin a NEW repo source | `mise run kb-manifest-add -- <url> [--name N --ref R --kind K]` | ~~hand-write a `.manifest`~~ |
 | add a URL (page/blog/article/video) | `mise run kb-add -- <url> [--author NAME]` | ~~`graphify add`~~ |
 | rebuild from committed inputs | `mise run kb-build` | ~~`graphify extract`/`merge-graphs`~~ |
+| diagnose one pinned source before a build retry | `mise run kb-detect-census -- --source <name>` | ~~repeat a full build to rediscover the same preflight failure~~ |
 | advance a repo source | `mise run kb-update -- <name>` | ~~`graphify update`~~ |
-| host-agent extract N sources | the **`kb-extract` saved workflow** (`.claude/workflows/kb-extract.js`) | ~~an inline one-off Workflow~~ |
+| managed prose extract N sources | `mise run kb-graphify-ingest -- REQUEST.json` (see **`kb-graphify-ingest`**) | ~~the retired `kb-extract` Workflow~~ |
 | combine + validate extraction chunks | `mise run kb-assemble -- <name> <chunk.json>...` | ~~inline python assembly~~ |
 | schema-check chunks | `mise run kb-validate-chunks -- <chunk.json>...` | ~~inline python validation~~ |
 | merge one doc chunk | `mise run kb-merge -- <chunk.json> [root]` | ~~`_merge_docs.py`~~ |
@@ -53,9 +54,9 @@ The task map:
 | record / reflect | `mise run kb-remember` / `mise run kb-reflect` | ~~`graphify save-result`/`reflect`~~ |
 | artifacts | `mise run kb-artifacts` | — |
 
-**2. `claude-cli` or `openai-cli` by explicit `--backend` — NEVER an auto-detected
-key** (Ray, 2026-08-25; `do-not.md` #4). The host-agent Workflow does extraction here;
-labeling is deterministic no-LLM. Every task strips every key trigger
+**2. `claude-cli` or `openai-cli` by explicit backend selection — NEVER an auto-detected
+key** (Ray, 2026-08-25; `do-not.md` #4). The managed task does extraction here;
+labeling is deterministic no-LLM. Every task rejects API credentials and strips key triggers
 (`graphify_env.clean_env`) so graphify's auto-detect can never pick a provider. graphify's
 `claude-cli` backend exists but is BROKEN for labeling (#2076 — prose-wrapped JSON),
 so `kb-label` defaults to the deterministic hub labeler.
@@ -78,8 +79,8 @@ via the task, per mandate 1. Entry points:
 
 `curl`/WebFetch/manual vendoring are a **fallback ONLY** when graphify genuinely
 cannot reach a source — and even then route the content into the graph via an
-extraction chunk. With no API key the *semantic* extraction falls to the host agent
-(Claude), but the FETCH + pipeline is graphify's. One ingestion path = uniform
+extraction chunk. Semantic extraction routes through `kb-graphify-ingest` and its
+selected subscription CLI, while the FETCH + pipeline is graphify's. One ingestion path = uniform
 provenance, the freshness policy, and reproducibility.
 
 ## The aggregate-graph model
@@ -119,9 +120,9 @@ report; `graph-size` is the gate. Reading the report is not checking.
 | Source | Path | Cost |
 |---|---|---|
 | **GitHub repo** | add `sources/<name>.manifest` (url+ref+SHA); `mise run kb-build` clones + AST-extracts + merges | free (AST) |
-| **A whole docs SITE with an auto-synced mirror repo** | `mise run kb-manifest-add -- <mirror-url> --kind docs`, then host-agent extract from the pinned clone | tokens, but only for CHANGED pages |
-| **Docs page / sitemap.xml** (no mirror exists) | parse the sitemap (use `advertools`/`usp` — do NOT hand-roll), fetch on-topic pages, host-agent prose-extract → chunk | tokens |
-| **PDF / video / transcript / blog / forum** | vendor under `sources/media/`, host-agent prose-extract → `sources/extractions/<name>-docs.json` | tokens |
+| **A whole docs SITE with an auto-synced mirror repo** | `mise run kb-manifest-add -- <mirror-url> --kind docs`, then managed prose extract from the pinned clone | tokens, but only for CHANGED pages |
+| **Docs page / sitemap.xml** (no mirror exists) | parse the sitemap (use `advertools`/`usp` — do NOT hand-roll), fetch on-topic pages, managed prose extract → chunk | tokens |
+| **PDF / video / transcript / blog / forum** | vendor under `sources/media/`, managed prose extract → `sources/extractions/<name>-docs.json` | tokens |
 | **Any URL (quick)** | `mise run kb-add -- <url>` (graphify fetches → `./raw` → updates graph) | varies |
 
 **Prefer a mirror over per-page fetching whenever one exists.** `kind = docs` is
@@ -140,7 +141,7 @@ the SOURCE and skips every `.md` — the exact opposite — while adding the rep
 whole AST to a graph already crowding prose out of the query budget (#12).
 See issue #81 for the full scan and the suggested order.
 
-**Tier by relevance** (host-agent prose is token-costly): T1 = full semantic + code
+**Tier by relevance** (managed prose is token-costly): T1 = full semantic + code
 for authoritative/on-topic sources; T2 = code-AST or README-only; T3 = register but
 defer (live timelines → reach via a trend tool, not static ingest). Record the tier
 in `sources/REGISTRY.md`.
@@ -152,29 +153,32 @@ in `sources/REGISTRY.md`.
 2. **Ingest** (via the tasks — never raw graphify).
    - Repo → write the manifest, `mise run kb-build`. A prose-only repo (no code)
      is skipped without aborting — its value comes from the prose step, not AST.
+     If detect preflight refuses unclassified files, retain the failed build
+     receipt, run `mise run kb-detect-census -- --source <name>` for each named
+     source, and verify a matching pin, complete status and zero unresolved paths
+     before another full build. Classify reviewed unsupported source as counted
+     loss; keep a new unknown suffix as a refusal control.
    - URL(s) → `mise run kb-add -- <url>` (batch all; no-key add fetches to `./raw`
      without re-clustering). Video → `mise run kb-add --` then
      `mise run kb-transcribe -- raw/<yt>.m4a`.
-   - Prose extraction = **Claude host-agent via the saved `kb-extract` workflow**
-     (`.claude/workflows/kb-extract.js`) — invoke it with the Workflow tool, passing
-     `args = {scratchDir, capturedAt, sources:[{key,path,url,kind,note}]}` (`kind` ∈
-     `article|doc|designdoc|research_json|inventory|article_partial`).
-     **`capturedAt` is REQUIRED — pass TODAY's date as `YYYY-MM-DD`.** It has no
-     default and the workflow throws without one: it was a hardcoded literal until
-     #93, so every node every run emitted carried one frozen date, and a default
-     cannot be computed inside a Workflow script (`Date.now()`/`new Date()` throw).
-     Each `agent()`
-     reads one file, extracts a schema-valid `{nodes,edges}`, and WRITES it to
-     `<scratchDir>/<key>.json`. Do NOT hand-roll an inline Workflow — the saved one is
-     the reusable, resumable contract (an agent dying at source 13 of 20 leaves 13,
-     `agent-report-persistence`). **This is the ONLY LLM path and it is Claude** (mandate 2).
+   - Prose extraction = use the **`kb-graphify-ingest` skill**, write its NORMAL
+     request JSON, then run `mise run kb-graphify-ingest -- REQUEST.json`.
+     **`capturedAt` is REQUIRED — pass TODAY's real date as `YYYY-MM-DD`.** Keep
+     `scratchDir`, `cacheRoot`, and generated run evidence in their documented
+     `.agent/kb/graphify-ingest/{scratch,cache,runs}` families. Choose
+     `claude-cli / opus / xhigh` or `openai-cli / gpt-5.6-sol / high`; omitted
+     model/effort values use those defaults. The task embeds the complete source
+     bytes in the prompt, preserves `sourceFile`, `kind`, and `note`, checks a
+     profile-compatible cache, and accepts semantic output only after Graphify's
+     durable receipt contract completes. The old `kb-extract` Workflow now fails
+     explicitly with this migration route; do not hand-roll an inline Workflow.
    - **Assemble** the per-source chunks into one committed doc chunk:
      `mise run kb-assemble -- <name> <scratchDir>/*.json` — it validates every chunk
      (schema, unique ids, no dangling edges, no cross-chunk id collision) and writes
      `sources/extractions/<name>-docs.json`, failing loud on any problem. Never
      hand-assemble or hand-validate. (`mise run kb-validate-chunks -- <chunk...>` is
      the standalone gate.)
-   - ⚠️ **Every node MUST carry `"_origin": "semantic"`.** `kb-extract.js` asks for
+   - ⚠️ **Every node MUST carry `"_origin": "semantic"`.** `kb-graphify-ingest` asks for
      it and the validator REJECTS a chunk without it, so a hand-written or drifted
      chunk now fails the build rather than merging. graphify 0.9.32 infers the tier
      from shape when the marker is absent — a `source_location` matching `^L\d` reads
@@ -193,7 +197,7 @@ in `sources/REGISTRY.md`.
      source with every gate green. `kb-merge` and `kb-build` now refuse an undeclared
      intersection. If the supersession is intended (a re-extraction of the same page),
      add the paths to a top-level `"supersedes": [...]` in the chunk; if two unrelated
-     sources collided on a basename, fix the IDENTITY instead. `kb-extract.js` emits
+     sources collided on a basename, fix the IDENTITY instead. `kb-graphify-ingest` emits
      `<source>/<clone-relative>` for clone files precisely so a root `README.md` /
      `CHANGELOG.md` / `SKILL.md` cannot be a global name.
 3. **Merge.** `mise run kb-merge -- <chunk.json> [root]` (one chunk into the graph),
@@ -249,7 +253,7 @@ in `sources/REGISTRY.md`.
   scipy inject (`mise run kb-ensure-deps`).
 - **YouTube**: `mise run kb-add -- <url>` downloads audio; then
   `mise run kb-transcribe -- raw/<yt>.m4a` (graphify's bundled faster-whisper — local,
-  NO key, NO LLM; ffmpeg pinned). Then host-agent extract the transcript like any prose.
+  NO key, NO LLM; ffmpeg pinned). Then managed-extract the transcript like any prose.
 - Version-gated (0.9.24+, not in installed 0.9.23): `reflect --if-stale`,
   `extract --dedup-llm`. Bump the pin before relying on them.
 

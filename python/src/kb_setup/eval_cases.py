@@ -310,17 +310,16 @@ GOLDEN_QUERIES: tuple[evals.GoldenQuery, ...] = (
     _G(
         "delegate-unavailable",
         _NATURAL,
-        "what is supposed to happen when the cheaper command-line tool I hand "
-        "work to turns out not to be installed?",
-        ("fable-orchestrator.md",),
+        "what should happen when a non-Claude command-line lane I hand work to is unavailable?",
+        ("fable-advisor.md",),
         GOLDEN_K,
     ),
     _G(
         "delegate-unavailable",
         _ECHO,
-        "the lane fallback chain and announced substitution, with Claude Opus as "
-        "the terminal fallback",
-        ("fable-orchestrator.md",),
+        "non-Claude lanes fail loudly with structured STATUS: unavailable "
+        "rather than silently falling back to a Claude model",
+        ("fable-advisor.md",),
         GOLDEN_K,
     ),
     _G(

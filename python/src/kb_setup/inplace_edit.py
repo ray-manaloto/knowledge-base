@@ -27,13 +27,9 @@ The consequence is a silent-failure channel of exactly the shape
 possibly-broken code with nothing saying so, until a later ``mise run lint`` or
 an unrelated Edit happens to surface it.
 
-WHY A DENY. The fable-orchestrator plugin's Fable advisor proposed this guard on
-2026-09-02 and it was the ONE mechanism it would build (it argued explicitly
-*against* a broader grep/sed -> LSP deny). The caller refused to build it at the
-time, because the advisor's justification cited ``discover-plugins.md:82`` for a
-claim that line does not make, and wrote: *"must not be built until someone arms
-the premise."* The premise is now armed by the experiment above. This module is
-that build, and not a moment earlier — the ordering is the point.
+WHY A DENY. The experiment above arms the premise: common in-place shell
+rewrites bypass immediate type diagnostics. This guard targets those measured
+forms, not every possible shell write.
 
 WHAT THIS GUARD CANNOT COVER, stated because a guard that names two commands
 implies the rest are safe. The same hole exists for **any** write that does not

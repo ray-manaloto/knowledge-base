@@ -168,8 +168,7 @@ gh = "2.98.0"
 # a host old enough to lack a porcelain flag `kb_setup` uses — accepted as
 # unguarded, because the alternative does not exist.
 
-# Cross-vendor executor-lane CLIs: codex (this repo's own kb-codex lanes; the
-# fable-orchestrator plugin that once drove it was removed, dotfiles#1310) + the
+# Cross-vendor executor-lane CLIs: codex (this repo's own kb-codex lanes) + the
 # antigravity plugin (yuting0624/antigravity-for-claude-code). `antigravity-cli`'s canonical mise
 # registry short name (https://mise.jdx.dev/registry.html) is
 # `aqua:google-antigravity/antigravity-cli` (Google's current agentic CLI,
@@ -748,7 +747,7 @@ run = "uv run kb-setup build"
 timeout = "180m"
 
 [tasks.kb-detect-census]
-description = "Emit a read-only complete-source Graphify detection receipt"
+description = "Emit a read-only Graphify detection receipt; pass -- --source NAME for one pinned source"
 run = "uv run kb-setup detect-census"
 
 [tasks.kb-update]
@@ -817,6 +816,10 @@ run = "uv run kb-setup graphify-baseline"
 [tasks.kb-graphify-native-extract]
 description = "graphify's OWN native deep extraction over the pinned sources/graphify clone; --cluster re-clusters an existing --out tree; --artifacts [view...] regenerates derived views (wiki/graphml/svg/...) over it"
 run = "uv run kb-setup graphify-native-extract"
+
+[tasks.kb-graphify-ingest]
+description = "NORMAL source ingestion through the captured Graphify CLI adapter"
+run = "uv run kb-setup graphify-ingest"
 # UNPARKED 2026-08-26, together with the `cli.py` dispatch — the two are one
 # gesture, exactly as the park's own note required.
 #

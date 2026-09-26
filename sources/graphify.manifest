@@ -148,7 +148,7 @@
 # disable-override defect that made every openai-cli extraction die in ~3s.
 # Re-measure `v8` before assuming this still holds; upstream ships near-daily.
 url = https://github.com/ray-manaloto/graphify
-ref = kb-pin/openai-cli-backend-v0.9.57
-commit = 3c9b930f386f80c393fe658e1afb685030828c6a
+ref = kb-openai-cli-backend-v0.9.67-de57710f
+commit = de57710fb020619a1f436c1b538cf9a410f629bc
 kind = code
 added = 2026-07-21

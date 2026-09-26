@@ -1,10 +1,9 @@
 # Copyright (c) 2026 Raymond Manaloto
 """Saved workflows may dispatch only built-in or repo-declared agents (knowledge-base#793).
 
-`kb-tool-review.js` dispatched `fable-orchestrator:codex-reviewer`, a PLUGIN agent
-whose only copy was a plugin cache that can be garbage-collected. It was the one
-runtime dependency on the plugin in either repo, and nothing noticed it until the
-removal audit. This test is the class fix: any `agentType` a workflow names must
+`kb-tool-review.js` dispatched `legacy-provider:codex-reviewer`, a PLUGIN agent
+whose only copy was a cache that can be garbage-collected. This test is the
+class fix: any `agentType` a workflow names must
 be a Claude Code built-in or the frontmatter `name:` of a file in `.claude/agents/`.
 """
 
@@ -62,8 +61,8 @@ def _fixture(tmp_path: Path, agent_type: str) -> list[str]:
 
 
 def test_a_plugin_namespaced_agent_fails(tmp_path: Path) -> None:
-    assert _fixture(tmp_path, "fable-orchestrator:codex-reviewer") == [
-        "w.js: fable-orchestrator:codex-reviewer"
+    assert _fixture(tmp_path, "legacy-provider:codex-reviewer") == [
+        "w.js: legacy-provider:codex-reviewer"
     ]
 
 

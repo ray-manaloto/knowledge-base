@@ -37,8 +37,7 @@ fine — `gh pr view` is how you resolve whether a bare `#42` is an issue or a P
 The first line is the **trigger**, **deliberately UN-gated** (Ray, 2026-08-24): default
 `/model` here is **Opus 5**, so a Fable-gated trigger was false in every session and the flow
 stayed dormant. It is rule-synced byte-for-byte with dotfiles and names each repo's own
-routing-doctrine skill; it replaced the fable-orchestrator plugin's trigger when that plugin
-was removed from both repos (spec dotfiles#1310). `grok` CLI is not installed → codex is the
+routing-doctrine skill (spec dotfiles#1310). `grok` CLI is not installed → codex is the
 implementation lane (`kb-codex-implementer`, a stopgap), reviewed cross-family per `kb-review`.
 
 Adopted plugin (enabled in `.claude/settings.json`): `antigravity@antigravity-for-claude-code`
