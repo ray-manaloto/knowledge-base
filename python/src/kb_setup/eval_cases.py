@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -730,10 +731,24 @@ def _redaction_collision_control() -> evals.Outcome:
     all-long host set returns PASS, and PASS from a control means NOT ARMED.
     """
     with tempfile.TemporaryDirectory() as tmp:
-        (Path(tmp) / "mise.toml").write_text(
+        root = Path(tmp)
+        (root / "mise.toml").write_text(
             f'[env]\n{REDACTION_CANARY} = {{ value = "1", redact = true }}\n'
         )
-        return evals.mise_redaction_legible(cwd=Path(tmp))
+        state_dir = root / "mise-state"
+        state_dir.mkdir()
+        return evals.mise_redaction_legible(
+            cwd=root,
+            # Its own state dir keeps the throwaway config out of the host's
+            # tracked-configs; its own trust root keeps the arm ARMED on a host
+            # with no ambient `trusted_config_paths` (without it, mise refuses the
+            # untrusted config and the arm reads SKIP — measured 2026-09-26).
+            env={
+                **os.environ,
+                "MISE_STATE_DIR": str(state_dir),
+                "MISE_TRUSTED_CONFIG_PATHS": str(root),
+            },
+        )
 
 
 def _binary_gate(name: str, detail: str) -> evals.Outcome | None:
