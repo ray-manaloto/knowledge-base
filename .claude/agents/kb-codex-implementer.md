@@ -8,7 +8,7 @@ maxTurns: 60
 
 <!--
 STOPGAP — RETIRE when the codex entry point (dotfiles `sdlc_team`) moves into the
-shared `kb_setup` package; that is a later ticket (spec dotfiles#1310, "Out of
+shared `kb_setup` package, tracked as dotfiles#1383 (spec dotfiles#1310, "Out of
 Scope"). Added by knowledge-base#795 so this repo keeps an implementer lane after
 the fable-orchestrator plugin (whose `codex-implementer` this replaces) is removed.
 -->
