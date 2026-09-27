@@ -1,0 +1,84 @@
+name: Graphify signed live receipt
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify signed exact-head live evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_HEAD: ${{ github.event.pull_request.head.sha }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      # This checkout is the protected base commit. Never check out or run PR code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14.7'
+      - name: Verify candidate and external signed receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          [[ "$PR_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git -C trusted rev-parse HEAD)" = "$BASE_SHA"
+          git -C trusted fetch --no-tags --depth=1 origin \
+            "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/graphify-live-candidate"
+          test "$(git -C trusted rev-parse refs/remotes/origin/graphify-live-candidate)" = "$PR_HEAD"
+
+          git -C trusted diff --no-renames --name-only -z "$BASE_SHA" "$PR_HEAD" \
+            > "$RUNNER_TEMP/changed-paths.nul"
+          git -C trusted diff --no-ext-diff --no-renames -U0 \
+            "$BASE_SHA" "$PR_HEAD" -- mise.toml > "$RUNNER_TEMP/mise.diff"
+          git -C trusted show "${BASE_SHA}:mise.lock" > "$RUNNER_TEMP/base-mise.lock"
+          git -C trusted show "${PR_HEAD}:mise.lock" > "$RUNNER_TEMP/head-mise.lock"
+          scope="$(python3 trusted/python/src/kb_setup/live_receipt_scope.py \
+            --changed-paths "$RUNNER_TEMP/changed-paths.nul" \
+            --mise-diff "$RUNNER_TEMP/mise.diff" \
+            --base-lock "$RUNNER_TEMP/base-mise.lock" \
+            --head-lock "$RUNNER_TEMP/head-mise.lock")"
+          case "$scope" in
+            EXEMPT)
+              echo "Graphify live receipt exempt: no extraction-capable change"
+              exit 0
+              ;;
+            REQUIRED) ;;
+            *) echo "Graphify live receipt scope is indeterminate" >&2; exit 2 ;;
+          esac
+
+          candidate="$RUNNER_TEMP/graphify-candidate"
+          evidence="$RUNNER_TEMP/graphify-live-evidence"
+          mkdir -p "$candidate/sources" "$evidence"
+          git -C trusted show "${PR_HEAD}:uv.lock" > "$candidate/uv.lock"
+          git -C trusted show "${PR_HEAD}:sources/graphify.manifest" \
+            > "$candidate/sources/graphify.manifest"
+
+          # The evidence ref is data, not a trust anchor. Only the signed bytes
+          # and protected-main public-key allowlist can authorize this receipt.
+          git -C trusted fetch --no-tags --depth=1 origin \
+            '+refs/heads/graphify-live-evidence:refs/remotes/origin/graphify-live-evidence'
+          receipt="receipts/${PR_NUMBER}/${PR_HEAD}/live-receipt.json"
+          git -C trusted show "refs/remotes/origin/graphify-live-evidence:${receipt}" \
+            > "$evidence/live-receipt.json"
+          git -C trusted show "refs/remotes/origin/graphify-live-evidence:${receipt}.sig" \
+            > "$evidence/live-receipt.json.sig"
+
+          python3 trusted/python/src/kb_setup/live_receipt.py \
+            --candidate-root "$candidate" \
+            --evidence-root "$evidence" \
+            --trusted-main-root trusted \
+            --pr "$PR_NUMBER" \
+            --head "$PR_HEAD"
