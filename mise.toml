@@ -43,7 +43,7 @@ min_version = { hard = "2026.9.0", soft = "2026.9.0" }
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.7"
 uv = "0.12.8"
-hk = "1.57.0"
+hk = "2.3.0"
 pkl = "0.32.1"
 typos = "1.50.0"
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
@@ -263,9 +263,12 @@ show_tools = true
 missing_tools = "always"
 
 [hooks]
-# Reshim after installs (pipx backend leaves stale shims otherwise) + install
-# the hk git hooks against mise-provided binaries.
-postinstall = "mise reshim && hk install --mise"
+# Reshim after installs (pipx backend leaves stale shims otherwise). Git hooks
+# are NOT installed from here any more: upstream removed that recipe because it
+# mutates .git/config during mise installs and races (jdx/hk#1376, discussion
+# #1375). The setup is `hk install --global --mise`, once per machine — same
+# as ray-manaloto/dotfiles.
+postinstall = "mise reshim"
 
 [env]
 HK_MISE = "1"

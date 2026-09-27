@@ -1,12 +1,12 @@
-amends "package://github.com/jdx/hk/releases/download/v1.57.0/hk@1.57.0#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.3.0/hk@2.3.0#/Config.pkl"
 
 // Builtin linters MUST be assigned from Builtins (`= Builtins.name`), never a
 // bare `["name"] {}` block — a bare block is a fresh empty Step that hk silently
 // skips. See ray-manaloto/dotfiles feedback_hk_builtins_need_assignment.
-import "package://github.com/jdx/hk/releases/download/v1.57.0/hk@1.57.0#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.3.0/hk@2.3.0#/Builtins.pkl"
 
 // Refuse this config on an older hk binary rather than silently misreading it.
-min_hk_version = "1.49.0"
+min_hk_version = "2.3.0"
 
 // Zero-skip: report ALL issues, not just the first.
 fail_fast = false
@@ -343,7 +343,12 @@ local proseExclude = baseExclude
 // own `.pre-commit-hooks.yaml`. `--staged` wins — armed here: secret on disk but
 // unstaged -> rc 0; staged clean while the disk holds it -> rc 0; staged WITH it,
 // disk then cleaned -> rc 1. That last case the old disk-scanning shape MISSED.
-local gitleaksStaged: Step = Builtins.gitleaks_staged
+// hk v2.0.0 REMOVED the variant builtin (jdx/hk#1253; migration-v2.md): the
+// staged form is now an option on the base builtin. Its argv is byte-identical
+// to v1.57's `gitleaks_staged` (`gitleaks git --pre-commit --redact --staged
+// --verbose --no-banner`), per the 2026-09-27 source diff in
+// ray-manaloto/dotfiles docs/research/kb/reports/agents/hk-v2-migration-research-2026-09-27.md Q6.
+local gitleaksStaged: Step = (Builtins.gitleaks) { scan = "staged" }
 
 local pyGlob = List("python/src/**/*.py", "tests/**/*.py")
 
