@@ -218,9 +218,9 @@ _EXPECTED_UNCLASSIFIED = (
         source_name="hk",
         relative_path="docs/.vitepress/fonts/SpaceGrotesk.ttf",
         content_sha256="acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
-        pinned_commit="169c5f15ce52ff97b0a3693c3f9f30ae09e0d60e",
-        # The hk v2.3.0 docs embed the same TrueType VitePress asset as mise;
-        # both the Git blob and content hash were checked at this release pin.
+        pinned_commit="07d39997a32175873d104950f185400760060881",
+        # The hk v2.3.1 docs embed the same TrueType VitePress asset as mise;
+        # its Git blob matches v2.3.0 exactly at this release pin.
         classification=ReviewedClassification.reviewed_binary_docs_asset,
     ),
 )

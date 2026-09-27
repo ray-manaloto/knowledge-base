@@ -34,10 +34,10 @@ jobs:
         with:
           version: "2026.9.15"
           install_args: >-
-            python uv node@26.10.0 rust pkl typos taplo rumdl biome gitleaks
+            python uv node@26.10.0 node@24.21.0 rust pkl typos taplo rumdl biome gitleaks
             lychee
       - name: Build pinned hk and agnix for this runner
-        run: mise install --locked cargo:hk cargo:agnix-cli
+        run: mise install --locked hk cargo:agnix-cli
       - name: Record runner and tool identity
         run: |
           : "${ImageOS:?GitHub runner image OS missing}"

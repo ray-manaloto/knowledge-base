@@ -135,6 +135,30 @@ def test_pinned_version_reads_exact_project_requirement(tmp_path: Path) -> None:
     assert graphify_env.pinned_graphify_version(root) == "0.9.41"
 
 
+def test_pinned_version_reads_complete_platform_requirements(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    (tmp_path / "pyproject.toml").write_bytes((repo_root / "pyproject.toml").read_bytes())
+    assert graphify_env.pinned_graphify_version(tmp_path) == "0.9.69"
+
+
+@pytest.mark.parametrize("change", ["version", "marker", "extra", "missing"])
+def test_pinned_version_refuses_incomplete_platform_requirements(
+    tmp_path: Path, change: str
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    project = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+    if change == "version":
+        project = project.replace("watch]==0.9.69", "watch]==0.9.68", 1)
+    elif change == "marker":
+        project = project.replace("platform_machine == 'x86_64'", "platform_machine == 'arm64'", 1)
+    elif change == "extra":
+        project = project.replace(",watch]==0.9.69", "]==0.9.69", 1)
+    else:
+        project = "\n".join(line for line in project.splitlines() if "graphifyy[all]==" not in line)
+    (tmp_path / "pyproject.toml").write_text(project, encoding="utf-8")
+    assert graphify_env.pinned_graphify_version(tmp_path) == ""
+
+
 def test_non_exact_project_requirement_is_not_a_pin(tmp_path: Path) -> None:
     root = _pyproject(tmp_path, "graphifyy[all]>=0.9.41")
     assert graphify_env.pinned_graphify_version(root) == ""

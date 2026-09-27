@@ -20,6 +20,39 @@ binary = "graphify"
 pypi = "graphifyy"
 github = "Graphify-Labs/graphify"
 extras = ["all"]
+# macOS Intel cannot install the video extra at this Python version because
+# onnxruntime has no compatible artifact. These are all the fork's other extras.
+extras_macos_intel = [
+  "anthropic",
+  "bedrock",
+  "chinese",
+  "commonlisp",
+  "dm",
+  "erlang",
+  "falkordb",
+  "gemini",
+  "google",
+  "images",
+  "kimi",
+  "leiden",
+  "mcp",
+  "neo4j",
+  "ocaml",
+  "office",
+  "ollama",
+  "openai",
+  "pascal",
+  "pdf",
+  "postgres",
+  "r",
+  "robot",
+  "solidity",
+  "sql",
+  "svg",
+  "terraform",
+  "vbnet",
+  "watch",
+]
 # Packages the `all` extra must ACTUALLY deliver — comparing two config files
 # cannot tell you the install is intact. Deliberately NOT the full extra set:
 # graspologic/leidenalg/igraph auto-skip by PEP 508 marker on Python 3.14 (the
@@ -27,6 +60,11 @@ extras = ["all"]
 # drift. Verified present on this host 2026-07-24.
 extra_probes = [
   "faster_whisper",
+  "tree_sitter",
+  "tree_sitter_cpp",
+  "tree_sitter_ocaml",
+]
+extra_probes_macos_intel = [
   "tree_sitter",
   "tree_sitter_cpp",
   "tree_sitter_ocaml",
@@ -1471,7 +1509,7 @@ deliberately NOT added to `_STRIP_BACKEND_ENV`."""
 # depends ban stays) and one a fact about this repo's SHAPE (the version is
 # written in three places). Nothing upstream will ever close them.
 [tool.hk]
-mise_key = "cargo:hk"
+mise_key = "hk"
 binary = "hk"
 github = "jdx/hk"
 # The ingested corpus must describe the release we actually run — the same
@@ -1508,9 +1546,9 @@ manifest = "sources/hk.manifest"
 # a watch item is prose, so it warned nobody. This is the machine-enforced half.
 #
 # Anchored on the URI prefix and capturing the leading `v` so the value compares
-# directly against the manifest's `ref = v2.3.0`.
+# directly against the manifest's `ref = v2.3.1`.
 #
-# The `hk@2.3.0` fragment later in the same URI is NOT bound separately, and the
+# The `hk@2.3.1` fragment later in the same URI is NOT bound separately, and the
 # reason stated here until 2026-08-20 was FALSE: it said the two are "the same
 # literal in the same string", which they are not — one carries the `v` prefix
 # and one does not, so a partial hand-edit genuinely can desync them and this
@@ -1518,7 +1556,7 @@ manifest = "sources/hk.manifest"
 #
 # It stays unbound for a different and weaker reason, recorded honestly rather
 # than dressed up: a desync here is not silent. Pkl resolves the package by the
-# whole URI, so `download/v2.3.0/hk@2.2.0` fails to load the config outright
+# whole URI, so `download/v2.3.1/hk@2.3.0` fails to load the config outright
 # and `mise run lint` exits non-zero on the next run. The failure mode this
 # mechanism exists to catch is the QUIET one — a version that drifts while
 # everything still works — and that is not this. Binding it would also need a

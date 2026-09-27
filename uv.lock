@@ -1,6 +1,10 @@
 version = 1
 revision = 3
 requires-python = ">=3.14"
+resolution-markers = [
+    "platform_machine != 'x86_64' or sys_platform != 'darwin'",
+    "platform_machine == 'x86_64' and sys_platform == 'darwin'",
+]
 
 [[package]]
 name = "annotated-types"
@@ -722,6 +726,102 @@ all = [
     { name = "watchdog" },
     { name = "yt-dlp" },
 ]
+anthropic = [
+    { name = "anthropic" },
+]
+bedrock = [
+    { name = "boto3" },
+]
+chinese = [
+    { name = "jieba-py" },
+]
+commonlisp = [
+    { name = "tree-sitter-commonlisp" },
+]
+dm = [
+    { name = "tree-sitter-dm" },
+]
+erlang = [
+    { name = "tree-sitter-language-pack" },
+]
+falkordb = [
+    { name = "falkordb" },
+]
+gemini = [
+    { name = "openai" },
+    { name = "tiktoken" },
+]
+google = [
+    { name = "openpyxl" },
+]
+images = [
+    { name = "pillow" },
+]
+kimi = [
+    { name = "openai" },
+    { name = "tiktoken" },
+]
+leiden = [
+    { name = "graspologic-native" },
+]
+mcp = [
+    { name = "mcp" },
+    { name = "starlette" },
+]
+neo4j = [
+    { name = "neo4j" },
+]
+ocaml = [
+    { name = "tree-sitter-ocaml" },
+]
+office = [
+    { name = "openpyxl" },
+    { name = "python-docx" },
+]
+ollama = [
+    { name = "openai" },
+]
+openai = [
+    { name = "openai" },
+    { name = "tiktoken" },
+]
+pascal = [
+    { name = "tree-sitter-pascal" },
+]
+pdf = [
+    { name = "markdownify" },
+    { name = "pypdf" },
+]
+postgres = [
+    { name = "psycopg", extra = ["binary"] },
+    { name = "tree-sitter-sql" },
+]
+r = [
+    { name = "tree-sitter-language-pack" },
+]
+robot = [
+    { name = "robotframework" },
+]
+solidity = [
+    { name = "tree-sitter-solidity" },
+]
+sql = [
+    { name = "tree-sitter-sql" },
+]
+svg = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pillow" },
+]
+terraform = [
+    { name = "tree-sitter-hcl" },
+]
+vbnet = [
+    { name = "tree-sitter-vb-dotnet" },
+]
+watch = [
+    { name = "watchdog" },
+]
 
 [[package]]
 name = "graspologic-native"
@@ -909,7 +1009,7 @@ dependencies = [
     { name = "click" },
     { name = "filelock" },
     { name = "fsspec" },
-    { name = "hf-xet", marker = "platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'" },
+    { name = "hf-xet", marker = "platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or (platform_machine == 'x86_64' and sys_platform != 'darwin')" },
     { name = "httpx" },
     { name = "packaging" },
     { name = "pyyaml" },
@@ -1072,7 +1172,9 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
-    { name = "graphifyy", extra = ["all"] },
+    { name = "graphifyy" },
+    { name = "graphifyy", extra = ["all"], marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
+    { name = "graphifyy", extra = ["anthropic", "bedrock", "chinese", "commonlisp", "dm", "erlang", "falkordb", "gemini", "google", "images", "kimi", "leiden", "mcp", "neo4j", "ocaml", "office", "ollama", "openai", "pascal", "pdf", "postgres", "r", "robot", "solidity", "sql", "svg", "terraform", "vbnet", "watch"], marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
     { name = "httpx2" },
     { name = "msgspec" },
     { name = "skillopt" },
@@ -1100,7 +1202,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=1.0.0" },
-    { name = "graphifyy", extras = ["all"], git = "https://github.com/ray-manaloto/graphify?rev=baa506742e768c578d2e9a454118e0004f3923f7" },
+    { name = "graphifyy", extras = ["all"], marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", git = "https://github.com/ray-manaloto/graphify?rev=baa506742e768c578d2e9a454118e0004f3923f7" },
+    { name = "graphifyy", extras = ["anthropic", "bedrock", "chinese", "commonlisp", "dm", "erlang", "falkordb", "gemini", "google", "images", "kimi", "leiden", "mcp", "neo4j", "ocaml", "office", "ollama", "openai", "pascal", "pdf", "postgres", "r", "robot", "solidity", "sql", "svg", "terraform", "vbnet", "watch"], marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'", git = "https://github.com/ray-manaloto/graphify?rev=baa506742e768c578d2e9a454118e0004f3923f7" },
     { name = "httpx2", specifier = ">=2.12.0" },
     { name = "msgspec", specifier = "==0.21.1" },
     { name = "skillopt", git = "https://github.com/microsoft/SkillOpt?rev=93bdf3d770b99128daf35278218e5a666fe392f3" },

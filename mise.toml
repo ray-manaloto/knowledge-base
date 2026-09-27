@@ -39,6 +39,11 @@
 # drifted once under the old two-tier rule and the cold lane caught it.)
 min_version = { hard = "2026.9.0", soft = "2026.9.0" }
 
+[tool_alias]
+# hk's recommended global Git launcher calls `mise x hk`; keep that name on
+# the same cross-platform Cargo source build used by project tasks and CI.
+hk = "cargo:hk"
+
 [tools]
 # Project pins are reviewed independently; current Node, uv, and hk can differ
 # from ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml.
@@ -46,7 +51,7 @@ python = "3.14.7"
 uv = "0.12.19"
 # Current Node release for project and CI; Renovate's narrower runtime is task-scoped.
 node = "26.10.0"
-"cargo:hk" = "2.3.0"
+hk = "2.3.1"
 # Source builds cover macOS Intel, for which hk v2 publishes no binary.
 rust = "1.98.1"
 pkl = "0.32.1"

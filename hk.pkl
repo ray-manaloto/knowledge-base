@@ -1,12 +1,12 @@
-amends "package://github.com/jdx/hk/releases/download/v2.3.0/hk@2.3.0#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.3.1/hk@2.3.1#/Config.pkl"
 
 // Builtin linters MUST be assigned from Builtins (`= Builtins.name`), never a
 // bare `["name"] {}` block — a bare block is a fresh empty Step that hk silently
 // skips. See ray-manaloto/dotfiles feedback_hk_builtins_need_assignment.
-import "package://github.com/jdx/hk/releases/download/v2.3.0/hk@2.3.0#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.3.1/hk@2.3.1#/Builtins.pkl"
 
 // Refuse this config on an older hk binary rather than silently misreading it.
-min_hk_version = "2.3.0"
+min_hk_version = "2.3.1"
 
 // Zero-skip: report ALL issues, not just the first.
 fail_fast = false
@@ -327,7 +327,7 @@ local proseExclude = baseExclude
 //     reads the index, so the filter could only suppress the STEP — a commit
 //     staging just a `.png` or `.zip` never ran the secret gate at all.
 //
-// The v1 adoption moved `hk test` from 46 to 51 passing cases. With hk v2.3.0,
+// The v1 adoption moved `hk test` from 46 to 51 passing cases. With hk v2.3.1,
 // `hk test` passes 53, including staged-secret and worktree/index controls.
 //
 // FOURTH VERSION TOKEN, found the hard way during an earlier v1 upgrade:

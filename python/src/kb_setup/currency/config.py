@@ -180,12 +180,14 @@ class ToolSpec:
     pypi: str = ""
     github: str = ""
     extras: tuple[str, ...] = ()
+    extras_macos_intel: tuple[str, ...] = ()
     # Packages that must actually BE INSTALLED for the declared extras to mean
     # anything. Deliberately author-chosen rather than derived: several of
     # graphify's `[all]` deps auto-skip by PEP 508 marker on Python 3.14
     # (graspologic/leidenalg/igraph → Louvain fallback, an accepted state), so a
     # naive "every extra must import" check would report drift that is not drift.
     extra_probes: tuple[str, ...] = ()
+    extra_probes_macos_intel: tuple[str, ...] = ()
     #: Backend names that MUST exist in the installed tool's own backend
     #: table. Sibling of `extra_probes`: that one asks whether a declared
     #: extra delivered a package, this one asks whether a declared BACKEND
@@ -544,7 +546,9 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         pypi=_str("pypi"),
         github=_str("github"),
         extras=_tuple("extras"),
+        extras_macos_intel=_tuple("extras_macos_intel"),
         extra_probes=_tuple("extra_probes"),
+        extra_probes_macos_intel=_tuple("extra_probes_macos_intel"),
         backend_probes=_tuple("backend_probes"),
         skill_dir=_str("skill_dir"),
         skill_install=_tuple("skill_install"),

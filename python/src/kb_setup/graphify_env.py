@@ -185,7 +185,7 @@ def graphify_exe(repo_root: Path | None = None) -> str:
 
 
 def pinned_graphify_version(repo_root: Path | None = None) -> str:
-    """Return the exact ``graphifyy[all]`` project requirement, or ``""``."""
+    """Return the exact Graphify pin when both platform requirements agree."""
     root = repo_root or Path.cwd()
     try:
         with (root / "pyproject.toml").open("rb") as fh:
@@ -193,11 +193,65 @@ def pinned_graphify_version(repo_root: Path | None = None) -> str:
     except OSError, tomllib.TOMLDecodeError:
         return ""
     dependencies = (data.get("project") or {}).get("dependencies") or []
-    for requirement in dependencies:
-        match = re.fullmatch(r"graphifyy\[all\]==([0-9]+(?:\.[0-9]+)+)", str(requirement))
-        if match:
-            return match.group(1)
-    return ""
+    graphify_requirements = [
+        str(item) for item in dependencies if str(item).startswith("graphifyy")
+    ]
+    if len(graphify_requirements) == 1:
+        match = re.fullmatch(r"graphifyy\[all\]==([0-9]+(?:\.[0-9]+)+)", graphify_requirements[0])
+        return match.group(1) if match else ""
+    platform_requirement_count = 2
+    if len(graphify_requirements) != platform_requirement_count:
+        return ""
+    non_intel = re.fullmatch(
+        r"graphifyy\[all\]==([0-9]+(?:\.[0-9]+)+); "
+        r"sys_platform != 'darwin' or platform_machine != 'x86_64'",
+        graphify_requirements[0],
+    )
+    intel = re.fullmatch(
+        r"graphifyy\[([a-z0-9,]+)\]==([0-9]+(?:\.[0-9]+)+); "
+        r"sys_platform == 'darwin' and platform_machine == 'x86_64'",
+        graphify_requirements[1],
+    )
+    if not non_intel or not intel or non_intel.group(1) != intel.group(2):
+        return ""
+    expected_intel_extras = {
+        "anthropic",
+        "bedrock",
+        "chinese",
+        "commonlisp",
+        "dm",
+        "erlang",
+        "falkordb",
+        "gemini",
+        "google",
+        "images",
+        "kimi",
+        "leiden",
+        "mcp",
+        "neo4j",
+        "ocaml",
+        "office",
+        "ollama",
+        "openai",
+        "pascal",
+        "pdf",
+        "postgres",
+        "r",
+        "robot",
+        "solidity",
+        "sql",
+        "svg",
+        "terraform",
+        "vbnet",
+        "watch",
+    }
+    intel_extras = intel.group(1).split(",")
+    if (
+        len(intel_extras) != len(expected_intel_extras)
+        or set(intel_extras) != expected_intel_extras
+    ):
+        return ""
+    return non_intel.group(1)
 
 
 def running_graphify_version(exe: str) -> str:

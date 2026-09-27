@@ -4,8 +4,8 @@
 # TOOLCHAIN SOURCE — a tool this repo actually RUNS (#81, ingested 2026-08-02).
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
-#   version source: mise.toml `[tools] "cargo:hk"`
-#   pinned here:    2.3.0
+#   version source: mise.toml `[tools] hk` with `[tool_alias] hk = "cargo:hk"`
+#   pinned here:    2.3.1
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -34,7 +34,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/jdx/hk
-ref = v2.3.0
-commit = 169c5f15ce52ff97b0a3693c3f9f30ae09e0d60e
+ref = v2.3.1
+commit = 07d39997a32175873d104950f185400760060881
 kind = code
 added = 2026-08-02
