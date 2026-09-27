@@ -854,6 +854,185 @@ def _print_dry_run(exe: str, opts: Options) -> None:
             )
 
 
+@dataclass(frozen=True)
+class _SemanticReplayContext:
+    semantic_files: list[Path]
+    target: Path
+    cache_root: Path
+    public_profile: dict
+    run_context: dict
+    attachment_compatibility: dict
+    run_root: Path
+
+
+def _semantic_reconciliation_report(
+    fresh: dict,
+    persisted: tuple[list[dict], list[dict], list[dict]],
+    *,
+    still_uncached: list[str],
+    replay: _SemanticReplayContext,
+    cache_evidence: list[dict],
+) -> dict:
+    """Account for SDK cache exclusions before cold output uses the warm view."""
+    nodes, edges, hyperedges = persisted
+    allowed_sources = {path.resolve() for path in replay.semantic_files}
+    node_ids = {node.get("id") for node in nodes}
+    edge_keys = {(edge.get("source"), edge.get("relation"), edge.get("target")) for edge in edges}
+
+    def hyperedge_key(item: dict) -> str:
+        return json.dumps(
+            {"id": item.get("id"), "nodes": item.get("nodes"), "relation": item.get("relation")},
+            sort_keys=True,
+        )
+
+    hyperedge_keys = {hyperedge_key(item) for item in hyperedges}
+    omitted_nodes = [node for node in fresh["nodes"] if node.get("id") not in node_ids]
+    omitted_edges = [
+        edge
+        for edge in fresh["edges"]
+        if (edge.get("source"), edge.get("relation"), edge.get("target")) not in edge_keys
+    ]
+    omitted_hyperedges = [
+        item for item in fresh["hyperedges"] if hyperedge_key(item) not in hyperedge_keys
+    ]
+
+    def source_in_scope(item: dict) -> bool:
+        source = item.get("source_file")
+        if not isinstance(source, str) or not source:
+            return True  # Unknown attribution cannot justify an omission.
+        path = Path(source)
+        return (path if path.is_absolute() else replay.target / path).resolve() in allowed_sources
+
+    unexpected_nodes = [node for node in omitted_nodes if source_in_scope(node)]
+    unexpected_edges = [
+        edge
+        for edge in omitted_edges
+        if edge.get("source") in node_ids and edge.get("target") in node_ids
+    ]
+    unexpected_hyperedges = [
+        item for item in omitted_hyperedges if set(item.get("nodes") or []) <= node_ids
+    ]
+    return {
+        "status": "incomplete"
+        if still_uncached or unexpected_nodes or unexpected_edges or unexpected_hyperedges
+        else "complete",
+        "still_uncached": still_uncached,
+        "fresh_counts": {kind: len(fresh[kind]) for kind in ("nodes", "edges", "hyperedges")},
+        "persisted_counts": dict(
+            zip(("nodes", "edges", "hyperedges"), map(len, persisted), strict=True)
+        ),
+        "excluded_out_of_scope_nodes": [
+            {"id": node.get("id"), "source_file": node.get("source_file")}
+            for node in omitted_nodes
+            if not source_in_scope(node)
+        ],
+        "excluded_edges_to_unavailable_nodes": [
+            {key: edge.get(key) for key in ("source", "relation", "target", "source_file")}
+            for edge in omitted_edges
+            if edge not in unexpected_edges
+        ],
+        "excluded_hyperedges_to_unavailable_nodes": [
+            item for item in omitted_hyperedges if item not in unexpected_hyperedges
+        ],
+        "unexpected_in_scope_nodes": unexpected_nodes,
+        "unexpected_in_scope_edges": unexpected_edges,
+        "unexpected_in_scope_hyperedges": unexpected_hyperedges,
+        "cache_evidence": cache_evidence,
+    }
+
+
+def _canonical_semantic_after_extraction(
+    semantic: dict,
+    *,
+    replay: _SemanticReplayContext,
+) -> dict | None:
+    """Use Graphify's public persisted view for both cold and warm graph builds."""
+    from kb_setup import graphify_execution, graphify_sdk
+
+    cache_evidence: list[dict] = []
+    nodes, edges, hyperedges, still_uncached = graphify_sdk.check_semantic_cache_public(
+        [str(path) for path in replay.semantic_files],
+        root=replay.target,
+        mode="deep",
+        prompt=graphify_sdk.extraction_system_prompt_public(deep=True),
+        cache_root=replay.cache_root,
+        execution_profile=replay.public_profile,
+        run_context=replay.run_context,
+        cache_evidence_out=cache_evidence,
+        attachment_compatibility=replay.attachment_compatibility,
+    )
+    report = _semantic_reconciliation_report(
+        semantic,
+        (nodes, edges, hyperedges),
+        still_uncached=still_uncached,
+        replay=replay,
+        cache_evidence=cache_evidence,
+    )
+    report_path = replay.run_root / "semantic-reconciliation.json"
+    graphify_execution.atomic_bytes(
+        report_path, json.dumps(report, sort_keys=True, indent=2).encode() + b"\n"
+    )
+    if report["status"] != "complete":
+        partial_path = replay.run_root / "partial-semantic.json"
+        graphify_execution.atomic_bytes(
+            partial_path,
+            json.dumps(semantic, sort_keys=True, indent=2, ensure_ascii=False).encode() + b"\n",
+        )
+        graphify_execution.atomic_bytes(
+            replay.run_root / "run-state.json",
+            json.dumps(
+                {
+                    "completion": "incomplete",
+                    "reason": "semantic cache reconciliation",
+                    "partial_semantic_ref": str(partial_path),
+                    "reconciliation_ref": str(report_path),
+                },
+                sort_keys=True,
+                indent=2,
+            ).encode()
+            + b"\n",
+        )
+        print(
+            "[graphify-native-extract] incomplete: persisted semantic cache "
+            f"differs from in-scope extraction; see {report_path}"
+        )
+        return None
+    return {**semantic, "nodes": nodes, "edges": edges, "hyperedges": hyperedges}
+
+
+def _retain_partial_semantic(
+    run_root: Path,
+    semantic: dict,
+    state: dict,
+) -> None:
+    from kb_setup import graphify_execution
+
+    partial_path = run_root / "partial-semantic.json"
+    graphify_execution.atomic_bytes(
+        partial_path,
+        json.dumps(semantic, sort_keys=True, indent=2, ensure_ascii=False).encode() + b"\n",
+    )
+    graphify_execution.atomic_bytes(
+        run_root / "run-state.json",
+        json.dumps(
+            {
+                "completion": "incomplete",
+                **state,
+                "partial_semantic_ref": str(partial_path),
+            },
+            sort_keys=True,
+            indent=2,
+        ).encode()
+        + b"\n",
+    )
+    print(
+        f"[graphify-native-extract] incomplete: {state['failed_chunks']} semantic chunk(s) "
+        f"failed, {len(state['uncovered_files'])} uncovered source(s), "
+        f"{len(state['partial_files'])} partial source(s), "
+        f"empty_semantic={state['empty_semantic']}; retained partial result at {partial_path}"
+    )
+
+
 def _run_real(repo_root: Path, exe: str, opts: Options) -> int:
     # Checked here, not in the dry-run path: this is the one place graphify
     # actually runs, and a stale binary rewriting output under an unverified
@@ -991,35 +1170,35 @@ def _run_real(repo_root: Path, exe: str, opts: Options) -> int:
     }
     empty_semantic = bool(semantic_files) and not semantic.get("nodes")
     if failed_chunks or uncovered_files or partial_files or empty_semantic:
-        partial_path = run_root / "partial-semantic.json"
-        state_path = run_root / "run-state.json"
-        graphify_execution.atomic_bytes(
-            partial_path,
-            json.dumps(semantic, sort_keys=True, indent=2, ensure_ascii=False).encode() + b"\n",
-        )
-        graphify_execution.atomic_bytes(
-            state_path,
-            json.dumps(
-                {
-                    "completion": "incomplete",
-                    "failed_chunks": failed_chunks,
-                    "uncovered_files": uncovered_files,
-                    "partial_files": partial_files,
-                    "empty_semantic": empty_semantic,
-                    "partial_semantic_ref": str(partial_path),
-                },
-                sort_keys=True,
-                indent=2,
-            ).encode()
-            + b"\n",
-        )
-        print(
-            f"[graphify-native-extract] incomplete: {failed_chunks} semantic chunk(s) "
-            f"failed, {len(uncovered_files)} uncovered source(s), "
-            f"{len(partial_files)} partial source(s), "
-            f"empty_semantic={empty_semantic}; retained partial result at {partial_path}"
+        _retain_partial_semantic(
+            run_root,
+            semantic,
+            {
+                "failed_chunks": failed_chunks,
+                "uncovered_files": uncovered_files,
+                "partial_files": partial_files,
+                "empty_semantic": empty_semantic,
+            },
         )
         return Rc.FINDINGS
+    if uncached_files:
+        # The cache is the canonical view: it excludes out-of-scope references.
+        # Re-reading it makes cold and warm graph assembly identical.
+        persisted = _canonical_semantic_after_extraction(
+            semantic,
+            replay=_SemanticReplayContext(
+                semantic_files=semantic_files,
+                target=target,
+                cache_root=semantic_cache,
+                public_profile=public_profile,
+                run_context=context,
+                attachment_compatibility=attachment_compatibility,
+                run_root=run_root,
+            ),
+        )
+        if persisted is None:
+            return Rc.FINDINGS
+        semantic = persisted
     ast = graphify_sdk.extract_public(
         code_files,
         cache_root=opts.out / _GRAPHIFY_OUT_NAME,

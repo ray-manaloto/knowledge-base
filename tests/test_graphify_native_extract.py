@@ -671,6 +671,58 @@ def _assert_managed_profile_forwarding(context_seen, deep_seen, profile) -> None
     assert isinstance(deep_seen["attachment_stager"], graphify_execution.CapturedRasterStager)
 
 
+def _assert_managed_cold_result(
+    observed: dict[str, object], run_root: Path, target: Path, profile: dict
+) -> None:
+    project_root = target.parent.parent
+    source = target / "README.md"
+    context_seen = cast("graphify_execution.RunContextSpec", observed["context"])
+    profile_seen = cast("graphify_execution.ProfileSelection", observed["profile_selection"])
+    deep_seen = cast("dict[str, object]", observed["deep_kwargs"])
+    assert context_seen.repo_root == project_root
+    assert profile_seen.model == "opus"
+    assert profile_seen.effort == "xhigh"
+    assert observed["detect_root"] == deep_seen["root"] == target
+    assert observed["deep_files"] == [source]
+    assert (run_root / "detection-receipt.json").is_file()
+    _assert_managed_profile_forwarding(context_seen, deep_seen, profile)
+    assert deep_seen["run_context"] == {
+        "project_root": str(project_root),
+        "cwd": str(project_root),
+    }
+    reconciliation = json.loads((run_root / "semantic-reconciliation.json").read_text())
+    assert reconciliation["status"] == "complete"
+    assert reconciliation["excluded_out_of_scope_nodes"] == [
+        {"id": "external", "source_file": "SECURITY.md"}
+    ]
+    assert reconciliation["excluded_edges_to_unavailable_nodes"] == [
+        {
+            "source": "concept",
+            "relation": "references",
+            "target": "external",
+            "source_file": str(source),
+        }
+    ]
+    assert reconciliation["excluded_hyperedges_to_unavailable_nodes"] == [
+        {
+            "id": "cross-reference",
+            "nodes": ["concept", "external"],
+            "relation": "mentions",
+            "source_file": str(source),
+        }
+    ]
+
+
+def _assert_in_scope_loss_retained(run_root: Path) -> None:
+    reconciliation = json.loads((run_root / "semantic-reconciliation.json").read_text())
+    assert reconciliation["status"] == "incomplete"
+    assert [node["id"] for node in reconciliation["unexpected_in_scope_nodes"]] == ["new"]
+    state = json.loads((run_root / "run-state.json").read_text())
+    assert state["completion"] == "incomplete"
+    partial = json.loads((run_root / "partial-semantic.json").read_text())
+    assert [node["id"] for node in partial["nodes"]] == ["old", "new"]
+
+
 def test_run_real_uses_managed_sdk_with_kb_project_root(tmp_path, monkeypatch) -> None:
     """Corpus root selects bytes; KB root remains provider CWD/configuration root."""
     target = tmp_path / "sources" / "graphify"
@@ -716,14 +768,40 @@ def test_run_real_uses_managed_sdk_with_kb_project_root(tmp_path, monkeypatch) -
     def deep(files: list[Path], **kwargs: object) -> dict:
         observed["deep_files"] = files
         observed["deep_kwargs"] = kwargs
-        return {"nodes": [{"id": "concept"}], "edges": [], "hyperedges": []}
+        return {
+            "nodes": [
+                {"id": "concept", "source_file": str(source)},
+                {"id": "external", "source_file": "SECURITY.md"},
+            ],
+            "edges": [
+                {
+                    "source": "concept",
+                    "target": "external",
+                    "relation": "references",
+                    "source_file": str(source),
+                }
+            ],
+            "hyperedges": [
+                {
+                    "id": "cross-reference",
+                    "nodes": ["concept", "external"],
+                    "relation": "mentions",
+                    "source_file": str(source),
+                }
+            ],
+        }
+
+    cache_reads = 0
+
+    def cache_lookup(files: list[str], **_kwargs: object) -> tuple[list, list, list, list[str]]:
+        nonlocal cache_reads
+        cache_reads += 1
+        if cache_reads == 1:
+            return [], [], [], files
+        return [{"id": "concept", "source_file": str(source)}], [], [], []
 
     monkeypatch.setattr(graphify_sdk, "observe_detect", detect)
-    monkeypatch.setattr(
-        graphify_sdk,
-        "check_semantic_cache_public",
-        lambda files, **_kwargs: ([], [], [], files),
-    )
+    monkeypatch.setattr(graphify_sdk, "check_semantic_cache_public", cache_lookup)
     monkeypatch.setattr(graphify_sdk, "extract_corpus_parallel_public", deep)
     monkeypatch.setattr(
         graphify_sdk,
@@ -745,20 +823,8 @@ def test_run_real_uses_managed_sdk_with_kb_project_root(tmp_path, monkeypatch) -
 
     assert rc == Rc.OK
     assert order == ["pin", "detect"]
-    context_seen = cast("graphify_execution.RunContextSpec", observed["context"])
-    profile_seen = cast("graphify_execution.ProfileSelection", observed["profile_selection"])
-    deep_seen = cast("dict[str, object]", observed["deep_kwargs"])
-    assert context_seen.repo_root == tmp_path
-    assert profile_seen.model == "opus"
-    assert profile_seen.effort == "xhigh"
-    assert observed["detect_root"] == deep_seen["root"] == target
-    assert observed["deep_files"] == [source]
-    assert (run_root / "detection-receipt.json").is_file()
-    _assert_managed_profile_forwarding(context_seen, deep_seen, profile)
-    assert deep_seen["run_context"] == {
-        "project_root": str(tmp_path),
-        "cwd": str(tmp_path),
-    }
+    assert cache_reads == 2
+    _assert_managed_cold_result(observed, run_root, target, profile)
 
 
 def test_run_real_deep_cache_hit_skips_cli_and_keeps_original_producer(
@@ -870,9 +936,15 @@ def test_run_real_raster_preflight_identity_reaches_cache_and_extraction(
         ),
     )
 
+    cache_reads = 0
+
     def cache_lookup(files: list[str], **kwargs: object) -> tuple[list, list, list, list[str]]:
+        nonlocal cache_reads
         observed["cache_compatibility"] = kwargs["attachment_compatibility"]
-        return [], [], [], files
+        cache_reads += 1
+        if cache_reads == 1:
+            return [], [], [], files
+        return [{"id": "pixel", "source_file": str(image)}], [], [], []
 
     def deep(files: list[Path], **kwargs: object) -> dict:
         observed["extract_compatibility"] = kwargs["attachment_compatibility"]
@@ -901,6 +973,7 @@ def test_run_real_raster_preflight_identity_reaches_cache_and_extraction(
     cache_compatibility = cast("dict[str, str]", observed["cache_compatibility"])
     assert len(cache_compatibility) == 1
     assert observed["extract_compatibility"] == cache_compatibility
+    assert cache_reads == 2
     retained = json.loads((run_root / "semantic-cache-evidence.json").read_text())
     assert len(retained["raster_preflight_batches"]) == 1
 
@@ -927,12 +1000,10 @@ def test_run_real_refuses_semantic_signature_drift_before_writing(
         )
 
 
-@pytest.mark.parametrize("fresh_outcome", ["covered", "omitted", "partial"])
+@pytest.mark.parametrize("fresh_outcome", ["covered", "omitted", "partial", "lost-in-scope"])
 def test_run_real_deep_partial_cache_extracts_only_missing_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh_outcome: str
 ) -> None:
-    fresh_omitted = fresh_outcome == "omitted"
-    fresh_partial = fresh_outcome == "partial"
     target = tmp_path / "subset"
     target.mkdir()
     cached = target / "cached.md"
@@ -967,26 +1038,31 @@ def test_run_real_deep_partial_cache_extracts_only_missing_file(
             _complete_detect_receipt(),
         ),
     )
-    monkeypatch.setattr(
-        graphify_sdk,
-        "check_semantic_cache_public",
-        lambda _files, **_kwargs: (
-            [{"id": "old", "source_file": str(cached)}],
-            [],
-            [],
-            [str(missing)],
-        ),
-    )
+    cache_reads = 0
+
+    def cache_lookup(_files: list[str], **_kwargs: object) -> tuple[list, list, list, list[str]]:
+        nonlocal cache_reads
+        cache_reads += 1
+        nodes = [{"id": "old", "source_file": str(cached)}]
+        if cache_reads == 1:
+            return nodes, [], [], [str(missing)]
+        if fresh_outcome == "covered":
+            nodes.append({"id": "new", "source_file": str(missing)})
+        return nodes, [], [], []
+
+    monkeypatch.setattr(graphify_sdk, "check_semantic_cache_public", cache_lookup)
 
     def deep(files: list[Path], **_kwargs: object) -> dict:
         observed["dispatched"] = files
         return {
-            "nodes": [] if fresh_omitted else [{"id": "new", "source_file": str(missing)}],
+            "nodes": (
+                [] if fresh_outcome == "omitted" else [{"id": "new", "source_file": str(missing)}]
+            ),
             "edges": [],
             "hyperedges": [],
             "failed_chunks": 0,
-            "uncovered_files": [str(missing)] if fresh_omitted else [],
-            "_partial_files": [str(missing)] if fresh_partial else [],
+            "uncovered_files": [str(missing)] if fresh_outcome == "omitted" else [],
+            "_partial_files": [str(missing)] if fresh_outcome == "partial" else [],
         }
 
     def build(parts: list[dict], **_kwargs: object) -> str:
@@ -1002,17 +1078,21 @@ def test_run_real_deep_partial_cache_extracts_only_missing_file(
     result = gne._run_real(
         tmp_path, "/unused/graphify", gne.Options(target=target, out=tmp_path / "out")
     )
-    assert result == (Rc.FINDINGS if fresh_omitted or fresh_partial else Rc.OK)
+    assert result == (
+        Rc.FINDINGS if fresh_outcome in {"omitted", "partial", "lost-in-scope"} else Rc.OK
+    )
     assert observed["dispatched"] == [missing]
-    if fresh_omitted or fresh_partial:
+    if fresh_outcome == "lost-in-scope":
+        _assert_in_scope_loss_retained(run_root)
+    elif fresh_outcome in {"omitted", "partial"}:
         state = json.loads((run_root / "run-state.json").read_text())
-        if fresh_omitted:
+        if fresh_outcome == "omitted":
             assert state["uncovered_files"] == [str(missing)]
         else:
             assert state["partial_files"] == [str(missing)]
         partial = json.loads((run_root / "partial-semantic.json").read_text())
         assert [node["id"] for node in partial["nodes"]] == (
-            ["old"] if fresh_omitted else ["old", "new"]
+            ["old"] if fresh_outcome == "omitted" else ["old", "new"]
         )
     else:
         assert [node["id"] for node in cast("dict", observed["semantic"])["nodes"]] == [
