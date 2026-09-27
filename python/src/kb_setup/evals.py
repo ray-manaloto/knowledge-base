@@ -424,8 +424,8 @@ def declared_lanes_reconcile(
 
     The doctrine's position is that "availability is discovered at run time, not
     declared", so this deliberately does NOT assert that every declared lane is
-    installed. ``grok`` is named across the routing docs and is not installed;
-    that is correct and must stay passing. What must NOT be true is a lane named
+    installed. A named lane that is absent on this runner is correct and must stay
+    passing. What must NOT be true is a lane named
     with no recorded fallback — then the doctrine routes work to a lane that
     cannot run it and says nothing about what happens next.
 
