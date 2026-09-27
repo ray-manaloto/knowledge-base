@@ -278,6 +278,11 @@ DEFAULT_ALIASES = (
     # coexist, so tracking only the newer one would under-report what sessions
     # actually run.
     "claude-fable-5-1",
+    # Successor to `claude-opus-5`, added 2026-09-25 via `/claude-api migrate`.
+    # Ray scoped that migration to THIS list only: no caller's model changed.
+    # `claude-opus-5` stays listed because it is still served and remains
+    # graphify's claude-cli default (`graphify_native_extract.DEFAULT_MODEL`).
+    "claude-opus-5-5",
 )
 """Asked of the Models API when the caller names none.
 

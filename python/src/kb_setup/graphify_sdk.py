@@ -167,7 +167,7 @@ _PUBLIC_SYMBOLS = (
         "(root: 'Path', manifest_path: 'str' = 'graphify-out/manifest.json', *, "
         "follow_symlinks: 'bool | None' = None, google_workspace: 'bool | None' = None, "
         "kind: 'str' = 'semantic', extra_excludes: 'list[str] | None' = None, gitignore: "
-        "'bool' = True) -> 'dict'",
+        "'bool' = True, cache_root: 'Path | None' = None) -> 'dict'",
     ),
     PublicSymbol(
         "graphify.reflect.reflect",

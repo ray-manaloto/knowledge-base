@@ -15,6 +15,7 @@ time. That is the difference between a red gate and a red gate you understand.
 from __future__ import annotations
 
 import json
+import shutil
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -107,6 +108,31 @@ def test_the_redaction_control_arm_really_fails() -> None:
         "the arm failed, but not demonstrably on its own canary — a short host "
         "secret would produce the same FAIL"
     )
+
+
+def test_the_redaction_control_is_armed_and_leaves_host_state_alone(
+    monkeypatch: pytest.MonkeyPatch, isolated_mise_state: Path
+) -> None:
+    """Against REAL mise: the control stays armed and never touches host state.
+
+    The autouse `isolated_mise_state` dir stands in for the host registry. Ambient
+    trust is removed (a bogus trust root), so the arm can only read its canary if
+    it carries its own trust — and it must register its config in its OWN state
+    dir, leaving the stand-in empty.
+
+    FAIL arms: drop `MISE_TRUSTED_CONFIG_PATHS` from the control's env -> verdict
+    SKIP; drop its `MISE_STATE_DIR` -> the stand-in gains a tracked-configs link.
+    """
+    if shutil.which("mise") is None:
+        pytest.skip("mise does not resolve on PATH")
+    monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", "/nonexistent-trust-root")
+
+    outcome = eval_cases._redaction_collision_control()
+
+    assert outcome.verdict is evals.Verdict.FAIL, outcome.detail
+    assert eval_cases.REDACTION_CANARY in outcome.detail
+    host_links = isolated_mise_state / "tracked-configs"
+    assert not host_links.exists() or not any(host_links.iterdir())
 
 
 def test_the_redaction_case_skips_without_mise() -> None:

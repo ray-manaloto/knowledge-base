@@ -1,0 +1,87 @@
+name: Graphify integration
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Graphify contract (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-26.04
+          - platform: linux-arm64
+            runner: ubuntu-26.04-arm
+          - platform: macos-arm64
+            runner: macos-26
+          - platform: macos-intel
+            runner: macos-26-intel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: "2026.9.14"
+          install_args: >-
+            python uv node hk pkl typos taplo rumdl biome gitleaks
+            github:agent-sh/agnix lychee
+      - name: Record runner and tool identity
+        run: |
+          : "${ImageOS:?GitHub runner image OS missing}"
+          : "${ImageVersion:?GitHub runner image version missing}"
+          printf 'image_os=%s image_version=%s\n' "$ImageOS" "$ImageVersion"
+          printf 'runner=%s arch=%s os=%s\n' "$RUNNER_NAME" "$RUNNER_ARCH" "$RUNNER_OS"
+          uname -a
+          mise --version
+          mise exec -- python --version
+          mise exec -- uv --version
+          mise exec -- node --version
+          mise exec -- hk --version
+      - name: Check locked resolution
+        run: mise exec -- uv lock --check
+      - name: Install locked dependencies
+        run: mise exec -- uv sync --locked
+      - name: Validate hk v2 config and staged-secret controls
+        run: |
+          mise exec -- hk validate
+          mise exec -- hk test
+      - name: Verify installed fork origin and exact commit
+        run: |
+          mise exec -- uv run python -c \
+            'from pathlib import Path; from kb_setup.graphify_env import assert_installed_graphify_origin; assert_installed_graphify_origin(Path.cwd())'
+      - name: Check mise lock drift
+        run: mise run kb-lock-drift
+      - name: Check Graphify SDK contract
+        run: mise run kb-graphify-contract
+      - name: Check Graphify SDK code and tests
+        run: |
+          mise run kb-check -- python/src/kb_setup/graphify_sdk.py \
+            python/src/kb_setup/graphify_execution.py \
+            python/src/kb_setup/graphify_native_extract.py \
+            tests/test_graphify_sdk.py tests/test_graphify_execution.py \
+            tests/test_graphify_native_extract.py
+      - name: Rebuild full deterministic KB graph
+        run: mise run kb-build
+      - name: Build deterministic Graphify source baseline
+        run: mise run kb-graphify-baseline -- build
+      - name: Verify deterministic Graphify source baseline
+        run: mise run kb-graphify-baseline -- verify
+      - name: Check baseline failure controls
+        run: mise run kb-graphify-baseline -- controls
+      - name: Check source manifest consistency
+        run: mise run kb-manifest-audit
+      - name: Run complete repository lint and tests
+        run: mise run check
+      - name: Refuse derived tracked-file drift
+        run: git diff --exit-code

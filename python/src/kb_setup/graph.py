@@ -214,6 +214,15 @@ _EXPECTED_UNCLASSIFIED = (
         # lose, and no extractor could produce one.
         classification=ReviewedClassification.reviewed_binary_docs_asset,
     ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/.vitepress/fonts/SpaceGrotesk.ttf",
+        content_sha256="acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
+        pinned_commit="169c5f15ce52ff97b0a3693c3f9f30ae09e0d60e",
+        # The hk v2.3.0 docs embed the same TrueType VitePress asset as mise;
+        # both the Git blob and content hash were checked at this release pin.
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
 )
 
 # `Attacca` emits EIGHT metadata-only JSON files, which is why the truncation
@@ -321,17 +330,9 @@ _RUFF_MANIFEST_PATHS = (
 )
 
 _UV_MANIFEST_PATHS = (
-    # Re-hashed 2026-09-01 against the content AT THE PINNED COMMIT
-    # (`sources/uv.manifest`'s `commit = 68209e5c61ce4b76c2e685bea7913876bc929dc9`,
-    # fetched via raw.githubusercontent.com since no local clone was checked out
-    # there). The prior value (`deb1b5b7…`) was verified — via a second, local
-    # route — to be the hash of the file at the OLD pin (0.12.5,
-    # `210d1f6785e95a8c8c0d53e284408c9be1134700`): commit `b2d51b53` bumped
-    # `sources/uv.manifest` to 0.12.7 without touching this registration, so the
-    # workspace `Cargo.toml`'s content moved and this hash did not. Re-confirmed
-    # the file is STILL a bare `[workspace]` root with no `[package]`/`name` —
-    # the registration's premise still holds, only the pinned bytes changed.
-    ("Cargo.toml", "8462425d8e7f512c64662a8fccca4d821fe64251b438c4042429d7d3b05d68c2"),
+    # Re-hashed at uv 0.12.19's pinned tree. The root is still a bare
+    # `[workspace]` without `[package]`/`name`; only its reviewed bytes changed.
+    ("Cargo.toml", "7f5d65e26296d63e04eb482c1329f8199b220dd88546b97d35659b3b13428cd3"),
     (
         "test/workspaces/albatross-groups-only/pyproject.toml",
         "70ae71d05636b4496820087106ae2c8e8673e5ef4c4ea0c5fc709c9e493c0b34",
@@ -449,7 +450,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="uv",
             relative_path=relative_path,
             content_sha256=content_sha256,
-            pinned_commit="68209e5c61ce4b76c2e685bea7913876bc929dc9",
+            pinned_commit="bea138450f0e620a4ce5765b0e38cff7b9f0799f",
             skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         )
         for relative_path, content_sha256 in _UV_MANIFEST_PATHS
@@ -543,7 +544,15 @@ _EXPECTED_METADATA_ONLY = (
         source_name="uv",
         relative_path="crates/uv/pyproject.toml",
         content_sha256="32b3705d5b32ffaf3da1f3ccb279bafdb572a6f8a156f1929eaef62f780eac85",
-        pinned_commit="68209e5c61ce4b76c2e685bea7913876bc929dc9",
+        pinned_commit="bea138450f0e620a4ce5765b0e38cff7b9f0799f",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
+    graphify_health.ExpectedMetadataOnly(
+        source_name="uv",
+        relative_path="test/packages/native_extension/pyproject.toml",
+        content_sha256="0988e55b053fae2a191046925aa73aaf4f94fb4e52bd6328e18520ca02590c94",
+        pinned_commit="bea138450f0e620a4ce5765b0e38cff7b9f0799f",
+        # A build-system-only fixture with no `[project]` name at the 0.12.19 pin.
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
 )
@@ -674,7 +683,7 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         source_name="graphify",
         relative_path="tests/fixtures/sample.luau",
         content_sha256="c1aa998580d46b917014567ad39fe125c2a63ac540c3840fd27813d2004d2bd5",
-        pinned_commit="c8502c2accea2e78f7b737a653af15d364d245bf",
+        pinned_commit="baa506742e768c578d2e9a454118e0004f3923f7",
         first_error_line=8,
         extracted_nodes=5,
         lost_symbols=0,

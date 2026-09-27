@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Raymond Manaloto
 """Second-brain routing seam — record, aggregate, audit verified delegation outcomes.
 
-The Fable-5 architect delegates implementation to codex / antigravity / grok lanes.
+The Fable-5 architect delegates implementation to codex / antigravity lanes.
 This module lets it (1) RECORD a verified outcome per delegation, (2) AGGREGATE those
 outcomes deterministically into advisory routing lessons, and (3) AUDIT that every
 record is complete ("closed").
@@ -411,7 +411,7 @@ def audit(repo_root: Path) -> int:
 # such rather than raised as an alarm.
 #
 # Delegation signal = an Agent/Task tool_use to an IMPLEMENTATION lane
-# (codex/grok implementer, antigravity delegate) — the schema is probe-verified
+# (codex implementer, antigravity delegate) — the schema is probe-verified
 # (`name:"Agent"`, `input.subagent_type`). Review/research/advisor lanes are
 # deliberately excluded: they produce no routing outcome to record. A
 # write-capable `codex exec` run through Bash counts too (read-only research

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source": "graphify",
-  "source_ref": "kb-openai-cli-backend-v0.9.67-c8502c2a",
-  "source_commit": "c8502c2accea2e78f7b737a653af15d364d245bf",
-  "source_tree": "732f4a484e60ca81233dcd57f055e7674633e0f4",
+  "source_ref": "kb-openai-cli-backend-v0.9.69-baa50674",
+  "source_commit": "baa506742e768c578d2e9a454118e0004f3923f7",
+  "source_tree": "4263aa0706c22109445fd36078e9e4768236fdcb",
   "entries": [
     {
       "path": ".dockerignore",
@@ -62,6 +62,14 @@
       "file_type": "regular"
     },
     {
+      "path": "mise.toml",
+      "kind": "unsupported-file",
+      "reason": "fork-maintenance task configuration is TOML unsupported by Graphify 0.9.69 detection; reviewed as a separate fork capability",
+      "sha256": "343b269f427ebc60bc0815aab9fb50306786ba40b764ec8c643ae5d1e9b39427",
+      "size": 279,
+      "file_type": "regular"
+    },
+    {
       "path": "tools/skillgen/fragments/dispatch/.gitkeep",
       "kind": "unsupported-file",
       "reason": "empty-directory marker is not graph source",
@@ -89,7 +97,7 @@
       "path": "uv.lock",
       "kind": "unsupported-file",
       "reason": "uv lockfile is unsupported by Graphify detection 0.9.42 through 0.9.47",
-      "sha256": "8b5635d550b5a414bd7cd49110055abe5665e036607bb74145845fe8a5b88adf",
+      "sha256": "3e146b32f2818ea3152f803504c92e1b109b4943e9970d1c6d3f104dee0ae181",
       "size": 1031889,
       "file_type": "regular"
     },

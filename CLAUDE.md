@@ -87,6 +87,7 @@ Concretely:
 
 ```bash
 mise install && mise deps                     # tools + locked Python runtime (Graphify SDK/CLI)
+mise run kb-hk-setup                          # one-time Git 2.54+ global hk v2 hooks
 mise run kb-skill-refresh                     # install + repair project-scoped skill + graphify-out/
 mise run kb-build                             # reproduce graph.json from committed inputs (no LLM)
 mise run kb-query -- "what does this corpus cover?"

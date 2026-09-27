@@ -16,6 +16,7 @@ schedule. (Standards lane, round 2.)
 
 from __future__ import annotations
 
+import os
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -29,6 +30,41 @@ _GIT_TIMEOUT = 30
 #: realistic form, and `report_path` strips it, so using it here keeps that
 #: stripping exercised rather than assumed.
 LANES_RAN = ("standards", "spec", "cold:codex", "silent-failure")
+
+
+@pytest.fixture(autouse=True)
+def isolated_mise_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Keep every test's mise registry in its own disposable state directory.
+
+    Without this, a test that runs the real `mise` against a throwaway
+    `mise.toml` registers it in the HOST's `tracked-configs`, and every later
+    host `mise` command re-parses it (dotfiles#1169/#1248).
+
+    The directory is a SIBLING of `tmp_path`, not inside it: on hosts where
+    `git` resolves through a mise shim, any Git call creates the state dir, and
+    inside `tmp_path` it would read as drift in tests that prove a fixture repo
+    is clean or a tmp dir is empty.
+    """
+    ambient = _ambient_mise_state_dir()
+    state_dir = tmp_path.parent / f"{tmp_path.name}.mise-state"
+    state_dir.mkdir(exist_ok=True)
+    # MISE_STATE_DIR moves TRUST records too. A host that trusts this checkout
+    # via `mise trust` (rather than a global `trusted_config_paths`) would lose
+    # that trust inside every test, and `mise env`/`mise run` would refuse the
+    # repo config. Share the ambient trust store; isolate only tracking.
+    ambient_trust = ambient / "trusted-configs"
+    if ambient_trust.is_dir():
+        (state_dir / "trusted-configs").symlink_to(ambient_trust)
+    monkeypatch.setenv("MISE_STATE_DIR", str(state_dir))
+    return state_dir
+
+
+def _ambient_mise_state_dir() -> Path:
+    """The state dir mise would use without the fixture (its documented order)."""
+    if explicit := os.environ.get("MISE_STATE_DIR"):
+        return Path(explicit)
+    xdg = os.environ.get("XDG_STATE_HOME")
+    return (Path(xdg) if xdg else Path.home() / ".local" / "state") / "mise"
 
 
 def apply_merge(argv: list[str]) -> None:

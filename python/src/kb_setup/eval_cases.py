@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -37,13 +38,15 @@ from pathlib import Path
 
 from kb_setup import evals, fusion, graph_first, hook_guard, lexical, prose
 
-#: Lane CLIs the routing doctrine names. `grok` is deliberately included and is
-#: NOT installed — the doctrine says availability is discovered at run time, so
-#: the case asserts the degradation path is DECLARED, not that grok exists.
-DECLARED_LANES = ("codex", "agy", "grok")
+#: Lane CLIs the routing doctrine names in `.claude/CLAUDE.md`. Availability is
+#: discovered at run time, so the case asserts each lane resolves OR its
+#: DEGRADATION PATH IS DECLARED — a runner without `agy` must still pass.
+DECLARED_LANES = ("codex", "agy")
 
-#: Tokens whose presence constitutes "the degradation path is written down".
-FALLBACK_TOKENS = ("fallback", "not installed")
+#: Tokens whose presence in the doctrine doc constitutes a declared degradation
+#: path: `.claude/CLAUDE.md` states that execution falls back to Claude Opus.
+#: Deliberately a whole phrase — a bare `fallback` matches unrelated prose.
+FALLBACK_TOKENS = ("terminal fallback is always a Claude Opus subagent",)
 
 #: A question the corpus must be able to answer at all. Deliberately NOT phrased
 #: by echoing node labels — a label-echoing query grades lexical overlap and
@@ -729,10 +732,24 @@ def _redaction_collision_control() -> evals.Outcome:
     all-long host set returns PASS, and PASS from a control means NOT ARMED.
     """
     with tempfile.TemporaryDirectory() as tmp:
-        (Path(tmp) / "mise.toml").write_text(
+        root = Path(tmp)
+        (root / "mise.toml").write_text(
             f'[env]\n{REDACTION_CANARY} = {{ value = "1", redact = true }}\n'
         )
-        return evals.mise_redaction_legible(cwd=Path(tmp))
+        state_dir = root / "mise-state"
+        state_dir.mkdir()
+        return evals.mise_redaction_legible(
+            cwd=root,
+            # Its own state dir keeps the throwaway config out of the host's
+            # tracked-configs; its own trust root keeps the arm ARMED on a host
+            # with no ambient `trusted_config_paths` (without it, mise refuses the
+            # untrusted config and the arm reads SKIP — measured 2026-09-26).
+            env={
+                **os.environ,
+                "MISE_STATE_DIR": str(state_dir),
+                "MISE_TRUSTED_CONFIG_PATHS": str(root),
+            },
+        )
 
 
 def _binary_gate(name: str, detail: str) -> evals.Outcome | None:

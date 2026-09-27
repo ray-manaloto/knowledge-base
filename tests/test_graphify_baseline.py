@@ -1000,7 +1000,7 @@ def test_committed_graphify_disposition_catalog_is_typed_and_exact() -> None:
     # `.gitignore` pattern, matching git's own behaviour, so those two markdown
     # docs are ordinary detected source now — content this corpus had been
     # silently losing.
-    assert len(catalog.entries) == 22
+    assert len(catalog.entries) == 23
     assert (
         next(
             entry
@@ -1021,6 +1021,7 @@ def test_committed_graphify_disposition_catalog_is_typed_and_exact() -> None:
         "LICENSE",
         "LICENSE-MIT",
         "NOTICE",
+        "mise.toml",
         "tools/skillgen/fragments/dispatch/.gitkeep",
         "tools/skillgen/fragments/extra/.gitkeep",
         "tools/skillgen/platforms.toml",

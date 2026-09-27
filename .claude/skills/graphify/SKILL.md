@@ -64,12 +64,11 @@ Only when the path is one or more `https://github.com/...` URLs, or several loca
 
 ### Step 1 - Ensure graphify is installed
 
-Before running this block, replace `INPUT_PATH_SHELL_LITERAL` with the exact source path encoded as one POSIX shell word (for example, Python's `shlex.quote(path)`). Keep the resulting quotes; never paste the raw path into shell code. Use `.` when no path was supplied.
+Before running this block, replace `INPUT_PATH` inside the quoted heredoc with the exact source path. Use `.` when no path was supplied. Keep the heredoc delimiter quoted so shell metacharacters in the path remain literal data.
 
 ```bash
 # Detect the correct Python interpreter (handles uv tool, pipx, venv, system installs)
 PYTHON=""
-GRAPHIFY_INPUT_PATH=INPUT_PATH_SHELL_LITERAL
 GRAPHIFY_BIN=$(which graphify 2>/dev/null)
 # 1. uv tool installs — most reliable on modern Mac/Linux
 if [ -z "$PYTHON" ] && command -v uv >/dev/null 2>&1; then
@@ -99,8 +98,14 @@ fi
 # Write interpreter path for all subsequent steps (persists across invocations)
 mkdir -p graphify-out
 "$PYTHON" -c "import sys; open('graphify-out/.graphify_python', 'w', encoding='utf-8').write(sys.executable)"
-# Save scan root so `graphify update` (no args) knows where to look next time
-"$PYTHON" -c 'import pathlib, sys; pathlib.Path("graphify-out/.graphify_root").write_text(str(pathlib.Path(sys.argv[1]).resolve(strict=True)), encoding="utf-8")' "$GRAPHIFY_INPUT_PATH"
+# Save scan root so `graphify update` (no args) knows where to look next time.
+# INPUT_PATH is passed through a quoted heredoc, never substituted into the
+# command line itself: a bare `cd INPUT_PATH` (or an unquoted heredoc, which
+# still expands $()/backticks in its body) would let a malicious path execute
+# as shell code the moment this line runs.
+"$PYTHON" -c "import os, sys; out_path = os.path.abspath('graphify-out/.graphify_root'); os.chdir(sys.stdin.readline().rstrip('\n')); open(out_path, 'w', encoding='utf-8').write(os.getcwd())" <<'GRAPHIFY_ROOT_EOF'
+INPUT_PATH
+GRAPHIFY_ROOT_EOF
 ```
 
 If the import succeeds, print nothing and move straight to Step 2.

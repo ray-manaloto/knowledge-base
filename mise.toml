@@ -40,10 +40,13 @@
 min_version = { hard = "2026.9.0", soft = "2026.9.0" }
 
 [tools]
-# Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
+# Project pins are reviewed independently; current Node, uv, and hk can differ
+# from ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml.
 python = "3.14.7"
-uv = "0.12.8"
-hk = "1.57.0"
+uv = "0.12.19"
+# Current Node release for project and CI; Renovate's narrower runtime is task-scoped.
+node = "26.10.0"
+hk = "2.3.0"
 pkl = "0.32.1"
 typos = "1.50.0"
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
@@ -239,7 +242,7 @@ gh = "2.98.0"
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
 "npm:@openai/codex" = "0.154.0"
-antigravity-cli = "1.2.2"
+antigravity-cli = "1.2.11"
 "npm:ctx7" = { version = "0.5.9", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.3"
 # coreutils: macOS ships BSD userland, not GNU — this repo's own rules and
@@ -265,9 +268,15 @@ show_tools = true
 missing_tools = "always"
 
 [hooks]
-# Reshim after installs (pipx backend leaves stale shims otherwise) + install
-# the hk git hooks against mise-provided binaries.
-postinstall = "mise reshim && hk install --mise"
+# Reshim after installs (the pipx backend can leave stale shims). On Git 2.54+,
+# install hk's mise-backed launcher once per developer machine with
+# `mise run kb-hk-setup`; repo-local installation is no longer repeated.
+postinstall = "mise reshim"
+
+[tasks.kb-hk-setup]
+description = "One-time Git 2.54+ hk v2 global hook setup via the pinned mise environment"
+run = "hk install --global --mise"
+timeout = "60s"
 
 [env]
 HK_MISE = "1"
@@ -1473,6 +1482,18 @@ description = "Offline drift check: is the installed tooling in sync with the pi
 # blocked over a version pin. Logic in kb_setup.currency.sync.
 run = "uv run kb-setup currency check"
 
+[tasks.kb-renovate-validate]
+description = "Validate the single dependency updater config with its supported Node runtime"
+tools = { node = "24.21.0" }
+# Gitleaks scans ignored worktree files, including synthetic keys in npm fixtures.
+# Keep Renovate's Node-24-native cache outside the repository.
+env = { npm_config_cache = "{{env.HOME}}/.cache/kb-renovate-node24" }
+run = [
+  "node --version",
+  "npm config get cache",
+  "npm exec --yes --allow-scripts=re2 --package renovate@44.115.10 -- renovate-config-validator --strict",
+]
+
 [tasks.kb-currency]
 description = 'Full tool-currency workflow (steps 1-4 + 6): mise run kb-currency [-- --tool T --json]'
 # Fetches upstream + release notes + tracked-issue movement, applies the six-gate
@@ -1504,8 +1525,8 @@ description = 'Review receipt + this branch handoff + gates (lint/test/brain-aud
 # is convention, not enforcement, and a raw `gh pr create` would bypass the
 # review receipt entirely. Said plainly because the comment used to claim the
 # guard stopped it, while `mise-tasks-only.md` correctly said it does not.
-# Gates run BEFORE the push, so a red branch never becomes a PR. This repo has no
-# CI, so the local gates are the only gates. Between the receipt and the gates it
+# Gates run BEFORE the push, so a red branch never becomes a PR. Focused Graphify
+# CI supplements these broader local gates. Between the receipt and the gates it
 # runs kb-handoff-check against the NEWEST handoff, and only when that handoff
 # records the branch you are on (#149) — otherwise it reports a SKIP, never
 # silence. The skip is the ordinary case, because /clear-prep writes the handoff
@@ -1517,8 +1538,9 @@ run = "uv run kb-setup ship"
 [tasks.kb-land]
 description = 'Await terminal checks + review receipt → SHA-pinned squash-merge → sync main: mise run kb-land -- <PR#>'
 # Pins the merge to the head SHA it just verified (`gh pr merge --match-head-commit`),
-# so a commit pushed between check and merge cannot ride in unverified. No main-CI
-# watch and no container re-validation — this repo has neither. Logic in kb_setup.pr.
+# so a commit pushed between check and merge cannot ride in unverified. This task
+# does not watch the focused post-merge CI or revalidate in a container; delivery
+# must verify those separately. Logic in kb_setup.pr.
 run = "uv run kb-setup land"
 
 [tasks.kb-context]

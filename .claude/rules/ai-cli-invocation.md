@@ -16,8 +16,7 @@ patterns. Incorrect flags waste tokens and cause silent failures or hangs.
 ## Which lanes exist here
 
 `mise.toml` pins **`codex`** (OpenAI, GPT-5.6 Sol) and **`antigravity-cli`**
-(Google, exposes `agy`). **`grok` is NOT installed** — do not write a fallback
-that assumes it. Auth is per-user; mise manages the binaries, not the
+(Google, exposes `agy`). Auth is per-user; mise manages the binaries, not the
 credentials. Routing doctrine lives in
 `.claude/skills/orchestrator-routing/SKILL.md` and is grounded in this repo's
 own graph (`mise run kb-query -- "<routing question>"`).
