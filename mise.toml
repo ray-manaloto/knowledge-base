@@ -46,7 +46,9 @@ python = "3.14.7"
 uv = "0.12.19"
 # Current Node release for project and CI; Renovate's narrower runtime is task-scoped.
 node = "26.10.0"
-hk = "2.3.0"
+"cargo:hk" = "2.3.0"
+# Source builds cover macOS Intel, for which hk v2 publishes no binary.
+rust = "1.98.1"
 pkl = "0.32.1"
 typos = "1.50.0"
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
@@ -109,7 +111,7 @@ gitleaks = "8.30.1"
 # triggers a documented FULL SESSION RESYNC against a ~5 GB archive.
 "github:kenn-io/agentsview" = "0.42.0"
 # agnix: agent-documentation validator (CLAUDE.md / .claude/** / settings.json).
-# Same pin as dotfiles' shared set. Run with --strict everywhere — agnix exits 0
+# Use the current release from source on every CI architecture. Run with --strict everywhere — agnix exits 0
 # on warnings-only, so without it every warning is invisible (dotfiles #250).
 #
 # 0.40.0 -> 0.46.0 (2026-08-06). The floor that matters is **0.44.0**, which fixed
@@ -119,7 +121,7 @@ gitleaks = "8.30.1"
 # `mise run lint` while the pinned docs (`sub-agents.md:286`, `:303`) declare it
 # valid. Do not drop below 0.44.0 to "match dotfiles" — bump dotfiles instead.
 # 0.45.0 additionally accepts parameterized ids such as `claude-opus-5[effort=high]`.
-"github:agent-sh/agnix" = "0.52.1"
+"cargo:agnix-cli" = "0.54.0"
 # fnox: the credential tool the shell's secrets come from (jdx/fnox, in mise's
 # registry as `github:jdx/fnox`). Pinned here rather than left to the user's
 # GLOBAL mise, which at the time installed into a directory literally named
@@ -260,6 +262,9 @@ run = "uv sync --locked"
 experimental = true
 auto_install = true
 lockfile = true
+# hk and agnix need source builds on macOS Intel; never select a stale
+# cargo-binstall shim or platform-specific prebuilt artifact.
+cargo.binstall = false
 # New tool requests get exact-pinned versions (pins are the versioning model).
 pin = true
 

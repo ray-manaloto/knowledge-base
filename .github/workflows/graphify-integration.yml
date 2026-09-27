@@ -34,8 +34,10 @@ jobs:
         with:
           version: "2026.9.15"
           install_args: >-
-            python uv node hk pkl typos taplo rumdl biome gitleaks
-            github:agent-sh/agnix lychee
+            python uv node@26.10.0 rust pkl typos taplo rumdl biome gitleaks
+            lychee
+      - name: Build pinned hk and agnix for this runner
+        run: mise install --locked cargo:hk cargo:agnix-cli
       - name: Record runner and tool identity
         run: |
           : "${ImageOS:?GitHub runner image OS missing}"
@@ -47,7 +49,9 @@ jobs:
           mise exec -- python --version
           mise exec -- uv --version
           mise exec -- node --version
+          mise exec -- rustc --version
           mise exec -- hk --version
+          mise exec -- agnix --version
       - name: Check locked resolution
         run: mise exec -- uv lock --check
       - name: Install locked dependencies

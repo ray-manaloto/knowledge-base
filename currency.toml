@@ -1471,7 +1471,7 @@ deliberately NOT added to `_STRIP_BACKEND_ENV`."""
 # depends ban stays) and one a fact about this repo's SHAPE (the version is
 # written in three places). Nothing upstream will ever close them.
 [tool.hk]
-mise_key = "hk"
+mise_key = "cargo:hk"
 binary = "hk"
 github = "jdx/hk"
 # The ingested corpus must describe the release we actually run — the same
@@ -1999,10 +1999,10 @@ manifest = "sources/antigravity-cli.manifest"
 # project-level `sandbox.ripgrep` override that Claude Code silently ignores.
 # We do not set that key, so `--strict` stayed green, but that was verified by
 # RUNNING it rather than by reading the note.
-mise_key = "github:agent-sh/agnix"
+mise_key = "cargo:agnix-cli"
 binary = "agnix"
 github = "agent-sh/agnix"
-# `mise exec -- agnix --version` prints `agnix 0.49.0` — the house form with the
+# `mise exec -- agnix --version` prints `agnix 0.54.0` — the house form with the
 # tool's own name anchored, as at `[tool.ruff]` / `[tool.ty]`.
 version_pattern = '^agnix (\d+\.\d+\.\d+)'
 manifest = "sources/agnix.manifest"

@@ -4,7 +4,7 @@
 # TOOLCHAIN SOURCE — a tool this repo actually RUNS (#81, ingested 2026-08-02).
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
-#   version source: mise.toml `[tools] hk`
+#   version source: mise.toml `[tools] "cargo:hk"`
 #   pinned here:    2.3.0
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
