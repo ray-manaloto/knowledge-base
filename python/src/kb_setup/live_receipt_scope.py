@@ -52,7 +52,9 @@ def _only_node_lock_changed(before: bytes, after: bytes) -> bool:
     try:
         old = tomllib.loads(before.decode("utf-8"))
         new = tomllib.loads(after.decode("utf-8"))
-    except UnicodeDecodeError, tomllib.TOMLDecodeError:
+    except UnicodeDecodeError:
+        return False
+    except tomllib.TOMLDecodeError:
         return False
     old_tools = old.get("tools")
     new_tools = new.get("tools")
