@@ -16,6 +16,11 @@ SENSITIVE_EXACT = {
     b"uv.lock",
     b"mise.toml",
     b"mise.lock",
+    b"AGENTS.md",
+    b"CLAUDE.md",
+    b".claude/CLAUDE.md",
+    b".claude/settings.json",
+    b".mcp.json",
     b"sources/graphify.manifest",
     b"sources/graphify.dispositions.json",
     b"sources/planning-with-files.manifest",
@@ -37,8 +42,15 @@ SENSITIVE_PREFIXES = (
     # Shared helpers can affect extraction through the CLI's import graph.
     # Fail closed for new modules too; a static name list missed result.py.
     b"python/src/kb_setup/",
-    b".agents/skills/graphify/",
-    b".claude/skills/graphify/",
+    # Agent instructions can select the ingestion task, CLI, model or profile.
+    # Guard new skill/rule paths too, not just the currently named Graphify skill.
+    b".agents/skills/",
+    b".claude/skills/",
+    b".claude/rules/",
+    b".claude/agents/",
+    b".claude/mods/",
+    b".claude/workflows/",
+    b".codex/",
 )
 
 

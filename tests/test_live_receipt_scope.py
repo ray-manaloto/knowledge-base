@@ -35,6 +35,30 @@ def test_shared_and_new_package_helpers_require_live_evidence() -> None:
         assert needs_live_receipt(_paths(name))
 
 
+def test_active_agent_instructions_require_live_evidence() -> None:
+    for name in (
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".claude/CLAUDE.md",
+        ".claude/settings.json",
+        ".mcp.json",
+        ".agents/skills/kb-graphify-ingest/SKILL.md",
+        ".claude/skills/kb-graphify-ingest/SKILL.md",
+        ".agents/skills/kb-curator/SKILL.md",
+        ".claude/skills/kb-curator/SKILL.md",
+        ".claude/rules/ai-cli-invocation.md",
+        ".claude/agents/kb-extraction-worker.md",
+        ".claude/mods/kb-settings-guard/hooks/register.ts",
+        ".claude/workflows/future-extractor.js",
+        ".codex/agents/kb-extraction-worker.toml",
+        ".codex/agents/kb-corpus-curator.toml",
+        ".codex/config.toml",
+        ".codex/hooks.json",
+        ".agents/skills/future-backend/SKILL.md",
+    ):
+        assert needs_live_receipt(_paths(name))
+
+
 def test_mise_changes_always_require_live_evidence() -> None:
     # Even a Node-only pin affects the runtime for kb-extract.js. The same paths
     # can also alter PATH, CODEX_HOME, multiline task selectors or lock URLs.
