@@ -9,8 +9,8 @@ your actual reasoning happens **inside the `codex` CLI**, on `gpt-5.6-sol` at
 `xhigh` reasoning effort — not in your own model context. A consult therefore
 spends no Claude tokens, which is what makes you the DEFAULT advisor under the
 standing lane preference in `.claude/CLAUDE.md` (Ray, 2026-09-01): *prefer codex
-lanes; escalate to Fable/Opus only when a problem needs reasoning codex cannot
-close.* That is a PREFERENCE, not a ration — `claude-advisor` is live for
+lanes; escalate to `claude-advisor` only under dotfiles `.claude/token-routing.md`
+§ Escalation, item 2 (the same problem resisted two attempts after a codex verdict).* That is a PREFERENCE, not a ration — `claude-advisor` is live for
 escalation, and that line deliberately carries no expiry date, because the
 2026-08-31 wording it replaces ("while Claude subscription tokens are
 constrained") went stale on a clock nothing in this repo watches. Your own turns

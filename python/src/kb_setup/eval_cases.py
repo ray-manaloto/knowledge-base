@@ -38,13 +38,15 @@ from pathlib import Path
 
 from kb_setup import evals, fusion, graph_first, hook_guard, lexical, prose
 
-#: Lane CLIs the routing doctrine names. `grok` is deliberately included and is
-#: NOT installed — the doctrine says availability is discovered at run time, so
-#: the case asserts the degradation path is DECLARED, not that grok exists.
-DECLARED_LANES = ("codex", "agy", "grok")
+#: Lane CLIs the routing doctrine names in `.claude/CLAUDE.md`. Availability is
+#: discovered at run time, so the case asserts each lane resolves OR its
+#: DEGRADATION PATH IS DECLARED — a runner without `agy` must still pass.
+DECLARED_LANES = ("codex", "agy")
 
-#: Tokens whose presence constitutes "the degradation path is written down".
-FALLBACK_TOKENS = ("fallback", "not installed")
+#: Tokens whose presence in the doctrine doc constitutes a declared degradation
+#: path: `.claude/CLAUDE.md` states that execution falls back to Claude Opus.
+#: Deliberately a whole phrase — a bare `fallback` matches unrelated prose.
+FALLBACK_TOKENS = ("terminal fallback is always a Claude Opus subagent",)
 
 #: A question the corpus must be able to answer at all. Deliberately NOT phrased
 #: by echoing node labels — a label-echoing query grades lexical overlap and

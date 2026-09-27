@@ -620,14 +620,14 @@ def test_all_lanes_resolving_passes(tmp_path: Path) -> None:
 
 
 def test_an_absent_lane_passes_when_its_degradation_path_is_declared(tmp_path: Path) -> None:
-    """This is the `grok` case, and it must stay PASSING.
+    """An absent lane with a written fallback must stay PASSING.
 
     The doctrine's position is that availability is discovered at run time, not
     declared. So an absent lane is not itself the defect — an absent lane with
     no written fallback is.
     """
     doc = tmp_path / "routing.md"
-    doc.write_text("grok is not installed; fall back to codex, then Claude Opus.\n")
+    doc.write_text("lane-x is not installed; fall back to codex, then Claude Opus.\n")
     out = evals.declared_lanes_reconcile(
         ["definitely-not-a-real-binary-xyz"],
         fallback_doc=doc,
@@ -640,7 +640,7 @@ def test_an_absent_lane_passes_when_its_degradation_path_is_declared(tmp_path: P
 def test_an_absent_lane_fails_when_no_degradation_path_is_declared(tmp_path: Path) -> None:
     """CONTROL ARM: the case above must be able to fail, or it proves nothing."""
     doc = tmp_path / "routing.md"
-    doc.write_text("we route implementation to grok.\n")
+    doc.write_text("we route implementation to lane-x.\n")
     out = evals.declared_lanes_reconcile(
         ["definitely-not-a-real-binary-xyz"],
         fallback_doc=doc,
