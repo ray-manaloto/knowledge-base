@@ -1466,7 +1466,7 @@ def source_detection_policy(
         if item.source_name != source_name:
             continue
         match item.classification:
-            # Three classes share ONE predicate deliberately. `_safe_exact_
+            # Four classes share ONE predicate deliberately. `_safe_exact_
             # reviewed_file` is not version-marker-specific: it rejects absolute
             # paths, `..`, symlinks and anything escaping `root`, then pins the
             # file by content hash. That is the whole guarantee these classes
@@ -1476,6 +1476,7 @@ def source_detection_policy(
                 ReviewedClassification.reviewed_version_marker
                 | ReviewedClassification.reviewed_build_toolchain_config
                 | ReviewedClassification.reviewed_binary_docs_asset
+                | ReviewedClassification.reviewed_docs_caption_asset
             ):
                 if _safe_exact_reviewed_file(root, item):
                     allowed.append(item.relative_path)
@@ -1489,7 +1490,7 @@ def source_detection_policy(
                 # nothing. Two such entries cost two full `kb-build` runs before
                 # anything said why.
                 #
-                # It is unreachable for today's four members, and that is not a
+                # It is unreachable for today's five members, and that is not a
                 # reason to omit it. The live risk is the HALF-CHANGE the schema
                 # warns about: adding a value to
                 # `schemas/reviewed-classification.schema.json` without adding a

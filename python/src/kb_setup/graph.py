@@ -223,6 +223,30 @@ _EXPECTED_UNCLASSIFIED = (
         # its Git blob matches v2.3.0 exactly at this release pin.
         classification=ReviewedClassification.reviewed_binary_docs_asset,
     ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/.vitepress/fonts/LiberationMono-Bold.ttf",
+        content_sha256="626655e94dd82f3f42549daf995c921b0915fa8ab1f4b839559e8892ea41d240",
+        pinned_commit="07d39997a32175873d104950f185400760060881",
+        # The hk VitePress docs serve this 308,068-byte TrueType font (18 tables).
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/.vitepress/fonts/LiberationMono-Regular.ttf",
+        content_sha256="395fa5ab8d40c8eba390ced528744ea75a7f69aabf3e68b6f925ca0e39a27370",
+        pinned_commit="07d39997a32175873d104950f185400760060881",
+        # The paired 319,624-byte TrueType documentation font has 18 tables.
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/public/showreel-chapters.vtt",
+        content_sha256="387354be22646c56ee90470117f30dc2a2ff582a4fe890fae98c970bdce3f2e1",
+        pinned_commit="07d39997a32175873d104950f185400760060881",
+        # 597 bytes of WEBVTT video chapter labels/timestamps, not code source.
+        classification=ReviewedClassification.reviewed_docs_caption_asset,
+    ),
 )
 
 # `Attacca` emits EIGHT metadata-only JSON files, which is why the truncation
