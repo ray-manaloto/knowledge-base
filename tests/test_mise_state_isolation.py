@@ -112,3 +112,95 @@ def test_real_mise_registers_the_scratch_config(tmp_path: Path) -> None:
     )
     child_config = str((child_tmp_path / "mise.toml").resolve())
     assert child_config in child_mapping.values()
+
+
+_ENV_ALLOWLIST = ("PATH", "HOME", "TMPDIR", "LANG", "USER", "LOGNAME")
+
+
+def _minimal_env(**extra: str) -> dict[str, str]:
+    """Only what mise and a child pytest need — no CI-detection variables."""
+    base = {k: v for k, v in os.environ.items() if k in _ENV_ALLOWLIST}
+    return {**base, **extra}
+
+
+def test_child_pytest_keeps_ambient_mise_trust(tmp_path: Path) -> None:
+    """Isolating tracking must not isolate TRUST (codex review of ccbf62c1).
+
+    A config trusted only through a `mise trust` record in the outer state, with
+    no trust root covering it, must still load inside a child test.
+
+    FAIL ARM: removing the `trusted-configs` symlink from `isolated_mise_state`
+    leaves the child with an empty trust store; `mise env` then refuses the
+    config and the child test fails.
+    """
+    if shutil.which("mise") is None:
+        pytest.skip("mise does not resolve on PATH")
+
+    outer_state = tmp_path / "outer-state"
+    outer_state.mkdir()
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "mise.toml").write_text('[env]\nTRUST_PROBE = "1"\n', encoding="utf-8")
+    # mise trusts EVERY config when `ci_info::is_ci()` is true (jdx/mise
+    # src/config/config_file/mod.rs:635-637 @v2026.9.14) — CI, GITHUB_ACTIONS,
+    # BUILD_NUMBER and more each trigger it, and MISE_PARANOID does not stop it
+    # (measured). On a runner this test would then pass with the symlink
+    # removed (codex review round 2 of this fix). So the subprocesses get an ALLOWLISTED
+    # environment rather than a denylist of CI variables that would rot.
+    no_trust_root = _minimal_env(MISE_TRUSTED_CONFIG_PATHS=str(tmp_path / "no-trust-root"))
+    trust = subprocess.run(
+        ["mise", "trust", str(project / "mise.toml")],
+        cwd=project,
+        env={**no_trust_root, "MISE_STATE_DIR": str(outer_state)},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=_CHILD_TIMEOUT,
+    )
+    assert trust.returncode == 0, trust.stderr
+
+    scratch_test = tmp_path / "test_child_mise_trust.py"
+    scratch_test.write_text(
+        f"""from __future__ import annotations
+
+import os
+import subprocess
+
+
+def test_trusted_config_still_loads() -> None:
+    proc = subprocess.run(
+        ["mise", "env", "--json"],
+        cwd={str(project)!r},
+        env=os.environ.copy(),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout={_CHILD_TIMEOUT},
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert '"TRUST_PROBE"' in proc.stdout
+""",
+        encoding="utf-8",
+    )
+    child = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-o",
+            "addopts=",
+            "-p",
+            "no:cacheprovider",
+            "-p",
+            "conftest",
+            str(scratch_test),
+        ],
+        cwd=_REPO_ROOT / "tests",
+        env={**no_trust_root, "MISE_STATE_DIR": str(outer_state)},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=_CHILD_TIMEOUT,
+    )
+
+    assert child.returncode == 0, child.stdout + child.stderr
