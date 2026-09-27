@@ -26,10 +26,13 @@ SENSITIVE_EXACT = {
     b"python/src/kb_setup/graph.py",
     b"python/src/kb_setup/manifest.py",
     b"python/src/kb_setup/chunks.py",
+    b"python/src/kb_setup/cli.py",
     b"python/src/kb_setup/fetch.py",
     b"python/src/kb_setup/extract_census.py",
     b"python/src/kb_setup/live_receipt.py",
+    b"python/src/kb_setup/live_receipt_produce.py",
     b"python/src/kb_setup/live_receipt_scope.py",
+    b".claude/workflows/kb-extract.js",
 }
 SENSITIVE_PREFIXES = (
     b"python/src/kb_setup/graphify",

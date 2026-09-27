@@ -55,7 +55,7 @@ jobs:
       - name: Validate hk v2 config and staged-secret controls
         run: |
           mise exec -- hk validate
-          mise exec -- hk test
+          mise run hk-test
       - name: Verify installed fork origin and exact commit
         run: |
           mise exec -- uv run python -c \

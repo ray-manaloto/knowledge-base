@@ -124,7 +124,8 @@ def _candidate_file(root: Path, relative: str, maximum: int) -> bytes:
     return target.read_bytes()
 
 
-def _manifest_identity(raw: bytes) -> tuple[str, str]:
+def manifest_identity(raw: bytes) -> tuple[str, str]:
+    """Read the exact Graphify ref and commit from a reviewed source manifest."""
     values: dict[str, str] = {}
     for line in raw.decode("utf-8").splitlines():
         if line.lstrip().startswith("#") or "=" not in line:
@@ -233,7 +234,7 @@ def validate_payload(
         hashlib.sha256(manifest).hexdigest() == payload["source_manifest_sha256"],
         "Graphify manifest changed since live run",
     )
-    ref, commit = _manifest_identity(manifest)
+    ref, commit = manifest_identity(manifest)
     _require(
         (payload["fork_ref"], payload["fork_commit"]) == (ref, commit),
         "fork ref/commit differs from manifest",

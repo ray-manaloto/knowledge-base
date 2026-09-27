@@ -266,7 +266,8 @@ local proseExclude = baseExclude
 // `(Builtins.ruff){prefix=…}` panics. A string check/fix carries the `uv run` prefix.
 // Order per Astral docs: `ruff check --fix` BEFORE `ruff format`; `exclusive` (a
 // barrier), NOT `depends` (a failed dep deadlocks hk — dotfiles #268). taplo/rumdl and
-// the hygiene builtins are on PATH via mise (HK_MISE=1), so they need no prefix.
+// the hygiene builtins are on PATH through the mise-backed hook installed by
+// `mise run kb-hk-setup`, so they need no prefix.
 // `ruff_format` is declared at the BOTTOM of `lintSteps`, far from `ruff` — that
 // separation is measured and deliberate; see the comment on the step itself before
 // moving it back up. The `depends` note above still stands as the reason it is a

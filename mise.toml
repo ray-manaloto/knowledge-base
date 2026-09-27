@@ -279,7 +279,6 @@ run = "hk install --global --mise"
 timeout = "60s"
 
 [env]
-HK_MISE = "1"
 # ─── mise's own logging CANNOT be configured from this file ──────────────────
 # Asked for 2026-08-08 after a `mise run fmt` wedged 3h06m at 0.0% CPU with the
 # shell pane showing only "No output available". MEASURED, both forms, with a
@@ -495,7 +494,8 @@ description = "Eval harness: tiers 1+2 (offline, gated). `-- --slow` retrieval"
 #      redacted. Discriminator, with `MISE_IGNORED_CONFIG_PATHS` pointed at that
 #      file: ignored -> the three vars are absent from `mise env` (0) and the
 #      redacted set is EMPTY (0); honoured -> present (3) and redacted (3).
-#      Control arm: the same grep finds `HK_MISE` either way, so it discriminates.
+#      Historical control arm: the same grep found `HK_MISE` either way, so it
+#      discriminated. The redundant project-wide default has since been removed.
 #      They do NOT reach mise from the ambient shell, and `:64` is the only
 #      redaction-capable directive in the file — which is what narrows this from
 #      "the user config" to that directive. (Attribution was flagged as unarmed by
@@ -1493,6 +1493,34 @@ run = [
   "npm config get cache",
   "npm exec --yes --allow-scripts=re2 --package renovate@44.115.10 -- renovate-config-validator --strict",
 ]
+
+[tasks.kb-renovate-dryrun]
+description = "Run the pinned Renovate updater locally and report extraction and pending updates"
+tools = { node = "24.21.0" }
+env = { npm_config_cache = "{{env.HOME}}/.cache/kb-renovate-node24" }
+run = "uv run python -m kb_setup.renovate_local"
+timeout = "20m"
+
+[tasks.kb-renovate-freshness]
+description = "Fail if the local Renovate lookup is incomplete or finds pending updates"
+tools = { node = "24.21.0" }
+env = { npm_config_cache = "{{env.HOME}}/.cache/kb-renovate-node24" }
+run = "uv run python -m kb_setup.renovate_local --check"
+timeout = "20m"
+
+[tasks.kb-live-receipt-produce]
+description = "On a trusted host, derive and sign an eight-case exact-head Graphify live receipt"
+usage = '''
+arg "<matrix>" help="Frozen eight-case artifact manifest JSON"
+arg "<candidate>" help="Clean exact-head KB checkout"
+arg "<trusted_main>" help="Separate protected-main checkout holding the signer allowlist"
+arg "<head>" help="Exact KB commit SHA"
+arg "<pr>" help="GitHub pull request number"
+arg "<private_key>" help="Dedicated host-only SSH signing key"
+arg "<out>" help="Output directory outside the repository"
+'''
+run = "uv run python -m kb_setup.live_receipt_produce --matrix ${usage_matrix?} --candidate ${usage_candidate?} --trusted-main ${usage_trusted_main?} --head ${usage_head?} --pr ${usage_pr?} --private-key ${usage_private_key?} --out ${usage_out?}"
+timeout = "10m"
 
 [tasks.kb-currency]
 description = 'Full tool-currency workflow (steps 1-4 + 6): mise run kb-currency [-- --tool T --json]'

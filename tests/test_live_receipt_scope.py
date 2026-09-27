@@ -15,11 +15,14 @@ def test_graphify_fork_and_adapter_changes_require_live_evidence() -> None:
         "sources/graphify.manifest",
         "sources/planning-with-files.manifest",
         "python/src/kb_setup/graphify_ingest.py",
+        "python/src/kb_setup/cli.py",
         "python/src/kb_setup/graph.py",
+        ".claude/workflows/kb-extract.js",
         ".agents/skills/graphify/SKILL.md",
         ".github/graphify/allowed-signers",
         ".github/workflows/graphify-live-receipt.yml",
         ".github/workflows/graphify-integration.yml",
+        "python/src/kb_setup/live_receipt_produce.py",
     ):
         assert needs_live_receipt(_paths(name), b"")
 
