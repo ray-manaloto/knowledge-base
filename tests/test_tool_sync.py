@@ -143,6 +143,14 @@ def test_exact_mise_already_installed_progress_is_not_a_warning(tmp_path) -> Non
     assert not tool_sync._mise_progress_only("warning: source changed\n", spec)
 
 
+def test_exact_mise_new_install_progress_is_not_a_warning(tmp_path) -> None:
+    _root, spec = _repo(tmp_path)
+    assert tool_sync._mise_progress_only("mise probe@1.2.3                ✓ installed\n", spec)
+    assert not tool_sync._mise_progress_only(
+        "mise probe@1.2.3                ⇢ downloading\n", spec
+    )
+
+
 def test_public_main_refuses_a_synthetic_skill_bearing_tool(tmp_path, monkeypatch) -> None:
     root, _spec = _repo(tmp_path, skill_declared=True)
     monkeypatch.setattr(

@@ -65,8 +65,8 @@ def _mise_progress_only(stderr: str, spec: ToolSpec) -> bool:
     """
     lines = stderr.splitlines()
     pattern = re.compile(
-        rf"^mise {re.escape(spec.mise_key)}@[^\s]+\s+⇢\s+"
-        r"(?:already installed|installed)$"
+        rf"^mise {re.escape(spec.mise_key)}@[^\s]+\s+"
+        r"(?:⇢\s+already installed|✓\s+installed)$"
     )
     return bool(lines) and all(pattern.fullmatch(line) is not None for line in lines)
 

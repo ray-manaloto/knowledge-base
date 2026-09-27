@@ -93,6 +93,12 @@ dev = [
 
 codegen = ["datamodel-code-generator[protobuf]==0.76.0"]
 
+[tool.uv]
+# Guard-codegen tests call the pinned generator with --no-sync against temp
+# repo copies. Include its group in every ordinary development sync so a
+# concurrent plain `uv run` cannot remove grpcio-tools from the shared .venv.
+default-groups = ["dev", "codegen"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

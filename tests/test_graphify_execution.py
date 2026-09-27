@@ -121,7 +121,9 @@ def test_runner_timeout_retains_partial_bytes(tmp_path: Path) -> None:
         ],
         "stdin": b"",
         "cwd": str(tmp_path),
-        "timeout_seconds": 0.05,
+        # Leave room for interpreter startup under the full xdist suite; the
+        # child sleeps five seconds, so this still exercises timeout capture.
+        "timeout_seconds": 1.0,
         "output_contract": "stdout-json-envelope",
         "requested_profile": {"binary_expectation": _identity(python)},
     }
