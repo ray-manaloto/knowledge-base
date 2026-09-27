@@ -16,6 +16,8 @@ jobs:
     name: Graphify contract (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
+    env:
+      MISE_AUTO_INSTALL: "false"
     strategy:
       fail-fast: false
       matrix:
@@ -35,9 +37,12 @@ jobs:
           version: "2026.9.15"
           install_args: >-
             python uv node@26.10.0 node@24.21.0 rust pkl typos taplo rumdl biome gitleaks
-            lychee
-      - name: Build pinned hk and agnix for this runner
-        run: mise install --locked hk cargo:agnix-cli
+            lychee antigravity-cli conda:coreutils conda:ffmpeg doppler fnox gh
+            github:kenn-io/agentsview
+      - name: Install pinned Cargo and npm tools after Rust and Node
+        run: >-
+          mise install --locked hk cargo:agnix-cli
+          npm:@openai/codex npm:ctx7 npm:firecrawl-cli
       - name: Record runner and tool identity
         run: |
           : "${ImageOS:?GitHub runner image OS missing}"
