@@ -27,6 +27,14 @@ def test_graphify_fork_and_adapter_changes_require_live_evidence() -> None:
         assert needs_live_receipt(_paths(name), b"")
 
 
+def test_shared_and_new_package_helpers_require_live_evidence() -> None:
+    for name in (
+        "python/src/kb_setup/result.py",
+        "python/src/kb_setup/future_extraction_helper.py",
+    ):
+        assert needs_live_receipt(_paths(name), b"")
+
+
 def test_node_only_mise_update_is_exempt() -> None:
     diff = b'--- a/mise.toml\n+++ b/mise.toml\n@@ -48 +48 @@\n-node = "26.9.0"\n+node = "26.10.0"\n'
     assert not needs_live_receipt(

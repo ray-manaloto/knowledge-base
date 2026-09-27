@@ -35,7 +35,9 @@ SENSITIVE_EXACT = {
     b".claude/workflows/kb-extract.js",
 }
 SENSITIVE_PREFIXES = (
-    b"python/src/kb_setup/graphify",
+    # Shared helpers can affect extraction through the CLI's import graph.
+    # Fail closed for new modules too; a static name list missed result.py.
+    b"python/src/kb_setup/",
     b".agents/skills/graphify/",
     b".claude/skills/graphify/",
 )
@@ -52,7 +54,9 @@ def _only_node_lock_changed(before: bytes, after: bytes) -> bool:
     try:
         old = tomllib.loads(before.decode("utf-8"))
         new = tomllib.loads(after.decode("utf-8"))
-    except UnicodeDecodeError, tomllib.TOMLDecodeError:
+    except UnicodeDecodeError:
+        return False
+    except tomllib.TOMLDecodeError:
         return False
     old_tools = old.get("tools")
     new_tools = new.get("tools")
