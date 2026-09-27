@@ -147,11 +147,11 @@ gitleaks = "8.30.1"
 # matching this file — evidence that the probe read real values rather than
 # defaulting to agreement.
 #
-# Practically: the 1.34.1 bump moved this repo pin into agreement with the
-# global pin and CLOSED the gap rather than widening it. This repo still does
-# not touch `~/.config/fnox`, so `do-not.md` #11 remains un-engaged. Check the
-# global `[tools]` entry when bumping; do not assume it floats.
-fnox = "1.34.1"
+# The 2026-09-27 release check found the global pin and installed binary at
+# 1.35.3 while this repo still held 1.34.1. Align the repo pin with that exact
+# release; this repo does not touch `~/.config/fnox`, so `do-not.md` #11 remains
+# un-engaged. Check the global `[tools]` entry when bumping; it does not float.
+fnox = "1.35.3"
 # Doppler is the runtime secret-delivery boundary used by the devcontainer and
 # CI/CD workflows. Keep this exact pin aligned with `[tool.doppler]` and
 # `sources/doppler.manifest`; credentials/config remain user-owned and are not

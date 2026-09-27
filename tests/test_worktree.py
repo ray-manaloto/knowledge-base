@@ -17,11 +17,17 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 from kb_setup import worktree as wt
 from kb_setup.result import Err, Ok, Rc
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason="worktree-ready requires macOS clonefile; other platforms have refusal tests",
+)
 
 
 def _git(cwd: Path, *args: str) -> str:

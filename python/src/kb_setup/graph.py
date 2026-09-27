@@ -707,7 +707,7 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         source_name="graphify",
         relative_path="tests/fixtures/sample.luau",
         content_sha256="c1aa998580d46b917014567ad39fe125c2a63ac540c3840fd27813d2004d2bd5",
-        pinned_commit="baa506742e768c578d2e9a454118e0004f3923f7",
+        pinned_commit="5519c9886574b46b467fcafaf3445e2ee79cf5d2",
         first_error_line=8,
         extracted_nodes=5,
         lost_symbols=0,
@@ -2453,59 +2453,33 @@ def _handoff_counts(handoff: Path) -> dict[str, int | None]:
 
 
 def _replay_doc_chunks(
-    repo_root: Path, gpy: str, sources: Path, out: Path, chunk_paths: list[Path]
+    repo_root: Path, gpy: str, _sources: Path, out: Path, chunk_paths: list[Path]
 ) -> None:
-    """Replay every committed chunk in CAPTURE-DATE order, checking the arithmetic.
+    """Replay committed chunks in CAPTURE-DATE order with one full-build merge.
 
-    Order first, because it is the load-bearing part: `build_merge` gives a
-    `source_file` to the LAST chunk that names it, so replay order IS the
-    supersession rule — see `chunks.replay_order` for the measured defect (a
-    rebuild and an incremental merge producing different graphs from the same
-    committed corpus, chosen by the alphabet).
-
-    Each merge's post-count is then threaded into the NEXT merge as its prior, so
-    every step asserts its own arithmetic (#191). This is the loop where the
-    2026-08-05 rebuild silently swapped a fresh page's 69 nodes for an older
-    chunk's 13, and the only reason anyone noticed was a human subtracting
-    `+290 printed` from `total rose 221` across two printed lines.
-
-    The FIRST chunk's prior is deliberately UNKNOWN, and the ledger is not
-    consulted for it. By the time this runs `build()` has already re-seeded
-    `graph.json` from the freshly composed code layer, so the ledger describes a
-    DIFFERENT artifact — the previous build's — and any number it returned would
-    be a baseline for a file that no longer exists. Its fingerprint gate would
-    reject it anyway; not asking is the version of that which cannot be misread
-    later as "the ledger had nothing to say". So chunk 1 reports *not checked*,
-    and every chunk after it is checked against the merge immediately before it.
-
-    The ledger's own payoff is the INCREMENTAL path (`graphify_ops.merge_chunk`),
-    where the graph on disk really is the one it describes — and that is the path
-    the 2026-08-06 loss arrived on.
-
-    HYPEREDGES ARE THREADED HERE TOO (#198 item 1), and this path is the one that
-    needed it most: the #186 loss that started this whole ticket family — 11
-    hyperedges to 8, no nodes moved — was observed on a REBUILD, i.e. in this loop,
-    by a human diffing rebuild against incremental. Until now this loop threaded
-    `nodes` alone, so it would have replayed straight past it printing "0 replaced"
-    and been entirely correct about nodes while the thing it was written to catch
-    went by.
+    `chunks.replay_order` defines the last owner of every source_file. The batch
+    script discards superseded records, merges the surviving records once, and
+    verifies each claimed source's semantic node count before writing. This
+    avoids 29 full-graph load/write cycles on a several-hundred-MB graph.
+    Incremental recomposition still uses `_replay_pairs` and its per-step counts.
     """
-    _replay_pairs(repo_root, gpy, out, [(c, _derived_root(sources, c)) for c in chunk_paths])
+    from kb_setup import chunks as _chunks
 
-
-def _derived_root(sources: Path, chunk: Path) -> str:
-    """The `sources/<name>` root `build()` merges a globbed chunk under."""
-    return str((sources / chunk.stem.removesuffix("-docs")).resolve())
+    ordered = _chunks.replay_order(chunk_paths)
+    if not ordered:
+        return
+    _run(
+        [gpy, str(_MERGE_SCRIPT), "--batch", str(repo_root), str(out), *map(str, ordered)],
+        repo_root,
+    )
 
 
 def _replay_pairs(repo_root: Path, gpy: str, out: Path, pairs: list[tuple[Path, str]]) -> None:
     """Replay `(chunk, root)` pairs in CAPTURE-DATE order, checking the arithmetic.
 
-    THE one replay loop. Both paths that exist call it — `build()`'s
-    :func:`_replay_doc_chunks`, which derives each root from the chunk stem, and
-    `refresh_self()`'s :func:`_recompose_into_temp`, which carries a recorded
-    root per chunk. They were separate loops until 2026-08-08, and the whole
-    cost of that is what this function's existence is for:
+    Incremental recomposition uses this per-chunk loop and its threaded counts.
+    Full builds use :func:`_replay_doc_chunks` to merge the same ordered chunks
+    in one batch. The common replay order remains essential to both paths:
 
     `build()`'s loop applied `chunks.replay_order` and threaded `--prior-<field>`;
     the recomposition loop did neither. It replayed in `manifest.chunks` order —
@@ -2516,9 +2490,8 @@ def _replay_pairs(repo_root: Path, gpy: str, out: Path, pairs: list[tuple[Path, 
     `[merge]` line `kb-watch` ever printed said *prior node count unknown —
     arithmetic NOT checked*, so #191's gate had never once fired there either.
 
-    Two fixes on one path and not its sibling is not two bugs; it is one missing
-    seam. Hence pairs rather than paths: the root is the only thing the two
-    callers genuinely disagree about, so it is the only thing they still supply.
+    The incremental path carries each chunk's recorded root explicitly, hence
+    the `(chunk, root)` pairs rather than deriving roots from filenames.
     """
     from kb_setup import chunks as _chunks
 
@@ -3067,11 +3040,9 @@ def build(repo_root: Path) -> None:
     _cluster_study_graph(repo_root, out.parent / STUDY_GRAPH_NAME)
 
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
-    # MERGE-ONLY (#169): `_merge_docs.py` no longer clusters, scores, or reports
-    # per chunk — 17 of 18 such passes were discarded and never read. It loads
-    # graph.json, merges the chunk, reconstructs communities from what the graph
-    # already carries, and writes. The real clustering/labelling happens ONCE,
-    # below, after every chunk has landed — not once per chunk.
+    # MERGE-ONLY (#169): `_merge_docs.py` no longer clusters or labels each
+    # chunk. Full builds merge the validated doc layer once; the final
+    # clustering/labelling pass follows below.
     gpy = graphify_python(repo_root)
     # Already validated at the TOP of build(), before anything wrote graph.json.
     # CAPTURE-DATE order, not the glob's alphabetical order: build_merge gives

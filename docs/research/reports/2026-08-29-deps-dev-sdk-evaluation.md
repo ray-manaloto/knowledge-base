@@ -26,7 +26,7 @@ primary sources this session, not assumed from #568's original spec text.
 "Using the gRPC API":
 
 > "The gRPC API can be accessed using any gRPC client. The service
-> definition... can be found in [api/v3/api.proto](api/v3/api.proto)"
+> definition... can be found in [api/v3/api.proto](https://github.com/google/deps.dev/blob/main/api/v3/api.proto)"
 
 No first-party client library is linked anywhere in the README. The repo's
 root tree (checked via the GitHub API) has no `python/`, `clients/`, or SDK

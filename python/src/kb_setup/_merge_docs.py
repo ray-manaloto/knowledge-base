@@ -1,12 +1,13 @@
 # Copyright (c) 2026 Raymond Manaloto
-"""Merge a committed doc-extraction chunk into graphify-out/graph.json.
+"""Merge committed document extractions into graphify-out/graph.json.
 
-Runs under graphify's BUNDLED interpreter (imports graphify), invoked by
-graph.py via subprocess — NOT under the KB repo's uv python.
+Runs under the locked Graphify-capable interpreter chosen by graph.py. It is a
+subprocess boundary even when the current KB uv environment provides Graphify.
 
 Usage: python _merge_docs.py <chunk.json> <source_root_abs> <graph.json>
                              [--prior-nodes N] [--prior-hyperedges N]
                              [--counts-out PATH]
+       python _merge_docs.py --batch <repo_root> <graph.json> <chunk.json>...
 
 `--prior-nodes` is how many nodes `graph.json` held BEFORE this merge, when the
 caller could establish that for free (`kb_setup.graph_counts`). Given it, the
@@ -23,21 +24,16 @@ because the FIRST loss this whole ticket family was filed over — the #186 roun
 blind to the very incident that motivated it.
 
 `--counts-out` is a path this script writes its post-merge counts to, so the
-caller — which runs under a DIFFERENT interpreter and cannot import anything
-from here — can record them in the ledger. The fingerprint that makes those
+caller — which does not read the subprocess's in-memory Graph — can record them
+in the ledger. The fingerprint that makes those
 counts trustworthy is added by the caller, deliberately: duplicating the
 `size:mtime_ns` formula into this file would give the ledger two owners that
 could drift into disagreeing about what "the graph moved" means.
 
-MERGE-ONLY (#169, #175). This used to also re-cluster (Louvain), score
-cohesion, find god nodes and surprising connections, and render GRAPH_REPORT.md
-— once PER CHUNK, i.e. once per source in the doc-replay loop. Measured: 17 of
-those 18 per-chunk passes were discarded and never read, because `build()`
-replays every committed chunk in one run and only the LAST chunk's report
-survived on disk. The real clustering/labelling now happens exactly once, in
-`build()`, via `graphify_ops.label` — AFTER every chunk (this script, run once
-per chunk) and the code layer have all landed. This script's only remaining
-job is: merge one chunk in, hand `to_json` a communities mapping, write.
+MERGE-ONLY (#169, #175). Clustering and labeling happen once in `build()` after
+the code and document layers have landed. Full builds collapse approved
+capture-date supersessions and merge all committed chunks once; incremental
+recomposition retains the one-chunk mode and its threaded count handoff.
 """
 
 import json
@@ -45,13 +41,103 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 
-# graphify is imported INSIDE main(), not at module scope, so the pure-python
-# helpers below (`_opt`, `_report`) can be imported and tested from the repo's
-# own uv interpreter — which has no graphify and never will, since this script
-# is the one thing that deliberately runs under graphify's bundled one. The
-# arithmetic in `_report` is the whole point of #191; leaving it unreachable by
-# the test suite would make it the kind of check that is only ever verified by
-# the incident it was written for.
+
+def _collapse_replay(chunks: list[dict]) -> tuple[list[dict], dict[str, set[str]]]:
+    """Keep only the last semantic claimant of each source in an ordered replay.
+
+    Full builds have already validated the chunks and their declared overlaps.
+    Materializing the final owners before Graphify's one merge avoids parsing and
+    serializing the entire code graph once per small document chunk.
+    """
+    from kb_setup.chunks import normalise_source_file
+
+    # The one-chunk path returns before merging a zero-node chunk. A full build
+    # must make the same choice even if that chunk carries cross-chunk edges.
+    chunks = [chunk for chunk in chunks if chunk.get("nodes")]
+    owners: dict[str, int] = {}
+    for index, chunk in enumerate(chunks):
+        for node in chunk.get("nodes", []):
+            if node.get("_origin") != "semantic":
+                raise ValueError("batched document replay requires semantic-only nodes")
+            source = normalise_source_file(node.get("source_file"))
+            if source is None:
+                raise ValueError("batched document replay requires node source_file")
+            owners[source] = index
+
+    effective: list[dict] = []
+    expected: dict[str, set[str]] = {source: set() for source in owners}
+    for index, chunk in enumerate(chunks):
+        filtered = dict(chunk)
+        for field in ("nodes", "edges", "hyperedges"):
+            kept = []
+            for item in chunk.get(field, []) or []:
+                source = normalise_source_file(item.get("source_file"))
+                if source is not None and owners.get(source, index) != index:
+                    continue
+                kept.append(item)
+                if field == "nodes":
+                    expected[source].add(item["id"])
+            filtered[field] = kept
+        effective.append(filtered)
+    return effective, expected
+
+
+def _batch_main(argv: list[str]) -> int:
+    """Replay validated committed chunks with one graph load and one write."""
+    from graphify.build import _is_ast_tier, build_merge
+    from graphify.export import to_json
+
+    try:
+        root, out, *paths = argv[2:]
+    except ValueError as exc:
+        raise ValueError("usage: _merge_docs.py --batch ROOT GRAPH CHUNK...") from exc
+    if not paths:
+        raise ValueError("batched document replay needs at least one chunk")
+    chunks = [json.loads(Path(path).read_text(encoding="utf-8")) for path in paths]
+    effective, expected = _collapse_replay(chunks)
+    if not effective:
+        print(f"[merge] {len(paths)} zero-node document chunks skipped")
+        return 0
+    # Sequential replay reloads every earlier chunk's edges before the last
+    # merge. Graphify's loader backfills _origin on those persisted edges; the
+    # final chunk's edges have not been reloaded yet. Preserve that distinction.
+    for chunk in effective[:-1]:
+        for edge in chunk["edges"]:
+            edge.setdefault("_origin", "ast" if _is_ast_tier(edge) else "semantic")
+    graph = build_merge(effective, graph_path=out, root=root, directed=False, dedup=False)
+
+    observed: dict[str, set[str]] = {source: set() for source in expected}
+    for node_id, data in graph.nodes(data=True):
+        source = data.get("source_file")
+        if data.get("_origin") == "semantic" and source in observed:
+            observed[source].add(node_id)
+    # Graphify canonicalizes legacy semantic IDs from their full source paths.
+    # The input IDs are therefore not the output IDs even when all nodes survive.
+    # The full-corpus sequential/batch parity control checks final identities.
+    mismatches = [source for source in expected if len(observed[source]) != len(expected[source])]
+    if mismatches:
+        raise ValueError(
+            "batched document replay changed semantic node counts for "
+            + ", ".join(sorted(mismatches)[:8])
+        )
+
+    communities = _communities_from_graph(graph)
+    if not to_json(graph, communities, out):
+        print("[merge] ERROR: to_json refused (shrink guard #479)")
+        return 1
+    print(
+        f"[merge] batched {len(paths)} document chunks; "
+        f"{len(expected)} final source owners; "
+        f"{graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges; "
+        "semantic source counts checked"
+    )
+    return 0
+
+
+# Graphify imports stay inside the entry points so the pure-Python reporting
+# helpers remain independently testable. Both the batch and one-chunk paths run
+# under the selected Graphify interpreter; callers must not rely on their own
+# environment to select the merge implementation.
 
 
 def _communities_from_graph(g: object) -> dict[int, list[str]]:
@@ -353,6 +439,8 @@ def _report(
 
 
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "--batch":
+        return _batch_main(sys.argv)
     from graphify.build import build_merge
     from graphify.export import to_json
 

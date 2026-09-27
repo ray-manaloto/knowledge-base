@@ -169,7 +169,7 @@ def test_preflight_admits_a_re_merge_of_an_already_committed_chunk(tmp_path: Pat
     assert graphify_ops._preflight(tmp_path, committed) is None
 
 
-def test_replay_threads_each_count_into_the_next_chunk(
+def test_incremental_replay_threads_each_count_into_the_next_chunk(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Chunk 1 carries no prior; every chunk after it carries the one before.
@@ -210,8 +210,8 @@ def test_replay_threads_each_count_into_the_next_chunk(
         )
 
     monkeypatch.setattr(graph, "_run", _fake_run)
-    graph._replay_doc_chunks(
-        tmp_path, "py", tmp_path / "sources", out, sorted(chunks_dir.glob("*.json"))
+    graph._replay_pairs(
+        tmp_path, "py", out, [(p, str(tmp_path)) for p in sorted(chunks_dir.glob("*.json"))]
     )
 
     def _flag(argv: list[str], flag: str) -> str | None:

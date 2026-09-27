@@ -137,18 +137,32 @@ def test_exact_mise_already_installed_progress_is_not_a_warning(tmp_path) -> Non
         ["mise", "install", "probe"],
         0,
         stdout="",
-        stderr="mise probe@1.2.3                ⇢ already installed\n",
+        stderr=(
+            "mise by @jdx \u2013 installing 1 tool\n"
+            "mise ⇢ probe@1.2.3  1ms · already installed\n"
+            "mise ████████████████ 1/1 · installed 0 tools · 1 already installed in 2ms\n"
+        ),
     )
     assert tool_sync._mise_progress_only(proc.stderr, spec)
     assert not tool_sync._mise_progress_only("warning: source changed\n", spec)
+    assert not tool_sync._mise_progress_only(proc.stderr + "hk installed hook\n", spec)
 
 
 def test_exact_mise_new_install_progress_is_not_a_warning(tmp_path) -> None:
     _root, spec = _repo(tmp_path)
-    assert tool_sync._mise_progress_only("mise probe@1.2.3                ✓ installed\n", spec)
-    assert not tool_sync._mise_progress_only(
-        "mise probe@1.2.3                ⇢ downloading\n", spec
+    progress = (
+        "mise by @jdx \u2013 installing 1 tool\n"
+        "mise ███████░░░░░░░░░ 0/1 · 3.0s\n"
+        "  probe@1.2.3  downloading  3.0s  1.1/2.3 MB · 367 kB/s\n"
+        "mise ✓ probe@1.2.3  4.2s\n"
+        "mise ████████████████ 1/1 · installed 1 tool in 4.3s\n"
     )
+    assert tool_sync._mise_progress_only(progress, spec)
+    assert not tool_sync._mise_progress_only(
+        progress.replace("installed 1 tool", "installed 0 tools"), spec
+    )
+    assert not tool_sync._mise_progress_only(progress.replace("probe@1.2.3", "other@1.2.3"), spec)
+    assert not tool_sync._mise_progress_only(progress.replace("downloading", "warning: bad"), spec)
 
 
 def test_public_main_refuses_a_synthetic_skill_bearing_tool(tmp_path, monkeypatch) -> None:

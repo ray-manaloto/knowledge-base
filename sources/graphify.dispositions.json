@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source": "graphify",
-  "source_ref": "kb-openai-cli-backend-v0.9.69-baa50674",
-  "source_commit": "baa506742e768c578d2e9a454118e0004f3923f7",
-  "source_tree": "4263aa0706c22109445fd36078e9e4768236fdcb",
+  "source_ref": "kb-openai-cli-backend-v0.9.70-5519c988",
+  "source_commit": "5519c9886574b46b467fcafaf3445e2ee79cf5d2",
+  "source_tree": "a252303b69092da1a1889f5ed758ba943b360b4b",
   "entries": [
     {
       "path": ".dockerignore",
@@ -64,7 +64,7 @@
     {
       "path": "mise.toml",
       "kind": "unsupported-file",
-      "reason": "fork-maintenance task configuration is TOML unsupported by Graphify 0.9.69 detection; reviewed as a separate fork capability",
+      "reason": "fork-maintenance task configuration is TOML unsupported by Graphify 0.9.70 detection; reviewed as a separate fork capability",
       "sha256": "343b269f427ebc60bc0815aab9fb50306786ba40b764ec8c643ae5d1e9b39427",
       "size": 279,
       "file_type": "regular"
@@ -97,7 +97,7 @@
       "path": "uv.lock",
       "kind": "unsupported-file",
       "reason": "uv lockfile is unsupported by Graphify detection 0.9.42 through 0.9.47",
-      "sha256": "3e146b32f2818ea3152f803504c92e1b109b4943e9970d1c6d3f104dee0ae181",
+      "sha256": "100a4bcc684a64afc5a72375adb08d39a832dc0e6cd91c7e6386642d50a2c5b5",
       "size": 1031889,
       "file_type": "regular"
     },
