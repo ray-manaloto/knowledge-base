@@ -21,6 +21,7 @@ import subprocess
 import threading
 import time
 from collections.abc import Iterable, Iterator
+from concurrent.futures import Future
 from pathlib import Path
 from typing import Never
 
@@ -1479,19 +1480,38 @@ def test_results_arrive_in_completion_order_within_a_batch(monkeypatch, tmp_path
     rest on should be somebody's assertion.
     """
     root = _repo(tmp_path, _SAFE)
-    # Ordered so the CONCURRENT batch inverts: brain-audit finishes first and
-    # lint last, against a requested order of lint, test, brain-audit. `eval` is
-    # a batch of its own since #321, so its delay cannot affect where it lands —
-    # it arrives last because it runs last, and giving it the shortest delay (as
-    # this fixture used to) would prove nothing about ordering at all.
-    delays = {"brain-audit": 0.0, "test": 0.05, "lint": 0.10, "eval": 0.0}
+    # Let the real as_completed observe each future, then release the next
+    # worker. Millisecond sleeps do not establish an order on a busy CI runner.
+    release_test = threading.Event()
+    release_lint = threading.Event()
 
     def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
         if cmd[0] == "mise":
-            time.sleep(delays[cmd[-1]])
+            if cmd[-1] == "test":
+                assert release_test.wait(10)
+            elif cmd[-1] == "lint":
+                assert release_lint.wait(10)
         return subprocess.CompletedProcess(cmd, 0, "")
 
+    real_as_completed = gates.as_completed
+
+    def controlled_completion(
+        futures: Iterable[Future[gates.GateResult]],
+    ) -> Iterator[Future[gates.GateResult]]:
+        submitted = list(futures)
+        try:
+            for future in real_as_completed(submitted):
+                yield future
+                if len(submitted) == 3 and future is submitted[2]:
+                    release_test.set()
+                elif len(submitted) == 3 and future is submitted[1]:
+                    release_lint.set()
+        finally:
+            release_test.set()
+            release_lint.set()
+
     monkeypatch.setattr(gates.subprocess, "run", run)
+    monkeypatch.setattr(gates, "as_completed", controlled_completion)
     _pin_sha(monkeypatch)
 
     arrived = [r.task for r in gates.iter_run(root, _SAFE, stop_on_failure=False)]
