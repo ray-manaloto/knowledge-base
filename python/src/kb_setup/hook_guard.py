@@ -49,6 +49,18 @@ _UNPINNED_GRAPHIFY_TOOL = re.compile(
     re.IGNORECASE,
 )
 
+# Quoted package arguments are shell words, even though _code_only masks quoted
+# prose. Match the executable on the original command, then verify that its
+# head survives quote/heredoc masking so an rg/echo example is never a command.
+_QUOTED_GRAPHIFY_TOOL = re.compile(
+    r"(?P<head>(?:^|[;&|]|\$\(|\bthen\b|\bdo\b)\s*"
+    r"(?:(?:env\s+)?(?:\w+=\S*\s+)*)"
+    r"(?:uv\s+tool\s+(?:run|install|upgrade)\b|uvx\b|pip(?:3)?\s+install\b|"
+    r"(?:\"\$\w+\"|'\$\w+'|\$\w+|python[3.]*)\s+-m\s+pip\s+install\b))"
+    r"[^;&|\n]*?(?P<package>['\"]graphifyy(?:\[[^'\"\]\n]+\])?['\"])(?=\s|$|[;&|)])",
+    re.IGNORECASE,
+)
+
 # A python-ish command head DRIVING graphify — the head and the payload must sit
 # in the same segment (`[^;&|\n]*` stops at the next separator).
 #
@@ -169,6 +181,7 @@ def decide(command: str) -> str | None:
 
     if (
         _UNPINNED_GRAPHIFY_TOOL.search(_code_only(command))
+        or _quoted_graphify_tool(command)
         or _GRAPHIFY_PYBIN.search(command)
         or _PY_DRIVES_GRAPHIFY.search(command)
     ):
@@ -241,6 +254,24 @@ def _code_only(command: str) -> str:
     """
     head = _HEREDOC.split(command, maxsplit=1)[0]
     return _QUOTED.sub(" ", head)
+
+
+def _quoted_graphify_tool(command: str) -> bool:
+    """Detect a quoted public package only when its tool head is executable."""
+    head = _HEREDOC.split(command, maxsplit=1)[0]
+    masked = _QUOTED.sub(
+        lambda match: (
+            match.group()
+            if re.fullmatch(r"['\"]\$\w+['\"]", match.group())
+            else " " * len(match.group())
+        ),
+        head,
+    )
+    for match in _QUOTED_GRAPHIFY_TOOL.finditer(head):
+        start, end = match.span("head")
+        if masked[start:end] == head[start:end]:
+            return True
+    return False
 
 
 def _bare_python(command: str) -> str | None:

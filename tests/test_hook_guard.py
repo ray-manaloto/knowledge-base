@@ -53,6 +53,12 @@ DENY = [
     ),
     ('"$PYTHON" -m pip install graphifyy -q', "kb-skill-refresh"),
     ('uvx --from graphifyy graphify query "x"', "kb-skill-refresh"),
+    ('pip install "graphifyy"', "kb-skill-refresh"),
+    ("pip install 'graphifyy[gemini]'", "kb-skill-refresh"),
+    ('uv tool install "graphifyy"', "kb-skill-refresh"),
+    ('uv tool run --from "graphifyy" graphify query x', "kb-skill-refresh"),
+    ('_UV_PY=$(uv tool run --from "graphifyy" python -c "print(1)")', "kb-skill-refresh"),
+    ('"$PYTHON" -m pip install "graphifyy"', "kb-skill-refresh"),
 ]
 
 # Must be ALLOWED (verdict None) — the control arm.
@@ -78,6 +84,9 @@ ALLOW = [
     'rg "graphify.transcribe" python/',
     'rg "uv tool install --upgrade graphifyy" .',
     'echo "pip install graphifyy is forbidden"',
+    "echo \"pip install 'graphifyy' is forbidden\"",
+    "rg \"foo && pip install 'graphifyy'\" .",
+    "rg \"uv tool run --from 'graphifyy'\" .",
     "cat <<'EOF'\nuv tool install --upgrade graphifyy\nEOF",
     "mise run kb-skill-refresh",
     # The same payload with a python head in a DIFFERENT segment: the head and
