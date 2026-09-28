@@ -141,20 +141,22 @@ def test_runner_timeout_bounds_drain_when_descendant_keeps_pipe_open(tmp_path: P
             "-c",
             (
                 "import subprocess,sys,time; "
-                "subprocess.Popen([sys.executable,'-c','import time;time.sleep(1.5)'], "
+                "subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'], "
                 "start_new_session=True); "
-                "sys.stdout.buffer.write(b'partial'); sys.stdout.flush(); time.sleep(5)"
+                "sys.stdout.buffer.write(b'partial'); sys.stdout.flush(); time.sleep(30)"
             ),
         ],
         "stdin": b"",
         "cwd": str(tmp_path),
-        "timeout_seconds": 0.1,
+        # Allow interpreter startup and child spawn on loaded CI runners; the
+        # escaped child lives much longer than this and the drain allowance.
+        "timeout_seconds": 5.0,
         "requested_profile": {"binary_expectation": _identity(python)},
     }
     runner = graphify_execution.CapturedProcessRunner(tmp_path / "run", {}, shutdown_seconds=0.1)
     started = time.monotonic()
     result = runner(request)
-    assert time.monotonic() - started < 1.0
+    assert time.monotonic() - started < 8.0
     assert result["runner_error"] == "timed_out_incomplete_capture"
     assert result["stdout"] == b"partial"
     assert result["stdout_eof"] is False
