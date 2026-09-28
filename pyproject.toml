@@ -310,7 +310,7 @@ cpy = "cpy"
 nativ = "nativ"
 
 [tool.uv.sources]
-graphifyy = { git = "https://github.com/ray-manaloto/graphify", rev = "5519c9886574b46b467fcafaf3445e2ee79cf5d2" }
+graphifyy = { git = "https://github.com/ray-manaloto/graphify", rev = "d9b60e6de351410dbacb192c988e7ffa22bfc958" }
 
 # Every strict msgspec model generated from a committed schema, as datamodel-codegen's
 # own `--all-jobs`/`--all-jobs --check` batch (0.75.1). Replaces four
