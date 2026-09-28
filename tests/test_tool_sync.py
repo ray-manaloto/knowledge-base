@@ -158,6 +158,13 @@ def test_exact_mise_new_install_progress_is_not_a_warning(tmp_path) -> None:
         "mise ████████████████ 1/1 · installed 1 tool in 4.3s\n"
     )
     assert tool_sync._mise_progress_only(progress, spec)
+    minute_progress = (
+        progress.replace("3.0s", "1m1s").replace("4.2s", "1m2s").replace("4.3s", "1m2.1s")
+    )
+    assert tool_sync._mise_progress_only(minute_progress, spec)
+    assert not tool_sync._mise_progress_only(
+        minute_progress.replace("downloading", "warning: bad"), spec
+    )
     assert not tool_sync._mise_progress_only(
         progress.replace("installed 1 tool", "installed 0 tools"), spec
     )

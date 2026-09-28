@@ -72,7 +72,8 @@ def _mise_progress_only(stderr: str, spec: ToolSpec) -> bool:
         return False
     key = re.escape(spec.mise_key)
     tool = rf"{key}@[^\s]+"
-    elapsed = r"\d+(?:\.\d+)?(?:ms|s)"
+    # A successful install can cross a minute while staying below _TIMEOUT.
+    elapsed = r"(?:\d+(?:\.\d+)?ms|\d+(?:\.\d+)?s|\d+m(?:\d+(?:\.\d+)?s)?)"
     skipped = re.compile(rf"^mise ⇢ {tool}\s+{elapsed} · already installed$")
     installed = re.compile(rf"^mise ✓ {tool}\s+{elapsed}(?: · cached)?(?:  [^\s]+)?$")
     summary = re.compile(
