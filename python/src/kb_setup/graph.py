@@ -247,6 +247,15 @@ _EXPECTED_UNCLASSIFIED = (
         # 597 bytes of WEBVTT video chapter labels/timestamps, not code source.
         classification=ReviewedClassification.reviewed_docs_caption_asset,
     ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="fnox",
+        relative_path="docs/.vitepress/fonts/SpaceGrotesk.ttf",
+        content_sha256="acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
+        pinned_commit="efaa682d140e7ef1d9383e9116dfe57757d2d659",
+        # The 1.35.3 VitePress docs carry the same 136,676-byte TrueType asset
+        # reviewed for mise and hk; it contains no extractable source code.
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
 )
 
 # `Attacca` emits EIGHT metadata-only JSON files, which is why the truncation
