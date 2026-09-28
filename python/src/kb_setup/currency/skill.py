@@ -146,6 +146,21 @@ class Addendum:
 ADDENDA: dict[str, tuple[Addendum, ...]] = {
     ".claude/skills/graphify": (
         Addendum(
+            path=".claude/skills/graphify/SKILL.md",
+            anchor="# /graphify\n",
+            text=(
+                "\n> **Knowledge-base override:** Use the reviewed project instructions in\n"
+                "> `.agents/skills/graphify/SKILL.md` for every `/graphify` request in this\n"
+                "> repository. The generic installer, interpreter, fast-path, and pipeline\n"
+                "> commands below are reference material here, not executable steps. Run\n"
+                "> Graphify only through the corresponding `mise run kb-*` task. Never run\n"
+                "> `uv tool run --from graphifyy`, `uv tool install --upgrade graphifyy`,\n"
+                "> `pip install graphifyy`, or a bare `graphify` command. If no reviewed task\n"
+                "> supports the requested operation, stop and report that gap instead of\n"
+                "> falling back to a public or global installation.\n"
+            ),
+        ),
+        Addendum(
             path=".claude/skills/graphify/references/query.md",
             anchor='graphify path "NODE_A" "NODE_B"\n```\n',
             text=(

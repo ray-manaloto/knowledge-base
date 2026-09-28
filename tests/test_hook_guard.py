@@ -43,6 +43,10 @@ DENY = [
     ),
     ("FOO=1 graphify add https://example.com/x", "kb-add"),
     ("for f in a b; do graphify update $f; done", "kb-update"),
+    ("uv tool run --from graphifyy python -c 'print(1)'", "kb-skill-refresh"),
+    ("uv tool install --upgrade graphifyy", "kb-skill-refresh"),
+    ("python3 -m pip install graphifyy", "kb-skill-refresh"),
+    ("cd /kb && pip install graphifyy", "kb-skill-refresh"),
 ]
 
 # Must be ALLOWED (verdict None) — the control arm.
@@ -66,6 +70,8 @@ ALLOW = [
     'grep -rn "import graphify" python/',
     'rg "_merge_docs.py" .',
     'rg "graphify.transcribe" python/',
+    'rg "uv tool install --upgrade graphifyy" .',
+    "mise run kb-skill-refresh",
     # The same payload with a python head in a DIFFERENT segment: the head and
     # the payload must co-occur in one segment, or `rg …; <python> -c …` denies.
     #
