@@ -10,9 +10,9 @@
 # ask. That row now exists; this pin is what it checks against.
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
-#   version source: mise.toml `[tools]` pin `"github:agent-sh/agnix" = "0.49.0"`,
+#   version source: mise.toml `[tools]` pin `"cargo:agnix-cli" = "0.54.0"`,
 #                   confirmed against `mise exec -- agnix --version`.
-#   pinned here:    0.49.0
+#   pinned here:    0.54.0
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -35,9 +35,9 @@
 #   2. THE TAG LIST IS NOT VERSION-SORTED. `git ls-remote --tags` ends at
 #      `v0.9.3` — three minors BEHIND v0.49.0 — and reads exactly like "latest".
 #
-# To bump: `mise use "github:agent-sh/agnix@<version>"`, then resolve the tag
+# To bump: `mise use "cargo:agnix-cli@<version>"`, then resolve the tag
 # with mise (Ray's directive, #395) and cross-check the COMMIT:
-#   mise ls-remote "github:agent-sh/agnix"
+#   mise ls-remote "cargo:agnix-cli"
 #   gh api repos/agent-sh/agnix/commits/v<version> --jq .sha
 # set ref/commit here to match, then `mise run kb-build`.
 #
@@ -45,7 +45,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/agent-sh/agnix
-ref = v0.52.1
-commit = d18c0a88e6a61878502f105106d054bcce9789df
+ref = v0.54.0
+commit = 784ae6497e2c879e3b7a97ab7a7005b5d5e2025f
 kind = code
 added = 2026-08-02

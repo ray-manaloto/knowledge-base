@@ -494,17 +494,22 @@ def test_the_graphify_addenda_registration_is_pinned() -> None:
     Same shape as `test_the_writer_set_names_every_graph_writer` — membership
     pinned, so removing one is a deliberate edit here rather than a silent loss.
     """
-    entries = {a.path: a for a in skill.ADDENDA[".claude/skills/graphify"]}
+    entries = skill.ADDENDA[".claude/skills/graphify"]
 
-    assert set(entries) == {
-        ".claude/skills/graphify/references/query.md",
-        ".claude/skills/graphify/SKILL.md",
-    }
+    assert [(a.path, a.anchor) for a in entries] == [
+        (".claude/skills/graphify/SKILL.md", "# /graphify\n"),
+        (
+            ".claude/skills/graphify/references/query.md",
+            'graphify path "NODE_A" "NODE_B"\n```\n',
+        ),
+        (".claude/skills/graphify/SKILL.md", "### Step 5 - Label communities\n"),
+    ]
     # Each is pinned by the CLAIM it carries, not merely by existing: an entry
     # rewritten to say something else is the same silent loss with extra steps.
-    assert "--undirected" in entries[".claude/skills/graphify/references/query.md"].text
-    assert "mise run kb-label" in entries[".claude/skills/graphify/SKILL.md"].text
-    assert "Step 5" in entries[".claude/skills/graphify/SKILL.md"].anchor
+    assert ".agents/skills/graphify/SKILL.md" in entries[0].text
+    assert "uv tool install --upgrade graphifyy" in entries[0].text
+    assert "--undirected" in entries[1].text
+    assert "mise run kb-label" in entries[2].text
 
 
 def test_a_failing_installer_still_normalises_the_stamp(tmp_path) -> None:

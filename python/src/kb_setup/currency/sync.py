@@ -22,9 +22,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
+import sys
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -180,7 +182,7 @@ def _python_project_pin(
         return "", ()
     dependencies = project.get("dependencies", []) if isinstance(project, dict) else []
     version_pattern = re.compile(
-        rf"{re.escape(package)}(?:\[([^]]+)\])?==([0-9]+(?:\.[0-9]+)+)",
+        rf"{re.escape(package)}(?:\[([^]]+)\])?==([0-9]+(?:\.[0-9]+)+)(?:; (.+))?",
         re.IGNORECASE,
     )
     vcs_pattern = re.compile(
@@ -188,21 +190,36 @@ def _python_project_pin(
         r"git\+https://github\.com/([^@\s]+)@([0-9a-f]{40})",
         re.IGNORECASE,
     )
-    matches: list[tuple[str, tuple[str, ...]]] = []
+    matches: list[tuple[str, tuple[str, ...], str]] = []
     for requirement in dependencies if isinstance(dependencies, list) else []:
+        if not re.match(rf"{re.escape(package)}(?:\[|==|\s*@)", str(requirement), re.IGNORECASE):
+            continue
         version_match = version_pattern.fullmatch(str(requirement))
         vcs_match = vcs_pattern.fullmatch(str(requirement))
         if version_match:
             extras = tuple(
                 part.strip() for part in (version_match.group(1) or "").split(",") if part
             )
-            matches.append((version_match.group(2), extras))
+            matches.append((version_match.group(2), extras, version_match.group(3) or ""))
         elif vcs_match and (not github or vcs_match.group(2).lower() == github.lower()):
             extras = tuple(part.strip() for part in (vcs_match.group(1) or "").split(",") if part)
-            matches.append((vcs_match.group(3), extras))
-    if len(matches) == 1:
-        return matches[0]
+            matches.append((vcs_match.group(3), extras, ""))
+        else:
+            return "", ()
+    if len(matches) == 1 and not matches[0][2]:
+        return matches[0][:2]
+    non_intel_marker = "sys_platform != 'darwin' or platform_machine != 'x86_64'"
+    intel_marker = "sys_platform == 'darwin' and platform_machine == 'x86_64'"
+    marker_count = 2
+    if len(matches) == marker_count and matches[0][0] == matches[1][0]:
+        by_marker = {marker: (version, extras) for version, extras, marker in matches}
+        if set(by_marker) == {non_intel_marker, intel_marker}:
+            return by_marker[intel_marker if _is_macos_intel() else non_intel_marker]
     return "", ()
+
+
+def _is_macos_intel() -> bool:
+    return sys.platform == "darwin" and platform.machine() == "x86_64"
 
 
 # ------------------------------------------------------- resolved version ----
@@ -1289,7 +1306,9 @@ def _check_source_clone(repo_root: Path, spec: ToolSpec, commit: str) -> Finding
 
 
 def _check_extras(spec: ToolSpec, declared: tuple[str, ...]) -> Finding:
-    if not spec.extras:
+    intel_extras = spec.extras_macos_intel
+    expected = intel_extras if _is_macos_intel() and intel_extras else spec.extras
+    if not expected:
         if declared:
             # One-directional checking hid a real supply-surface change: the pin
             # installing extras nobody declared is as much a drift as the reverse.
@@ -1300,14 +1319,12 @@ def _check_extras(spec: ToolSpec, declared: tuple[str, ...]) -> Finding:
                 f"does not declare",
             )
         return Finding("extras", SKIP, "no extras declared for this tool")
-    if tuple(sorted(declared)) != tuple(sorted(spec.extras)):
-        return Finding(
-            "extras",
-            DRIFT,
-            f"mise pin declares extras {list(declared)} "
-            f"but currency.toml expects {list(spec.extras)}",
+    if tuple(sorted(declared)) != tuple(sorted(expected)):
+        detail = (
+            f"mise pin declares extras {list(declared)} but currency.toml expects {list(expected)}"
         )
-    return Finding("extras", OK, f"pin declares the expected extras {list(spec.extras)}")
+        return Finding("extras", DRIFT, detail)
+    return Finding("extras", OK, f"pin declares the expected extras {list(expected)}")
 
 
 def install_site_packages(
@@ -1373,7 +1390,12 @@ def _check_extra_probes(repo_root: Path, spec: ToolSpec, *, deep: bool) -> Findi
     files cannot answer: `extras = ["all"]` in both files is satisfied even when
     the install is missing every package the extra was meant to provide.
     """
-    if not spec.extra_probes:
+    probes = (
+        spec.extra_probes_macos_intel
+        if _is_macos_intel() and spec.extra_probes_macos_intel
+        else spec.extra_probes
+    )
+    if not probes:
         return Finding("extra-probes", SKIP, "no extra_probes declared for this tool")
     site = install_site_packages(
         spec.binary,
@@ -1389,16 +1411,14 @@ def _check_extra_probes(repo_root: Path, spec: ToolSpec, *, deep: bool) -> Findi
             "install path not resolvable here"
             + ("" if deep else " without a subprocess (run the full workflow for a deep check)"),
         )
-    missing = [p for p in spec.extra_probes if not (site / p).exists()]
+    missing = [p for p in probes if not (site / p).exists()]
     if missing:
         return Finding(
             "extra-probes",
             DRIFT,
-            f"declared extras {list(spec.extras)} did not deliver {missing} (looked in {site})",
+            f"declared extras did not deliver {missing} (looked in {site})",
         )
-    return Finding(
-        "extra-probes", OK, f"all {len(spec.extra_probes)} probed extra package(s) present"
-    )
+    return Finding("extra-probes", OK, f"all {len(probes)} probed extra package(s) present")
 
 
 def _check_backend_probes(spec: ToolSpec) -> Finding:

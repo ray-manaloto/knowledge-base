@@ -180,12 +180,12 @@ def _blob(clone: Path, commit: str, path: str) -> tuple[str, int] | None:
     try:
         raw = _git(clone, "cat-file", "blob", f"{commit}:{path}")
     except CatalogUnavailableError:
-        # `cat-file` exits non-zero for "no such path in that tree", which is a
-        # legitimate answer here rather than a broken probe. It also exits
-        # non-zero for a missing OBJECT, which is not — `derive` proves the
-        # commit resolves before any of these run, so by this point the only
-        # reachable cause is absence.
-        return None
+        # A source sync can replace the clone after the earlier commit check.
+        # Only a successful tree read proving this path absent is drift; any
+        # other cat-file failure means the catalog could not be verified.
+        if not _git(clone, "ls-tree", "-z", commit, "--", path):
+            return None
+        raise
     return hashlib.sha256(raw).hexdigest(), len(raw)
 
 

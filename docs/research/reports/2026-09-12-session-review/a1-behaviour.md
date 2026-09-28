@@ -191,7 +191,8 @@ times while iterating the contract-derivation regex against real output.
 a live `/plugin-types` regeneration + reachability check, landed in `4cdd8bfb`,
 then hardened in `c33a1fb5` ("the gate was green only because of WHERE it
 ran") after a P1 was found in the FIX itself (matches the standing lesson
-already in `MEMORY.md`: [the fix is where the defect lives](the-fix-is-where-the-defect-lives-measured-twice.md)).
+already in `MEMORY.md`: `the fix is where the defect lives` (the external-memory file
+`the-fix-is-where-the-defect-lives-measured-twice.md`).
 
 ## GitHub repos touched
 

@@ -99,7 +99,9 @@ def test_every_committed_manifest_still_loads() -> None:
     # then reproduced the corpus green with codex included for the first time.
     assert {m.name for m in loaded if m.build == "skip"} == {
         "GitNexus",
+        "agentsview",
         "codebase-memory-mcp",
+        "code-review-graph",
         "codegraph",
         "colibri",
         "deps-dev",

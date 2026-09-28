@@ -214,6 +214,48 @@ _EXPECTED_UNCLASSIFIED = (
         # lose, and no extractor could produce one.
         classification=ReviewedClassification.reviewed_binary_docs_asset,
     ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/.vitepress/fonts/SpaceGrotesk.ttf",
+        content_sha256="acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
+        pinned_commit="07d39997a32175873d104950f185400760060881",
+        # The hk v2.3.1 docs embed the same TrueType VitePress asset as mise;
+        # its Git blob matches v2.3.0 exactly at this release pin.
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/.vitepress/fonts/LiberationMono-Bold.ttf",
+        content_sha256="626655e94dd82f3f42549daf995c921b0915fa8ab1f4b839559e8892ea41d240",
+        pinned_commit="07d39997a32175873d104950f185400760060881",
+        # The hk VitePress docs serve this 308,068-byte TrueType font (18 tables).
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/.vitepress/fonts/LiberationMono-Regular.ttf",
+        content_sha256="395fa5ab8d40c8eba390ced528744ea75a7f69aabf3e68b6f925ca0e39a27370",
+        pinned_commit="07d39997a32175873d104950f185400760060881",
+        # The paired 319,624-byte TrueType documentation font has 18 tables.
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/public/showreel-chapters.vtt",
+        content_sha256="387354be22646c56ee90470117f30dc2a2ff582a4fe890fae98c970bdce3f2e1",
+        pinned_commit="07d39997a32175873d104950f185400760060881",
+        # 597 bytes of WEBVTT video chapter labels/timestamps, not code source.
+        classification=ReviewedClassification.reviewed_docs_caption_asset,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="fnox",
+        relative_path="docs/.vitepress/fonts/SpaceGrotesk.ttf",
+        content_sha256="acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
+        pinned_commit="efaa682d140e7ef1d9383e9116dfe57757d2d659",
+        # The 1.35.3 VitePress docs carry the same 136,676-byte TrueType asset
+        # reviewed for mise and hk; it contains no extractable source code.
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
 )
 
 # `Attacca` emits EIGHT metadata-only JSON files, which is why the truncation
@@ -321,17 +363,9 @@ _RUFF_MANIFEST_PATHS = (
 )
 
 _UV_MANIFEST_PATHS = (
-    # Re-hashed 2026-09-01 against the content AT THE PINNED COMMIT
-    # (`sources/uv.manifest`'s `commit = 68209e5c61ce4b76c2e685bea7913876bc929dc9`,
-    # fetched via raw.githubusercontent.com since no local clone was checked out
-    # there). The prior value (`deb1b5b7…`) was verified — via a second, local
-    # route — to be the hash of the file at the OLD pin (0.12.5,
-    # `210d1f6785e95a8c8c0d53e284408c9be1134700`): commit `b2d51b53` bumped
-    # `sources/uv.manifest` to 0.12.7 without touching this registration, so the
-    # workspace `Cargo.toml`'s content moved and this hash did not. Re-confirmed
-    # the file is STILL a bare `[workspace]` root with no `[package]`/`name` —
-    # the registration's premise still holds, only the pinned bytes changed.
-    ("Cargo.toml", "8462425d8e7f512c64662a8fccca4d821fe64251b438c4042429d7d3b05d68c2"),
+    # Re-hashed at uv 0.12.19's pinned tree. The root is still a bare
+    # `[workspace]` without `[package]`/`name`; only its reviewed bytes changed.
+    ("Cargo.toml", "7f5d65e26296d63e04eb482c1329f8199b220dd88546b97d35659b3b13428cd3"),
     (
         "test/workspaces/albatross-groups-only/pyproject.toml",
         "70ae71d05636b4496820087106ae2c8e8673e5ef4c4ea0c5fc709c9e493c0b34",
@@ -449,7 +483,7 @@ _EXPECTED_METADATA_ONLY = (
             source_name="uv",
             relative_path=relative_path,
             content_sha256=content_sha256,
-            pinned_commit="68209e5c61ce4b76c2e685bea7913876bc929dc9",
+            pinned_commit="bea138450f0e620a4ce5765b0e38cff7b9f0799f",
             skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
         )
         for relative_path, content_sha256 in _UV_MANIFEST_PATHS
@@ -543,7 +577,15 @@ _EXPECTED_METADATA_ONLY = (
         source_name="uv",
         relative_path="crates/uv/pyproject.toml",
         content_sha256="32b3705d5b32ffaf3da1f3ccb279bafdb572a6f8a156f1929eaef62f780eac85",
-        pinned_commit="68209e5c61ce4b76c2e685bea7913876bc929dc9",
+        pinned_commit="bea138450f0e620a4ce5765b0e38cff7b9f0799f",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
+    graphify_health.ExpectedMetadataOnly(
+        source_name="uv",
+        relative_path="test/packages/native_extension/pyproject.toml",
+        content_sha256="0988e55b053fae2a191046925aa73aaf4f94fb4e52bd6328e18520ca02590c94",
+        pinned_commit="bea138450f0e620a4ce5765b0e38cff7b9f0799f",
+        # A build-system-only fixture with no `[project]` name at the 0.12.19 pin.
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
 )
@@ -674,7 +716,7 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         source_name="graphify",
         relative_path="tests/fixtures/sample.luau",
         content_sha256="c1aa998580d46b917014567ad39fe125c2a63ac540c3840fd27813d2004d2bd5",
-        pinned_commit="3c9b930f386f80c393fe658e1afb685030828c6a",
+        pinned_commit="3d6d280b81d92fe8856cf68ace196ee0e09930fc",
         first_error_line=8,
         extracted_nodes=5,
         lost_symbols=0,
@@ -746,59 +788,12 @@ _EXPECTED_PARTIAL_EXTRACTION = (
     ),
 )
 
-# Files in a language graphify has NO AST extractor for (#1689). Separate from
-# `_EXPECTED_PARTIAL_EXTRACTION` above because the two expire on different
-# events: a partial extraction changes when the FILE or the grammar changes,
-# while these change only when UPSTREAM ships an extractor.
-#
-# Upstream state, verified 2026-08-20 against the tracker AND the installed
-# 0.9.48, because the tracker alone has already been wrong about this once:
-#   * #1689 is OPEN and is exactly this warning. The maintainer shipped the
-#     warning itself in v8 (377dc7f) and said the extractor "is the natural
-#     follow-up".
-#   * #2116 ("Native Tree-sitter Support for R") is CLOSED as COMPLETED and
-#     nothing shipped — a commenter documented the same thing at 0.9.27.
-#   * The installed 0.9.48 has 30 files in `graphify/extractors/` and no `r.py`
-#     (the r-prefixed ones are razor, resolution, rust). The gap is real at the
-#     version we run, which is the only version whose behaviour this gates.
-# So the loss below is accepted as CURRENT, never as permanent: the zero-node
-# check in `approve_unsupported_language_warning` expires each entry the moment
-# an extractor lands, and the build reports that rather than absorbing it.
-_EXPECTED_UNSUPPORTED_LANGUAGE = (
-    # code-review-graph is a multi-language parser and carries one fixture per
-    # language it claims to handle. These two are its R pair, and R is precisely
-    # the language #1689 was filed about.
-    #
-    # MEASURED from the sub-graph, control-armed: 53 other `tests/fixtures/*`
-    # files ARE present in it, so a zero here is an absence and not a broken
-    # probe.
-    graphify_health.ExpectedUnsupportedLanguage(
-        source_name="code-review-graph",
-        relative_path="tests/fixtures/sample.R",
-        content_sha256="3e3d48a842d2fcf26d288fda088a1fe0f218165b8f1a01b1b899fbf401e7613b",
-        pinned_commit="c3f3a6681791f6c6d870e8e437ecfe4e8500e377",
-        language=".r",
-        lost_symbols=6,
-        reason=(
-            "graphify has no tree-sitter-r dispatch (#1689), so this 30-line CRAN-style "
-            "fixture contributes zero nodes; add(), multiply(), MyClass, greet(), "
-            "get_age() and process_data() are all absent"
-        ),
-    ),
-    graphify_health.ExpectedUnsupportedLanguage(
-        source_name="code-review-graph",
-        relative_path="tests/fixtures/test_sample.R",
-        content_sha256="2c643bf1eb0749fe0af797b46c119325f62169bb06763f42054b81f1fa0fb702",
-        pinned_commit="c3f3a6681791f6c6d870e8e437ecfe4e8500e377",
-        language=".r",
-        lost_symbols=1,
-        reason=(
-            "the R half of code-review-graph's test-detection fixtures; no tree-sitter-r "
-            "dispatch (#1689), so test_add() is absent. The testthat block is a call, "
-            "not a definition, and is not counted as loss"
-        ),
-    ),
-)
+# The v0.9.67 fork now has an R extractor. The old code-review-graph R
+# unsupported-language approvals from 0.9.48 are obsolete, and that source is
+# explicitly skipped until its new external-symbol provenance warnings are
+# resolved. Keep the inventory empty so a future unsupported-language warning
+# cannot inherit a stale R exception.
+_EXPECTED_UNSUPPORTED_LANGUAGE: tuple[graphify_health.ExpectedUnsupportedLanguage, ...] = ()
 
 # The tool whose artifacts `kb-build` produces. Named explicitly so a
 # multi-tool currency.toml cannot silently stamp the wrong tool.
@@ -2467,59 +2462,33 @@ def _handoff_counts(handoff: Path) -> dict[str, int | None]:
 
 
 def _replay_doc_chunks(
-    repo_root: Path, gpy: str, sources: Path, out: Path, chunk_paths: list[Path]
+    repo_root: Path, gpy: str, _sources: Path, out: Path, chunk_paths: list[Path]
 ) -> None:
-    """Replay every committed chunk in CAPTURE-DATE order, checking the arithmetic.
+    """Replay committed chunks in CAPTURE-DATE order with one full-build merge.
 
-    Order first, because it is the load-bearing part: `build_merge` gives a
-    `source_file` to the LAST chunk that names it, so replay order IS the
-    supersession rule — see `chunks.replay_order` for the measured defect (a
-    rebuild and an incremental merge producing different graphs from the same
-    committed corpus, chosen by the alphabet).
-
-    Each merge's post-count is then threaded into the NEXT merge as its prior, so
-    every step asserts its own arithmetic (#191). This is the loop where the
-    2026-08-05 rebuild silently swapped a fresh page's 69 nodes for an older
-    chunk's 13, and the only reason anyone noticed was a human subtracting
-    `+290 printed` from `total rose 221` across two printed lines.
-
-    The FIRST chunk's prior is deliberately UNKNOWN, and the ledger is not
-    consulted for it. By the time this runs `build()` has already re-seeded
-    `graph.json` from the freshly composed code layer, so the ledger describes a
-    DIFFERENT artifact — the previous build's — and any number it returned would
-    be a baseline for a file that no longer exists. Its fingerprint gate would
-    reject it anyway; not asking is the version of that which cannot be misread
-    later as "the ledger had nothing to say". So chunk 1 reports *not checked*,
-    and every chunk after it is checked against the merge immediately before it.
-
-    The ledger's own payoff is the INCREMENTAL path (`graphify_ops.merge_chunk`),
-    where the graph on disk really is the one it describes — and that is the path
-    the 2026-08-06 loss arrived on.
-
-    HYPEREDGES ARE THREADED HERE TOO (#198 item 1), and this path is the one that
-    needed it most: the #186 loss that started this whole ticket family — 11
-    hyperedges to 8, no nodes moved — was observed on a REBUILD, i.e. in this loop,
-    by a human diffing rebuild against incremental. Until now this loop threaded
-    `nodes` alone, so it would have replayed straight past it printing "0 replaced"
-    and been entirely correct about nodes while the thing it was written to catch
-    went by.
+    `chunks.replay_order` defines the last owner of every source_file. The batch
+    script discards superseded records, merges the surviving records once, and
+    verifies each claimed source's semantic node count before writing. This
+    avoids 29 full-graph load/write cycles on a several-hundred-MB graph.
+    Incremental recomposition still uses `_replay_pairs` and its per-step counts.
     """
-    _replay_pairs(repo_root, gpy, out, [(c, _derived_root(sources, c)) for c in chunk_paths])
+    from kb_setup import chunks as _chunks
 
-
-def _derived_root(sources: Path, chunk: Path) -> str:
-    """The `sources/<name>` root `build()` merges a globbed chunk under."""
-    return str((sources / chunk.stem.removesuffix("-docs")).resolve())
+    ordered = _chunks.replay_order(chunk_paths)
+    if not ordered:
+        return
+    _run(
+        [gpy, str(_MERGE_SCRIPT), "--batch", str(repo_root), str(out), *map(str, ordered)],
+        repo_root,
+    )
 
 
 def _replay_pairs(repo_root: Path, gpy: str, out: Path, pairs: list[tuple[Path, str]]) -> None:
     """Replay `(chunk, root)` pairs in CAPTURE-DATE order, checking the arithmetic.
 
-    THE one replay loop. Both paths that exist call it — `build()`'s
-    :func:`_replay_doc_chunks`, which derives each root from the chunk stem, and
-    `refresh_self()`'s :func:`_recompose_into_temp`, which carries a recorded
-    root per chunk. They were separate loops until 2026-08-08, and the whole
-    cost of that is what this function's existence is for:
+    Incremental recomposition uses this per-chunk loop and its threaded counts.
+    Full builds use :func:`_replay_doc_chunks` to merge the same ordered chunks
+    in one batch. The common replay order remains essential to both paths:
 
     `build()`'s loop applied `chunks.replay_order` and threaded `--prior-<field>`;
     the recomposition loop did neither. It replayed in `manifest.chunks` order —
@@ -2530,9 +2499,8 @@ def _replay_pairs(repo_root: Path, gpy: str, out: Path, pairs: list[tuple[Path, 
     `[merge]` line `kb-watch` ever printed said *prior node count unknown —
     arithmetic NOT checked*, so #191's gate had never once fired there either.
 
-    Two fixes on one path and not its sibling is not two bugs; it is one missing
-    seam. Hence pairs rather than paths: the root is the only thing the two
-    callers genuinely disagree about, so it is the only thing they still supply.
+    The incremental path carries each chunk's recorded root explicitly, hence
+    the `(chunk, root)` pairs rather than deriving roots from filenames.
     """
     from kb_setup import chunks as _chunks
 
@@ -3081,11 +3049,9 @@ def build(repo_root: Path) -> None:
     _cluster_study_graph(repo_root, out.parent / STUDY_GRAPH_NAME)
 
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
-    # MERGE-ONLY (#169): `_merge_docs.py` no longer clusters, scores, or reports
-    # per chunk — 17 of 18 such passes were discarded and never read. It loads
-    # graph.json, merges the chunk, reconstructs communities from what the graph
-    # already carries, and writes. The real clustering/labelling happens ONCE,
-    # below, after every chunk has landed — not once per chunk.
+    # MERGE-ONLY (#169): `_merge_docs.py` no longer clusters or labels each
+    # chunk. Full builds merge the validated doc layer once; the final
+    # clustering/labelling pass follows below.
     gpy = graphify_python(repo_root)
     # Already validated at the TOP of build(), before anything wrote graph.json.
     # CAPTURE-DATE order, not the glob's alphabetical order: build_merge gives

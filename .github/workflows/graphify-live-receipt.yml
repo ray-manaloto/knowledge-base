@@ -41,15 +41,8 @@ jobs:
 
           git -C trusted diff --no-renames --name-only -z "$BASE_SHA" "$PR_HEAD" \
             > "$RUNNER_TEMP/changed-paths.nul"
-          git -C trusted diff --no-ext-diff --no-renames -U0 \
-            "$BASE_SHA" "$PR_HEAD" -- mise.toml > "$RUNNER_TEMP/mise.diff"
-          git -C trusted show "${BASE_SHA}:mise.lock" > "$RUNNER_TEMP/base-mise.lock"
-          git -C trusted show "${PR_HEAD}:mise.lock" > "$RUNNER_TEMP/head-mise.lock"
           scope="$(python3 trusted/python/src/kb_setup/live_receipt_scope.py \
-            --changed-paths "$RUNNER_TEMP/changed-paths.nul" \
-            --mise-diff "$RUNNER_TEMP/mise.diff" \
-            --base-lock "$RUNNER_TEMP/base-mise.lock" \
-            --head-lock "$RUNNER_TEMP/head-mise.lock")"
+            --changed-paths "$RUNNER_TEMP/changed-paths.nul")"
           case "$scope" in
             EXEMPT)
               echo "Graphify live receipt exempt: no extraction-capable change"

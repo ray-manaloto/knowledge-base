@@ -1,0 +1,30 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "enabledManagers": ["mise", "pep621", "github-actions"],
+  "timezone": "America/Chicago",
+  "schedule": ["* 0-5 * * *"],
+  "dependencyDashboard": true,
+  "platformAutomerge": false,
+  "ignoreTests": false,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["* 0-5 * * *"],
+    "automerge": false
+  },
+  "automerge": false,
+  "packageRules": [
+    {
+      "description": "Automerge patch PRs only after all hosted checks, including the signed live gate when required",
+      "matchManagers": ["mise", "pep621", "github-actions"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "The maintained Graphify fork uses its own release-selection and live-qualification workflow",
+      "matchPackageNames": ["graphifyy"],
+      "enabled": false
+    }
+  ]
+}

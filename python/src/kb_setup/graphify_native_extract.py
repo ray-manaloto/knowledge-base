@@ -220,12 +220,17 @@ runs; it is a one-line wiring check, not a real extraction.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import math
 import os
 import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from kb_setup import events
+import msgspec
+
+from kb_setup import events, graphify_health
 from kb_setup.graphify_env import (
     assert_pinned_graphify,
     clean_env,
@@ -265,7 +270,7 @@ DEFAULT_OUT = ".agent/kb/native-extract"
 #: Note it deliberately DIFFERS from graphify's own `claude-cli` default
 #: (`claude-code-plan`): overriding that is the point of setting the variable at
 #: all, and the paragraph above is why this identifier and not another.
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = "opus"
 
 #: `claude-cli`'s env keys, kept ONLY as the expected value in tests that assert
 #: what the default backend resolves to. Production code must call
@@ -306,6 +311,8 @@ class Options:
     out: Path
     token_budget: int | None = None
     max_concurrency: int | None = None
+    max_attempts: int = 8
+    total_timeout_seconds: float = 1800.0
     allow_parallel_claude_cli: bool = False
     #: The extraction backend, and with it the model/parallel env keys — ONE
     #: coupled choice (`backend_env_keys`), never three that can drift apart.
@@ -315,6 +322,8 @@ class Options:
     #: default here. `resolve_model` turns the absence into the right answer per
     #: backend — including "say nothing", which no non-empty default can express.
     model: str = ""
+    #: Empty delegates to the managed profile's backend-specific default.
+    effort: str = ""
     dry_run: bool = False
     cluster: bool = False
     artifacts: bool = False
@@ -411,7 +420,13 @@ _VALUE_FLAGS = {
     "--target": ("target", lambda root, _f, raw: root / raw),
     "--token-budget": ("token_budget", lambda _r, f, raw: _parse_positive_int(f, raw)),
     "--max-concurrency": ("max_concurrency", lambda _r, f, raw: _parse_positive_int(f, raw)),
+    "--max-attempts": ("max_attempts", lambda _r, f, raw: _parse_positive_int(f, raw)),
+    "--total-timeout-seconds": (
+        "total_timeout_seconds",
+        lambda _r, f, raw: _parse_positive_float(f, raw),
+    ),
     "--model": ("model", lambda _r, _f, raw: raw),
+    "--effort": ("effort", lambda _r, _f, raw: raw),
     "--backend": ("backend", lambda _r, _f, raw: raw),
 }
 
@@ -463,6 +478,16 @@ def _parse_positive_int(flag: str, raw: str) -> int:
         raise _UsageError(f"{flag} must be an integer (got {raw!r})") from exc
     if value <= 0:
         raise _UsageError(f"{flag} must be > 0 (got {value})")
+    return value
+
+
+def _parse_positive_float(flag: str, raw: str) -> float:
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise _UsageError(f"{flag} must be a finite positive number") from exc
+    if not math.isfinite(value) or value <= 0:
+        raise _UsageError(f"{flag} must be a finite positive number")
     return value
 
 
@@ -829,20 +854,380 @@ def _print_dry_run(exe: str, opts: Options) -> None:
             )
 
 
+@dataclass(frozen=True)
+class _SemanticReplayContext:
+    semantic_files: list[Path]
+    target: Path
+    cache_root: Path
+    public_profile: dict
+    run_context: dict
+    attachment_compatibility: dict
+    run_root: Path
+
+
+def _semantic_reconciliation_report(
+    fresh: dict,
+    persisted: tuple[list[dict], list[dict], list[dict]],
+    *,
+    still_uncached: list[str],
+    replay: _SemanticReplayContext,
+    cache_evidence: list[dict],
+) -> dict:
+    """Account for SDK cache exclusions before cold output uses the warm view."""
+    nodes, edges, hyperedges = persisted
+    allowed_sources = {path.resolve() for path in replay.semantic_files}
+    node_ids = {node.get("id") for node in nodes}
+    edge_keys = {(edge.get("source"), edge.get("relation"), edge.get("target")) for edge in edges}
+
+    def hyperedge_key(item: dict) -> str:
+        return json.dumps(
+            {"id": item.get("id"), "nodes": item.get("nodes"), "relation": item.get("relation")},
+            sort_keys=True,
+        )
+
+    hyperedge_keys = {hyperedge_key(item) for item in hyperedges}
+    omitted_nodes = [node for node in fresh["nodes"] if node.get("id") not in node_ids]
+    omitted_edges = [
+        edge
+        for edge in fresh["edges"]
+        if (edge.get("source"), edge.get("relation"), edge.get("target")) not in edge_keys
+    ]
+    omitted_hyperedges = [
+        item for item in fresh["hyperedges"] if hyperedge_key(item) not in hyperedge_keys
+    ]
+
+    def source_in_scope(item: dict) -> bool:
+        source = item.get("source_file")
+        if not isinstance(source, str) or not source:
+            return True  # Unknown attribution cannot justify an omission.
+        path = Path(source)
+        return (path if path.is_absolute() else replay.target / path).resolve() in allowed_sources
+
+    unexpected_nodes = [node for node in omitted_nodes if source_in_scope(node)]
+    unexpected_edges = [
+        edge
+        for edge in omitted_edges
+        if edge.get("source") in node_ids and edge.get("target") in node_ids
+    ]
+    unexpected_hyperedges = [
+        item for item in omitted_hyperedges if set(item.get("nodes") or []) <= node_ids
+    ]
+    return {
+        "status": "incomplete"
+        if still_uncached or unexpected_nodes or unexpected_edges or unexpected_hyperedges
+        else "complete",
+        "still_uncached": still_uncached,
+        "fresh_counts": {kind: len(fresh[kind]) for kind in ("nodes", "edges", "hyperedges")},
+        "persisted_counts": dict(
+            zip(("nodes", "edges", "hyperedges"), map(len, persisted), strict=True)
+        ),
+        "excluded_out_of_scope_nodes": [
+            {"id": node.get("id"), "source_file": node.get("source_file")}
+            for node in omitted_nodes
+            if not source_in_scope(node)
+        ],
+        "excluded_edges_to_unavailable_nodes": [
+            {key: edge.get(key) for key in ("source", "relation", "target", "source_file")}
+            for edge in omitted_edges
+            if edge not in unexpected_edges
+        ],
+        "excluded_hyperedges_to_unavailable_nodes": [
+            item for item in omitted_hyperedges if item not in unexpected_hyperedges
+        ],
+        "unexpected_in_scope_nodes": unexpected_nodes,
+        "unexpected_in_scope_edges": unexpected_edges,
+        "unexpected_in_scope_hyperedges": unexpected_hyperedges,
+        "cache_evidence": cache_evidence,
+    }
+
+
+def _canonical_semantic_after_extraction(
+    semantic: dict,
+    *,
+    replay: _SemanticReplayContext,
+) -> dict | None:
+    """Use Graphify's public persisted view for both cold and warm graph builds."""
+    from kb_setup import graphify_execution, graphify_sdk
+
+    cache_evidence: list[dict] = []
+    nodes, edges, hyperedges, still_uncached = graphify_sdk.check_semantic_cache_public(
+        [str(path) for path in replay.semantic_files],
+        root=replay.target,
+        mode="deep",
+        prompt=graphify_sdk.extraction_system_prompt_public(deep=True),
+        cache_root=replay.cache_root,
+        execution_profile=replay.public_profile,
+        run_context=replay.run_context,
+        cache_evidence_out=cache_evidence,
+        attachment_compatibility=replay.attachment_compatibility,
+    )
+    report = _semantic_reconciliation_report(
+        semantic,
+        (nodes, edges, hyperedges),
+        still_uncached=still_uncached,
+        replay=replay,
+        cache_evidence=cache_evidence,
+    )
+    report_path = replay.run_root / "semantic-reconciliation.json"
+    graphify_execution.atomic_bytes(
+        report_path, json.dumps(report, sort_keys=True, indent=2).encode() + b"\n"
+    )
+    if report["status"] != "complete":
+        partial_path = replay.run_root / "partial-semantic.json"
+        graphify_execution.atomic_bytes(
+            partial_path,
+            json.dumps(semantic, sort_keys=True, indent=2, ensure_ascii=False).encode() + b"\n",
+        )
+        graphify_execution.atomic_bytes(
+            replay.run_root / "run-state.json",
+            json.dumps(
+                {
+                    "completion": "incomplete",
+                    "reason": "semantic cache reconciliation",
+                    "partial_semantic_ref": str(partial_path),
+                    "reconciliation_ref": str(report_path),
+                },
+                sort_keys=True,
+                indent=2,
+            ).encode()
+            + b"\n",
+        )
+        print(
+            "[graphify-native-extract] incomplete: persisted semantic cache "
+            f"differs from in-scope extraction; see {report_path}"
+        )
+        return None
+    return {**semantic, "nodes": nodes, "edges": edges, "hyperedges": hyperedges}
+
+
+def _retain_partial_semantic(
+    run_root: Path,
+    semantic: dict,
+    state: dict,
+) -> None:
+    from kb_setup import graphify_execution
+
+    partial_path = run_root / "partial-semantic.json"
+    graphify_execution.atomic_bytes(
+        partial_path,
+        json.dumps(semantic, sort_keys=True, indent=2, ensure_ascii=False).encode() + b"\n",
+    )
+    graphify_execution.atomic_bytes(
+        run_root / "run-state.json",
+        json.dumps(
+            {
+                "completion": "incomplete",
+                **state,
+                "partial_semantic_ref": str(partial_path),
+            },
+            sort_keys=True,
+            indent=2,
+        ).encode()
+        + b"\n",
+    )
+    print(
+        f"[graphify-native-extract] incomplete: {state['failed_chunks']} semantic chunk(s) "
+        f"failed, {len(state['uncovered_files'])} uncovered source(s), "
+        f"{len(state['partial_files'])} partial source(s), "
+        f"empty_semantic={state['empty_semantic']}; retained partial result at {partial_path}"
+    )
+
+
 def _run_real(repo_root: Path, exe: str, opts: Options) -> int:
     # Checked here, not in the dry-run path: this is the one place graphify
     # actually runs, and a stale binary rewriting output under an unverified
     # version is the exact hazard `assert_pinned_graphify` exists to refuse
     # before any writer touches disk.
     assert_pinned_graphify(repo_root)
-    argv = resolve_argv(exe, opts)
-    env = resolve_env(opts)
-    print(f"[graphify-native-extract] $ {' '.join(argv)}")
-    # No capture_output: stdio is inherited so a human watching sees graphify's
-    # own progress output live, exactly like `merge_chunk`'s subprocess call.
-    # No timeout: the caller bounds this (long-running-command-hangs.md).
-    result = subprocess.run([*argv], cwd=repo_root, env=env, check=False)
-    return result.returncode
+    del exe
+    from kb_setup import graphify_execution, graphify_sdk
+
+    # The general pin check covers deterministic SDK symbols and installed
+    # origin. Semantic extraction has a separate reviewed signature contract.
+    graphify_sdk.assert_semantic_sdk(graphify_sdk.running_sdk_version())
+    budget = graphify_execution.ExecutionBudget(
+        max_attempts=opts.max_attempts, total_seconds=opts.total_timeout_seconds
+    )
+    target = opts.target.resolve(strict=True)
+    run_root = graphify_execution.allocate_run_root(repo_root)
+    profile = graphify_execution.resolve_profile(
+        opts.backend,
+        graphify_execution.ProfileSelection(
+            model=resolve_model(opts) or None,
+            effort=opts.effort or None,
+            environment=dict(os.environ),
+        ),
+    )
+    detection, detection_receipt = graphify_sdk.observe_detect(
+        target,
+        source_name=target.name,
+        coverage_policy=graphify_health.SourceCoveragePolicy(),
+    )
+    graphify_execution.atomic_bytes(
+        run_root / "detection-receipt.json", msgspec.json.encode(detection_receipt)
+    )
+    graphify_health.require_complete(detection_receipt)
+    groups = detection.get("files", {})
+    code_files = [Path(path) for path in groups.get("code", [])]
+    semantic_files = [
+        Path(path)
+        for kind in ("document", "paper", "image", "video")
+        for path in groups.get(kind, [])
+    ]
+    if not code_files and not semantic_files:
+        raise ValueError("deep target has no detected code or semantic source files")
+    source_inventory = [
+        {"path": path.relative_to(target).as_posix(), "sha256": _source_sha256(path)}
+        for path in sorted([*code_files, *semantic_files])
+    ]
+    context = graphify_execution.build_run_context(
+        graphify_execution.RunContextSpec(
+            run_root=run_root,
+            repo_root=repo_root,
+            source_bytes=json.dumps(source_inventory, sort_keys=True).encode(),
+            source_scope=[item["path"] for item in source_inventory],
+            prompt="graphify public deep extraction prompt",
+            profile=profile,
+            stage_id="deep:corpus",
+        )
+    )
+    runner = graphify_execution.CapturedProcessRunner(
+        run_root,
+        graphify_execution.safe_child_environment(resolve_env(opts), backend=profile["backend"]),
+        environment_overrides=graphify_execution.child_environment_override_evidence(
+            profile["backend"]
+        ),
+        budget=budget,
+    )
+    sink = graphify_execution.DurableReceiptSink(run_root)
+    attachment_snapshot_root = run_root / "attachments"
+    public_profile = graphify_execution.public_profile_request(profile)
+    semantic_cache = opts.out / _GRAPHIFY_OUT_NAME
+    raster_admission = graphify_sdk.preflight_raster_cache_admission_public(
+        semantic_files, root=target
+    )
+    attachment_compatibility = raster_admission["attachment_compatibility"]
+    cache_evidence: list[dict] = []
+    cached_nodes, cached_edges, cached_hyperedges, uncached_files = (
+        graphify_sdk.check_semantic_cache_public(
+            [str(path) for path in semantic_files],
+            root=target,
+            mode="deep",
+            prompt=graphify_sdk.extraction_system_prompt_public(deep=True),
+            cache_root=semantic_cache,
+            execution_profile=public_profile,
+            run_context=context,
+            cache_evidence_out=cache_evidence,
+            attachment_compatibility=attachment_compatibility,
+        )
+    )
+    graphify_execution.atomic_bytes(
+        run_root / "semantic-cache-evidence.json",
+        json.dumps(
+            {
+                "requested": [str(path) for path in semantic_files],
+                "uncached": uncached_files,
+                "cache_evidence": cache_evidence,
+                "raster_preflight_batches": raster_admission["preflight_batches"],
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+        ).encode()
+        + b"\n",
+    )
+    fresh: dict = (
+        graphify_sdk.extract_corpus_parallel_public(
+            [Path(path) for path in uncached_files],
+            backend=profile["backend"],
+            model=profile["model"],
+            root=target,
+            token_budget=opts.token_budget or 60_000,
+            max_concurrency=opts.max_concurrency or 4,
+            deep_mode=True,
+            cache_root=semantic_cache,
+            effort=profile["effort"],
+            execution_profile=public_profile,
+            run_context=context,
+            process_runner=runner,
+            receipt_sink=sink,
+            attachment_stager=graphify_execution.CapturedRasterStager(
+                attachment_snapshot_root, target
+            ),
+            attachment_snapshot_root=attachment_snapshot_root,
+            attachment_compatibility=attachment_compatibility,
+        )
+        if uncached_files
+        else {"nodes": [], "edges": [], "hyperedges": [], "failed_chunks": 0}
+    )
+    failed_chunks = int(fresh.get("failed_chunks", 0))
+    uncovered_files = list(fresh.get("uncovered_files", []))
+    partial_files = list(fresh.get("_partial_files", []))
+    semantic = {
+        **fresh,
+        "nodes": [*cached_nodes, *fresh.get("nodes", [])],
+        "edges": [*cached_edges, *fresh.get("edges", [])],
+        "hyperedges": [*cached_hyperedges, *fresh.get("hyperedges", [])],
+    }
+    empty_semantic = bool(semantic_files) and not semantic.get("nodes")
+    if failed_chunks or uncovered_files or partial_files or empty_semantic:
+        _retain_partial_semantic(
+            run_root,
+            semantic,
+            {
+                "failed_chunks": failed_chunks,
+                "uncovered_files": uncovered_files,
+                "partial_files": partial_files,
+                "empty_semantic": empty_semantic,
+            },
+        )
+        return Rc.FINDINGS
+    if uncached_files:
+        # The cache is the canonical view: it excludes out-of-scope references.
+        # Re-reading it makes cold and warm graph assembly identical.
+        persisted = _canonical_semantic_after_extraction(
+            semantic,
+            replay=_SemanticReplayContext(
+                semantic_files=semantic_files,
+                target=target,
+                cache_root=semantic_cache,
+                public_profile=public_profile,
+                run_context=context,
+                attachment_compatibility=attachment_compatibility,
+                run_root=run_root,
+            ),
+        )
+        if persisted is None:
+            return Rc.FINDINGS
+        semantic = persisted
+    ast = graphify_sdk.extract_public(
+        code_files,
+        cache_root=opts.out / _GRAPHIFY_OUT_NAME,
+        root=target,
+    )
+    graph = graphify_sdk.build_public([ast, semantic], root=target)
+    communities = graphify_sdk.cluster_public(graph)
+    labels = graphify_sdk.label_communities_by_hub_public(graph, communities)
+    graph_path = _cluster_graph_json(opts)
+    graph_path.parent.mkdir(parents=True, exist_ok=True)
+    wrote = graphify_sdk.to_json_public(
+        graph,
+        communities,
+        str(graph_path),
+        force=True,
+        community_labels=labels,
+    )
+    if not wrote:
+        return Rc.FINDINGS
+    print(
+        f"[graphify-native-extract] wrote {graph_path} via managed public SDK; "
+        f"run evidence: {run_root}"
+    )
+    return Rc.OK
+
+
+def _source_sha256(path: Path) -> str:
+    """Hash a detected deep-extraction input for the run's corpus identity."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _dispatch_cluster(repo_root: Path, exe: str, opts: Options) -> int:
@@ -946,17 +1331,31 @@ def native_extract_main(repo_root: Path, argv: list[str]) -> int:
     three confirmed defects a caller of EITHER path was accepting while the
     CLI subcommand was closed and the only way in was a direct import.
     """
+    usage = (
+        "[--out DIR] [--target DIR] [--token-budget N] [--max-concurrency N] "
+        "[--max-attempts N] [--total-timeout-seconds N] "
+        "[--model NAME] [--effort LEVEL] [--backend NAME] "
+        "[--allow-parallel-claude-cli] [--cluster] [--artifacts [VIEW...]] [--dry-run]"
+    )
+    if argv == ["--help"]:
+        print(
+            "Usage: mise run kb-graphify-native-extract -- " + usage + "\n"
+            "Defaults: claude-cli model=opus effort=xhigh; "
+            "openai-cli model=gpt-5.6-sol effort=high.\n"
+            "Subscription CLIs only; provider API credentials are refused."
+        )
+        return Rc.OK
     try:
         opts = _parse(repo_root, argv)
     except _UsageError as exc:
-        print(
-            f"[graphify-native-extract] {exc}. Accepted argv: "
-            "[--out DIR] [--target DIR] [--token-budget N] [--max-concurrency N] "
-            "[--model NAME] [--backend NAME] [--allow-parallel-claude-cli] [--cluster] "
-            "[--artifacts [VIEW...]] [--dry-run]"
-        )
+        print(f"[graphify-native-extract] {exc}. Accepted argv: " + usage)
         return Rc.BAD_REQUEST
 
+    return _dispatch_options(repo_root, opts)
+
+
+def _dispatch_options(repo_root: Path, opts: Options) -> int:
+    """Validate resolved options and dispatch exactly one native operation."""
     out_problem = _refuse_out(repo_root, opts)
     if out_problem:
         events.fail("graphify_native_extract.unsafe_out", out_problem)

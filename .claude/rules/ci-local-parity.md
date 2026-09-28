@@ -8,11 +8,11 @@ paths:
 
 # CI/Local Parity: Keep Local Checks in Sync (and With CI, If It Ever Exists)
 
-**This repo has no `.github/` today.** The gates are entirely local:
+**This repo has a focused Graphify integration workflow in `.github/workflows/`.** The full gates remain local:
 `mise run lint` (hk), `mise run test` (pytest), `mise run lint-docs` (agnix),
 plus `brain-audit` and `eval` — all run by `mise run kb-ship` before a PR is
 opened, behind a `kb-review` receipt check that runs first.
-That makes the rule below *cheaper*, not optional: with no CI to catch drift,
+That makes the rule below *cheaper*, not optional: focused CI cannot catch drift in the other gates,
 a check that exists in one place and not the other is simply not run.
 
 This rule is `paths:`-scoped, and legitimately so: its trigger genuinely *is*

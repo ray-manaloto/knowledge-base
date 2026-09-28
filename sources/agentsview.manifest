@@ -31,3 +31,5 @@ ref = v0.42.0
 commit = ff8fb4e84823b9583eba417afc243140caabdcb0
 kind = code
 added = 2026-09-11
+build = skip
+skip_reason = 2026-09-24 exact-pin extraction census found 107 syntax-error files in the v0.42.0 Svelte/TypeScript tree; AgentsView corpus ingestion is outside this Graphify delivery goal, although the installed tool and pinned source remain. Clear only after a parser or source correction and a fresh exact-pin census with zero unaccounted warnings; the gitignored clone is not an accepted graph.

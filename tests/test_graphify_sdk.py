@@ -973,6 +973,32 @@ def test_detection_policy_requires_exact_reviewed_source_path_and_hash(tmp_path:
     assert changed.optional_unclassified_paths == ()
 
 
+def test_detection_policy_reviews_docs_caption_by_exact_bytes(tmp_path: Path) -> None:
+    import hashlib
+
+    caption = tmp_path / "docs" / "public" / "showreel-chapters.vtt"
+    caption.parent.mkdir(parents=True)
+    caption.write_text("WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nhk\n")
+    expected = ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/public/showreel-chapters.vtt",
+        content_sha256=hashlib.sha256(caption.read_bytes()).hexdigest(),
+        pinned_commit=_PINNED_COMMIT,
+        classification=ReviewedClassification.reviewed_docs_caption_asset,
+    )
+
+    assert graphify_sdk.source_detection_policy(
+        tmp_path, "hk", (expected,)
+    ).optional_unclassified_paths == ("docs/public/showreel-chapters.vtt",)
+    caption.write_text("WEBVTT\n\nchanged\n")
+    assert (
+        graphify_sdk.source_detection_policy(
+            tmp_path, "hk", (expected,)
+        ).optional_unclassified_paths
+        == ()
+    )
+
+
 def test_detection_policy_refuses_a_classification_with_no_absorption_branch(
     tmp_path: Path,
 ) -> None:

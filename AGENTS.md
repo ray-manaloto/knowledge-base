@@ -31,6 +31,8 @@ bare Graphify binary:
 
 ## Development rules
 
+- On a fresh Git 2.54+ machine, run `mise run kb-hk-setup` once after `mise install`
+  to register hk v2's global mise-backed commit hooks.
 - Use `uv` through the repository environment; do not use `pip`.
 - Work only in the canonical checkout or a registered worktree created from it.
 - Treat dirty trees as protected evidence. Do not reset, clean, or discard work.

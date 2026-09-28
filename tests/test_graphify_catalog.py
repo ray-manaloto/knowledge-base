@@ -202,6 +202,23 @@ def test_a_path_the_pin_no_longer_has_is_absent_not_an_error(
     assert report.examined == 3, "the other rows were still examined"
 
 
+def test_a_present_path_cat_file_failure_is_unavailable(
+    agreeing: tuple[Path, BaselineAuthority], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A changing clone must not be reported as a path missing from the pin."""
+    root, authority = agreeing
+    original_git = gc._git
+
+    def failed_blob_read(clone: Path, *args: str) -> bytes:
+        if args[:2] == ("cat-file", "blob"):
+            raise gc.CatalogUnavailableError("source clone changed during read")
+        return original_git(clone, *args)
+
+    monkeypatch.setattr(gc, "_git", failed_blob_read)
+    with pytest.raises(gc.CatalogUnavailableError, match="source clone changed during read"):
+        gc.check(root, authority=authority)
+
+
 def test_a_stale_authority_tree_is_reported(agreeing: tuple[Path, BaselineAuthority]) -> None:
     """The half a catalog-only fix leaves behind — the python literal."""
     root, authority = agreeing

@@ -100,6 +100,59 @@ def test_reads_exact_python_project_pin_and_extras(tmp_path) -> None:
     assert extras == ("all",)
 
 
+def _platform_graphify_project(intel_version: str) -> str:
+    other = "sys_platform != 'darwin' or platform_machine != 'x86_64'"
+    intel = "sys_platform == 'darwin' and platform_machine == 'x86_64'"
+    return (
+        "[project]\ndependencies = [\n"
+        f'  "graphifyy[all]==0.9.69; {other}",\n'
+        f'  "graphifyy[mcp,neo4j]=={intel_version}; {intel}",\n'
+        "]\n"
+    )
+
+
+def test_platform_graphify_pin_selects_matching_extras(tmp_path, monkeypatch) -> None:
+    root = _repo(tmp_path)
+    (root / "pyproject.toml").write_text(_platform_graphify_project("0.9.69"), encoding="utf-8")
+    (root / "currency.toml").write_text(
+        '[tool.graphify]\npython_package = "graphifyy"\n'
+        'extras = ["all"]\nextras_macos_intel = ["mcp", "neo4j"]\n',
+        encoding="utf-8",
+    )
+    spec = _spec(root)
+    monkeypatch.setattr(sync, "_is_macos_intel", lambda: False)
+    assert sync.pinned_version(root, spec) == ("0.9.69", ("all",))
+    assert sync._check_extras(spec, ("all",)).status == sync.OK
+    monkeypatch.setattr(sync, "_is_macos_intel", lambda: True)
+    assert sync.pinned_version(root, spec) == ("0.9.69", ("mcp", "neo4j"))
+    assert sync._check_extras(spec, ("mcp", "neo4j")).status == sync.OK
+    assert sync._check_extras(spec, ("all",)).status == sync.DRIFT
+
+
+def test_platform_graphify_pin_refuses_a_mismatched_version(tmp_path) -> None:
+    root = _repo(tmp_path)
+    (root / "pyproject.toml").write_text(_platform_graphify_project("0.9.68"), encoding="utf-8")
+    spec = config.ToolSpec(name="graphify", python_package="graphifyy")
+    assert sync.pinned_version(root, spec) == ("", ())
+
+
+def test_platform_graphify_extra_probes_omit_unavailable_video(tmp_path, monkeypatch) -> None:
+    root = _repo(tmp_path)
+    site = tmp_path / "site-packages"
+    (site / "tree_sitter").mkdir(parents=True)
+    spec = config.ToolSpec(
+        name="graphify",
+        python_package="graphifyy",
+        extra_probes=("faster_whisper", "tree_sitter"),
+        extra_probes_macos_intel=("tree_sitter",),
+    )
+    monkeypatch.setattr(sync, "install_site_packages", lambda *_a, **_k: site)
+    monkeypatch.setattr(sync, "_is_macos_intel", lambda: False)
+    assert sync._check_extra_probes(root, spec, deep=True).status == sync.DRIFT
+    monkeypatch.setattr(sync, "_is_macos_intel", lambda: True)
+    assert sync._check_extra_probes(root, spec, deep=True).status == sync.OK
+
+
 def test_python_package_owner_requires_an_exact_project_pin(tmp_path) -> None:
     root = _repo(tmp_path)
     (root / "pyproject.toml").write_text(

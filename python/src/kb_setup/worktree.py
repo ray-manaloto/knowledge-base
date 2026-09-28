@@ -116,6 +116,7 @@ import ctypes.util
 import errno
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -155,7 +156,7 @@ def _libc() -> ctypes.CDLL:
     return lib
 
 
-_LIBC = _libc()
+_LIBC = _libc() if sys.platform == "darwin" else None
 
 
 def _clonefile(src: Path, dst: Path) -> str:
@@ -193,6 +194,8 @@ def _clonefile(src: Path, dst: Path) -> str:
     `_prepare_clone`. It recurses directories including `.git`, which
     `graphify_catalog` requires (armed: a cloned tree's `.git/HEAD` is present).
     """
+    if _LIBC is None:
+        return "clonefile unavailable on this platform: ENOTSUP"
     ctypes.set_errno(0)
     rc = _LIBC.clonefile(os.fsencode(str(src)), os.fsencode(str(dst)), 0)
     if rc == 0:

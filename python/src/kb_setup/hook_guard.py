@@ -40,6 +40,27 @@ _GRAPHIFY_CMD = re.compile(_CMD_POS + r"graphify\s+([a-z][a-z-]*)", re.IGNORECAS
 # graphify's bundled interpreter, invoked as the command.
 _GRAPHIFY_PYBIN = re.compile(_CMD_POS + r"\S*graphifyy/\S*/bin/python\b")
 
+# The generated upstream skill contains public-PyPI bootstrap commands. A
+# Claude session without this project's venv could execute them before reaching
+# a raw `graphify` command, so the ordinary Graphify redirect would be too late.
+_UNPINNED_GRAPHIFY_TOOL = re.compile(
+    r"(?:\buv\s+tool\s+(?:run|install|upgrade)\b|\buvx\b|\bpip(?:3)?\s+install\b)"
+    r"[^;&|\n]*\bgraphifyy\b",
+    re.IGNORECASE,
+)
+
+# Quoted package arguments are shell words, even though _code_only masks quoted
+# prose. Match the executable on the original command, then verify that its
+# head survives quote/heredoc masking so an rg/echo example is never a command.
+_QUOTED_GRAPHIFY_TOOL = re.compile(
+    r"(?P<head>(?:^|[;&|]|\$\(|\bthen\b|\bdo\b)\s*"
+    r"(?:(?:env\s+)?(?:\w+=\S*\s+)*)"
+    r"(?:uv\s+tool\s+(?:run|install|upgrade)\b|uvx\b|pip(?:3)?\s+install\b|"
+    r"(?:\"\$\w+\"|'\$\w+'|\$\w+|python[3.]*)\s+-m\s+pip\s+install\b))"
+    r"[^;&|\n]*?(?P<package>['\"]graphifyy(?:\[[^'\"\]\n]+\])?['\"])(?=\s|$|[;&|)])",
+    re.IGNORECASE,
+)
+
 # A python-ish command head DRIVING graphify — the head and the payload must sit
 # in the same segment (`[^;&|\n]*` stops at the next separator).
 #
@@ -100,10 +121,11 @@ _ALLOWED_READONLY = {
 }
 
 _REASON_PY = (
-    "Do not run graphify by hand via its bundled interpreter or _merge_docs.py. "
-    "Use the mise task instead: `mise run kb-merge -- <chunk> [root]` to merge a "
-    "doc chunk, `mise run kb-transcribe -- <audio>` to transcribe. All graphify "
-    "work goes through a mise task (KB CLAUDE.md; enforced by kb_setup.hook_guard)."
+    "Do not install or run graphifyy outside this project's locked fork, or "
+    "drive graphify via its bundled interpreter or _merge_docs.py. Use "
+    "`mise run kb-skill-refresh` for the skill, `mise run kb-merge -- <chunk> "
+    "[root]` to merge a doc chunk, or `mise run kb-transcribe -- <audio>` to "
+    "transcribe. All graphify work goes through a reviewed mise task."
 )
 
 
@@ -157,7 +179,12 @@ def decide(command: str) -> str | None:
             "kb-query/kb-artifacts). Enforced by kb_setup.hook_guard."
         )
 
-    if _GRAPHIFY_PYBIN.search(command) or _PY_DRIVES_GRAPHIFY.search(command):
+    if (
+        _UNPINNED_GRAPHIFY_TOOL.search(_code_only(command))
+        or _quoted_graphify_tool(command)
+        or _GRAPHIFY_PYBIN.search(command)
+        or _PY_DRIVES_GRAPHIFY.search(command)
+    ):
         return _REASON_PY
     return _bare_python(command)
 
@@ -227,6 +254,24 @@ def _code_only(command: str) -> str:
     """
     head = _HEREDOC.split(command, maxsplit=1)[0]
     return _QUOTED.sub(" ", head)
+
+
+def _quoted_graphify_tool(command: str) -> bool:
+    """Detect a quoted public package only when its tool head is executable."""
+    head = _HEREDOC.split(command, maxsplit=1)[0]
+    masked = _QUOTED.sub(
+        lambda match: (
+            match.group()
+            if re.fullmatch(r"['\"]\$\w+['\"]", match.group())
+            else " " * len(match.group())
+        ),
+        head,
+    )
+    for match in _QUOTED_GRAPHIFY_TOOL.finditer(head):
+        start, end = match.span("head")
+        if masked[start:end] == head[start:end]:
+            return True
+    return False
 
 
 def _bare_python(command: str) -> str | None:

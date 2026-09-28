@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Planning-with-files live Graphify CLI backend subset.
+url = https://github.com/OthmanAdi/planning-with-files
+ref = v3.20.7
+commit = 3b7690eafd887547f0cf4f111c0d62b77c46f797
+kind = code

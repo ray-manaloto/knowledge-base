@@ -11,3 +11,4 @@ class ReviewedClassification(Enum):
     reviewed_root_ignore_metadata = "reviewed-root-ignore-metadata"
     reviewed_build_toolchain_config = "reviewed-build-toolchain-config"
     reviewed_binary_docs_asset = "reviewed-binary-docs-asset"
+    reviewed_docs_caption_asset = "reviewed-docs-caption-asset"

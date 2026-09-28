@@ -136,9 +136,8 @@ def _terminate_group(proc: subprocess.Popen[str], *, own_group: bool) -> None:
     """End the lane's whole process GROUP, TERM then KILL.
 
     The group, not the PID, because codex spawns child tool-call workers that
-    outlive a bare `kill <pid>` and go on holding the terminal — the lesson
-    the former fable-orchestrator plugin's watchdog recorded as *kill the group,
-    never just the PID*.
+    outlive a bare `kill <pid>` and go on holding the terminal. Kill the group,
+    never just the PID.
 
     🔴 **The group is only ours to kill when we CREATED it**, so `own_group` is
     passed in by the caller rather than inferred. `_spawn` sets

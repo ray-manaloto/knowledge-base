@@ -236,7 +236,7 @@ def _transcript(tmp_path: Path, name: str, *lines: str) -> Path:
     return path
 
 
-_CODEX = "fable-orchestrator:codex-implementer"
+_CODEX = "legacy-provider:codex-implementer"
 
 
 def _verdict_of(paths: list[Path], session: str) -> str:
@@ -289,7 +289,7 @@ def test_review_and_general_lanes_are_not_delegations(tmp_path: Path) -> None:
     p = _transcript(
         tmp_path,
         "a.jsonl",
-        _line("s1", _agent("fable-orchestrator:codex-reviewer")),
+        _line("s1", _agent("legacy-provider:codex-reviewer")),
         _line("s1", _agent("general-purpose")),
         _line("s1", _bash("mise run test")),
     )

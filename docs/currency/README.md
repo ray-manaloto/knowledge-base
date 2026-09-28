@@ -24,6 +24,10 @@ execution-outcome field at all.
 
 | run | tool | verdict | detail |
 |---|---|---|---|
+| 2026-09-27T03:14+00:00 | uv | uv 0.12.19, current: clean | — |
+| 2026-09-27T03:14+00:00 | hk | hk 2.3.0, current: clean | — |
+| 2026-09-26T23:54+00:00 | graphify | graphify 0.9.69, current: 1 question(s) for review | [2026-09-26-graphify](runs/2026-09-26-graphify.md) |
+| 2026-09-25T10:21+00:00 | graphify | graphify 0.9.67, current: 1 question(s) for review | [2026-09-25-graphify](runs/2026-09-25-graphify.md) |
 | 2026-09-11T07:35+00:00 | uv | uv 0.12.8 → 0.12.13: auto-applying (6/6 gates) | [2026-09-11-uv](runs/2026-09-11-uv.md) |
 | 2026-09-11T07:35+00:00 | ty | ty 0.0.77 → 0.0.80: 1 question(s) for review | [2026-09-11-ty](runs/2026-09-11-ty.md) |
 | 2026-09-11T07:35+00:00 | skillopt | skillopt 93bdf3d770b99128daf35278218e5a666fe392f3 → v0.2.0: 2 question(s) for review | [2026-09-11-skillopt](runs/2026-09-11-skillopt.md) |

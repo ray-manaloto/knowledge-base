@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import importlib.metadata
+import importlib.util
+import json
 import os
 import re
 import shutil
@@ -182,7 +185,7 @@ def graphify_exe(repo_root: Path | None = None) -> str:
 
 
 def pinned_graphify_version(repo_root: Path | None = None) -> str:
-    """Return the exact ``graphifyy[all]`` project requirement, or ``""``."""
+    """Return the exact Graphify pin when both platform requirements agree."""
     root = repo_root or Path.cwd()
     try:
         with (root / "pyproject.toml").open("rb") as fh:
@@ -190,11 +193,65 @@ def pinned_graphify_version(repo_root: Path | None = None) -> str:
     except OSError, tomllib.TOMLDecodeError:
         return ""
     dependencies = (data.get("project") or {}).get("dependencies") or []
-    for requirement in dependencies:
-        match = re.fullmatch(r"graphifyy\[all\]==([0-9]+(?:\.[0-9]+)+)", str(requirement))
-        if match:
-            return match.group(1)
-    return ""
+    graphify_requirements = [
+        str(item) for item in dependencies if str(item).startswith("graphifyy")
+    ]
+    if len(graphify_requirements) == 1:
+        match = re.fullmatch(r"graphifyy\[all\]==([0-9]+(?:\.[0-9]+)+)", graphify_requirements[0])
+        return match.group(1) if match else ""
+    platform_requirement_count = 2
+    if len(graphify_requirements) != platform_requirement_count:
+        return ""
+    non_intel = re.fullmatch(
+        r"graphifyy\[all\]==([0-9]+(?:\.[0-9]+)+); "
+        r"sys_platform != 'darwin' or platform_machine != 'x86_64'",
+        graphify_requirements[0],
+    )
+    intel = re.fullmatch(
+        r"graphifyy\[([a-z0-9,]+)\]==([0-9]+(?:\.[0-9]+)+); "
+        r"sys_platform == 'darwin' and platform_machine == 'x86_64'",
+        graphify_requirements[1],
+    )
+    if not non_intel or not intel or non_intel.group(1) != intel.group(2):
+        return ""
+    expected_intel_extras = {
+        "anthropic",
+        "bedrock",
+        "chinese",
+        "commonlisp",
+        "dm",
+        "erlang",
+        "falkordb",
+        "gemini",
+        "google",
+        "images",
+        "kimi",
+        "leiden",
+        "mcp",
+        "neo4j",
+        "ocaml",
+        "office",
+        "ollama",
+        "openai",
+        "pascal",
+        "pdf",
+        "postgres",
+        "r",
+        "robot",
+        "solidity",
+        "sql",
+        "svg",
+        "terraform",
+        "vbnet",
+        "watch",
+    }
+    intel_extras = intel.group(1).split(",")
+    if (
+        len(intel_extras) != len(expected_intel_extras)
+        or set(intel_extras) != expected_intel_extras
+    ):
+        return ""
+    return non_intel.group(1)
 
 
 def running_graphify_version(exe: str) -> str:
@@ -256,6 +313,44 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
     from kb_setup.graphify_sdk import assert_public_sdk
 
     assert_public_sdk(pinned)
+    assert_installed_graphify_origin(root)
+
+
+def assert_installed_graphify_origin(repo_root: Path) -> None:
+    """Refuse a local/editable or wrong-commit Graphify despite matching version."""
+    try:
+        with (repo_root / "pyproject.toml").open("rb") as stream:
+            source = tomllib.load(stream)["tool"]["uv"]["sources"]["graphifyy"]
+        expected_url = source["git"]
+        expected_sha = source["rev"]
+        exact_revision = bool(re.fullmatch(r"[0-9a-f]{40}", expected_sha))
+        dist = importlib.metadata.distribution("graphifyy")
+        raw = dist.read_text("direct_url.json")
+        installed = json.loads(raw) if raw else {}
+        info = installed.get("vcs_info") or {}
+        spec = importlib.util.find_spec("graphify")
+        origin = Path(spec.origin).resolve(strict=True) if spec and spec.origin else None
+        venv = (repo_root / ".venv").resolve(strict=True)
+        matches = (
+            exact_revision
+            and installed.get("url") == expected_url
+            and info.get("vcs") == "git"
+            and info.get("commit_id") == expected_sha
+            and info.get("requested_revision") == expected_sha
+            and "dir_info" not in installed
+            and origin is not None
+            and origin.is_relative_to(venv)
+        )
+    except (
+        OSError,
+        KeyError,
+        ValueError,
+        TypeError,
+        importlib.metadata.PackageNotFoundError,
+    ) as exc:
+        raise SystemExit("[graphify] REFUSING unverified installed fork origin") from exc
+    if not matches:
+        raise SystemExit("[graphify] REFUSING local/editable or wrong-commit Graphify origin")
 
 
 def _imports_graphify(py: Path) -> bool:

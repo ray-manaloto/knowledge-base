@@ -137,10 +137,39 @@ def test_exact_mise_already_installed_progress_is_not_a_warning(tmp_path) -> Non
         ["mise", "install", "probe"],
         0,
         stdout="",
-        stderr="mise probe@1.2.3                ⇢ already installed\n",
+        stderr=(
+            "mise by @jdx \u2013 installing 1 tool\n"
+            "mise ⇢ probe@1.2.3  1ms · already installed\n"
+            "mise ████████████████ 1/1 · installed 0 tools · 1 already installed in 2ms\n"
+        ),
     )
     assert tool_sync._mise_progress_only(proc.stderr, spec)
     assert not tool_sync._mise_progress_only("warning: source changed\n", spec)
+    assert not tool_sync._mise_progress_only(proc.stderr + "hk installed hook\n", spec)
+
+
+def test_exact_mise_new_install_progress_is_not_a_warning(tmp_path) -> None:
+    _root, spec = _repo(tmp_path)
+    progress = (
+        "mise by @jdx \u2013 installing 1 tool\n"
+        "mise ███████░░░░░░░░░ 0/1 · 3.0s\n"
+        "  probe@1.2.3  downloading  3.0s  1.1/2.3 MB · 367 kB/s\n"
+        "mise ✓ probe@1.2.3  4.2s\n"
+        "mise ████████████████ 1/1 · installed 1 tool in 4.3s\n"
+    )
+    assert tool_sync._mise_progress_only(progress, spec)
+    minute_progress = (
+        progress.replace("3.0s", "1m1s").replace("4.2s", "1m2s").replace("4.3s", "1m2.1s")
+    )
+    assert tool_sync._mise_progress_only(minute_progress, spec)
+    assert not tool_sync._mise_progress_only(
+        minute_progress.replace("downloading", "warning: bad"), spec
+    )
+    assert not tool_sync._mise_progress_only(
+        progress.replace("installed 1 tool", "installed 0 tools"), spec
+    )
+    assert not tool_sync._mise_progress_only(progress.replace("probe@1.2.3", "other@1.2.3"), spec)
+    assert not tool_sync._mise_progress_only(progress.replace("downloading", "warning: bad"), spec)
 
 
 def test_public_main_refuses_a_synthetic_skill_bearing_tool(tmp_path, monkeypatch) -> None:
@@ -464,31 +493,23 @@ _INSTALL_STDERR = (
 )
 """`mise install <key>` stderr on an already-installed pin, captured verbatim on
 mise 2026.8.10 / hk 1.56.0 (paths shortened): mise prints nothing of its own and
-the repo's `[hooks].postinstall` (`mise reshim && hk install --mise`) prints these
-four lines. It was the WHOLE stderr, and the install step refused it (#438)."""
+the old `[hooks].postinstall` printed these four lines. The global hk v2
+launcher must never make tool-sync accept hook mutations as install progress."""
 
 
-def test_postinstall_hook_output_is_not_a_warning_on_install(tmp_path) -> None:
+def test_obsolete_postinstall_hook_output_is_refused(tmp_path) -> None:
     _root, spec = _repo(tmp_path)
-    assert tool_sync._mise_progress_only(_INSTALL_STDERR, spec)
-    # A checkout under a directory with a space in its name is legitimate (cold
-    # review of 90be7169, P2): the path part must not be matched with `[^\s]+`.
-    assert tool_sync._mise_progress_only(
-        _INSTALL_STDERR.replace("/Users/me/dev/kb", "/Users/me/My Dev/kb"), spec
-    )
-    # Mixed with the ordinary install-status line: still ordinary.
-    assert tool_sync._mise_progress_only(
-        "mise probe@1.2.3                ⇢ installed\n" + _INSTALL_STDERR, spec
-    )
-    # A hook this repo does not install, a stray line, or a warning: refused.
+    assert not tool_sync._mise_progress_only(_INSTALL_STDERR, spec)
     assert not tool_sync._mise_progress_only(
-        _INSTALL_STDERR.replace("commit-msg", "post-checkout"), spec
+        "mise probe@1.2.3                ⇢ installed\n" + _INSTALL_STDERR, spec
     )
     assert not tool_sync._mise_progress_only(_INSTALL_STDERR + "hk something else\n", spec)
     assert not tool_sync._mise_progress_only(_INSTALL_STDERR + "warning: x\n", spec)
 
 
-def test_install_step_tolerates_postinstall_hook_output(tmp_path, monkeypatch, capsys) -> None:
+def test_install_step_refuses_obsolete_postinstall_hook_output(
+    tmp_path, monkeypatch, capsys
+) -> None:
     root, _spec = _repo(tmp_path)
 
     def run(argv: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -499,5 +520,5 @@ def test_install_step_tolerates_postinstall_hook_output(tmp_path, monkeypatch, c
         return _success(argv, cwd)
 
     monkeypatch.setattr(tool_sync, "_run", run)
-    assert tool_sync.main(root, ["probe"]) == 0
-    assert "lock, install, and version verified" in capsys.readouterr().out
+    assert tool_sync.main(root, ["probe"]) == 1
+    assert "install refused" in capsys.readouterr().out

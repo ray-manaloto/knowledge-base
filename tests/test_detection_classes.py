@@ -73,6 +73,9 @@ def test_non_source_class_is_absorbed_silently(tmp_path: Path, relative: str) ->
         "testdata/repos/dotGit/HEAD",
         "core/src/main/resources/META-INF/services/java.nio.file.spi.FileTypeDetector",
         "crates/typos-cli/tests/cmd/bad.in/file.ignore",
+        "start-agentsview.command",
+        ".continue/prompts/planning-with-files.prompt",
+        "docker/debian-mirrors.list",
     ],
 )
 def test_unsupported_language_class_is_counted_not_hidden(tmp_path: Path, relative: str) -> None:

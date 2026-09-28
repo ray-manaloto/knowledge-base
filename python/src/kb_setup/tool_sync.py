@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 
 _TIMEOUT = 600
 _WARNING = re.compile(r"\bwarn(?:ing)?\b", re.IGNORECASE)
+_INSTALL_HEADER = "mise by @jdx \u2013 installing 1 tool"
+_INSTALL_MIN_LINES = 3
 
 
 @dataclass(frozen=True)
@@ -58,29 +60,51 @@ def _run(argv: list[str], repo_root: Path) -> subprocess.CompletedProcess[str]:
 
 
 def _mise_progress_only(stderr: str, spec: ToolSpec) -> bool:
-    """Recognize only mise's bounded ordinary install-status lines.
+    """Recognize a completed one-tool mise install session, without diagnostics.
 
-    Plus the two line shapes this repo's own `[hooks].postinstall`
-    (`mise reshim && hk install --mise`) prints on stderr after every install —
-    `hk removed hook: …/.git/hooks/<hook>` and `hk Installed hk hook:
-    …/.git/hooks/<hook>` for the two hooks it manages. On an already-installed
-    pin mise itself prints nothing, so that hook output was the WHOLE stderr
-    and the install step refused it (#438). Anything else still refuses.
+    hk v2 hooks are installed once globally, outside this transaction. An
+    install that prints hk hook mutations is unexpected and must be refused.
     """
     lines = stderr.splitlines()
-    pattern = re.compile(
-        rf"^mise {re.escape(spec.mise_key)}@[^\s]+\s+⇢\s+"
-        r"(?:already installed|installed)$"
+    if len(lines) < _INSTALL_MIN_LINES or lines[0] != _INSTALL_HEADER:
+        return False
+    if _WARNING.search(stderr) or "hook" in stderr.lower():
+        return False
+    key = re.escape(spec.mise_key)
+    tool = rf"{key}@[^\s]+"
+    # A successful install can cross a minute while staying below _TIMEOUT.
+    elapsed = r"(?:\d+(?:\.\d+)?ms|\d+(?:\.\d+)?s|\d+m(?:\d+(?:\.\d+)?s)?)"
+    skipped = re.compile(rf"^mise ⇢ {tool}\s+{elapsed} · already installed$")
+    installed = re.compile(rf"^mise ✓ {tool}\s+{elapsed}(?: · cached)?(?:  [^\s]+)?$")
+    summary = re.compile(
+        rf"^mise █{{16}} 1/1 · installed (?P<count>[01]) tools?"
+        rf"(?: · (?P<already>1) already installed)? in {elapsed}$"
     )
-    # `.+` for the path, not `[^\s]+`: a checkout under a directory with a space
-    # in its name is legitimate, and refusing it here would fail `kb-tool-sync` on
-    # that host for every tool (cold review of 90be7169, P2).
-    hook = re.compile(
-        r"^hk (?:removed hook|Installed hk hook): .+/\.git/hooks/(?:pre-commit|commit-msg)$"
+    final = summary.fullmatch(lines[-1])
+    if final is None:
+        return False
+    completion = lines[-2]
+    skipped_complete = (
+        bool(skipped.fullmatch(completion))
+        and final.group("count") == "0"
+        and final.group("already") == "1"
     )
-    return bool(lines) and all(
-        pattern.fullmatch(line) is not None or hook.fullmatch(line) is not None for line in lines
+    installed_complete = (
+        bool(installed.fullmatch(completion))
+        and final.group("count") == "1"
+        and final.group("already") is None
     )
+    if not (skipped_complete or installed_complete):
+        return False
+    snapshot = re.compile(rf"^mise [█░]{{16}} [01]/1 · {elapsed}$")
+    active = re.compile(
+        rf"^(?:mise )?  {tool}\s+"
+        r"(?:resolving|downloading|reusing download|verifying checksum|"
+        r"verifying size|verifying|extracting|installing|waiting to install)"
+        rf"\s+{elapsed}(?:\s+\d+(?:\.\d+)?(?:/\d+(?:\.\d+)?)? "
+        r"(?:B|kB|MB|GB)(?: · \d+(?:\.\d+)? (?:B|kB|MB|GB)/s)?)?$"
+    )
+    return all(snapshot.fullmatch(line) or active.fullmatch(line) for line in lines[1:-2])
 
 
 def _mise_lock_progress_only(stderr: str, spec: ToolSpec) -> bool:

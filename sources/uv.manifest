@@ -5,7 +5,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] uv`
-#   pinned here:    0.12.7
+#   pinned here:    0.12.19
 # Cross-checkable without trusting this file: `uv --version` prints the tag's own
 # short commit, so binary and pin verify against each other — the same property
 # ty has and ruff does not. Re-run at the 0.12.5 -> 0.12.7 bump, 2026-08-30:
@@ -33,7 +33,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/astral-sh/uv
-ref = 0.12.8
-commit = 68209e5c61ce4b76c2e685bea7913876bc929dc9
+ref = 0.12.19
+commit = bea138450f0e620a4ce5765b0e38cff7b9f0799f
 kind = code
 added = 2026-08-02

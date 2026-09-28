@@ -135,6 +135,17 @@ def test_skills_and_rules_are_classified() -> None:
     assert md_budget.classify(".claude/rules/x.md") == "rule_unscoped"
 
 
+def test_kb_graphify_ingest_skill_mirrors_are_identical_and_use_the_real_task() -> None:
+    canonical = (_REPO / ".agents" / "skills" / "kb-graphify-ingest" / "SKILL.md").read_bytes()
+    claude = (_REPO / ".claude" / "skills" / "kb-graphify-ingest" / "SKILL.md").read_bytes()
+    assert canonical == claude
+    text = canonical.decode("utf-8")
+    assert "mise run kb-graphify-ingest -- /absolute/path/to/request.json" in text
+    assert ".agent/kb/graphify-ingest/{runs,cache,scratch}" not in text
+    for family in ("runs/", "cache/", "scratch/"):
+        assert f".agent/kb/graphify-ingest/{family}" in text
+
+
 # --- frontmatter scoping -----------------------------------------------------
 
 
