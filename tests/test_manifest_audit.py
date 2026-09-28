@@ -15,6 +15,7 @@ seen to pass is not a check (`.claude/rules/probes-need-a-control-arm.md`).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from kb_setup import gates, graphify_health, manifest_audit
@@ -280,13 +281,12 @@ def test_main_rejects_arguments(tmp_path: Path) -> None:
     assert manifest_audit.main(tmp_path, ["--bogus"]) == int(Rc.BAD_REQUEST)
 
 
-def test_main_writes_the_sidecar_gates_reads_back(tmp_path: Path, monkeypatch) -> None:
+def test_main_writes_the_sidecar_gates_reads_back(
+    tmp_path: Path, monkeypatch, git: Callable[..., str]
+) -> None:
     """The channel C3 asked for: `main` writes what `gates.read_sidecar_outcome` reads."""
-    import subprocess
-
     monkeypatch.chdir(tmp_path)
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    subprocess.run(["git", "commit", "--allow-empty", "-q", "-m", "root"], cwd=tmp_path, check=True)
+    assert git("rev-parse", "HEAD")
 
     _write_manifest(tmp_path / "sources", "demo", _COMMIT_A)
     entry = _metadata_entry(
@@ -304,7 +304,7 @@ def test_main_writes_the_sidecar_gates_reads_back(tmp_path: Path, monkeypatch) -
 
 
 def test_main_returns_ok_and_writes_skip_sidecar_on_a_missing_clone(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch, git: Callable[..., str]
 ) -> None:
     """The claim this whole gate exists to prove: SKIP must never block `main`.
 
@@ -312,13 +312,10 @@ def test_main_returns_ok_and_writes_skip_sidecar_on_a_missing_clone(
     clone present at all — a fresh checkout. `main` must exit `Rc.OK` (never
     `Rc.FINDINGS`) and the sidecar must read `SKIP`, never laundered to `OK`.
     """
-    import subprocess
-
     from kb_setup.result import Rc
 
     monkeypatch.chdir(tmp_path)
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    subprocess.run(["git", "commit", "--allow-empty", "-q", "-m", "root"], cwd=tmp_path, check=True)
+    assert git("rev-parse", "HEAD")
 
     _write_manifest(tmp_path / "sources", "demo", _COMMIT_A)  # no clone ever made
     entry = _metadata_entry(
