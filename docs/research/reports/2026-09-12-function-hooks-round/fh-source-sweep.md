@@ -936,7 +936,7 @@ Its own method note, reproduced because it matters: *"this was an offline source
 
 **The most consequential later staff clarification:** abandoning a dispatch does **not** stop the plugin’s work. `next.signal` indicates that the host has abandoned the return value; plugins can continue calling `$`. This changes cancellation, timeout, resource cleanup, and concurrent-guard designs. **`poteat`, September 11:** `91870-comments.md:3115–3119`.
 
-All file anchors below are relative to [`.agent/kb/raw/fh/`](/Users/rmanaloto/dev/github/ray-manaloto/knowledge-base/.agent/kb/raw/fh). I read the complete issue body, all **161 comments**, the required files for all three mods, and the relevant implementations and types. **SOURCE** means the pinned mod source; **STAFF** means an attributed `poteat` statement; **REPORT** means a community member’s account, not independently reproduced here. **INFERRED** identifies my design conclusion. Linked artifacts were not fetched.
+All file anchors below are relative to `.agent/kb/raw/fh/`. I read the complete issue body, all **161 comments**, the required files for all three mods, and the relevant implementations and types. **SOURCE** means the pinned mod source; **STAFF** means an attributed `poteat` statement; **REPORT** means a community member’s account, not independently reproduced here. **INFERRED** identifies my design conclusion. Linked artifacts were not fetched.
 
 ## DECIDES — findings that change architecture or enforcement decisions
 
