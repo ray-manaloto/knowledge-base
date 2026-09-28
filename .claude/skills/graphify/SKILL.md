@@ -5,6 +5,16 @@ description: "Use for any question about a codebase, its architecture, file rela
 
 # /graphify
 
+> **Knowledge-base override:** Use the reviewed project instructions in
+> `.agents/skills/graphify/SKILL.md` for every `/graphify` request in this
+> repository. The generic installer, interpreter, fast-path, and pipeline
+> commands below are reference material here, not executable steps. Run
+> Graphify only through the corresponding `mise run kb-*` task. Never run
+> `uv tool run --from graphifyy`, `uv tool install --upgrade graphifyy`,
+> `pip install graphifyy`, or a bare `graphify` command. If no reviewed task
+> supports the requested operation, stop and report that gap instead of
+> falling back to a public or global installation.
+
 Turn any folder of files into a navigable knowledge graph with community detection, an honest audit trail, and three outputs: interactive HTML, GraphRAG-ready JSON, and a plain-language GRAPH_REPORT.md.
 
 ## Usage
