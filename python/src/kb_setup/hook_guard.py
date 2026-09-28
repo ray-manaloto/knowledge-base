@@ -44,10 +44,8 @@ _GRAPHIFY_PYBIN = re.compile(_CMD_POS + r"\S*graphifyy/\S*/bin/python\b")
 # Claude session without this project's venv could execute them before reaching
 # a raw `graphify` command, so the ordinary Graphify redirect would be too late.
 _UNPINNED_GRAPHIFY_TOOL = re.compile(
-    _CMD_POS
-    + r"(?:uv\s+tool\s+(?:run|install|upgrade)\b|(?:\S*/)?pip(?:3)?\s+install\b|"
-    + r"(?:\S*/)?python(?:3(?:\.\d+)?)?\s+-m\s+pip\s+install\b)"
-    + r"[^;&|\n]*\bgraphifyy\b",
+    r"(?:\buv\s+tool\s+(?:run|install|upgrade)\b|\buvx\b|\bpip(?:3)?\s+install\b)"
+    r"[^;&|\n]*\bgraphifyy\b",
     re.IGNORECASE,
 )
 
@@ -170,7 +168,7 @@ def decide(command: str) -> str | None:
         )
 
     if (
-        _UNPINNED_GRAPHIFY_TOOL.search(command)
+        _UNPINNED_GRAPHIFY_TOOL.search(_code_only(command))
         or _GRAPHIFY_PYBIN.search(command)
         or _PY_DRIVES_GRAPHIFY.search(command)
     ):

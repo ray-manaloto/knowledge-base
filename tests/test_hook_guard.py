@@ -47,6 +47,12 @@ DENY = [
     ("uv tool install --upgrade graphifyy", "kb-skill-refresh"),
     ("python3 -m pip install graphifyy", "kb-skill-refresh"),
     ("cd /kb && pip install graphifyy", "kb-skill-refresh"),
+    (
+        '_UV_PY=$(uv tool run --from graphifyy python -c "import sys; print(sys.executable)")',
+        "kb-skill-refresh",
+    ),
+    ('"$PYTHON" -m pip install graphifyy -q', "kb-skill-refresh"),
+    ('uvx --from graphifyy graphify query "x"', "kb-skill-refresh"),
 ]
 
 # Must be ALLOWED (verdict None) — the control arm.
@@ -71,6 +77,8 @@ ALLOW = [
     'rg "_merge_docs.py" .',
     'rg "graphify.transcribe" python/',
     'rg "uv tool install --upgrade graphifyy" .',
+    'echo "pip install graphifyy is forbidden"',
+    "cat <<'EOF'\nuv tool install --upgrade graphifyy\nEOF",
     "mise run kb-skill-refresh",
     # The same payload with a python head in a DIFFERENT segment: the head and
     # the payload must co-occur in one segment, or `rg …; <python> -c …` denies.
