@@ -146,7 +146,8 @@ _PUBLIC_SYMBOLS = (
         extract,
         "(paths: 'list[Path]', cache_root: 'Path | None' = None, *, root: 'Path | None' = None, "
         "parallel: 'bool' = True, max_workers: 'int | None' = None, resolution_context_nodes: "
-        "'list[dict] | None' = None, resolution_context_edges: 'list[dict] | None' = None) -> "
+        "'list[dict] | None' = None, resolution_context_edges: 'list[dict] | None' = None, "
+        "extra_excludes: 'list[str] | None' = None, gitignore: 'bool' = True) -> "
         "'dict'",
     ),
     PublicSymbol(

@@ -240,12 +240,12 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.70"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.71"
 # FORKED 2026-08-24: this names WHAT RUNS, so it followed the pin onto the fork
 # (`currency.toml` binds it with `tracks = "manifest"`). Contrast the semantic
 # corpus/slice constants, which are snapshot identities of completed runs and
 # correctly hold at the upstream base `v0.9.48`.
-_ACCEPTED_GRAPHIFY_REF = "kb-openai-cli-backend-v0.9.70-d9b60e6d"
+_ACCEPTED_GRAPHIFY_REF = "kb-openai-cli-backend-v0.9.71-3d6d280b"
 
 #: The public spelling of the version above, for the ONE cross-module consumer:
 #: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
@@ -289,18 +289,18 @@ _LPK_FILE_ID = _LPK_COLLISION_ID
 _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
-    "sdk_fingerprint_sha256": "1a55a686ab83ac607f4a5d3ab55bdf0c6fd77fdcbb800aed4f0dd61a1f19b58b",
+    "sdk_fingerprint_sha256": "abdf0aa71192f235463ef7bea709163d65079da010be493ef24f8f7f1f5dccc0",
     # FORKED 2026-08-24: a git-locked dependency has NO wheel and NO sdist, so
     # the two hashes that used to live here cannot exist and their absence is
     # not a gap to paper over. `git_commit` is the substitute and it is a
     # STRONGER identity — a wheel hash names a built artifact, a resolved
     # commit names the source tree it was built from. Reverts to the wheel/sdist
     # pair when #2981 merges and the pin returns to PyPI.
-    "git_commit": "d9b60e6de351410dbacb192c988e7ffa22bfc958",
+    "git_commit": "3d6d280b81d92fe8856cf68ace196ee0e09930fc",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="d9b60e6de351410dbacb192c988e7ffa22bfc958",
+    source_commit="3d6d280b81d92fe8856cf68ace196ee0e09930fc",
     # RE-DERIVED 2026-09-10 from the pinned commit, not carried forward. The
     # 0.9.57 pin move advanced `source_commit` and left BOTH of these describing
     # `157a957e`, and all eight gates passed over it — `mise run
@@ -310,8 +310,8 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # digests the catalog's canonical encoding, so fixing a stale catalog entry
     # changes it again. Measured across this fix: `a52e4f6e…` before the entry
     # was corrected, `0444f055…` after. Derive it LAST.
-    source_tree="18496887b76fd9894e00677066f5d58c9c345b28",
-    catalog_sha256="cc2ae3cc372113bf93ea8312b417344c8679cfb20d5629e050074d702c9cc756",
+    source_tree="685d0f4ce24e993daa355be4451527f3cf3578ad",
+    catalog_sha256="4333bad76b5a739afc5f881b81d5f752442b3309b9e4d3fe716e44cb34485256",
     # RE-DERIVED 2026-09-10, and it was the SIXTH stranded value — found only
     # after `kb-graphify-catalog`'s first version reported five and called that
     # the whole set. Its then-pinned commit had 880 members.
@@ -326,7 +326,7 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # Corroborated: an independent derivation in the previous session produced
     # this same digest and the same 880-member count at that earlier pin.
     # The 93c019a5 source manifest contains 956 members.
-    source_manifest_sha256="fbe0b42dbbc076db99973a9b9272291671b6972b8ea497926cba2f94b6e2ac49",
+    source_manifest_sha256="b7e15829ea3d77b324495f57b04ecae92e1f28eb00c9ba4f493f0392cfb84baa",
     # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
     # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
     # RE-DERIVED by a real build against the installed 0.9.47, never carried

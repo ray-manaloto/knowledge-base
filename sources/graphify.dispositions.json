@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source": "graphify",
-  "source_ref": "kb-openai-cli-backend-v0.9.70-d9b60e6d",
-  "source_commit": "d9b60e6de351410dbacb192c988e7ffa22bfc958",
-  "source_tree": "18496887b76fd9894e00677066f5d58c9c345b28",
+  "source_ref": "kb-openai-cli-backend-v0.9.71-3d6d280b",
+  "source_commit": "3d6d280b81d92fe8856cf68ace196ee0e09930fc",
+  "source_tree": "685d0f4ce24e993daa355be4451527f3cf3578ad",
   "entries": [
     {
       "path": ".dockerignore",
@@ -27,6 +27,14 @@
       "reason": "version-control ignore metadata is not graph source",
       "sha256": "0fa6380234ccd1dc4b57b56a681770385b5d0a6a2adf1cd8416606e184e7bfa2",
       "size": 894,
+      "file_type": "regular"
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "kind": "unsupported-file",
+      "reason": "GitHub code ownership metadata is not graph source",
+      "sha256": "9fa5a9073c6ad941a31fdabcae8111b25dbc53770dfd6cc207e2b9180ad84e11",
+      "size": 813,
       "file_type": "regular"
     },
     {
@@ -64,7 +72,7 @@
     {
       "path": "mise.toml",
       "kind": "unsupported-file",
-      "reason": "fork-maintenance task configuration is TOML unsupported by Graphify 0.9.70 detection; reviewed as a separate fork capability",
+      "reason": "fork-maintenance task configuration is TOML unsupported by Graphify 0.9.71 detection; reviewed as a separate fork capability",
       "sha256": "343b269f427ebc60bc0815aab9fb50306786ba40b764ec8c643ae5d1e9b39427",
       "size": 279,
       "file_type": "regular"
@@ -97,7 +105,7 @@
       "path": "uv.lock",
       "kind": "unsupported-file",
       "reason": "uv lockfile is unsupported by Graphify detection 0.9.42 through 0.9.47",
-      "sha256": "100a4bcc684a64afc5a72375adb08d39a832dc0e6cd91c7e6386642d50a2c5b5",
+      "sha256": "420365e6c41278f368d1902368b5485cac986b88ad9fd831f20c60bf98ded623",
       "size": 1031889,
       "file_type": "regular"
     },
