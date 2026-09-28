@@ -194,6 +194,9 @@ HYPEREDGE object (exact keys):
   confidence_score : 1 for EXTRACTED, 0.5 for INFERRED.
   source_file      : "{source_file}"
 
+Every edge and hyperedge must name this exact source_file. A missing value is
+attributed to this single source before caching; a different source is rejected.
+
 Emit a hyperedge only when 3+ nodes genuinely co-participate in one concept, flow, or
 pattern that pairwise edges do not already capture. Maximum 3; [] is valid. Every edge
 endpoint and hyperedge member must resolve in THIS chunk. Prefer faithful EXTRACTED edges,
@@ -376,6 +379,9 @@ def ingest_source(
         "hyperedges": value.get("hyperedges", []),
     }
     _require_valid(chunk, source.key)
+    _require_source_claims(chunk, source_file)
+    for bucket in ("edges", "hyperedges"):
+        chunk[bucket] = _source_bound_records(chunk[bucket], source_file, bucket[:-1])
     graphify_sdk.save_semantic_cache_public(
         chunk["nodes"],
         chunk["edges"],
@@ -510,6 +516,24 @@ def _require_valid(chunk: object, label: str) -> None:
     issues = chunks.validate(chunk, label=label)
     if issues:
         raise ValueError("invalid graphify chunk:\n" + "\n".join(issues))
+
+
+def _require_source_claims(chunk: dict, source_file: str) -> None:
+    """Refuse records that the one-source semantic cache would omit on replay."""
+    for node in chunk["nodes"]:
+        if node.get("source_file") != source_file:
+            raise ValueError("node source_file differs from the requested source")
+
+
+def _source_bound_records(records: list[dict], source_file: str, label: str) -> list[dict]:
+    """Give validated one-source relationships a cacheable source identity."""
+    bound = []
+    for record in records:
+        claimed = record.get("source_file")
+        if claimed not in (None, "", source_file):
+            raise ValueError(f"{label} source_file differs from the requested source")
+        bound.append({**record, "source_file": source_file})
+    return bound
 
 
 def _source(value: object) -> Source:

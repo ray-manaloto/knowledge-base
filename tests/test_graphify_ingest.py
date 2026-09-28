@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
@@ -572,6 +573,33 @@ def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(
             "source_location": "L1",
         }
     ]
+    chunk["nodes"].extend(
+        {**chunk["nodes"][0], "id": f"sample_{name}", "label": name}
+        for name in ("evidence", "decision")
+    )
+    chunk["edges"] = [
+        {
+            "source": "sample_concept",
+            "target": "sample_evidence",
+            "relation": "supports",
+            "confidence": "INFERRED",
+            "confidence_score": 0.5,
+            "weight": 1,
+        }
+    ]
+    chunk["hyperedges"] = [
+        {
+            "id": "sample_shared_context",
+            "label": "Shared context",
+            "nodes": [node["id"] for node in chunk["nodes"]],
+            "relation": "participate_in",
+            "confidence": "INFERRED",
+            "confidence_score": 0.5,
+        }
+    ]
+    expected_chunk = json.loads(json.dumps(chunk))
+    expected_chunk["edges"][0]["source_file"] = "source.md"
+    expected_chunk["hyperedges"][0]["source_file"] = "source.md"
     calls: list[dict] = []
     profile = graphify_execution.resolve_profile(
         backend,
@@ -623,7 +651,7 @@ def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(
             "runner_error": None,
         }
 
-    def ingest(run: str, selected: dict) -> dict:
+    def ingest(run: str, selected: dict, *, cache_name: str = "semantic") -> dict:
         return graphify_ingest.ingest_source(
             graphify_ingest.IngestSourceRequest(
                 repo_root=tmp_path,
@@ -632,7 +660,7 @@ def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(
                 captured_at="2026-09-14",
                 profile=selected,
                 run_root=task_root / "runs" / run,
-                cache_root=task_root / "cache" / "semantic",
+                cache_root=task_root / "cache" / cache_name,
             ),
             process_runner=runner,
         )
@@ -640,13 +668,15 @@ def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(
     cold = ingest("cold", profile)
     assert cold["cached"] is False
     assert len(calls) == 1
-    assert json.loads(Path(cold["output"]).read_text()) == chunk
+    assert json.loads(Path(cold["output"]).read_text()) == expected_chunk
     cold_bytes = Path(cold["output"]).read_bytes()
     warm = ingest("warm", profile)
     assert warm["cached"] is True
     assert len(calls) == 1
-    assert json.loads(Path(warm["output"]).read_text()) == chunk
+    assert json.loads(Path(warm["output"]).read_text()) == expected_chunk
     assert Path(warm["output"]).read_bytes() == cold_bytes
+    assert "source_file" not in chunk["edges"][0]
+    assert "source_file" not in chunk["hyperedges"][0]
     assert warm["cache_evidence"]
     assert cold["receipt_id"] in {
         receipt["receipt_id"]
@@ -667,6 +697,37 @@ def test_real_public_sdk_cold_save_warm_and_cross_profile_cache(
     assert len(calls) == 2
     assert profile == original
     assert profile["_explicit"] is True
+
+    _assert_one_source_rejection(ingest, profile, chunk, calls, task_root)
+
+
+def _assert_one_source_rejection(
+    ingest: Callable[..., dict],
+    profile: dict,
+    chunk: dict,
+    calls: list[dict],
+    task_root: Path,
+) -> None:
+    original_hyperedges = chunk["hyperedges"]
+    chunk["hyperedges"] = None
+    with pytest.raises(RuntimeError, match="managed extraction did not complete"):
+        ingest("null-cold", profile, cache_name="null-hyperedges")
+    assert not (task_root / "scratch" / "null-cold" / "sample.json").exists()
+    assert len(calls) == 3
+
+    for bucket in ("nodes", "edges", "hyperedges"):
+        chunk["hyperedges"] = original_hyperedges
+        record = chunk[bucket][0]
+        original_source = record.get("source_file")
+        record["source_file"] = "another-source.md"
+        with pytest.raises(ValueError, match="source_file differs from the requested source"):
+            ingest(f"foreign-{bucket}", profile, cache_name=f"foreign-{bucket}")
+        assert not (task_root / "scratch" / f"foreign-{bucket}" / "sample.json").exists()
+        if original_source is None:
+            del record["source_file"]
+        else:
+            record["source_file"] = original_source
+    assert len(calls) == 6
 
 
 @pytest.mark.parametrize("runner_outcome", ["completed", "raises"])
