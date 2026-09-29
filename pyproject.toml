@@ -89,6 +89,12 @@ dev = [
 
 codegen = ["datamodel-code-generator[protobuf]==0.76.0"]
 
+[tool.uv]
+# `mise run check` runs lint and test concurrently against one environment.
+# Keep codegen in every default sync so another `uv run` cannot remove the
+# grpcio-tools dependency while guard-codegen integration tests use it.
+default-groups = ["dev", "codegen"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

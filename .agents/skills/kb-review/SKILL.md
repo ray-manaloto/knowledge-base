@@ -8,7 +8,8 @@ argument-hint: "[fixed point — a SHA, branch, or tag; defaults to the merge-ba
 
 **One** cold lens over one diff, from a different model family than whoever wrote
 the code, bounded at **two rounds**. Then a receipt, keyed to the exact commit,
-that `mise run kb-ship` refuses to push without.
+that `mise run kb-ship` refuses to push without. On a fresh worktree, first read
+[worktree and gate preparation](references/worktree-publish.md).
 
 It ran four lenses with no round bound until 2026-07-29. That version cost
 **2.93M subagent tokens over 5 rounds / 17 lane-runs** on #67 and surfaced
