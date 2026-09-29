@@ -12,9 +12,10 @@ from pathlib import Path
 from kb_setup.result import Rc
 
 _REQUIRED_PATHS = (
-    "sources/graphify",
-    "sources/skillopt",
+    "sources/graphify/.git",
+    "sources/skillopt/.git",
     "graphify-out/graph.json",
+    "graphify-out/graph-prose.json",
 )
 
 
@@ -37,7 +38,24 @@ def main(
     """Run pytest in this exact interpreter, preserving its direct exit code."""
     missing = preflight(repo_root, has_codegen=has_codegen)
     if missing:
-        print(f"test: NOT_RUN — missing {', '.join(missing)}; run `mise run kb-worktree-ready`")
+        setup = "mise run kb-build"
+        if (repo_root / ".git").is_file():
+            setup = "mise run kb-worktree-ready"
+        print(f"test: NOT_RUN — missing {', '.join(missing)}; run `{setup}`")
         return int(Rc.NOT_RUN)
-    command = [sys.executable, "-m", "pytest", "tests/", "-x", "-q", "-n", "auto", *argv]
+    has_target = any(
+        not arg.startswith("-") and (arg.startswith("tests/") or arg.endswith(".py") or "::" in arg)
+        for arg in argv
+    )
+    command = [
+        sys.executable,
+        "-m",
+        "pytest",
+        *([] if has_target else ["tests/"]),
+        "-x",
+        "-q",
+        "-n",
+        "auto",
+        *argv,
+    ]
     return runner(command, cwd=repo_root, check=False).returncode

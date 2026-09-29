@@ -733,6 +733,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "handoff-check [path] | gates [task...] [--stop] | "
         "check <path...> | funnel | "
         "graphify-catalog | lock-drift | mod-runtime-check [--arms] | "
+        "worktree-ready [--target PATH] | test [pytest args...] | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
         "research-links <URL...> [--out PATH] | "
