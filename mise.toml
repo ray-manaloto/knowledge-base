@@ -436,7 +436,9 @@ description = "Run the Python test suite (pytest-xdist, one worker per core)"
 # gets fewer workers instead of thrashing. `-x` still stops the run, though under
 # xdist sibling workers may finish an in-flight test first, so more than one
 # failure can be reported. That is more information, not less.
-run = "uv run pytest tests/ -x -q -n auto"
+# `kb_setup.test_gate` fails fast on missing worktree clones or the codegen
+# group; the Python entry point then runs pytest in this locked environment.
+run = "uv run --locked kb-setup test"
 # Bound: the full suite under 12 xdist workers; a wedged worker is the failure mode, not a slow one. See [tasks.lint] for the measurement behind this key.
 # 25m and NOT 30m: `kb_setup.gates._GATE_TIMEOUT` is 1800s, so an equal bound is a
 # RACE — whichever fires first decides the message, and the outer one names no

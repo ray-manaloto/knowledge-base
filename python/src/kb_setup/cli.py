@@ -63,7 +63,7 @@ def _print_usage() -> int:
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | graphify-catalog | "
-        "lock-drift | mod-runtime-check [--arms] | worktree-ready [--target PATH] | "
+        "lock-drift | mod-runtime-check [--arms] | worktree-ready [--target PATH] | test | "
         "telemetry-prune | serve | serve-memory | env-refresh [--sentinel] | "
         "codex-config-check | "
         "instruction-edit-guard | "
@@ -238,6 +238,10 @@ def _run(argv: list[str] | None = None) -> int:
         # has neither and two end-to-end tests fail there and pass in the main
         # checkout at the same base.
         return worktree.main(repo_root, rest)
+    if cmd == "test":
+        from kb_setup import test_gate
+
+        return test_gate.main(repo_root, rest)
     if cmd == "mod-runtime-check":
         from kb_setup import mod_runtime
 
@@ -729,6 +733,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "handoff-check [path] | gates [task...] [--stop] | "
         "check <path...> | funnel | "
         "graphify-catalog | lock-drift | mod-runtime-check [--arms] | "
+        "worktree-ready [--target PATH] | test [pytest args...] | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
         "research-links <URL...> [--out PATH] | "

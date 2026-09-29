@@ -1,0 +1,20 @@
+---
+name: claude-graphify-takeover-v1
+description: Read-only preparation and explicit single-writer transfer for unfinished Graphify fork and KB integration.
+---
+
+# Claude takeover of unfinished Graphify delivery
+
+Read `../../CLAUDE-TAKEOVER-20260928.md` from this published skill directory. Begin read-only. If the original process-audit checkout is available, run `mise run claude-handoff-check` there and inspect its JSON. A remote clone of this handoff does not include that validator: record it as inaccessible, verify live owner/process state directly, and remain read-only. `HANDOFF_REVIEW_REQUIRED` requests human/agent review; `transfer_authorized:false` is never permission to edit.
+
+The current Codex delivery task is sole writer of the Graphify and KB integration. A cutoff or usage limit does not revoke that lease. Transfer requires a successor read-only digest acknowledgment, predecessor explicit relinquishment with no active owned process, then a separate start signal and successor acknowledgment. Use the three-phase protocol in the bundled takeover packet; if `codex-task-orchestration` is installed, read its current `SKILL.md` too. If it is unavailable, record the gap and preserve the packet protocol. Keep the original goal, approved spec/tickets, amendment and addendum intact.
+
+After a valid start signal, use the repository skills and mise tasks listed in the handoff. Only direct terminal receipts at the final exact commit count. Do not re-run paid cases until deterministic build and capability preflight pass. Stop on conflicts or unresolved source identity; report a blocker rather than reset an attempt or deadline.
+
+## Instruction-issue feedback from every Claude agent
+
+Every Claude agent that reviews or executes this handoff must return a bounded list of **all instruction issues it encountered**: vague, missing, contradictory or stale instructions; misleading status claims; repeated work caused by instructions; and instructions that could not be followed with the available tool or ownership boundary. Include issues that were resolved, rejected or refuted, rather than silently erasing them. An agent with no findings says so and names the sessions and steps it actually checked; "none" is not a claim about inaccessible history.
+
+The successor lead deduplicates agent reports by source and failure class, preserves each agent's evidence, and writes one machine-readable report at the packet's fixed feedback path only after the separate write-start signal. During read-only acknowledgment, return the provisional list in the acknowledgment instead of writing a file. For each issue, bind the exact instruction file/section/hash and a native or AgentsView parent-session ID with ordinal range; add a direct receipt SHA and child return code for a runtime failure. Distinguish confirmed failures, hypotheses and refuted explanations. List inaccessible session ranges explicitly. Never parse a hook transcript path as a stable transcript format or publish private reasoning or secrets.
+
+For each confirmed repeatable issue, propose the smallest skill → canonical mise task → Python predicate or checklist correction, its owner, and positive, negative, unchanged-input, changed-source and failure-mutation controls. State why an issue is not safely automatable when applicable. If the original process-audit checkout is available, run `mise run claude-instruction-feedback-check` there for the instruction contract, then `mise run claude-instruction-feedback-check -- --report <fixed-feedback-path>` for the completed report. If unavailable, report that validation gap and do not claim a green check. A passing report is diagnostic feedback, not delivery acceptance or permission to edit. Implement a correction only in the owned lane after the write-start signal and required review; preserve original gates and supersession boundaries. Recheck the next exact-head attempt, retain historical failures, and feed verified controls into the next hash-bound handoff revision.
