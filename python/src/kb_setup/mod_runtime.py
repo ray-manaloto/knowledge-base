@@ -11,13 +11,39 @@ generated). Nothing was detecting that. This module is the detector.
 🔴 **INTENTIONALLY NON-HERMETIC, and that word is the one this ticket got
 wrong.** The ticket asked for a check that was both "hermetic" and a live probe
 of the installed runtime; those cannot both hold. What gives way is *hermetic*,
-because it was never the real constraint — **credentials** were, and
-`/plugin-types` needs none. Armed 2026-09-12, one variable (`HOME`), same
-binary: with the real credentialed `$HOME` → rc 0, both files written; with
-`HOME` pointed at a fresh empty temp dir → rc 0, both files written. No prompt,
-no hang, no model call. So this check shells to `claude` and STILL runs on a
-machine with no Claude credentials; what it genuinely needs is the binary, and
-a machine without one gets :data:`Rc.NOT_RUN` (127), never a green.
+because it was never the real constraint — **credentials** were, and the
+declarations need none.
+
+🔴 **The generator changed under this module at Claude Code 2.1.287, and the
+original premise went false with it.** Through 2.1.272 the declarations came
+from a local `/plugin-types` slash command, measured (2026-09-12) to write its
+files with rc 0 under both a real and an empty `HOME`. At 2.1.287 there is no
+such command: `-p /plugin-types` is sent to the MODEL as an ordinary prompt
+(real `HOME`: rc 0, a model turn, nothing written), and under the isolated
+`HOME` it stops at `Not logged in · Please run /login`, rc 1 — the gate's
+2026-10-01 red. Nothing in this module had asked for credentials; the
+command it relied on had simply gone. The release notes call the feature
+"Claude Mods" (2.1.287), and the mods docs (`plugins/mods/create`, "Get type
+definitions for your version") name the replacement: Claude Code writes the
+declarations into `.claude-plugin/types/` inside a mod's directory **each
+time it loads that mod from `--plugin-dir`**.
+
+So the generator is now: a throwaway probe mod in the temp work dir, loaded
+with `claude -p /cost --plugin-dir <probe>` under the isolated `HOME` with
+every credential variable removed (:data:`_CREDENTIAL_VARIABLES`). Mod load
+happens at session start, before anything consults credentials, and `/cost`
+is a LOCAL command, so the child writes the files and exits without a model
+turn. Armed 2026-10-01 on 2.1.287, isolated `HOME`: `-p "reply ok"
+--plugin-dir` → all five files written, then rc 1 `Not logged in` (proving
+the write precedes auth); the same with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`
+unset → identical, so that flag is no longer part of the recipe; and the gate's
+own `-p /cost --plugin-dir` → all five files, rc 0, `Total cost: $0.0000`. Rejected, each measured:
+`claude plugin validate` and `claude plugin test` (rc 0 / rc 1, nothing
+written); `--plugin-dir` with `plugin list`, `plugin details`, `mcp list`,
+`auth status` or `doctor` (nothing written — only a SESSION loads a mod); and
+`--bare`, which refuses to load a non-managed mod's hooks module at all. The
+child's rc is therefore not the verdict — the written files are — and a
+machine without the binary still gets :data:`Rc.NOT_RUN` (127), never a green.
 
 That is also why this is in :data:`kb_setup.gates.GATE_TASKS` directly rather
 than reached transitively through `pytest` the way `kb-guard-codegen-check` and
@@ -92,7 +118,8 @@ measured identical across both environments — which is exactly what makes chec
 
 Two consequences worth stating because they bound what this module claims:
 
-- The token check reads **`claude-code.d.ts` only**. The MCP file collapses to
+- The token check reads **the primary declarations only** (`claude-code.d.ts`
+  at 2.1.269, `claude-code/index.d.ts` since 2.1.287). The MCP file collapses to
   10 lines under a bare `HOME`, so a token satisfied only there would be
   satisfied conditionally on the measuring machine's MCP inventory.
 - The ticket's headline `+1,297 lines` is **confounded**: version-only is
@@ -115,6 +142,7 @@ at all. Residuals are filed, not hidden.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -133,48 +161,93 @@ REGISTER_TS = guard_inventory.FUNCTION_HOOK_SOURCE_PATH
 #: INFORMATIONAL delta only — never as authority over a live probe.
 VENDORED_DECLARATIONS = Path("sources/media/claude-code-function-hooks-types.d.ts")
 
-#: Exactly what `/plugin-types` must write, relative to its working directory.
-#: Measured 2026-09-12 on 2.1.269 under two different `HOME`s: both files appear
-#: in both arms even though their CONTENTS differ, so this set is the
-#: environment-invariant property of the generator.
+#: The throwaway mod the generator loads, relative to the temp work dir. Its
+#: directory name is what Claude Code calls the plugin's directory; its manifest
+#: name (:data:`_PROBE_MOD_NAME`) is what it is loaded as.
+PROBE_MOD_DIR = Path("probe-mod")
+
+#: Where Claude Code writes the declarations when it loads a mod
+#: (`plugins/mods/create`, "Get type definitions for your version").
+TYPES_DIR = PROBE_MOD_DIR / ".claude-plugin" / "types"
+
+#: Exactly what loading the probe mod must write under :data:`TYPES_DIR`, as paths
+#: relative to the temp work dir. Only :data:`TYPES_DIR` is compared — the probe
+#: mod's own sources, and the `tsconfig.json` Claude Code adds at the mod root,
+#: are not generator output this repo reads.
+#:
+#: Measured 2026-10-01 on **2.1.287** under the isolated `HOME`: these five
+#: files, nothing else, with and without `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`.
+#: The `.gitignore` (`*`) is undocumented and `tsconfig.json` is documented; both
+#: are listed because an exact-set check that silently tolerated either would
+#: tolerate any extra file.
 #:
 #: 🔴 **Stability across Claude Code VERSIONS is untested, and a new output file
 #: will RED this gate.** That is the intended direction: a generator that starts
-#: writing a third artifact has changed a contract this repo reads, and the
+#: writing another artifact has changed a contract this repo reads, and the
 #: remedy is a human reviewing it and updating this tuple — not a check that
-#: shrugs. Both arms behind this set ran 2.1.269.
+#: shrugs. History: 2.1.269 wrote two flat files into `.claude/types/`, 2.1.272
+#: added a third (`claude-code-plugins.d.ts`, an index of enabled plugins' type
+#: contracts — caught here as UNEXPECTED OUTPUT, then accepted on review), and
+#: 2.1.287 moved everything into per-package directories inside the mod. The
+#: docs also promise one `<plugin>/index.d.ts` per plugin the mod's manifest
+#: lists under `dependencies`; the probe declares none, so none appear.
 EXPECTED_OUTPUTS = (
-    Path(".claude/types/claude-code.d.ts"),
-    Path(".claude/types/claude-code-mcp.d.ts"),
-    #: Added 2026-09-15 for Claude Code **2.1.272**, which began writing a third
-    #: file. The gate caught it as `UNEXPECTED OUTPUT` — working as designed —
-    #: and this is the reviewed acceptance it asked for, not a widening to make
-    #: a red gate green.
-    #:
-    #: Reviewed by generating it under the same isolated bare `HOME` the gate
-    #: uses: 916 bytes, 16 lines, all header, ending in "No enabled plugin names
-    #: a type contract in its manifest." It is an INDEX of the enabled plugins'
-    #: type contracts, so like `claude-code-mcp.d.ts` its CONTENT is
-    #: environment-dependent while its filename is not — which is the exact
-    #: property the topology check relies on.
-    #:
-    #: ⚠️ Its own header says each contributing plugin also gets a
-    #: `claude-code-plugins/<plugin>.d.ts` beside it. Those never appear here
-    #: because the generator runs under a `HOME` with no enabled plugins; if
-    #: this gate is ever run against a real `HOME`, the produced set grows by
-    #: one file per such plugin and an exact-set check would fail on every one.
-    Path(".claude/types/claude-code-plugins.d.ts"),
+    TYPES_DIR / "claude-code" / "index.d.ts",
+    TYPES_DIR / "claude-code-mcp" / "index.d.ts",
+    TYPES_DIR / "claude-code-tools" / "index.d.ts",
+    TYPES_DIR / "tsconfig.json",
+    TYPES_DIR / ".gitignore",
 )
 
-#: The declarations file the token contract is checked against. `claude-code-mcp.d.ts`
-#: is deliberately NOT used: it is 2,588 lines on this machine and **10** under a
-#: bare `HOME`, so a token satisfied only there is satisfied by local MCP
-#: configuration rather than by the runtime contract.
-PRIMARY_DECLARATIONS = Path(".claude/types/claude-code.d.ts")
+#: The declarations file the token contract is checked against. The MCP file is
+#: deliberately NOT used: at 2.1.269 it was 2,588 lines on this machine and
+#: **10** under a bare `HOME` (2.1.287 under the isolated `HOME`: 10 again), so a
+#: token satisfied only there is satisfied by local MCP configuration rather than
+#: by the runtime contract.
+PRIMARY_DECLARATIONS = TYPES_DIR / "claude-code" / "index.d.ts"
 
-#: Claude prints this and exits **0** when `/plugin-types` is not available —
-#: so the rc cannot discriminate and this string is what does.
-_UNKNOWN_COMMAND = "Unknown command"
+#: The probe mod's manifest name. Deliberately NOT `claude-`-prefixed: 2.1.287
+#: reserves names that look like Anthropic's own (`plugins/mods/create`).
+_PROBE_MOD_NAME = "kb-mod-runtime-probe"
+
+#: The probe mod's hooks module: one pass-through hook, enough to make the
+#: plugin a mod and therefore make Claude Code write the declarations.
+_PROBE_REGISTER_JS = """export function register(on) {
+  on("session.start", async ($, e, next) => next(e))
+}
+"""
+
+#: The prompt handed to the child. A LOCAL command, so it never becomes a model
+#: turn: measured 2026-10-01 under the isolated `HOME` → rc 0, `Total cost:
+#: $0.0000`; with a real `HOME` → rc 0, usage text, still no model call. Even a
+#: credential that somehow survived :data:`_CREDENTIAL_VARIABLES` therefore
+#: cannot turn this gate into a billed turn. An ordinary prompt would: under
+#: the isolated `HOME` it stops at `Not logged in` (rc 1), and with any
+#: credential it is sent to the model.
+_PROBE_PROMPT = "/cost"
+
+#: Environment variables that could AUTHENTICATE the child, removed from its
+#: environment. The isolated `HOME` already hides the claude.ai login (the
+#: 2026-10-01 arm: an ordinary prompt → `Not logged in`), but these are read
+#: from the environment directly — an exported API key, a long-lived OAuth
+#: token, or a third-party provider selector with ambient cloud credentials
+#: would each authenticate the child. The provider selectors are the `CLAUDE_CODE_USE_*`
+#: names the 2.1.287 binary itself enumerates.
+#:
+#: 🔴 Same staleness caveat as :data:`_WRITE_LOCATION_OVERRIDES`: enumerated, so
+#: a new auth variable leaks until it is added here. :data:`_PROBE_PROMPT` being a
+#: local command is the second line behind this one.
+_CREDENTIAL_VARIABLES = (
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "CLAUDE_CODE_USE_FOUNDRY",
+    "CLAUDE_CODE_USE_ANTHROPIC_AWS",
+    "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+    "CLAUDE_CODE_USE_MANTLE",
+)
 
 #: Environment variables naming an ABSOLUTE write location the runtime honours in
 #: preference to `$HOME`. Each is removed from the generator's environment, because
@@ -184,8 +257,8 @@ _UNKNOWN_COMMAND = "Unknown command"
 #:
 #: 🔴 **Enumerated, and the list is the part most likely to go stale.** A prefix
 #: rule over `CLAUDE_*` would also strip variables that are not write locations
-#: (`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS` among them, which this function sets on
-#: purpose), so there is no mechanical derivation to lean on. If a future runtime
+#: (the `CLAUDE_CODE_ENABLE_*` feature flags among them), so there is no
+#: mechanical derivation to lean on. If a future runtime
 #: adds another such variable, this gate will silently leak to it until someone
 #: adds it here — which is exactly how `CLAUDE_CODE_DEBUG_LOGS_DIR` was missed
 #: until a cold lane ran the installed logger's own path resolver against a
@@ -584,36 +657,57 @@ def claude_version(binary: Path) -> str | None:
 def generate_declarations(
     binary: Path, workdir: Path, home: Path
 ) -> subprocess.CompletedProcess[str]:
-    """Run `/plugin-types` in `workdir`, which MUST NOT be the repo.
+    """Load a throwaway probe mod from `workdir`, which MUST NOT be the repo.
 
-    🔴 **The fresh temp CWD is a correctness requirement, not tidiness.**
-    `/plugin-types` writes `.claude/types/*.d.ts` relative to its working
-    directory, and `.claude/types/` in this repo is neither tracked nor
-    gitignored — so a run in the repo root leaves two untracked files behind and
-    dirties the tree. A gate that dirties the tree breaks `kb-gates`' own
-    `dirty` accounting and `.claude/rules/clean-git-state.md` alike.
+    Writes the probe (:data:`PROBE_MOD_DIR`) into `workdir`, then runs
+    `claude -p /cost --plugin-dir <probe>` with `workdir` as its cwd. Claude Code
+    writes the declarations into the probe's `.claude-plugin/types/` while
+    loading it, at session start, and `/cost` then runs locally (measured rc 0,
+    `Total cost: $0.0000`). The rc is returned for the caller to report, not to
+    judge: the written files are the verdict.
+
+    🔴 **The fresh temp work dir is a correctness requirement, not tidiness.**
+    Generation writes beside the mod it loads and the session writes beside
+    its cwd; a run rooted in the repo would leave untracked files behind and
+    dirty the tree, which breaks `kb-gates`' own `dirty` accounting and
+    `.claude/rules/clean-git-state.md` alike.
 
     `stdin` is `DEVNULL` because an inherited TTY is what turns a headless run
     into a hang.
 
-    🔴 **`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set HERE, not inherited.** The
-    `/plugin-types` command does not exist without it. This repo declares it in
-    `.claude/settings.json`'s `env`, so a run from inside a Claude Code session
-    inherits it and passes — while the same command in a plain terminal or CI
-    silently gets a Claude that does not know the command. Armed 2026-09-12, same
-    binary, flag the only variable: absent -> the gate reported FINDINGS "expected
-    output not written"; present -> rc 0, clean. The gate was green only because
-    of where it was run, which is the class `probes-need-a-control-arm.md` exists
-    for.
+    🔴 **No credential reaches the child, by construction** — the isolated
+    `HOME` hides the claude.ai login and :data:`_CREDENTIAL_VARIABLES` are
+    removed. That is what keeps this gate free of model calls and billing.
+    Letting the child find the real login instead was considered and rejected:
+    it would buy nothing (the files are written before auth is consulted) and
+    would turn every gate run into a model turn.
     """
+    mod_dir = workdir / PROBE_MOD_DIR
+    (mod_dir / ".claude-plugin").mkdir(parents=True)
+    (mod_dir / "hooks").mkdir()
+    (mod_dir / ".claude-plugin" / "plugin.json").write_text(
+        json.dumps(
+            {
+                "name": _PROBE_MOD_NAME,
+                "version": "0.0.0",
+                "description": "kb-mod-runtime-check probe: loaded only to make Claude Code "
+                "write its mod type declarations",
+                "author": {"name": "kb-mod-runtime-check"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (mod_dir / "hooks" / "hooks.json").write_text(
+        json.dumps({"modules": ["./register.js"]}), encoding="utf-8"
+    )
+    (mod_dir / "hooks" / "register.js").write_text(_PROBE_REGISTER_JS, encoding="utf-8")
+
     # Annotated rather than inferred: `{**os.environ, …}` followed by a `pop`
     # with a `None` default widens the value type enough that no `subprocess.run`
     # overload matches, and ty says so at the CALL rather than here.
-    env: dict[str, str] = {
-        **os.environ,
-        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
-        "HOME": str(home),
-    }
+    env: dict[str, str] = {**os.environ, "HOME": str(home)}
+    for credential in _CREDENTIAL_VARIABLES:
+        env.pop(credential, None)
     # 🔴 Setting `HOME` is NOT sufficient on its own. Every variable below names
     # an absolute write location that the runtime honours in preference to
     # `$HOME`, so a caller who has one exported routes the child's writes straight
@@ -626,7 +720,7 @@ def generate_declarations(
     for override in _WRITE_LOCATION_OVERRIDES:
         env.pop(override, None)
     return subprocess.run(
-        [str(binary), "-p", "/plugin-types", "--permission-mode", "bypassPermissions"],
+        [str(binary), "-p", _PROBE_PROMPT, "--plugin-dir", str(mod_dir)],
         cwd=workdir,
         env=env,
         capture_output=True,
@@ -751,38 +845,40 @@ def _generate_into_temp(binary: Path, version: str) -> str:
         try:
             proc = generate_declarations(binary, workdir, home)
         except (OSError, subprocess.SubprocessError) as err:
-            print(f"[mod-runtime-check] `/plugin-types` could not be run ({err}) — nothing probed")
+            print(f"[mod-runtime-check] the probe mod could not be loaded ({err}) — nothing probed")
             raise _AbortError(Rc.NOT_RUN) from err
-        if proc.returncode != 0:
+
+        # 🔴 The child's rc is NOT the verdict. Measured both ways on 2.1.287:
+        # an ordinary prompt writes every declaration and THEN exits 1 at the
+        # auth check, so a nonzero rc does not mean nothing ran; and rc 0 was
+        # never evidence either — the retired
+        # `/plugin-types` path exited 0 both when it worked and when it printed
+        # `Unknown command`, and on 2.1.287 `-p /plugin-types` exits 0 after a
+        # model turn that writes nothing. Reported, never judged.
+        first_line = next(iter((proc.stdout + proc.stderr).strip().splitlines()), "")
+        print(
+            f"[mod-runtime-check] probe child exited {proc.returncode} at {version}: {first_line}"
+        )
+
+        types_dir = workdir / TYPES_DIR
+        produced = (
+            {p.relative_to(workdir) for p in types_dir.rglob("*") if p.is_file()}
+            if types_dir.is_dir()
+            else set()
+        )
+        # 🔴 NOTHING written is "we never asked", not "the contract regressed".
+        # Reporting it as missing OUTPUT would be a red ship gate pointing at the
+        # wrong thing — the class `Rc.NOT_RUN` exists for. A PARTIAL set below is
+        # different: the generator ran and its artifact set changed.
+        if not produced:
             print(
-                f"[mod-runtime-check] `/plugin-types` exited {proc.returncode} at {version} "
-                "— the runtime was not described, so nothing was checked:"
+                f"[mod-runtime-check] loading the probe mod at {version} wrote no "
+                f"declarations into {TYPES_DIR} — the runtime was never described, so "
+                "nothing was checked. The child said:"
             )
             print(proc.stdout + proc.stderr)
             raise _AbortError(Rc.NOT_RUN)
 
-        # 🔴 Claude exits **0** while printing `Unknown command: /plugin-types`
-        # when the feature flag is off or the command is gone. A zero rc is
-        # therefore NOT evidence the generator ran, and treating the resulting
-        # empty directory as missing OUTPUT misclassifies "we never asked" as
-        # "the contract regressed" — a red ship gate pointing at the wrong thing,
-        # with no mention of the cause. `Rc.NOT_RUN` is this repo's third state
-        # for exactly this, and the message names the flag.
-        combined = proc.stdout + proc.stderr
-        if _UNKNOWN_COMMAND in combined:
-            print(
-                f"[mod-runtime-check] `{binary}` does not know `/plugin-types` at {version} "
-                f"(it printed {_UNKNOWN_COMMAND!r} and still exited 0). The runtime was "
-                "never described, so nothing was checked"
-            )
-            print(
-                "[mod-runtime-check] the usual cause is the function-hooks feature flag: "
-                "this check sets CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 for its own subprocess, "
-                "so seeing this means the installed Claude Code no longer ships the command"
-            )
-            raise _AbortError(Rc.NOT_RUN)
-
-        produced = {p.relative_to(workdir) for p in workdir.rglob("*") if p.is_file()}
         missing_files, extra_files = topology_findings(produced, set(EXPECTED_OUTPUTS))
         if missing_files or extra_files:
             for path in sorted(missing_files):

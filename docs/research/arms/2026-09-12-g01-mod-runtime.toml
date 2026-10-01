@@ -237,39 +237,42 @@ test = "test_an_event_field_read_off_a_binding_not_named_e_is_still_found"
 # in the module; no arm here covers them, and their absence from this list is not
 # evidence they are safe.
 
-# A12 — sever the "Unknown command" branch. Pre-`c33a1fb5` behaviour: a flag-off
-# run writes nothing, prints `Unknown command: /plugin-types` and exits **0**, so
-# rc cannot discriminate and the gate reported FINDINGS "expected output not
-# written" — a real-looking contract breach from a probe that never asked.
+# A12 — sever the "wrote nothing" branch. RE-DERIVED 2026-10-01 for Claude Code
+# 2.1.287, which retired `/plugin-types`: the row used to sever the
+# `Unknown command` branch, whose job — "a probe that never ran is NOT_RUN, not
+# FINDINGS" — now belongs to the empty-output check. Severed, an empty types dir
+# falls through to topology and reports five MISSING outputs: a real-looking
+# contract breach from a probe that never described the runtime.
 [[arm]]
 id = "A12"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''        if _UNKNOWN_COMMAND in combined:'''
+old = '''        if not produced:'''
 new = '''        if False:'''
-test = "test_an_unknown_plugin_types_command_is_not_run_rather_than_findings"
+test = "test_a_generator_that_writes_nothing_is_not_run_rather_than_findings"
 
-# A13 — stop setting the flag explicitly and fall back to inheritance. This is
-# the realistic break: it looks like a simplification, and it PASSES inside any
-# Claude Code session, because `.claude/settings.json` exports the flag. It fails
-# only in a plain terminal or CI — which is exactly how the gate came to be green
-# "only because of where it ran". The test deletes the variable from its own env
-# for that reason; without that `delenv` the arm could not die.
+# A13 — stop removing credential variables. RE-DERIVED 2026-10-01: the row used
+# to drop the `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` set, which 2.1.287 no longer
+# needs (measured: identical output with it unset). The realistic break now is
+# deleting the scrub as "redundant" because `HOME` is already isolated — which
+# holds only until a caller exports `ANTHROPIC_API_KEY`.
 [[arm]]
 id = "A13"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",'''
-new = '''        "KB_ARM_A13_NOT_THE_FLAG": "1",'''
-test = "test_the_generator_subprocess_is_handed_the_function_hooks_flag"
+old = '''    for credential in _CREDENTIAL_VARIABLES:'''
+new = '''    for credential in ():'''
+test = "test_no_credential_variable_reaches_the_generator"
 
 # A14 — stop isolating HOME. Measured before the fix: 13 directories named
 # `~/.claude/projects/-private-var-folders-…-kb-mod-runtime-<random>/`, each with
 # a session JSONL, accumulated in the real profile between 09:09 and 13:16 on one
-# day. Unbounded, never cleaned, one per gate run.
+# day. Unbounded, never cleaned, one per gate run. Re-measured 2026-10-01 on the
+# 2.1.287 probe-mod generator, live: isolated -> real-profile count 14 -> 14;
+# this mutation -> 14 -> 15.
 [[arm]]
 id = "A14"
 file = "python/src/kb_setup/mod_runtime.py"
-old = '''        "HOME": str(home),'''
-new = '''        "KB_ARM_A14_NOT_HOME": str(home),'''
+old = '''    env: dict[str, str] = {**os.environ, "HOME": str(home)}'''
+new = '''    env: dict[str, str] = {**os.environ, "KB_ARM_A14_NOT_HOME": str(home)}'''
 test = "test_the_generator_runs_under_an_isolated_home"
 
 # A15 — leave a caller's `CLAUDE_CONFIG_DIR` in place. Isolating HOME is not
