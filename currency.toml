@@ -1946,8 +1946,11 @@ manifest = "sources/codex.manifest"
 # currency.toml pin 1.1.13" when the pin was `mise.toml`'s 1.1.11 and this file
 # did not mention antigravity at all. Both halves wrong, and the figure reached
 # Ray's own directive text before anyone re-derived it.
-mise_key = "antigravity-cli"
-expected = "1.2.12"
+# No `mise_key` since 2026-10-01: Ray ruled agy comes ONLY from its native
+# installer, so this row is self-managed — `expected` against the binary.
+# `expected` moved 1.2.12 -> 1.2.14: the native installer's `agy update` landed
+# 1.2.14, the version dotfiles already pinned and ran.
+expected = "1.2.14"
 binary = "agy"
 github = "google-antigravity/antigravity-cli"
 # The HOUSE form (`^v?(\d+\.\d+\.\d+)`, as at `[tool.hk]` and `[tool.fnox]`),

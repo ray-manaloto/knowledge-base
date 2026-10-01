@@ -253,7 +253,7 @@ catches things — a fresh context with no design intent is worth something — 
 it is not the cross-family check the lane is named for, and a receipt that
 implies otherwise is a lie told to a future reader.
 
-Both CLIs are pinned in `mise.toml` (`codex`, `antigravity-cli`) and auth is
+`codex` is pinned in `mise.toml`; `agy` comes only from its native installer (no mise pin). Auth is
 per-user, so "installed" is not "authenticated". A lane that cannot run returns
 an error rather than substituting itself; treat that error as "advance the
 chain", not as "no findings".
