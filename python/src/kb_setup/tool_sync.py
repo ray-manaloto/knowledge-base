@@ -60,27 +60,18 @@ def _run(argv: list[str], repo_root: Path) -> subprocess.CompletedProcess[str]:
 def _mise_progress_only(stderr: str, spec: ToolSpec) -> bool:
     """Recognize only mise's bounded ordinary install-status lines.
 
-    Plus the two line shapes this repo's own `[hooks].postinstall`
-    (`mise reshim && hk install --mise`) prints on stderr after every install —
-    `hk removed hook: …/.git/hooks/<hook>` and `hk Installed hk hook:
-    …/.git/hooks/<hook>` for the two hooks it manages. On an already-installed
-    pin mise itself prints nothing, so that hook output was the WHOLE stderr
-    and the install step refused it (#438). Anything else still refuses.
+    This once also accepted the `hk removed hook:` / `hk Installed hk hook:`
+    lines that `[hooks].postinstall = "mise reshim && hk install --mise"`
+    printed after every install (#438). That postinstall no longer installs
+    hooks (hk 2.x bump; upstream jdx/hk#1376 removed the recipe), so nothing
+    emits those lines and they are refused like any other stray output.
     """
     lines = stderr.splitlines()
     pattern = re.compile(
         rf"^mise {re.escape(spec.mise_key)}@[^\s]+\s+⇢\s+"
         r"(?:already installed|installed)$"
     )
-    # `.+` for the path, not `[^\s]+`: a checkout under a directory with a space
-    # in its name is legitimate, and refusing it here would fail `kb-tool-sync` on
-    # that host for every tool (cold review of 90be7169, P2).
-    hook = re.compile(
-        r"^hk (?:removed hook|Installed hk hook): .+/\.git/hooks/(?:pre-commit|commit-msg)$"
-    )
-    return bool(lines) and all(
-        pattern.fullmatch(line) is not None or hook.fullmatch(line) is not None for line in lines
-    )
+    return bool(lines) and all(pattern.fullmatch(line) is not None for line in lines)
 
 
 def _mise_lock_progress_only(stderr: str, spec: ToolSpec) -> bool:

@@ -43,7 +43,7 @@ min_version = { hard = "2026.9.0", soft = "2026.9.0" }
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.7"
 uv = "0.12.8"
-hk = "1.57.0"
+hk = "2.4.0"
 pkl = "0.32.1"
 typos = "1.50.0"
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
@@ -51,7 +51,7 @@ typos = "1.50.0"
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
 "conda:ffmpeg" = "9.0.1"
 taplo = "0.10.0"
-rumdl = "0.2.62"
+rumdl = "0.2.78"
 # biome: the JS/TS linter for `.claude/workflows/*.js` (U8b0). Rust-native, per
 # this repo's toolset comment in hk.pkl. Was installed and used unpinned before
 # this — `grep -c biome mise.toml` returned 0 — so the `workflow_lint` gate
@@ -280,9 +280,13 @@ show_tools = true
 missing_tools = "always"
 
 [hooks]
-# Reshim after installs (pipx backend leaves stale shims otherwise) + install
-# the hk git hooks against mise-provided binaries.
-postinstall = "mise reshim && hk install --mise"
+# Reshim after installs (pipx backend leaves stale shims otherwise). The hk hook
+# install is NOT here any more: upstream removed this postinstall recipe
+# (jdx/hk#1376, discussion #1375) because it mutates `.git/config` during mise
+# installs and races; hk 2's per-repo `hk install` also skips (or deletes local
+# hooks) when global `hook.hk-*` entries exist. Hooks come from the once-per-
+# machine `hk install --global --mise` — same change as ray-manaloto/dotfiles#1403.
+postinstall = "mise reshim"
 
 [env]
 HK_MISE = "1"
