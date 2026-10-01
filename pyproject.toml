@@ -299,6 +299,19 @@ cpy = "cpy"
 # WRONG fix: it would falsify a pinned source's identity to satisfy a linter.
 nativ = "nativ"
 
+# `codegen` is a DEFAULT group, not an opt-in one. As an opt-in group the shared
+# `.venv` held it only some of the time, with two writers flipping it mid-suite:
+# every `mise run`/`mise exec` here fires `[deps.uv]`'s `uv sync --locked`, which
+# is EXACT and UNINSTALLED the group's 16 packages, while `tests/test_codegen.py`'s
+# `uv run --group codegen` reinstalled them. `guard_codegen._run_native` runs
+# `--no-sync` (load-bearing, see its docstring), i.e. whatever is installed at
+# that instant, so under `-n auto` it saw the package absent, half-written
+# (`ModuleNotFoundError: datamodel_code_generator._format_types`) or without its
+# `protobuf` extra — a different failing set every run, green serially.
+# Default membership makes every sync converge on the same environment.
+[tool.uv]
+default-groups = ["dev", "codegen"]
+
 [tool.uv.sources]
 graphifyy = { git = "https://github.com/ray-manaloto/graphify", rev = "3c9b930f386f80c393fe658e1afb685030828c6a" }
 
