@@ -409,6 +409,14 @@ _NODE_LINE = re.compile(r"^NODE .*\[src=(?P<src>.*?) loc=")
 #: when run alone.
 RETRIEVAL_TIMEOUT = 180
 
+#: CPU-seconds the `tier1.graph-answers` canary may spend (#838). Measured
+#: 2026-10-02 on the 756 MB graph: 31.7 CPU-s (30.69 user + 1.02 sys, 4.4 GB
+#: RSS, single process). That leaves ~5.7x headroom. It is the same number the
+#: wall bound carried, now in CPU-seconds, so on an idle host it is no looser:
+#: a single-threaded process never accrues more CPU than wall time. What it
+#: drops is the failure a busy host caused while the query itself was fine.
+CANARY_CPU_BUDGET = 180.0
+
 
 def _graph_path(repo_root: Path) -> Path:
     return repo_root / "graphify-out" / "graph.json"
@@ -851,7 +859,13 @@ def cases(repo_root: Path) -> list[evals.Case]:
                 "(rc=0 with empty output is a corpus that reads as healthy and "
                 "knows nothing)"
             ),
-            # RETRIEVAL_TIMEOUT, not the 60s default, and this is applying an
+            # CANARY_CPU_BUDGET, a CPU-time bound, not a wall-clock one (#838).
+            # The history below explains why: the wall bound moved 60 -> 180 s
+            # and still failed, at 180 s, on a host at load ~100 with nothing
+            # wrong with the query. A wall bound measures the host. See
+            # `evals.run_command_cpu_bounded` for what replaces it.
+            #
+            # History. RETRIEVAL_TIMEOUT, not the 60s default, and this is applying an
             # existing justified constant rather than widening a bound to make a
             # gate pass. That constant's own comment says why: a retrieval query
             # "reloads the whole graph". This canary IS a `graphify query` over
@@ -875,7 +889,7 @@ def cases(repo_root: Path) -> list[evals.Case]:
             # stays checkable, since a comment naming a value it does not use is
             # indistinguishable from one that is simply stale.
             probe=lambda: evals.graphify_canary(
-                repo_root, CANARY_QUESTION, timeout=RETRIEVAL_TIMEOUT
+                repo_root, CANARY_QUESTION, cpu_budget=CANARY_CPU_BUDGET
             ),
             control=_broken_graph_canary,
             precondition=_graphify_installed,

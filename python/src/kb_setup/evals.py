@@ -38,9 +38,12 @@ review happened.
 
 from __future__ import annotations
 
+import contextlib
 import itertools
 import json
+import os
 import shutil
+import signal
 import subprocess
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -258,6 +261,132 @@ def run_command(
     return rc, (out + err)
 
 
+#: How often a CPU-bounded run is sampled, and the window a stall is judged over.
+STALL_WINDOW = 60.0
+
+#: CPU-seconds a process group must accrue per :data:`STALL_WINDOW` to count as
+#: alive. One CPU-second a minute is ~1.7% of one core. A host at load 206 on 12
+#: cores, the worst seen during #838, still gives a runnable process ~6%, so
+#: this only trips on a process that is barely running or not running at all.
+STALL_MIN_PROGRESS = 1.0
+
+
+def _ps_seconds(text: str) -> float:
+    """Parse a ``ps -o time`` field, ``[dd-][hh:]mm:ss.cc``, into seconds."""
+    days, _, clock = text.rpartition("-")
+    seconds = 0.0
+    for part in clock.split(":"):
+        seconds = seconds * 60 + float(part)
+    return seconds + (int(days) * 86400 if days else 0)
+
+
+def group_cpu_seconds(pgid: int) -> float | None:
+    """Total CPU time of every live process in group ``pgid``, or None.
+
+    None means no live process in that group was seen, or ``ps`` could not be
+    read. Those are "could not ask", never "zero".
+    """
+    try:
+        listing = subprocess.run(
+            ["ps", "-A", "-o", "pgid=,time="],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        ).stdout
+    except subprocess.TimeoutExpired, OSError:
+        return None
+    total, seen = 0.0, False
+    for line in listing.splitlines():
+        group, _, cpu = line.strip().partition(" ")
+        if group == str(pgid) and cpu.strip():
+            total += _ps_seconds(cpu.strip())
+            seen = True
+    return total if seen else None
+
+
+def run_command_cpu_bounded(
+    argv: Sequence[str],
+    *,
+    cwd: Path | None = None,
+    cpu_budget: float,
+    stall_window: float = STALL_WINDOW,
+    min_progress: float = STALL_MIN_PROGRESS,
+) -> tuple[int, str]:
+    """Run ``argv`` bounded by the WORK it does, not by elapsed time (#838).
+
+    A wall-clock bound cannot tell "this command is broken" from "this host is
+    busy". On a host at load ~100 the eval canary (31.7 CPU-s alone) got less
+    than a fifth of a core and missed its 180 s wall bound, though nothing was
+    wrong with it. Busy-host waiting is not what the bound is for. The two
+    failures it IS for each get a bound that load cannot trip:
+
+    - **runaway**: the group's CPU time passes ``cpu_budget`` (rc -1);
+    - **wedge**: the group accrues less than ``min_progress`` CPU-seconds over
+      ``stall_window`` of wall time. That is the 0%-CPU hang of
+      `long-running-command-hangs.md` rule 4 (rc -1).
+
+    Real slowness is not hidden. A query that costs more CPU fails the budget
+    exactly as it would on an idle host.
+
+    Polled with ``ps`` over the command's own process group, NOT ``RLIMIT_CPU``.
+    The kernel limit is native but per process, and so blind to descendants,
+    while a group sample covers any the command forks. The cost: the budget is
+    checked once per window, so a runaway can overshoot it by up to one window's
+    worth of CPU.
+    Unreadable CPU time while the command still runs fails CLOSED (rc -3).
+    Wall time is not bounded by this function itself. The minimum-progress rule
+    caps it at ``cpu_budget / min_progress`` windows, and the calling task's own
+    timeout caps it sooner.
+    """
+    try:
+        proc = subprocess.Popen(
+            list(argv),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=str(cwd) if cwd else None,
+            start_new_session=True,
+        )
+    except (FileNotFoundError, PermissionError) as exc:
+        return -2, str(exc)
+    last = 0.0
+    while True:
+        try:
+            out, err = proc.communicate(timeout=stall_window)
+        except subprocess.TimeoutExpired:
+            pass
+        else:
+            return proc.returncode, out + err
+        used = group_cpu_seconds(proc.pid)
+        if used is None:
+            if proc.poll() is not None:
+                continue  # exited between samples; the next communicate() reaps it
+            verdict = -3, "could not read the command's CPU time; refusing to wait blind"
+        elif used > cpu_budget:
+            verdict = -1, f"exceeded CPU budget: {used:.1f} CPU-s > {cpu_budget:g}"
+        elif used - last < min_progress:
+            verdict = (
+                -1,
+                (
+                    f"stalled: {used - last:.2f} CPU-s in the last {stall_window:g}s "
+                    f"(< {min_progress:g}); {used:.1f} CPU-s total"
+                ),
+            )
+        else:
+            last = used
+            continue
+        _kill_group(proc)
+        return verdict
+
+
+def _kill_group(proc: subprocess.Popen[str]) -> None:
+    """SIGKILL the whole session ``proc`` leads, then reap it."""
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(proc.pid, signal.SIGKILL)
+    proc.communicate()
+
+
 # --- probe primitives ---------------------------------------------------------
 
 
@@ -462,8 +591,13 @@ def graphify_canary(
     *,
     graph: Path | None = None,
     timeout: int = DEFAULT_TIMEOUT,
+    cpu_budget: float | None = None,
 ) -> Outcome:
     """A graph that exists must also ANSWER. rc=0 and non-empty output.
+
+    ``cpu_budget`` replaces the wall-clock ``timeout`` with
+    :func:`run_command_cpu_bounded`, so a busy host cannot fail the canary
+    while a runaway or a wedged query still does (#838).
 
     The two halves are separate failures and are reported separately: a
     non-zero rc is a broken query path, while rc=0 with empty output is a graph
@@ -481,7 +615,11 @@ def graphify_canary(
     # actually resolves, not the one the pin names. See `_retrieval` in
     # eval_cases.py for the full reasoning, and #40 for why every OPERATIONAL
     # call site went the other way.
-    rc, out = run_command(["graphify", "query", question], cwd=repo_root, timeout=timeout)
+    argv = ["graphify", "query", question]
+    if cpu_budget is None:
+        rc, out = run_command(argv, cwd=repo_root, timeout=timeout)
+    else:
+        rc, out = run_command_cpu_bounded(argv, cwd=repo_root, cpu_budget=cpu_budget)
     if rc != 0:
         return fail(f"graphify query rc={rc}: {out.strip()[:200]}")
     if not out.strip():
