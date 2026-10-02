@@ -77,8 +77,8 @@ new = '''    if False:'''
 id = "A6"
 test = "test_library_declaring_a_binary_is_refused"
 file = "python/src/kb_setup/currency/config.py"
-old = '''    if library and table.get("binary"):'''
-new = '''    if False:'''
+old = '''        if clashing:'''
+new = '''        if False:'''
 
 # A7 — the venv path leaks the host's absolute path into a committed report.
 [[arm]]
@@ -93,7 +93,7 @@ new = '''    venv = str(repo_root / (spec.python_project_dir or ".") / ".venv")'
 id = "A8"
 test = "test_installed_library_at_the_pin_is_in_sync"
 file = "python/src/kb_setup/currency/sync.py"
-old = '''importlib.metadata.distributions(name=spec.python_package, path=[str(site)])'''
+old = '''importlib.metadata.distributions(name=spec.python_package, path=sites)'''
 new = '''importlib.metadata.distributions(name=spec.python_package)'''
 
 # A9 — ignore `python_project_dir` when locating the venv.
@@ -101,12 +101,8 @@ new = '''importlib.metadata.distributions(name=spec.python_package)'''
 id = "A9"
 test = "test_library_in_a_nested_project_reads_that_projects_venv"
 file = "python/src/kb_setup/currency/sync.py"
-old = '''        "",
-        deep=False,
-        repo_root=repo_root / (spec.python_project_dir or "."),'''
-new = '''        "",
-        deep=False,
-        repo_root=repo_root,'''
+old = '''    lib = repo_root / (spec.python_project_dir or ".") / ".venv" / "lib"'''
+new = '''    lib = repo_root / ".venv" / "lib"'''
 
 # A10 — a git-pinned library compares a version string against a SHA.
 [[arm]]
@@ -132,7 +128,7 @@ new = '''    if False:'''
 id = "A12"
 test = "test_undeclared_library_drift_names_library_true_as_the_fix"
 file = "python/src/kb_setup/currency/sync.py"
-old = '''    if installed and not _declares_console_scripts(repo_root, spec):'''
+old = '''    if installed and not _ships_an_executable(repo_root, spec):'''
 new = '''    if False:'''
 
 # A13 — the hint fires for a CLI package whose executable is merely missing.
@@ -140,8 +136,10 @@ new = '''    if False:'''
 id = "A13"
 test = "test_installed_cli_package_missing_its_executable_gets_no_library_hint"
 file = "python/src/kb_setup/currency/sync.py"
-old = '''    return any(ep.group == "console_scripts" for ep in dists[0].entry_points)'''
-new = '''    return False'''
+old = '''    if any(ep.group in {"console_scripts", "gui_scripts"} for ep in dist.entry_points):
+        return True'''
+new = '''    if False:
+        return True'''
 
 # A14 — the missing-executable message leaks the absolute host path again.
 [[arm]]
@@ -150,3 +148,62 @@ test = "test_uninstalled_package_missing_its_executable_gets_no_library_hint"
 file = "python/src/kb_setup/currency/sync.py"
 old = '''    shown = _redacted_path(str(executable), repo_root)'''
 new = '''    shown = str(executable)'''
+
+# ---- round 2: the cold review's P3s and /code-review's finding ----
+
+# A15 — only `console_scripts` counts as an executable (the /code-review finding).
+[[arm]]
+id = "A15"
+test = "test_a_package_shipping_any_executable_gets_no_library_hint"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''{"console_scripts", "gui_scripts"}'''
+new = '''{"console_scripts"}'''
+
+# A16 — a legacy `scripts=` file in RECORD is ignored.
+[[arm]]
+id = "A16"
+test = "test_a_package_shipping_any_executable_gets_no_library_hint"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    return any("bin" in Path(path).parts for path in paths)'''
+new = '''    return False'''
+
+# A17 — the TRAP found while arming: read `dist.files`, which on Python 3.14
+# omits paths absent from disk — and an absent script is the very case asked.
+[[arm]]
+id = "A17"
+test = "test_a_package_shipping_any_executable_gets_no_library_hint"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    record = dist.read_text("RECORD")'''
+new = '''    record = "\\n".join(str(f) for f in dist.files or ()) if dist.files is not None else None'''
+
+# A18 — an install with no RECORD is treated as binaryless.
+[[arm]]
+id = "A18"
+test = "test_a_package_with_no_record_gets_no_library_hint"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''        return True  # no RECORD: a legacy script cannot be ruled out'''
+new = '''        return False  # no RECORD: a legacy script cannot be ruled out'''
+
+# A19 — review F1: read only the first `python*/site-packages`.
+[[arm]]
+id = "A19"
+test = "test_a_stale_python_dir_beside_the_live_one_is_drift_not_ok"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    sites = [str(site) for site in sorted(lib.glob("python*/site-packages"))]'''
+new = '''    sites = [str(site) for site in sorted(lib.glob("python*/site-packages"))][:1]'''
+
+# A20 — review F4: a library may declare `stamp` / `expected`.
+[[arm]]
+id = "A20"
+test = "test_a_library_declaring_an_executable_only_key_is_refused"
+file = "python/src/kb_setup/currency/config.py"
+old = '''("binary", "stamp", "expected")'''
+new = '''("binary",)'''
+
+# A21 — review F3: the hint stops telling an explicit-`binary` reader to drop it.
+[[arm]]
+id = "A21"
+test = "test_undeclared_library_drift_names_library_true_as_the_fix"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''            f"(and drop any `binary`) in [tool.{spec.name}]",'''
+new = '''            f"in [tool.{spec.name}]",'''

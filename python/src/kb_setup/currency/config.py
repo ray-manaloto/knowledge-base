@@ -537,11 +537,16 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         # Only the uv-managed owner has a venv whose distribution metadata can be
         # read; a "library" owned by mise or self-managed has nowhere to look.
         raise ValueError(f"{CONFIG_NAME}: [tool.{name}] is a library and needs 'python_package'")
-    if library and table.get("binary"):
-        raise ValueError(
-            f"{CONFIG_NAME}: [tool.{name}] is a library (no executable) yet declares "
-            "a 'binary'; drop one of them"
-        )
+    if library:
+        # Each of these is answered by RUNNING an executable — `stamp` records what
+        # `<binary> --version` printed, `expected` compares it — so on a library
+        # each is either dead config or a silent detour off the library path.
+        clashing = [key for key in ("binary", "stamp", "expected") if table.get(key)]
+        if clashing:
+            raise ValueError(
+                f"{CONFIG_NAME}: [tool.{name}] is a library (no executable) yet declares "
+                f"{clashing}; drop them or drop 'library'"
+            )
 
     def _str(key: str) -> str:
         value = table.get(key, "")

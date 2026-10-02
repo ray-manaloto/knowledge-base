@@ -33,13 +33,20 @@ def _library_repo(tmp_path: Path, *, installed: str | None, pin: str = _PIN) -> 
     site = tmp_path / ".venv" / "lib" / "python3.14" / "site-packages"
     site.mkdir(parents=True)
     if installed is not None:
-        dist = site / f"githubkit-{installed}.dist-info"
-        dist.mkdir()
-        (dist / "METADATA").write_text(
-            f"Metadata-Version: 2.4\nName: githubkit\nVersion: {installed}\n",
-            encoding="utf-8",
-        )
+        _install(site, "githubkit", installed)
     return tmp_path
+
+
+def _install(site: Path, name: str, version: str, *, record: tuple[str, ...] = ()) -> Path:
+    """Write a minimal wheel-installed dist-info. RECORD always exists, as uv writes it."""
+    dist = site / f"{name}-{version}.dist-info"
+    dist.mkdir(parents=True)
+    (dist / "METADATA").write_text(
+        f"Metadata-Version: 2.4\nName: {name}\nVersion: {version}\n", encoding="utf-8"
+    )
+    rows = (f"{name}/__init__.py,,", f"{dist.name}/METADATA,,", *record)
+    (dist / "RECORD").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    return dist
 
 
 def _spec(root: Path) -> config.ToolSpec:
@@ -207,6 +214,8 @@ def test_undeclared_library_drift_names_library_true_as_the_fix(tmp_path) -> Non
     resolution = _finding(sync.check_sync(root, _spec(root)), "resolution")
     assert resolution.status == sync.DRIFT
     assert "library = true" in resolution.detail
+    # `library` refuses a `binary`, so the hint must say to drop one (review F3).
+    assert "drop any `binary`" in resolution.detail
     assert "mise deps" not in resolution.detail
 
 
@@ -231,3 +240,65 @@ def test_uninstalled_package_missing_its_executable_gets_no_library_hint(tmp_pat
     assert "library = true" not in resolution.detail
     assert "mise deps" in resolution.detail
     assert str(root) not in resolution.detail
+
+
+@pytest.mark.parametrize(
+    ("entry_points", "record"),
+    [
+        ("[gui_scripts]\ngithubkit-gui = githubkit.gui:main\n", ()),
+        ("", ("../../../bin/githubkit-legacy,,",)),
+    ],
+    ids=["gui_scripts", "legacy-scripts"],
+)
+def test_a_package_shipping_any_executable_gets_no_library_hint(
+    tmp_path, entry_points: str, record: tuple[str, ...]
+) -> None:
+    """console_scripts is not the only way to ship one (review F2, /code-review)."""
+    root = _library_repo(tmp_path, installed=None)
+    site = next((root / ".venv").rglob("site-packages"))
+    dist = _install(site, "githubkit", "0.13.4", record=record)
+    if entry_points:
+        (dist / "entry_points.txt").write_text(entry_points, encoding="utf-8")
+    _write_config(root, '[tool.githubkit]\npython_package = "githubkit"\n')
+    resolution = _finding(sync.check_sync(root, _spec(root)), "resolution")
+    assert resolution.status == sync.DRIFT
+    assert "library = true" not in resolution.detail
+
+
+def test_a_package_with_no_record_gets_no_library_hint(tmp_path) -> None:
+    """Unknown is not "binaryless": without RECORD a legacy script cannot be ruled out."""
+    root = _library_repo(tmp_path, installed="0.13.4")
+    (next((root / ".venv").rglob("githubkit-*.dist-info")) / "RECORD").unlink()
+    _write_config(root, '[tool.githubkit]\npython_package = "githubkit"\n')
+    resolution = _finding(sync.check_sync(root, _spec(root)), "resolution")
+    assert "library = true" not in resolution.detail
+
+
+def test_sibling_distributions_sharing_the_name_prefix_are_not_read(tmp_path) -> None:
+    """The real githubkit venv holds `githubkit_schemas*` beside it (review F6)."""
+    root = _library_repo(tmp_path, installed="0.13.4")
+    site = next((root / ".venv").rglob("site-packages"))
+    _install(site, "githubkit_schemas", "26.9.29")
+    _install(site, "githubkit_schemas_2026_03_10", "26.9.29")
+    resolution = _finding(sync.check_sync(root, _spec(root)), "resolution")
+    assert resolution.status == sync.OK, resolution.detail
+
+
+def test_a_stale_python_dir_beside_the_live_one_is_drift_not_ok(tmp_path) -> None:
+    """Review F1: `python3.13` sorts first; reading it alone reported a false green."""
+    root = _library_repo(tmp_path, installed="0.9.0")
+    _install(root / ".venv" / "lib" / "python3.13" / "site-packages", "githubkit", "0.13.4")
+    resolution = _finding(sync.check_sync(root, _spec(root)), "resolution")
+    assert resolution.status == sync.DRIFT
+    assert "conflicting" in resolution.detail
+
+
+@pytest.mark.parametrize("key", ["stamp", "expected"])
+def test_a_library_declaring_an_executable_only_key_is_refused(tmp_path, key: str) -> None:
+    """Review F4: both are answered by running `<binary> --version`."""
+    _write_config(
+        tmp_path,
+        f'[tool.githubkit]\npython_package = "githubkit"\nlibrary = true\n{key} = "x"\n',
+    )
+    with pytest.raises(ValueError, match=key):
+        config.load(tmp_path)
