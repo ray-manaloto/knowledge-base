@@ -89,9 +89,18 @@ def test_extraction_tool_or_task_change_requires_live_evidence() -> None:
     for line in (
         b'-python = "3.14.6"\n+python = "3.14.7"\n',
         b'-run = "mise run kb-graphify-ingest"\n+run = "python other.py"\n',
-        b'+hk = "2.3.0"\n',
+        b'-pkl = "0.32.0"\n+pkl = "0.32.1"\n',
     ):
-        assert needs_live_receipt(_paths("mise.toml", "mise.lock"), line)
+        assert needs_live_receipt(_paths("mise.toml"), line)
+
+
+def test_hk_and_postinstall_mise_lines_are_exempt() -> None:
+    """#824: the hk pin and the postinstall hook are not extraction inputs."""
+    for line in (
+        b'-hk = "1.57.0"\n+hk = "2.4.0"\n',
+        b'-postinstall = "mise reshim && hk install --mise"\n+postinstall = "mise reshim"\n',
+    ):
+        assert not needs_live_receipt(_paths("mise.toml"), line)
 
 
 def test_ambiguous_or_oversized_diff_fails_closed() -> None:

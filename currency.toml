@@ -1853,7 +1853,11 @@ version_pattern = '^ty (\d+\.\d+\.\d+)'
 manifest = "sources/ty.manifest"
 
 [tool.codex]
-mise_key = "npm:@openai/codex"
+# No `mise_key` since 2026-10-01: Ray ruled codex comes ONLY from its native
+# installer (`~/.local/bin/codex`), so this row is self-managed — `expected`
+# against the binary, as `[tool.antigravity-cli]` below. 0.160.0 is what the
+# native install reports (`codex --version`, measured 2026-10-01).
+expected = "0.160.0"
 binary = "codex"
 github = "openai/codex"
 # ⚠️ codex tags releases `rust-v<version>`, NOT `v<version>` — so

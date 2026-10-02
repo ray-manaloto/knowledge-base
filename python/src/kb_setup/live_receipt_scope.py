@@ -39,8 +39,12 @@ SENSITIVE_PREFIXES = (
     b".agents/skills/graphify/",
     b".claude/skills/graphify/",
 )
+#: `mise.toml` lines that can change what an extraction runs. `hk` (the git-hook
+#: runner) and `postinstall` were dropped 2026-10-01 (#824, Ray's ruling): neither
+#: is exercised by the eight live cases, and matching them made every hk bump
+#: unmergeable while no evidence producer exists.
 MISE_SENSITIVE = re.compile(
-    rb"graphify|python|\buv\b|\bhk\b|\bpkl\b|postinstall|kb-build|kb-ingest|kb-native",
+    rb"graphify|python|\buv\b|\bpkl\b|kb-build|kb-ingest|kb-native",
     re.IGNORECASE,
 )
 

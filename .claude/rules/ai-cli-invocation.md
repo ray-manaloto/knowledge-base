@@ -15,9 +15,11 @@ patterns. Incorrect flags waste tokens and cause silent failures or hangs.
 
 ## Which lanes exist here
 
-`mise.toml` pins **`codex`** (OpenAI, GPT-5.6 Sol). **`agy`** (Google Antigravity) is NOT
-mise-managed: it comes only from its native installer and self-updates (Ray, 2026-10-01).
-Auth is per-user; neither tool's credentials are managed here. Routing doctrine lives in
+**`codex`** (OpenAI, GPT-5.6 Sol) and **`agy`** (Google Antigravity) are NOT
+mise-managed: on this Mac claude, codex and agy come only from their native installers
+(`~/.local/bin/{codex,agy}`) and self-update (Ray, 2026-10-01); every mise name for them is
+in `mise.toml`'s `disable_tools`. Invoke agy by its native path, `"$HOME/.local/bin/agy"`,
+never `mise exec -- agy`. Auth is per-user; neither tool's credentials are managed here. Routing doctrine lives in
 `.claude/skills/orchestrator-routing/SKILL.md` and is grounded in this repo's
 own graph (`mise run kb-query -- "<routing question>"`).
 

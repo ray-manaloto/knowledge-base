@@ -236,10 +236,13 @@ gh = "2.98.0"
 # `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
-"npm:@openai/codex" = "0.154.0"
-# `antigravity-cli` is deliberately NOT pinned (Ray, 2026-10-01): `agy` comes ONLY
-# from its native installer (`~/.local/bin/agy`, self-updating via `agy update`).
-# Its currency row in currency.toml is self-managed (`expected`, no `mise_key`).
+# `npm:@openai/codex` and `antigravity-cli` are deliberately NOT pinned (Ray,
+# 2026-10-01): claude, codex and agy come ONLY from their native installers on
+# this Mac (`~/.local/bin/{codex,agy}`, self-updating), and every mise name for
+# them is in `[settings] disable_tools` below. Nothing else needs the pin: this
+# repo's only CI workflow (graphify-live-receipt.yml) runs bare python3, and there
+# is no image. Their currency rows in currency.toml are self-managed (`expected`,
+# no `mise_key`). The comments above describe the retired pins' history.
 "npm:ctx7" = { version = "0.5.9", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.3"
 # coreutils: macOS ships BSD userland, not GNU — this repo's own rules and
@@ -255,6 +258,18 @@ run = "uv sync --locked"
 
 [settings]
 experimental = true
+# A project `disable_tools` REPLACES the user-global list rather than extending it,
+# so this carries every mise name for the three native-installer-only CLIs (the
+# same set as the global config), not just the two this file used to pin.
+disable_tools = [
+  "antigravity-cli",
+  "npm:@openai/codex",
+  "aqua:openai/codex",
+  "codex",
+  "claude-code",
+  "npm:@anthropic-ai/claude-code",
+  "github:anthropics/claude-code",
+]
 auto_install = true
 lockfile = true
 # New tool requests get exact-pinned versions (pins are the versioning model).
