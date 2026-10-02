@@ -22,9 +22,10 @@ import test_mcp_serve
 ROOT = Path(__file__).resolve().parents[1]
 GROUP = "real_graph"
 
-#: Every test that loads the real aggregate graph, measured 2026-10-02 by
-#: `--durations` over the suite's graph-touching modules: all four take 11-31 s
-#: alone, and nothing else in those modules takes more than 5 s.
+#: The tests KNOWN to load the real aggregate graph, found 2026-10-02 by
+#: `--durations` over the suite's graph-touching modules (all four take 11-31 s
+#: alone, nothing else there over 5 s) and confirmed by a cold review. A closed
+#: list: a fifth, unmarked real-graph test would pass here silently.
 REAL_GRAPH_TESTS = (
     (test_mcp_serve, "test_kb_serve_actually_answers_mcp"),
     (test_eval_cases, "test_the_real_offline_run_is_green_on_this_tree"),
