@@ -50,6 +50,8 @@ happened. `kb-ship` reads the receipt and compares its SHA to `HEAD`. That
 inversion is deliberate — a gate the model can talk itself past is not a gate,
 and a receipt whose SHA does not match is not a receipt.
 
+**Classify the diff for signed live evidence before shipping.** The required check runs MAIN's `python/src/kb_setup/live_receipt_scope.py` (inputs: `graphify-live-receipt.yml:42-52`): any `SENSITIVE_EXACT`/`SENSITIVE_PREFIXES` path (incl. `cli.py`), a `mise.toml` line matching `MISE_SENSITIVE` (incl. `\buv\b`), or a non-exempt `mise.lock` entry prints `REQUIRED`; nothing produces that evidence today, so such a PR needs Ray's admin merge, and `enforce_admins: true` makes `gh pr merge --admin` return 405 until toggled off.
+
 ## Process
 
 ### 1. Pin the fixed point
