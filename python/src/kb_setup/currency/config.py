@@ -538,10 +538,12 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         # read; a "library" owned by mise or self-managed has nowhere to look.
         raise ValueError(f"{CONFIG_NAME}: [tool.{name}] is a library and needs 'python_package'")
     if library:
-        # Each of these is answered by RUNNING an executable — `stamp` records what
-        # `<binary> --version` printed, `expected` compares it — so on a library
-        # each is either dead config or a silent detour off the library path.
-        clashing = [key for key in ("binary", "stamp", "expected") if table.get(key)]
+        # `binary` contradicts the claim outright. `expected` is worse than dead
+        # config: it switches the row onto the self-managed path
+        # (`ToolSpec.self_managed`), which reads `<binary> --version`, so the
+        # library check would silently never run. (`stamp` is NOT refused: it is a
+        # build-stamp path, and `run.stamp` takes an explicit `--version`.)
+        clashing = [key for key in ("binary", "expected") if table.get(key)]
         if clashing:
             raise ValueError(
                 f"{CONFIG_NAME}: [tool.{name}] is a library (no executable) yet declares "

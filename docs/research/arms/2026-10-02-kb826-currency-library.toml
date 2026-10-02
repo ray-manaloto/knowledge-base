@@ -164,7 +164,7 @@ new = '''{"console_scripts"}'''
 id = "A16"
 test = "test_a_package_shipping_any_executable_gets_no_library_hint"
 file = "python/src/kb_setup/currency/sync.py"
-old = '''    return any("bin" in Path(path).parts for path in paths)'''
+old = '''    return any(parts[:1] == ("..",) and "bin" in parts for parts in paths)'''
 new = '''    return False'''
 
 # A17 — the TRAP found while arming: read `dist.files`, which on Python 3.14
@@ -192,12 +192,12 @@ file = "python/src/kb_setup/currency/sync.py"
 old = '''    sites = [str(site) for site in sorted(lib.glob("python*/site-packages"))]'''
 new = '''    sites = [str(site) for site in sorted(lib.glob("python*/site-packages"))][:1]'''
 
-# A20 — review F4: a library may declare `stamp` / `expected`.
+# A20 — review F4: a library may declare `expected`.
 [[arm]]
 id = "A20"
-test = "test_a_library_declaring_an_executable_only_key_is_refused"
+test = "test_a_library_declaring_expected_is_refused"
 file = "python/src/kb_setup/currency/config.py"
-old = '''("binary", "stamp", "expected")'''
+old = '''("binary", "expected")'''
 new = '''("binary",)'''
 
 # A21 — review F3: the hint stops telling an explicit-`binary` reader to drop it.
@@ -207,3 +207,34 @@ test = "test_undeclared_library_drift_names_library_true_as_the_fix"
 file = "python/src/kb_setup/currency/sync.py"
 old = '''            f"(and drop any `binary`) in [tool.{spec.name}]",'''
 new = '''            f"in [tool.{spec.name}]",'''
+
+# ---- post-round-2: the round-2 cold review's P3s ----
+
+# A22 — R2-4: match distributions by name PREFIX, so `githubkit_schemas*` (real
+# siblings in the githubkit venv) are read as githubkit.
+[[arm]]
+id = "A22"
+test = "test_sibling_distributions_sharing_the_name_prefix_are_not_read"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    return list(importlib.metadata.distributions(name=spec.python_package, path=sites))'''
+new = '''    return [
+        dist
+        for dist in importlib.metadata.distributions(path=sites)
+        if (dist.metadata["Name"] or "").replace("-", "_").startswith(spec.python_package)
+    ]'''
+
+# A23 — R2-2: any `bin` path component counts as a script again.
+[[arm]]
+id = "A23"
+test = "test_a_library_with_a_package_dir_named_bin_still_gets_the_hint"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''parts[:1] == ("..",) and "bin" in parts'''
+new = '''"bin" in parts'''
+
+# A24 — R2-1: the git path answers with the first sorted directory's commit.
+[[arm]]
+id = "A24"
+test = "test_git_pinned_stale_python_dir_with_another_commit_is_drift"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    return commits.pop() if len(commits) == 1 else ""'''
+new = '''    return sorted(commits)[0] if commits else ""'''

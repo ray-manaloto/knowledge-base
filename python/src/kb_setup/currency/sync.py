@@ -1151,8 +1151,10 @@ def _installed_distributions(
     what `install_site_packages` returns). A stale `python3.13` left beside a live
     `python3.14` would otherwise answer alone, and report the pin as installed
     while the interpreter that runs imports something else. Searching all of them
-    lets the conflicting-versions refusal see both. `_installed_direct_url_commit`
-    already globs every `python*` directory for the same reason.
+    lets the conflicting-versions refusal see both; `_installed_direct_url_commit`
+    refuses two disagreeing commits the same way. (`_check_extra_probes` still
+    reads only the first directory via `install_site_packages` — pre-existing,
+    and out of #826's scope.)
     """
     lib = repo_root / (spec.python_project_dir or ".") / ".venv" / "lib"
     sites = [str(site) for site in sorted(lib.glob("python*/site-packages"))]
@@ -1203,15 +1205,26 @@ def _ships_an_executable(repo_root: Path, spec: ToolSpec) -> bool:
     record = dist.read_text("RECORD")
     if record is None:
         return True  # no RECORD: a legacy script cannot be ruled out
-    paths = (row[0] for row in csv.reader(record.splitlines()) if row)
-    return any("bin" in Path(path).parts for path in paths)
+    # An installed script sits OUTSIDE site-packages, so its RECORD path climbs
+    # out with `..` (uv writes `../../../bin/<name>` for legacy and gui scripts
+    # alike). Requiring the climb keeps a library with a package directory that
+    # merely happens to be called `bin` from reading as one that ships a script.
+    paths = (Path(row[0]).parts for row in csv.reader(record.splitlines()) if row)
+    return any(parts[:1] == ("..",) and "bin" in parts for parts in paths)
 
 
 def _installed_direct_url_commit(repo_root: Path, spec: ToolSpec) -> str:
-    """Read the VCS commit recorded by the installed distribution."""
+    """Read the VCS commit recorded by the installed distribution.
+
+    `""` (reported as DRIFT, never a pass) when no commit is recorded OR when
+    two `python*` directories record DIFFERENT commits. Returning the first one
+    sorted let a stale `python3.13` holding the pin answer for a live
+    `python3.14` holding something else — a false green (#826 round-2 review).
+    """
     venv = repo_root / (spec.python_project_dir or ".") / ".venv"
     normalized = spec.python_package.replace("-", "_")
     pattern = f"lib/python*/site-packages/{normalized}-*.dist-info/direct_url.json"
+    commits: set[str] = set()
     for direct_url in sorted(venv.glob(pattern)):
         try:
             payload = json.loads(direct_url.read_text(encoding="utf-8"))
@@ -1221,8 +1234,8 @@ def _installed_direct_url_commit(repo_root: Path, spec: ToolSpec) -> str:
         if isinstance(vcs_info, dict):
             commit = str(vcs_info.get("commit_id") or "")
             if re.fullmatch(r"[0-9a-f]{40}", commit):
-                return commit
-    return ""
+                commits.add(commit)
+    return commits.pop() if len(commits) == 1 else ""
 
 
 def _redacted_path(found: str, repo_root: Path) -> str:

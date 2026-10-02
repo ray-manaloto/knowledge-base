@@ -293,12 +293,51 @@ def test_a_stale_python_dir_beside_the_live_one_is_drift_not_ok(tmp_path) -> Non
     assert "conflicting" in resolution.detail
 
 
-@pytest.mark.parametrize("key", ["stamp", "expected"])
-def test_a_library_declaring_an_executable_only_key_is_refused(tmp_path, key: str) -> None:
-    """Review F4: both are answered by running `<binary> --version`."""
+def test_a_library_declaring_expected_is_refused(tmp_path) -> None:
+    """`expected` would detour the row onto the self-managed path (review F4)."""
     _write_config(
         tmp_path,
-        f'[tool.githubkit]\npython_package = "githubkit"\nlibrary = true\n{key} = "x"\n',
+        '[tool.githubkit]\npython_package = "githubkit"\nlibrary = true\nexpected = "1"\n',
     )
-    with pytest.raises(ValueError, match=key):
+    with pytest.raises(ValueError, match="expected"):
         config.load(tmp_path)
+
+
+def test_a_library_may_still_declare_a_stamp(tmp_path) -> None:
+    """Round-2 R2-3: `stamp` is a build-stamp path, not an executable read."""
+    _write_config(
+        tmp_path,
+        '[tool.githubkit]\npython_package = "githubkit"\nlibrary = true\n'
+        'stamp = "out/.stamp.json"\n',
+    )
+    assert _spec(tmp_path).stamp == "out/.stamp.json"
+
+
+def test_a_library_with_a_package_dir_named_bin_still_gets_the_hint(tmp_path) -> None:
+    """Round-2 R2-2: `githubkit/bin/__init__.py` is a module, not a script."""
+    root = _library_repo(tmp_path, installed=None)
+    site = next((root / ".venv").rglob("site-packages"))
+    _install(site, "githubkit", "0.13.4", record=("githubkit/bin/__init__.py,,",))
+    _write_config(root, '[tool.githubkit]\npython_package = "githubkit"\n')
+    resolution = _finding(sync.check_sync(root, _spec(root)), "resolution")
+    assert "library = true" in resolution.detail
+
+
+def test_git_pinned_stale_python_dir_with_another_commit_is_drift(tmp_path) -> None:
+    """Round-2 R2-1: the first sorted dir used to answer alone on the git path."""
+    pinned = "93bdf3d770b99128daf35278218e5a666fe392f3"
+    pin = (
+        "[project]\ndependencies = ["
+        f'"githubkit @ git+https://github.com/yanyongyu/githubkit@{pinned}"'
+        "]\n"
+    )
+    root = _library_repo(tmp_path, installed="0.13.4", pin=pin)
+    live = next((root / ".venv").rglob("githubkit-*.dist-info"))
+    stale = _install(root / ".venv" / "lib" / "python3.13" / "site-packages", "githubkit", "0.1")
+    for dist, commit in ((stale, pinned), (live, "a" * 40)):
+        (dist / "direct_url.json").write_text(
+            json.dumps({"url": "x", "vcs_info": {"vcs": "git", "commit_id": commit}}),
+            encoding="utf-8",
+        )
+    resolution = _finding(sync.check_sync(root, _spec(root)), "resolution")
+    assert resolution.status == sync.DRIFT
