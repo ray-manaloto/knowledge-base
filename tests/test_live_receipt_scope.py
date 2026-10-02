@@ -37,13 +37,52 @@ def test_node_only_mise_update_is_exempt() -> None:
     )
 
 
-def test_non_node_lock_change_requires_evidence_even_with_node_only_mise_diff() -> None:
+def test_extraction_lock_change_requires_evidence_even_with_node_only_mise_diff() -> None:
     assert needs_live_receipt(
         _paths("mise.toml", "mise.lock"),
         b'-node = "26.9.0"\n+node = "26.10.0"\n',
-        base_lock=b'[tools]\nnode = [{version = "26.9.0"}]\nhk = [{version = "2.2.0"}]\n',
-        head_lock=b'[tools]\nnode = [{version = "26.10.0"}]\nhk = [{version = "2.3.0"}]\n',
+        base_lock=b'[tools]\nnode = [{version = "26.9.0"}]\npython = [{version = "3.14.6"}]\n',
+        head_lock=b'[tools]\nnode = [{version = "26.10.0"}]\npython = [{version = "3.14.7"}]\n',
     )
+
+
+_LOCK = (
+    b'conda-packages = {}\n[tools]\nhk = [{version = "1.57.0"}]\nrumdl = [{version = "0.2.62"}]\n'
+    b'antigravity-cli = [{version = "1.2.12"}]\npython = [{version = "3.14.7"}]\n'
+    b'uv = [{version = "0.12.8"}]\n"npm:@openai/codex" = [{version = "0.154.0"}]\n'
+)
+
+
+def _lock_only(head: bytes) -> bool:
+    return needs_live_receipt(_paths("mise.lock"), b"", base_lock=_LOCK, head_lock=head)
+
+
+def test_plain_tool_pin_lock_changes_are_exempt() -> None:
+    """#824: a lock diff touching only non-extraction tools needs no live evidence."""
+    assert not _lock_only(_LOCK.replace(b'"1.57.0"', b'"2.4.0"'))
+    assert not _lock_only(_LOCK.replace(b'"1.57.0"', b'"2.4.0"').replace(b'"0.2.62"', b'"0.2.78"'))
+    assert not _lock_only(_LOCK.replace(b'antigravity-cli = [{version = "1.2.12"}]\n', b""))
+    assert not _lock_only(_LOCK + b'gh = [{version = "2.80.0"}]\n')
+
+
+def test_extraction_relevant_lock_changes_require_evidence() -> None:
+    assert _lock_only(_LOCK.replace(b'"3.14.7"', b'"3.14.8"'))
+    assert _lock_only(_LOCK.replace(b'"0.12.8"', b'"0.12.9"'))
+    assert _lock_only(_LOCK.replace(b'"0.154.0"', b'"0.156.0"'))
+    assert _lock_only(_LOCK + b'"pipx:graphifyy" = [{version = "0.9.61"}]\n')
+    assert _lock_only(_LOCK + b'"claude-code" = [{version = "2.1.287"}]\n')
+
+
+def test_mixed_lock_change_requires_evidence() -> None:
+    assert _lock_only(_LOCK.replace(b'"1.57.0"', b'"2.4.0"').replace(b'"3.14.7"', b'"3.14.8"'))
+
+
+def test_malformed_or_non_tool_lock_change_fails_closed() -> None:
+    assert _lock_only(b"[tools\nnot toml")
+    assert _lock_only(b"")
+    assert _lock_only(b'tools = "not a table"\n')
+    assert _lock_only(_LOCK.replace(b"conda-packages = {}", b'conda-packages = {x = "1"}'))
+    assert needs_live_receipt(_paths("mise.lock"), b"", base_lock=b"", head_lock=_LOCK)
 
 
 def test_extraction_tool_or_task_change_requires_live_evidence() -> None:

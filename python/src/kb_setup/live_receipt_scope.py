@@ -45,8 +45,50 @@ MISE_SENSITIVE = re.compile(
 )
 
 
-def _only_node_lock_changed(before: bytes, after: bytes) -> bool:
-    """Accept only the Node entries changing in two readable mise lockfiles."""
+#: The `mise.lock` tool entries the eight signed live cases actually exercise
+#: (`live_receipt.CASES`: graphify and planning-with-files extraction through the
+#: claude-cli and openai-cli backends, NORMAL and DEEP), plus the interpreter and
+#: resolver the extraction venv is built with. A change to any of these entries
+#: still REQUIRES evidence. Every OTHER tool pin (hk, rumdl, antigravity-cli, gh,
+#: typos, ...) is EXEMPT: it cannot change what an extraction produces, and
+#: requiring evidence for it made every ordinary pin bump unmergeable (#824).
+#: Listed by every spelling a backend can give the same tool, because the lock
+#: key is the backend-qualified name. `node` is deliberately absent — it was the
+#: original exemption and stays one.
+EXTRACTION_LOCK_TOOLS = frozenset(
+    {
+        "python",
+        "uv",
+        # openai-cli backend
+        "codex",
+        "npm:@openai/codex",
+        "aqua:openai/codex",
+        "github:openai/codex",
+        # claude-cli backend
+        "claude",
+        "claude-code",
+        "npm:@anthropic-ai/claude-code",
+        "github:anthropics/claude-code",
+    }
+)
+#: Substrings that mark a lock entry as extraction-relevant whatever its backend
+#: prefix (`pipx:graphifyy`, `pypi:planning-with-files`, ...).
+EXTRACTION_LOCK_MARKERS = ("graphify", "planning-with-files")
+
+
+def _extraction_relevant(tool: str) -> bool:
+    lowered = tool.lower()
+    return lowered in EXTRACTION_LOCK_TOOLS or any(m in lowered for m in EXTRACTION_LOCK_MARKERS)
+
+
+def _only_exempt_lock_tools_changed(before: bytes, after: bytes) -> bool:
+    """Accept a lock diff that touches only non-extraction tool entries (#824).
+
+    Fail closed: an empty, oversized or unparsable lockfile, a `tools` table
+    that is not a table, or ANY change outside `tools` (e.g. `conda-packages`)
+    all return False, so evidence stays REQUIRED. An added or removed tool entry
+    counts as a change to that tool.
+    """
     if not before or not after or max(len(before), len(after)) > MAX_INPUT_BYTES:
         return False
     try:
@@ -56,13 +98,16 @@ def _only_node_lock_changed(before: bytes, after: bytes) -> bool:
         return False
     except tomllib.TOMLDecodeError:
         return False
-    old_tools = old.get("tools")
-    new_tools = new.get("tools")
-    if not isinstance(old_tools, dict) or not isinstance(new_tools, dict):
+    old_tools = old.pop("tools", None)
+    new_tools = new.pop("tools", None)
+    if not isinstance(old_tools, dict) or not isinstance(new_tools, dict) or old != new:
         return False
-    old_tools.pop("node", None)
-    new_tools.pop("node", None)
-    return old == new
+    changed = {
+        tool
+        for tool in old_tools.keys() | new_tools.keys()
+        if old_tools.get(tool) != new_tools.get(tool)
+    }
+    return not any(_extraction_relevant(tool) for tool in changed)
 
 
 def needs_live_receipt(
@@ -79,7 +124,7 @@ def needs_live_receipt(
     if not paths:
         return True  # A PR with no observable changed paths is ambiguous.
     if any(path in SENSITIVE_EXACT or path.startswith(SENSITIVE_PREFIXES) for path in paths) or (
-        b"mise.lock" in paths and not _only_node_lock_changed(base_lock, head_lock)
+        b"mise.lock" in paths and not _only_exempt_lock_tools_changed(base_lock, head_lock)
     ):
         return True
     if b"mise.toml" in paths:
