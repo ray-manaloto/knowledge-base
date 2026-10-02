@@ -458,37 +458,24 @@ def test_lock_progress_on_stderr_does_not_refuse(tmp_path, monkeypatch, capsys) 
 
 _INSTALL_STDERR = (
     "hk removed hook: ~/dev/kb/.git/hooks/commit-msg\n"
-    "hk removed hook: ~/dev/kb/.git/hooks/pre-commit\n"
     "hk Installed hk hook: /Users/me/dev/kb/.git/hooks/pre-commit\n"
-    "hk Installed hk hook: /Users/me/dev/kb/.git/hooks/commit-msg\n"
 )
-"""`mise install <key>` stderr on an already-installed pin, captured verbatim on
-mise 2026.8.10 / hk 1.56.0 (paths shortened): mise prints nothing of its own and
-the repo's `[hooks].postinstall` (`mise reshim && hk install --mise`) prints these
-four lines. It was the WHOLE stderr, and the install step refused it (#438)."""
+"""What `[hooks].postinstall = "mise reshim && hk install --mise"` used to print
+on every install (mise 2026.8.10 / hk 1.56.0, #438). The hk 2.x bump dropped the
+hook install from postinstall (upstream jdx/hk#1376), so these lines are no
+longer expected output and must be refused like any other stray stderr."""
 
 
-def test_postinstall_hook_output_is_not_a_warning_on_install(tmp_path) -> None:
+def test_retired_postinstall_hook_output_is_refused_on_install(tmp_path) -> None:
     _root, spec = _repo(tmp_path)
-    assert tool_sync._mise_progress_only(_INSTALL_STDERR, spec)
-    # A checkout under a directory with a space in its name is legitimate (cold
-    # review of 90be7169, P2): the path part must not be matched with `[^\s]+`.
-    assert tool_sync._mise_progress_only(
-        _INSTALL_STDERR.replace("/Users/me/dev/kb", "/Users/me/My Dev/kb"), spec
-    )
-    # Mixed with the ordinary install-status line: still ordinary.
-    assert tool_sync._mise_progress_only(
+    assert tool_sync._mise_progress_only("mise probe@1.2.3                ⇢ installed\n", spec)
+    assert not tool_sync._mise_progress_only(_INSTALL_STDERR, spec)
+    assert not tool_sync._mise_progress_only(
         "mise probe@1.2.3                ⇢ installed\n" + _INSTALL_STDERR, spec
     )
-    # A hook this repo does not install, a stray line, or a warning: refused.
-    assert not tool_sync._mise_progress_only(
-        _INSTALL_STDERR.replace("commit-msg", "post-checkout"), spec
-    )
-    assert not tool_sync._mise_progress_only(_INSTALL_STDERR + "hk something else\n", spec)
-    assert not tool_sync._mise_progress_only(_INSTALL_STDERR + "warning: x\n", spec)
 
 
-def test_install_step_tolerates_postinstall_hook_output(tmp_path, monkeypatch, capsys) -> None:
+def test_install_step_refuses_retired_postinstall_hook_output(tmp_path, monkeypatch) -> None:
     root, _spec = _repo(tmp_path)
 
     def run(argv: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -499,5 +486,4 @@ def test_install_step_tolerates_postinstall_hook_output(tmp_path, monkeypatch, c
         return _success(argv, cwd)
 
     monkeypatch.setattr(tool_sync, "_run", run)
-    assert tool_sync.main(root, ["probe"]) == 0
-    assert "lock, install, and version verified" in capsys.readouterr().out
+    assert tool_sync.main(root, ["probe"]) == 1
