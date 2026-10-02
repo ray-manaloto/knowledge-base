@@ -91,7 +91,7 @@ def _codex_argv(spec: LaneSpec) -> list[str]:
 
     `model` and `output` exist because THE GUARD BROKE AN EXISTING WORKFLOW
     without them. `codex review` (P1) found that `kb-codex-advisor`'s own
-    documented command — `codex exec --model gpt-6.1-sol … -o <file> -` — is
+    documented command — `codex exec --model gpt-5.6-sol … -o <file> -` — is
     denied the moment `codex_lane` is wired in, and this task offered no
     equivalent, so the advisor became unrunnable. That is this repo's own
     recorded lesson: *a guard whose redirect target cannot perform the redirected

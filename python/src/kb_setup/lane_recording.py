@@ -111,7 +111,7 @@ def join_continuations(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
 
         cat prompt.md | codex exec \
           --sandbox read-only \
-          --model gpt-6.1-sol \
+          --model gpt-5.6-sol \
           ...
 
     A per-line walk sees `--ephemeral` on a line whose command word is nothing,

@@ -15,7 +15,7 @@ patterns. Incorrect flags waste tokens and cause silent failures or hangs.
 
 ## Which lanes exist here
 
-**`codex`** (OpenAI, GPT-5.6 Sol) and **`agy`** (Google Antigravity) are NOT
+**`codex`** (OpenAI, GPT-6.1 Sol) and **`agy`** (Google Antigravity) are NOT
 mise-managed: on this Mac claude, codex and agy come only from their native installers
 (`~/.local/bin/{codex,agy}`) and self-update (Ray, 2026-10-01); every mise name for them is
 in `mise.toml`'s `disable_tools`. Invoke agy by its native path, `"$HOME/.local/bin/agy"`,

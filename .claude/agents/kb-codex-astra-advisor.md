@@ -41,8 +41,9 @@ verdict reported as partial is worth something; one reported as complete is not.
 
 **Refuse and hand back** when:
 
-- 🔴 **The question is about the guard or secret surface.** `gpt-6.1-sol` is
-  OpenAI's cybersecurity model and Astra rejects some *authorized* security work
+- 🔴 **The question is about the guard or secret surface.** The Sol lane was
+  chosen as OpenAI's cybersecurity model when it ran `gpt-5.6-sol` (not yet
+  re-measured for `gpt-6.1-sol`) and Astra rejects some *authorized* security work
   outright — five independent upstream reports (openai/codex issues 43163,
   43781, 43131, 43208, 42939) describe `invalid_prompt` or a usage-policy
   rejection, recorded in `.claude/skills/kb-review/SKILL.md:182-189`. Anything
