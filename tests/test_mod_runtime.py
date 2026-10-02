@@ -300,7 +300,7 @@ def test_a_stale_extra_output_is_caught() -> None:
     from the native checker. An exact-set test is symmetric by construction and
     cannot inherit that blind spot.
     """
-    orphan = Path(".claude/types/claude-code-legacy.d.ts")
+    orphan = mod_runtime.TYPES_DIR / "claude-code-legacy" / "index.d.ts"
     produced = {*mod_runtime.EXPECTED_OUTPUTS, orphan}
     missing, extra = mod_runtime.topology_findings(produced, set(mod_runtime.EXPECTED_OUTPUTS))
     assert missing == frozenset()
@@ -409,7 +409,7 @@ def test_check_reports_findings_when_the_generator_writes_an_extra_artifact(
     """A1's gap: the topology VERDICT, not just `topology_findings` in isolation."""
     stub_runtime(
         _satisfying_declarations(),
-        extra_outputs=(Path(".claude/types/claude-code-legacy.d.ts"),),
+        extra_outputs=(mod_runtime.TYPES_DIR / "claude-code-legacy" / "index.d.ts",),
     )
     assert mod_runtime.check(REPO) == Rc.FINDINGS
 
@@ -438,9 +438,30 @@ def test_check_reports_not_run_when_its_own_matcher_is_broken(stub_runtime: _Stu
     assert mod_runtime.check(REPO) == Rc.NOT_RUN
 
 
-def test_check_reports_not_run_when_the_generator_fails(stub_runtime: _StubRuntime) -> None:
-    stub_runtime(_satisfying_declarations(), returncode=2)
+def test_check_reports_not_run_when_the_generator_writes_nothing(
+    stub_runtime: _StubRuntime,
+) -> None:
+    """A probe that described nothing never asked — NOT_RUN, never FINDINGS."""
+    stub_runtime(_satisfying_declarations(), omit=mod_runtime.EXPECTED_OUTPUTS, returncode=1)
     assert mod_runtime.check(REPO) == Rc.NOT_RUN
+
+
+def test_a_nonzero_child_rc_with_complete_output_is_still_checked(
+    stub_runtime: _StubRuntime,
+) -> None:
+    """🔴 The 2026-10-01 shape: the rc is reported, the written files decide.
+
+    Measured on 2.1.287: an ordinary prompt writes all five declarations and
+    THEN exits 1 at the auth check. Gating on rc would call that NOT_RUN while
+    the runtime had in fact been fully described — the inverse of the error the
+    old `Unknown command` branch guarded against. Both directions are asserted:
+    complete output under rc 1 is OK, and the same rc with a dropped symbol is
+    still FINDINGS, so this cannot pass against a check that ignores everything.
+    """
+    stub_runtime(_satisfying_declarations(), returncode=1)
+    assert mod_runtime.check(REPO) == Rc.OK
+    stub_runtime(_satisfying_declarations().replace("agentId", "agent_id"), returncode=1)
+    assert mod_runtime.check(REPO) == Rc.FINDINGS
 
 
 def test_no_binary_short_circuits_before_trying_to_execute_one(

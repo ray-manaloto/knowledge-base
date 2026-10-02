@@ -14,6 +14,7 @@ Every FAIL arm here has its PASS arm, and vice versa.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,9 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A repo root whose HEAD and merge-base are stubbed to fixed values."""
     monkeypatch.setattr(review, "head_sha", lambda _root: "a" * 40)
     monkeypatch.setattr(review, "base_sha", lambda _root, _fp, **_kw: "b" * 40)
+    # The host's real `disable_tools` (this Mac disables every codex/agy name)
+    # must never decide a test: nothing is disabled unless a test says so.
+    monkeypatch.setattr(review, "disabled_tools", lambda _root: frozenset())
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -401,6 +405,56 @@ def test_reviewer_pin_check_is_open_when_the_binary_is_absent(
     _pin_codex(repo, "1.0.0")
     monkeypatch.setattr(sync, "observed_version", lambda *_a, **_kw: "")
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0
+
+
+def test_reviewer_pin_drift_passes_when_the_tool_is_disabled_in_mise(
+    repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """NATIVE ARM: the SAME drifted pin as the FAIL arm, but mise disables the tool.
+
+    A pin mise is told to ignore governs nothing that runs, so the native
+    reviewer is not compared to it — and the version that ran is still REPORTED.
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    _pin_codex(repo, "1.0.0")
+    monkeypatch.setattr(sync, "observed_version", lambda *_a, **_kw: "2.0.0")
+    monkeypatch.setattr(review, "disabled_tools", lambda _root: frozenset({"codex"}))
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0
+    out = capsys.readouterr().out
+    assert "ran codex 2.0.0" in out
+    assert "native-only" in out
+    assert review.receipt_path(repo, "a" * 40).exists()
+
+
+def test_reviewer_with_no_mise_key_is_native_and_reported(
+    repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """NATIVE ARM: a self-managed currency row (no `mise_key`) has no pin to match."""
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    (repo / "mise.toml").write_text('[tools]\ncodex = "1.0.0"\n', encoding="utf-8")
+    (repo / "currency.toml").write_text(
+        '[tool.codex]\nexpected = "2.0.0"\nbinary = "codex"\n', encoding="utf-8"
+    )
+    monkeypatch.setattr(sync, "observed_version", lambda *_a, **_kw: "2.0.0")
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0
+    assert "ran codex 2.0.0" in capsys.readouterr().out
+
+
+def test_disabled_tools_reads_mises_json_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`disabled_tools` parses mise's JSON list; any failure reads as nothing disabled."""
+    import subprocess as sp
+
+    def fake(stdout: str, rc: int = 0) -> Callable[..., sp.CompletedProcess[str]]:
+        return lambda *_a, **_kw: sp.CompletedProcess([], rc, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(review.subprocess, "run", fake('["codex", "antigravity-cli"]\n'))
+    assert review.disabled_tools(tmp_path) == frozenset({"codex", "antigravity-cli"})
+    monkeypatch.setattr(review.subprocess, "run", fake("not json"))
+    assert review.disabled_tools(tmp_path) == frozenset()
+    monkeypatch.setattr(review.subprocess, "run", fake('["codex"]', rc=1))
+    assert review.disabled_tools(tmp_path) == frozenset()
 
 
 def test_reviewer_pin_check_is_open_with_no_currency_config(repo: Path) -> None:

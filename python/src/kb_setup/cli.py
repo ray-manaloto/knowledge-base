@@ -920,6 +920,8 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
 
     path = review.write_receipt(repo_root, receipt)
     print(f"review-receipt: wrote {path.relative_to(repo_root)}")
+    for note in review.reviewer_native_notes(repo_root, receipt.as_payload()):
+        print(f"review-receipt: note — {note}")
     ok, summary = review.receipt_state(repo_root, sha)
     print(f"review-receipt: {'OK' if ok else 'REJECTED'} — {summary}")
     # A receipt this module just wrote and its own gate rejects means the writer

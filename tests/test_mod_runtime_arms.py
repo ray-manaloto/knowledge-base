@@ -55,25 +55,64 @@ def _spy_subprocess(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
 # --------------------------------------------------------------- c33a1fb5's fix
 
 
-def test_the_generator_subprocess_is_handed_the_function_hooks_flag(
-    monkeypatch: pytest.MonkeyPatch,
+def _spy_argv(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    """Like `_spy_subprocess`, but also records the argv under `"argv"`."""
+    seen: dict[str, object] = {}
+
+    def spy(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        seen.update(kwargs)
+        seen["argv"] = list(argv)
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(mod_runtime.subprocess, "run", spy)
+    return seen
+
+
+@pytest.mark.parametrize("name", mod_runtime._CREDENTIAL_VARIABLES)
+def test_no_credential_variable_reaches_the_generator(
+    monkeypatch: pytest.MonkeyPatch, name: str
 ) -> None:
+    """🔴 The gate must stay credential-free BY CONSTRUCTION, not by luck.
+
+    The isolated `HOME` hides the claude.ai login, but each of these is read
+    from the environment directly — an exported key would turn every gate run
+    into an authenticated session. Set here so the assertion cannot pass merely
+    because the test process happened not to carry the variable.
+    """
     seen = _spy_subprocess(monkeypatch)
-    # The session running the tests may carry the flag itself. Deleting it is
-    # load-bearing: inheritance via `{**os.environ}` would otherwise satisfy this
-    # assertion without the explicit set, making the test tautological inside a
-    # Claude Code session — which is exactly where it will usually run.
-    monkeypatch.delenv("CLAUDE_CODE_ENABLE_FUNCTION_HOOKS", raising=False)
+    monkeypatch.setenv(name, f"kb-test-not-a-real-credential-{name}")
     _stub_binary(monkeypatch)
 
     mod_runtime.check(REPO)
 
     env = seen.get("env")
     assert isinstance(env, dict)
-    assert env.get("CLAUDE_CODE_ENABLE_FUNCTION_HOOKS") == "1"
+    assert name not in env
 
 
-def test_an_unknown_plugin_types_command_is_not_run_rather_than_findings(
+def test_the_generator_loads_the_probe_mod_with_a_local_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The 2.1.287 recipe: `--plugin-dir <probe inside workdir>` + a LOCAL command.
+
+    `-p /plugin-types` — the retired recipe — is an ordinary prompt on 2.1.287:
+    a model turn with a real login, `Not logged in` without one, and nothing
+    written either way. This pins the replacement's two load-bearing argv parts.
+    """
+    seen = _spy_argv(monkeypatch)
+    _stub_binary(monkeypatch)
+
+    mod_runtime.check(REPO)
+
+    argv = seen.get("argv")
+    assert isinstance(argv, list)
+    assert "/plugin-types" not in argv
+    assert argv[argv.index("-p") + 1] == mod_runtime._PROBE_PROMPT
+    plugin_dir = Path(argv[argv.index("--plugin-dir") + 1])
+    assert plugin_dir == Path(str(seen["cwd"])) / mod_runtime.PROBE_MOD_DIR
+
+
+def test_a_generator_that_writes_nothing_is_not_run_rather_than_findings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _stub_binary(monkeypatch)
@@ -81,14 +120,16 @@ def test_an_unknown_plugin_types_command_is_not_run_rather_than_findings(
     def fake_generate(
         _binary: Path, _workdir: Path, *_rest: object
     ) -> subprocess.CompletedProcess[str]:
-        # What the binary does with the flag OFF, measured: writes nothing,
-        # prints this, exits 0. rc 0 is why the existing rc check cannot see it.
-        return subprocess.CompletedProcess([], 0, "Unknown command: /plugin-types\n", "")
+        # What 2.1.287 does with the retired `-p /plugin-types` under an isolated
+        # HOME, measured: writes nothing, prints this, exits 1. (With a real
+        # login it exits 0 after a model turn — still nothing written.)
+        return subprocess.CompletedProcess([], 1, "Not logged in · Please run /login\n", "")
 
     monkeypatch.setattr(mod_runtime, "generate_declarations", fake_generate)
 
-    # Pre-fix this returned FINDINGS — "expected output not written" — which
-    # reads as a real contract breach rather than as a probe that never ran.
+    # Without the empty-set branch this is FINDINGS — "expected output not
+    # written" five times — a real-looking contract breach from a probe that
+    # never described the runtime at all.
     assert mod_runtime.check(REPO) == Rc.NOT_RUN
 
 

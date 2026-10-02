@@ -30,7 +30,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from kb_setup.currency.config import ToolSpec
 
 #: Where receipts land, relative to the repo root. Under `.agent/` because a
 #: receipt is machine-local by design (`agent-artifact-conventions.md`).
@@ -315,6 +318,80 @@ _REVIEWER_CLI_MISE_KEYS: dict[str, str] = {
 }
 
 
+def disabled_tools(repo_root: Path) -> frozenset[str]:
+    """The EFFECTIVE mise `disable_tools` for ``repo_root``, or an empty set.
+
+    Asked of mise itself (`mise settings get disable_tools`, which prints a JSON
+    list) rather than re-derived from the config files: a project
+    `disable_tools` REPLACES the user-global one, and env overrides apply, so
+    reading one file would answer for the wrong scope. Any failure reads as
+    "nothing disabled", which keeps the pin comparison ON — the refusing side.
+    """
+    try:
+        proc = subprocess.run(
+            ["mise", "settings", "get", "disable_tools"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_GIT_TIMEOUT,
+        )
+        value = json.loads(proc.stdout) if proc.returncode == 0 else []
+    except OSError, subprocess.SubprocessError, UnicodeDecodeError, ValueError:
+        return frozenset()
+    if not isinstance(value, list):
+        return frozenset()
+    return frozenset(str(v) for v in value)
+
+
+def reviewer_native_notes(repo_root: Path, data: dict[str, Any]) -> list[str]:
+    """One note per reviewer lane whose CLI is native-only here, with its version.
+
+    The other half of :func:`_reviewer_pin_gap`'s native-only skip: a lane that
+    is not compared against a pin is still REPORTED, so the version that ran is
+    visible at write time rather than silently unchecked (Ray, 2026-10-01).
+    """
+    from kb_setup.currency import config, sync
+
+    try:
+        specs = config.load(repo_root)
+    except OSError, TypeError, ValueError:
+        return []
+    notes: list[str] = []
+    for entry in _as_entries(data.get("lanes_ran", [])) or []:
+        _, sep, variant = str(entry).partition(_SKIP_SEPARATOR)
+        if not sep or variant not in _REVIEWER_CLI_MISE_KEYS:
+            continue
+        mise_key = _REVIEWER_CLI_MISE_KEYS[variant]
+        spec = next((s for s in specs if mise_key in (s.name, s.mise_key)), None)
+        if spec is None or not spec.applies_here() or not _native_only(repo_root, spec):
+            continue
+        observed = sync.observed_version(spec.binary, spec.version_pattern, spec.version_args)
+        notes.append(
+            f"lane {entry!r} ran {spec.binary} {observed or 'unknown'} — native-only here "
+            "(no mise pin, or disabled in mise), so no pin was compared"
+        )
+    return notes
+
+
+def _native_only(repo_root: Path, spec: ToolSpec) -> bool:
+    """True when ``spec``'s tool has no mise pin or is in the effective ``disable_tools``.
+
+    A native-installer-only reviewer (Ray, 2026-10-01: claude, codex and agy on
+    this Mac) has no pin to match, and a pin mise is told to ignore governs
+    nothing that runs — comparing against it refused honest native reviews.
+    """
+    from kb_setup.currency import sync
+
+    if not spec.mise_key:
+        return True
+    disabled = disabled_tools(repo_root)
+    if spec.mise_key in disabled or spec.name in disabled:
+        return True
+    pinned, _extras = sync.pinned_version(repo_root, spec)
+    return not pinned
+
+
 def _reviewer_pin_gap(repo_root: Path, data: dict[str, Any]) -> str | None:
     """Return why a lane's reviewer CLI disagrees with its `mise.toml` pin, or None.
 
@@ -357,6 +434,13 @@ def _reviewer_pin_gap(repo_root: Path, data: dict[str, Any]) -> str | None:
     `kb_setup.absent_binary`'s host-conditional shape (silently inert wherever
     its tool is not installed) is the precedent.
 
+    **Native-only reviewers are not compared (Ray, 2026-10-01).** When the
+    tool has no `mise_key`, no pin, or is in the effective mise
+    `disable_tools`, there is no pin that governs what runs, so the lane is
+    skipped here and REPORTED by :func:`reviewer_native_notes` instead. Before
+    this, a receipt for a native `agy` 1.2.14 was refused against a 1.2.12 pin
+    mise had been told to ignore.
+
     **Runs from here (the WRITER) only — never from :func:`_all_reasons`,
     which :func:`receipt_state` (the reader) also shares.** A live-host
     comparison re-run at `kb-ship`/`kb-land` time would refuse an
@@ -384,9 +468,9 @@ def _reviewer_pin_gap(repo_root: Path, data: dict[str, Any]) -> str | None:
         spec = next((s for s in specs if mise_key in (s.name, s.mise_key)), None)
         if spec is None or not spec.applies_here():
             continue
+        if _native_only(repo_root, spec):
+            continue  # native-only: nothing to compare; reviewer_native_notes reports it.
         pinned, _extras = sync.pinned_version(repo_root, spec)
-        if not pinned:
-            continue  # no pin recorded — absence, not drift.
         observed = sync.observed_version(spec.binary, spec.version_pattern, spec.version_args)
         if not observed or observed == pinned:
             continue  # not installed, unreadable, or in sync — none is drift.
