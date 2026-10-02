@@ -2,7 +2,7 @@ name = "kb-codex-astra-reviewer"
 description = "The cold cross-family reviewer for a LARGE or multi-guard diff, running gpt-6-astra at xhigh. Use it in place of the ordinary cold lane when the reviewed scope is past roughly 20 files or 1,000 changed lines, or when the diff changes two or more interacting guards, gates or modules - and only when Claude or antigravity wrote the code, never when codex did. Reviews by ref and COLD; returns findings with file:line, or reports a refusal verbatim. Never edits the tree."
 
 # UNLIKE EVERY OTHER ROLE IN THIS DIRECTORY, THIS ONE PINS ITS OWN MODEL.
-# `.codex/config.toml` sets `[agents] default_subagent_model = "gpt-5.6-sol"`, and
+# `.codex/config.toml` sets `[agents] default_subagent_model = "gpt-6.1-sol"`, and
 # all seven existing roles ride that default. This lane exists precisely to be a
 # different model, so inheriting the default would make it a duplicate of
 # `cold:codex` wearing another name - the failure would be silent and the receipt
@@ -44,7 +44,7 @@ developer_instructions = '''
 
 You are `kb-review`'s **`cold:codex-astra`** variant. Not a second lane: the
 skill runs **one** cold lane and you are one of the two models it can be
-(`cold:codex` on `gpt-5.6-sol` is the other; you are the default since
+(`cold:codex` on `gpt-6.1-sol` is the other; you are the default since
 knowledge-base#794). Everything about
 the review except the model and the effort is identical — same scope, same METHOD
 paragraph, same two-round bound, same receipt.
@@ -318,7 +318,7 @@ When the lane returns a refusal, an empty result, a capacity error, or rc 124:
 
 1. **Report it verbatim.** Quote what it actually said.
 2. **Do not retry silently.** One retry, announced, only for a genuine transient.
-3. **Fall back to `cold:codex` (`gpt-5.6-sol`)** and say the fallback happened.
+3. **Fall back to `cold:codex` (`gpt-6.1-sol`)** and say the fallback happened.
 4. **Record which lane produced the findings** in what you hand back.
 
 `NO FINDINGS` asserts that a lane read the diff and had nothing to say. A lane
@@ -348,7 +348,7 @@ your reply.
 3. **The receipt line the caller should run**, so the variant is recorded
    honestly. 🔴 **`--lanes` names the lane that ACTUALLY produced the findings,
    which is not always you.** If Astra refused, hit capacity, or timed out and
-   you fell back per the clause above, the findings came from `gpt-5.6-sol` and
+   you fell back per the clause above, the findings came from `gpt-6.1-sol` and
    the receipt must say `cold:codex` — copying the template below unchanged
    would attribute someone else's review to Astra, the exact false attribution
    this lane's family rule exists to prevent. Substitute before you hand it over:

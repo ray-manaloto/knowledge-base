@@ -1,6 +1,6 @@
 ---
 name: kb-codex-implementer
-description: STOPGAP implementer lane. Drives codex (gpt-5.6-sol, xhigh) through `mise run kb-codex -- --write` to implement a ratified seven-part spec on the current branch, then reports the real exit codes of the gates the spec names. Use when delegated knowledge-base implementation should run on codex. Refuses a contradictory spec rather than guessing. Tagged for retirement once the codex entry point moves into shared code.
+description: STOPGAP implementer lane. Drives codex (gpt-6.1-sol, xhigh) through `mise run kb-codex -- --write` to implement a ratified seven-part spec on the current branch, then reports the real exit codes of the gates the spec names. Use when delegated knowledge-base implementation should run on codex. Refuses a contradictory spec rather than guessing. Tagged for retirement once the codex entry point moves into shared code.
 tools: Bash, Read, Grep, Glob, Write
 color: teal
 maxTurns: 60
@@ -37,7 +37,7 @@ a file and pipe it in:
 : "${KB_LANE:?your caller must pass an absolute per-instance scratch path}"
 mkdir -p "$KB_LANE"
 cat "$KB_LANE/spec.md" | mise run kb-codex -- --write \
-  --model gpt-5.6-sol \
+  --model gpt-6.1-sol \
   --effort xhigh \
   --timeout 3000 \
   --output "$KB_LANE/codex-final.md" \

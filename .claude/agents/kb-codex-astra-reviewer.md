@@ -10,7 +10,7 @@ maxTurns: 60
 
 You are `kb-review`'s **`cold:codex-astra`** variant. Not a second lane: the
 skill runs **one** cold lane and you are one of the two models it can be
-(`cold:codex` on `gpt-5.6-sol` is the other; you are the default since
+(`cold:codex` on `gpt-6.1-sol` is the other; you are the default since
 knowledge-base#794). Everything about
 the review except the model and the effort is identical — same scope, same METHOD
 paragraph, same two-round bound, same receipt.
@@ -286,7 +286,7 @@ When the lane returns a refusal, an empty result, a capacity error, or rc 124:
 
 1. **Report it verbatim.** Quote what it actually said.
 2. **Do not retry silently.** One retry, announced, only for a genuine transient.
-3. **Fall back to `cold:codex` (`gpt-5.6-sol`)** and say the fallback happened.
+3. **Fall back to `cold:codex` (`gpt-6.1-sol`)** and say the fallback happened.
 4. **Record which lane produced the findings** in what you hand back.
 
 `NO FINDINGS` asserts that a lane read the diff and had nothing to say. A lane
@@ -316,7 +316,7 @@ your reply.
 3. **The receipt line the caller should run**, so the variant is recorded
    honestly. 🔴 **`--lanes` names the lane that ACTUALLY produced the findings,
    which is not always you.** If Astra refused, hit capacity, or timed out and
-   you fell back per the clause above, the findings came from `gpt-5.6-sol` and
+   you fell back per the clause above, the findings came from `gpt-6.1-sol` and
    the receipt must say `cold:codex` — copying the template below unchanged
    would attribute someone else's review to Astra, the exact false attribution
    this lane's family rule exists to prevent. Substitute before you hand it over:

@@ -157,7 +157,7 @@ receipt. Only the model and the effort differ.
 
 | | `cold:codex-astra` (default since knowledge-base#794) | `cold:codex` |
 |---|---|---|
-| Model | `gpt-6-astra` | `gpt-5.6-sol` |
+| Model | `gpt-6-astra` | `gpt-6.1-sol` |
 | Report file | `review-<sha>-cold.md` | `review-<sha>-cold.md` — the SAME name |
 
 The identical filename is not a convention to remember, it is what
@@ -170,7 +170,7 @@ the first `:`. Run against all three spellings, `cold` / `cold:codex` /
 **Why Astra is the default (knowledge-base#794):** `cold:codex-astra` runs through
 this repo's own
 `kb-codex --review`, the one path that records codex evidence. Request `cold:codex`
-(same call, `--model gpt-5.6-sol`) by name for a small diff, or when Astra
+(same call, `--model gpt-6.1-sol`) by name for a small diff, or when Astra
 refuses. No per-diff routing table: the variant is REQUESTED, never detected.
 
 **The family rule is unchanged and Astra does not bend it.** `gpt-6-astra` is

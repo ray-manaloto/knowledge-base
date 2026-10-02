@@ -19,7 +19,7 @@ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"
 # Two lines here rather than a `model` key in all seven mirrors: the mirrors
 # stay free to differ, and nothing is locked in.
 [agents]
-default_subagent_model = "gpt-5.6-sol"
+default_subagent_model = "gpt-6.1-sol"
 default_subagent_reasoning_effort = "high"
 
 # TWO SERVERS, TWO NAMES. `graphify` is the HOSTED service; `kb` is this repo's
