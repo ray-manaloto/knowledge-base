@@ -29,7 +29,11 @@ token-cost decision tracked with #118.
 - `mise run kb-ccdocs-refresh` re-fetches every page, adds any page `llms.txt`
   or `sitemap.xml` newly lists, keeps a previous copy (and says so) when a fetch
   fails, and exits 1 if a listed page can be neither fetched nor kept. It
-  rewrites `fetch.tsv` and `fetch.stamp.json`; commit the result.
+  rewrites `fetch.tsv`, and advances `fetch.stamp.json` only when every `md`
+  page was actually re-fetched — a run that kept old copies exits 1 and leaves
+  the stamp (and so the warning below) where it was. Pages are written only
+  after every fetch returns, so an interrupted run changes nothing. Commit the
+  result.
 - `kb-currency-check` (the SessionStart hook) prints a `[ccdocs]` warning once
   `fetch.stamp.json` is 7 or more days old, or unreadable.
   `mise run kb-ccdocs-check` is the same probe with a real exit code.

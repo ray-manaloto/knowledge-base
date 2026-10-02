@@ -44,13 +44,14 @@ file = "python/src/kb_setup/ccdocs_mirror.py"
 old = '''        if not urls:'''
 new = '''        if False:'''
 
-# Missing pages no longer fail the run.
+# Missing pages no longer fail the run (after round 2, a missing page leaves the
+# stamp un-advanced, and THAT branch is what returns FINDINGS).
 [[arm]]
 id = "R1"
 test = "test_main_exits_findings_when_a_page_is_missing"
 file = "python/src/kb_setup/ccdocs_mirror.py"
-old = '''    return Rc.FINDINGS if out.missing else Rc.OK'''
-new = '''    return Rc.OK'''
+old = '''    if not out.stamped:'''
+new = '''    if False:'''
 
 # Staleness threshold disabled.
 [[arm]]
@@ -59,3 +60,86 @@ test = "test_staleness_reports_an_old_mirror"
 file = "python/src/kb_setup/ccdocs_mirror.py"
 old = '''    if age >= STALE_AFTER_DAYS:'''
 new = '''    if age > 10_000:'''
+
+# ---- Round-2 fixes (cold review of 4979b5e4): each arm reverts one fix. ----
+
+# P2: stamp advanced regardless of whether anything was fetched.
+[[arm]]
+id = "F1"
+test = "test_a_refresh_that_fetched_nothing_does_not_advance_the_stamp"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''    if writes and not stale_md and not out.missing:'''
+new = '''    if True:'''
+
+# P2: a kept md page no longer holds the stamp back.
+[[arm]]
+id = "F2"
+test = "test_one_stale_md_page_holds_the_stamp_back"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''            stale_md += old[url].method == "md"'''
+new = '''            stale_md += 0'''
+
+# P2: a naive or wrong-typed stamp escapes as a traceback again.
+[[arm]]
+id = "F3"
+test = "test_an_unusable_stamp_is_unknown_never_fresh"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''    except (OSError, ValueError, KeyError, TypeError) as e:'''
+new = '''    except (OSError, ValueError, KeyError) as e:'''
+
+# P3 (X1): only a missing stamp is UNKNOWN.
+[[arm]]
+id = "F4"
+test = "test_an_unusable_stamp_is_unknown_never_fresh"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''    except (OSError, ValueError, KeyError, TypeError) as e:'''
+new = '''    except OSError as e:'''
+
+# P3: a future-dated stamp reads as fresh.
+[[arm]]
+id = "F5"
+test = "test_an_unusable_stamp_is_unknown_never_fresh"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''    if age < 0:'''
+new = '''    if False:'''
+
+# P3: HTTPException escapes fetch().
+[[arm]]
+id = "F6"
+test = "test_fetch_turns_an_http_protocol_error_into_a_response"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''    except (OSError, TimeoutError, http.client.HTTPException) as e:'''
+new = '''    except (OSError, TimeoutError) as e:'''
+
+# P3: pages written inside the loop again (partial state on a crash).
+[[arm]]
+id = "F7"
+test = "test_a_crash_mid_loop_leaves_the_mirror_untouched"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''            writes[target] = resp.body'''
+new = '''            target.write_bytes(resp.body)
+            writes[target] = resp.body'''
+
+# P3 (X4): any status accepted as a page — a 404 body overwrites a real page.
+[[arm]]
+id = "F8"
+test = "test_a_404_served_as_markdown_is_not_a_page"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''        if not resp.error and resp.status == HTTPStatus.OK and "markdown" in ctype:'''
+new = '''        if not resp.error and "markdown" in ctype:'''
+
+# P3: trailing slash kept — the same page mirrored twice.
+[[arm]]
+id = "F9"
+test = "test_a_trailing_slash_url_is_the_same_page"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''.removesuffix(".md").rstrip("/") for u'''
+new = '''.removesuffix(".md") for u'''
+
+# P3: a malformed fetch.tsv crashes instead of NOT_RUN.
+[[arm]]
+id = "F10"
+test = "test_a_malformed_fetch_tsv_is_not_run_and_writes_nothing"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''    except (InventoryUnavailableError, MirrorUnreadableError) as exc:'''
+new = '''    except InventoryUnavailableError as exc:'''

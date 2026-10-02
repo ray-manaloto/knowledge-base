@@ -186,8 +186,11 @@ def test_currency_check_prints_the_stale_line(
 def test_the_committed_mirror_has_a_readable_stamp() -> None:
     from pathlib import Path as _Path
 
+    # Real clock, not `_NOW`: the committed stamp carries a time of day, and a
+    # fixed midnight `now` reads it as future-dated. Age may say "stale"; it must
+    # never say UNKNOWN.
     repo = _Path(__file__).parent.parent
-    assert "UNKNOWN" not in cm.staleness(repo, now=_NOW)
+    assert "UNKNOWN" not in cm.staleness(repo)
 
 
 @pytest.mark.parametrize("args", [[], ["nope"], ["refresh", "extra"], ["check", "x"]])
@@ -208,3 +211,118 @@ def test_the_sessionstart_currency_check_runs_the_staleness_probe(
     monkeypatch.setattr(cm, "staleness", lambda _root: "SENTINEL-stale-mirror")
     assert currency_run.check(_Path(__file__).parent.parent) == 0
     assert "SENTINEL-stale-mirror" in capsys.readouterr().out
+
+
+# --- round-2 cold review of 4979b5e4 -------------------------------------------
+
+
+def test_a_refresh_that_fetched_nothing_does_not_advance_the_stamp(tmp_path: Path) -> None:
+    mirror = _seed(tmp_path, {"hooks": "h", "costs": "c"})
+    fetch = _fetcher(
+        {_url("hooks"): _ok("<html>", "text/html"), _url("costs"): _ok("<html>", "text/html")},
+        llms=_url("hooks"),
+        sitemap=_url("costs"),
+    )
+    assert cm.main(tmp_path, ["refresh"], fetcher=fetch) == cm.Rc.FINDINGS
+    assert not (mirror / cm.STAMP).exists()
+
+
+def test_one_stale_md_page_holds_the_stamp_back(tmp_path: Path) -> None:
+    mirror = _seed(tmp_path, {"hooks": "h", "costs": "c"})
+    fetch = _fetcher(
+        {_url("hooks"): _ok("h2"), _url("costs"): cm.Response(0, "", b"", "fetch failed: x")},
+        llms=_url("hooks"),
+        sitemap=_url("costs"),
+    )
+    out = cm.refresh(tmp_path, fetcher=fetch, now=_NOW)
+    assert (out.changed, out.stamped) == ([_url("hooks")], False)
+    assert (mirror / "hooks.md").read_text() == "h2"
+
+
+def test_a_kept_webclaw_page_does_not_hold_the_stamp_back(tmp_path: Path) -> None:
+    mirror = _seed(tmp_path, {"hooks": "h"})
+    (mirror / "claude-tag.md").write_text("captured")
+    with (mirror / cm.FETCH_TSV).open("a") as f:
+        f.write(cm.Row(_url("claude-tag"), "200|text/html", "webclaw", 8).line() + "\n")
+    fetch = _fetcher(
+        {_url("hooks"): _ok("h"), _url("claude-tag"): cm.Response(307, "", b"")},
+        llms=_url("hooks"),
+        sitemap=_url("claude-tag"),
+    )
+    assert cm.main(tmp_path, ["refresh"], fetcher=fetch) == cm.Rc.OK
+    assert (mirror / cm.STAMP).exists()
+
+
+def test_a_404_served_as_markdown_is_not_a_page(tmp_path: Path) -> None:
+    # The live site answers a missing page with `404 text/markdown` (measured).
+    mirror = _seed(tmp_path, {"hooks": "real"})
+    fetch = _fetcher(
+        {_url("hooks"): cm.Response(404, _MD, b"# Not found")},
+        llms=_url("hooks"),
+        sitemap=_url("hooks"),
+    )
+    out = cm.refresh(tmp_path, fetcher=fetch, now=_NOW)
+    assert len(out.kept) == 1
+    assert (mirror / "hooks.md").read_text() == "real"
+
+
+def test_a_crash_mid_loop_leaves_the_mirror_untouched(tmp_path: Path) -> None:
+    mirror = _seed(tmp_path, {"a": "A", "b": "B"})
+    inner = _fetcher({_url("a"): _ok("A2")}, llms=_url("a"), sitemap=_url("b"))
+
+    def fetch(url: str) -> cm.Response:
+        if url == _url("b") + ".md":
+            raise RuntimeError
+        return inner(url)
+
+    with pytest.raises(RuntimeError):
+        cm.refresh(tmp_path, fetcher=fetch, now=_NOW)
+    assert (mirror / "a.md").read_text() == "A"
+
+
+def test_fetch_turns_an_http_protocol_error_into_a_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import http.client
+
+    class Broken:
+        def __init__(self, *_a: object, **_k: object) -> None: ...
+        def request(self, *_a: object) -> None: ...
+        def getresponse(self) -> object:
+            raise http.client.IncompleteRead(b"partial")
+
+        def close(self) -> None: ...
+
+    monkeypatch.setattr(http.client, "HTTPSConnection", Broken)
+    resp = cm.fetch(_url("hooks") + ".md")
+    assert resp.error.startswith("fetch failed: IncompleteRead")
+
+
+def test_a_malformed_fetch_tsv_is_not_run_and_writes_nothing(tmp_path: Path) -> None:
+    mirror = _seed(tmp_path, {"hooks": "h"})
+    (mirror / cm.FETCH_TSV).write_text("only\ttwo\n")
+    fetch = _fetcher({_url("hooks"): _ok("new")}, llms=_url("hooks"), sitemap=_url("hooks"))
+    assert cm.main(tmp_path, ["refresh"], fetcher=fetch) == cm.Rc.NOT_RUN
+    assert (mirror / "hooks.md").read_text() == "h"
+
+
+def test_a_trailing_slash_url_is_the_same_page() -> None:
+    assert cm.inventory_urls(f"<loc>{_url('overview')}/</loc>") == {_url("overview")}
+
+
+@pytest.mark.parametrize(
+    ("stamp", "reason"),
+    [
+        ("{not json", "JSONDecodeError"),
+        ('{"pages": 1}', "KeyError"),
+        ('{"fetched_at": 5}', "TypeError"),
+        ('{"fetched_at": "2026-10-02T16:31:13"}', "TypeError"),
+        ('{"fetched_at": "2027-10-02T00:00:00+00:00"}', "stamp is in the future"),
+    ],
+)
+def test_an_unusable_stamp_is_unknown_never_fresh(tmp_path: Path, stamp: str, reason: str) -> None:
+    (tmp_path / cm.MIRROR).mkdir(parents=True)
+    (tmp_path / cm.MIRROR / cm.STAMP).write_text(stamp)
+    line = cm.staleness(tmp_path, now=_NOW)
+    assert "freshness UNKNOWN" in line
+    assert reason in line

@@ -117,10 +117,17 @@ def fetch(url: str) -> Response:
         conn.request("GET", parts.path or "/")
         resp = conn.getresponse()
         return Response(resp.status, resp.getheader("Content-Type", ""), resp.read())
-    except (OSError, TimeoutError) as e:
-        return Response(0, "", b"", f"fetch failed: {e}")
+    except (OSError, TimeoutError, http.client.HTTPException) as e:
+        # HTTPException is NOT an OSError: IncompleteRead (from `read()`) and
+        # BadStatusLine/LineTooLong (from `getresponse()`) would otherwise escape
+        # `refresh` mid-loop (cold review of 4979b5e4).
+        return Response(0, "", b"", f"fetch failed: {type(e).__name__}: {e}")
     finally:
         conn.close()
+
+
+class MirrorUnreadableError(RuntimeError):
+    """`fetch.tsv` exists but cannot be parsed, so the previous page set is unknown."""
 
 
 def read_rows(mirror: Path) -> dict[str, Row]:
@@ -129,17 +136,25 @@ def read_rows(mirror: Path) -> dict[str, Row]:
     if not path.is_file():
         return {}
     rows: dict[str, Row] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
             continue
-        url, status, method, size = line.split("\t")
-        rows[url] = Row(url, status, method, int(size))
+        try:
+            url, status, method, size = line.split("\t")
+            rows[url] = Row(url, status, method, int(size))
+        except ValueError as e:
+            msg = f"{path}:{n}: not a 4-field row ({e})"
+            raise MirrorUnreadableError(msg) from e
     return rows
 
 
 def inventory_urls(text: str) -> set[str]:
-    """Every English docs page URL in an inventory, normalised to no `.md`."""
-    return {u.rstrip(".").removesuffix(".md") for u in _PAGE_URL.findall(text)}
+    """Every English docs page URL in an inventory, normalised to no `.md`.
+
+    A trailing `/` is dropped too: the site serves `overview/.md` byte-identical
+    to `overview.md`, so keeping it would mirror one page twice.
+    """
+    return {u.rstrip(".").removesuffix(".md").rstrip("/") for u in _PAGE_URL.findall(text)}
 
 
 class InventoryUnavailableError(RuntimeError):
@@ -172,18 +187,30 @@ class Outcome:
     unchanged: int
     kept: list[str]
     missing: list[str]
+    stamped: bool = False
 
 
 def refresh(repo_root: Path, *, fetcher: Fetcher = fetch, now: datetime | None = None) -> Outcome:
     """Re-fetch every page; keep a previous copy whenever a fetch fails.
 
-    Raises :class:`InventoryUnavailableError` before writing anything.
+    Raises :class:`InventoryUnavailableError` / :class:`MirrorUnreadableError`
+    before writing anything. Pages are written only AFTER every fetch has
+    returned, so a crash or a task timeout mid-loop leaves the tree untouched
+    rather than half-written against a stale `fetch.tsv`.
+
+    The stamp advances only when every page a refresh is responsible for was
+    actually fetched: a `md` page KEPT from a previous copy means part of the
+    mirror is still old, and a stamp saying "fresh" would silence the one
+    signal that says so. `webclaw` rows (captured by a different method, e.g.
+    `claude-tag`, whose `.md` redirects off-site) are expected to be kept.
     """
     mirror = repo_root / MIRROR
     old = read_rows(mirror)
     urls = discover(fetcher, set(old))
     rows: dict[str, Row] = {}
+    writes: dict[Path, bytes] = {}
     out = Outcome([], [], 0, [], [])
+    stale_md = 0
     for url in sorted(urls):
         target = mirror / page_name(url)
         resp = fetcher(url + ".md")
@@ -195,18 +222,23 @@ def refresh(repo_root: Path, *, fetcher: Fetcher = fetch, now: datetime | None =
                 out.changed.append(url)
             else:
                 out.unchanged += 1
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(resp.body)
+            writes[target] = resp.body
             rows[url] = Row(url, f"{resp.status}|{ctype}", "md", len(resp.body))
         elif url in old and target.is_file():
             out.kept.append(f"{url} ({resp.error or f'HTTP {resp.status} {ctype}'})")
             rows[url] = old[url]
+            stale_md += old[url].method == "md"
         else:
             out.missing.append(f"{url} ({resp.error or f'HTTP {resp.status} {ctype}'})")
+    for target, data in writes.items():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
     body = "".join(rows[u].line() + "\n" for u in sorted(rows))
     (mirror / FETCH_TSV).write_text(body, encoding="utf-8")
-    stamp = {"fetched_at": (now or datetime.now(UTC)).isoformat(), "pages": len(rows)}
-    (mirror / STAMP).write_text(json.dumps(stamp, indent=2) + "\n", encoding="utf-8")
+    if writes and not stale_md and not out.missing:
+        stamp = {"fetched_at": (now or datetime.now(UTC)).isoformat(), "pages": len(rows)}
+        (mirror / STAMP).write_text(json.dumps(stamp, indent=2) + "\n", encoding="utf-8")
+        out.stamped = True
     return out
 
 
@@ -220,13 +252,17 @@ def staleness(repo_root: Path, *, now: datetime | None = None) -> str:
     mirror = repo_root / MIRROR
     if not mirror.is_dir():
         return ""
+    unknown = f"{MIRROR}: freshness UNKNOWN ({{}}) — run `mise run kb-ccdocs-refresh`"
     try:
         stamp = json.loads((mirror / STAMP).read_text(encoding="utf-8"))
         fetched = datetime.fromisoformat(stamp["fetched_at"])
+        # INSIDE the try: a naive timestamp makes this subtraction raise, and an
+        # escape here crashes `currency check` on the SessionStart path.
+        age = ((now or datetime.now(UTC)) - fetched).days
     except (OSError, ValueError, KeyError, TypeError) as e:
-        why = type(e).__name__
-        return f"{MIRROR}: freshness UNKNOWN ({why}) — run `mise run kb-ccdocs-refresh`"
-    age = ((now or datetime.now(UTC)) - fetched).days
+        return unknown.format(type(e).__name__)
+    if age < 0:
+        return unknown.format("stamp is in the future")
     if age >= STALE_AFTER_DAYS:
         return f"{MIRROR}: fetched {age} days ago — run `mise run kb-ccdocs-refresh`"
     return ""
@@ -256,7 +292,7 @@ def main(repo_root: Path, args: Sequence[str] | None = None, *, fetcher: Fetcher
         return Rc.BAD_REQUEST
     try:
         out = refresh(repo_root, fetcher=fetcher)
-    except InventoryUnavailableError as exc:
+    except (InventoryUnavailableError, MirrorUnreadableError) as exc:
         events.warn("ccdocs.not_run", f"[ccdocs] COULD NOT ASK, nothing written: {exc}")
         return Rc.NOT_RUN
     events.say(
@@ -272,4 +308,10 @@ def main(repo_root: Path, args: Sequence[str] | None = None, *, fetcher: Fetcher
         events.warn("ccdocs.kept", f"[ccdocs]   kept previous copy: {note}")
     for note in out.missing:
         events.fail("ccdocs.missing", f"[ccdocs]   MISSING: {note}")
-    return Rc.FINDINGS if out.missing else Rc.OK
+    if not out.stamped:
+        events.fail(
+            "ccdocs.not_stamped",
+            "[ccdocs] stamp NOT advanced: some pages are still old copies — re-run once they serve",
+        )
+        return Rc.FINDINGS
+    return Rc.OK
