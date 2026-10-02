@@ -80,7 +80,8 @@ rule — which is why it is recorded rather than quietly fixed.
 
 This repo is **Claude-only**; its `AGENTS.md` (tracked, 51 lines, codex's minimum)
 is a SIBLING of `CLAUDE.md`, not an `@import` stub, so no budget counts it and
-AGM-003's 12,000-char ceiling never binds here — but the shared engine still must
+AGM-003's 12,000 ceiling (bytes, though its message says "chars"; measure with
+`wc -c`) never binds here — but the shared engine still must
 not re-adopt the figure, and a test pins that. (This line said "ships no
 `AGENTS.md`" until the 2026-08-23 session review read it against `git ls-files`.)
 
