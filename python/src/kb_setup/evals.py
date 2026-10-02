@@ -38,10 +38,14 @@ review happened.
 
 from __future__ import annotations
 
+import contextlib
 import itertools
 import json
+import os
 import shutil
+import signal
 import subprocess
+import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
@@ -258,6 +262,200 @@ def run_command(
     return rc, (out + err)
 
 
+#: Wall seconds of no CPU progress that make a CPU-bounded run a wedge.
+STALL_WINDOW = 60.0
+
+#: CPU-seconds a process group must accrue within :data:`STALL_WINDOW` to count
+#: as alive. One CPU-second a minute is ~1.7% of one core. A host at load 206 on
+#: 12 cores, the worst seen during #838, still gives a runnable process ~6%, so
+#: this only trips on a process that is barely running or not running at all.
+STALL_MIN_PROGRESS = 1.0
+
+#: How often the group's CPU time is sampled. This sets the budget's overshoot:
+#: a runaway can exceed ``cpu_budget`` by at most one interval of CPU per core.
+SAMPLE_EVERY = 10.0
+
+
+def _ps_seconds(text: str) -> float:
+    """Parse a ``ps -o time`` field, ``[dd-][hh:]mm:ss.cc``, into seconds."""
+    days, _, clock = text.rpartition("-")
+    seconds = 0.0
+    for part in clock.split(":"):
+        seconds = seconds * 60 + float(part)
+    return seconds + (int(days) * 86400 if days else 0)
+
+
+def group_cpu_seconds(pgid: int) -> float | None:
+    """Total CPU time of every process ``ps`` lists in group ``pgid``, or None.
+
+    None means no process in that group was listed, or ``ps`` could not be
+    read. Those are "could not ask", never "zero". A ZOMBIE is listed, and macOS
+    shows it with CPU ``0:00.00`` whatever it really used, so a caller must
+    check whether the command has exited before trusting a sample (#838 round 2).
+    """
+    try:
+        listing = subprocess.run(
+            ["ps", "-A", "-o", "pgid=,time="],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        ).stdout
+    except subprocess.TimeoutExpired, OSError:
+        return None
+    total, seen = 0.0, False
+    for line in listing.splitlines():
+        group, _, cpu = line.strip().partition(" ")
+        if group == str(pgid) and cpu.strip():
+            total += _ps_seconds(cpu.strip())
+            seen = True
+    return total if seen else None
+
+
+@dataclass(frozen=True)
+class CpuBound:
+    """What :func:`run_command_cpu_bounded` enforces. See its docstring."""
+
+    budget: float
+    stall_window: float = STALL_WINDOW
+    min_progress: float = STALL_MIN_PROGRESS
+    sample_every: float = SAMPLE_EVERY
+
+
+#: Consecutive unreadable ``ps`` samples, while the command runs, before the run
+#: fails closed. One bad read on a loaded host is not a verdict.
+_MAX_MISREADS = 2
+
+
+@dataclass
+class _Progress:
+    """The CPU total at the last sample that showed progress, and when it was."""
+
+    cpu: float
+    at: float
+    misreads: int = 0
+
+
+def _judge(bound: CpuBound, used: float | None, seen: _Progress) -> tuple[int, str] | None:
+    """One sample's verdict, or None to keep waiting. Mutates ``seen``."""
+    now = time.monotonic()
+    if used is None:
+        seen.misreads += 1
+        if seen.misreads < _MAX_MISREADS:
+            return None
+        return -3, "could not read the command's CPU time; refusing to wait blind"
+    seen.misreads = 0
+    if used > bound.budget:
+        return -1, f"exceeded CPU budget: {used:.1f} CPU-s > {bound.budget:g}"
+    if used - seen.cpu >= bound.min_progress:
+        seen.cpu, seen.at = used, now
+        return None
+    if now - seen.at < bound.stall_window:
+        return None
+    return -1, (
+        f"stalled: {used - seen.cpu:.2f} CPU-s in the last {now - seen.at:.0f}s "
+        f"(< {bound.min_progress:g} per {bound.stall_window:g}s); {used:.1f} CPU-s total"
+    )
+
+
+def _collect_after_exit(proc: subprocess.Popen[str], bound: CpuBound) -> tuple[int, str]:
+    """The command has exited: collect its output, bounded.
+
+    Only a descendant that left the group (``setsid``) and still holds the pipe
+    can keep this waiting, so the wait is capped at ``stall_window``.
+    """
+    try:
+        out, err = proc.communicate(timeout=bound.stall_window)
+    except subprocess.TimeoutExpired:
+        _kill_group(proc, read_timeout=0)
+        return -1, (
+            f"exited rc={proc.returncode}, but a descendant kept its output open "
+            f"past {bound.stall_window:g}s"
+        )
+    return proc.returncode, out + err
+
+
+def run_command_cpu_bounded(
+    argv: Sequence[str], *, bound: CpuBound, cwd: Path | None = None
+) -> tuple[int, str]:
+    """Run ``argv`` bounded by the WORK it does, not by elapsed time (#838).
+
+    A wall-clock bound cannot tell "this command is broken" from "this host is
+    busy". On a host at load ~100 the eval canary (31.7 CPU-s alone) got less
+    than a fifth of a core and missed its 180 s wall bound, though nothing was
+    wrong with it. Busy-host waiting is not what the bound is for. The two
+    failures it IS for each get a bound that load cannot trip:
+
+    - **runaway**: the group's CPU time passes ``bound.budget`` (rc -1). It is
+      checked every ``bound.sample_every`` seconds, so it can overshoot by at
+      most one interval of CPU per core.
+    - **wedge**: the group gains less than ``bound.min_progress`` CPU-seconds
+      over ``bound.stall_window`` of wall time. That is the 0%-CPU hang of
+      `long-running-command-hangs.md` rule 4 (rc -1).
+
+    Real slowness is not hidden. A query that costs more CPU fails the budget
+    exactly as it would on an idle host.
+
+    Sampled with ``ps`` over the command's process group rather than enforced
+    by ``RLIMIT_CPU``. Children inherit the kernel limit, but each child gets
+    its own budget; it cannot bound the TOTAL a group spends.
+
+    The command having EXITED is checked before any sample is trusted. A zombie
+    reads as zero CPU on macOS, and acting on that turned a successful run into
+    a false "stalled" (cold review, round 2). Unreadable CPU time on
+    ``_MAX_MISREADS`` samples in a row, while the command runs, fails CLOSED
+    (rc -3). Wall time has no bound of its own here. The progress rule caps it
+    at ``budget / min_progress`` windows, and the calling task's timeout caps it
+    sooner.
+    """
+    try:
+        proc = subprocess.Popen(
+            list(argv),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=str(cwd) if cwd else None,
+            start_new_session=True,
+        )
+    except (FileNotFoundError, PermissionError) as exc:
+        return -2, str(exc)
+    tick = min(bound.sample_every, bound.stall_window)
+    seen = _Progress(cpu=0.0, at=time.monotonic())
+    while True:
+        try:
+            out, err = proc.communicate(timeout=tick)
+        except subprocess.TimeoutExpired:
+            pass
+        else:
+            return proc.returncode, out + err
+        used = group_cpu_seconds(proc.pid)
+        if proc.poll() is not None:
+            return _collect_after_exit(proc, bound)  # never trust a post-exit sample
+        verdict = _judge(bound, used, seen)
+        if verdict is not None:
+            _kill_group(proc)
+            return verdict
+
+
+def _kill_group(proc: subprocess.Popen[str], *, read_timeout: float = 5) -> None:
+    """SIGKILL the whole session ``proc`` leads, then reap it, bounded.
+
+    ``killpg`` raises ``PermissionError`` (EPERM) on macOS when the only member
+    left is a zombie, so it is suppressed with ``ProcessLookupError``. The final
+    read is bounded, because a descendant that called ``setsid`` survives the
+    kill and can hold the pipe open.
+    """
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(proc.pid, signal.SIGKILL)
+    try:
+        proc.communicate(timeout=read_timeout)
+    except subprocess.TimeoutExpired:
+        for stream in (proc.stdout, proc.stderr):
+            if stream is not None:
+                stream.close()
+        proc.wait()
+
+
 # --- probe primitives ---------------------------------------------------------
 
 
@@ -462,8 +660,13 @@ def graphify_canary(
     *,
     graph: Path | None = None,
     timeout: int = DEFAULT_TIMEOUT,
+    cpu_budget: float | None = None,
 ) -> Outcome:
     """A graph that exists must also ANSWER. rc=0 and non-empty output.
+
+    ``cpu_budget`` replaces the wall-clock ``timeout`` with
+    :func:`run_command_cpu_bounded`, so a busy host cannot fail the canary
+    while a runaway or a wedged query still does (#838).
 
     The two halves are separate failures and are reported separately: a
     non-zero rc is a broken query path, while rc=0 with empty output is a graph
@@ -481,7 +684,11 @@ def graphify_canary(
     # actually resolves, not the one the pin names. See `_retrieval` in
     # eval_cases.py for the full reasoning, and #40 for why every OPERATIONAL
     # call site went the other way.
-    rc, out = run_command(["graphify", "query", question], cwd=repo_root, timeout=timeout)
+    argv = ["graphify", "query", question]
+    if cpu_budget is None:
+        rc, out = run_command(argv, cwd=repo_root, timeout=timeout)
+    else:
+        rc, out = run_command_cpu_bounded(argv, cwd=repo_root, bound=CpuBound(cpu_budget))
     if rc != 0:
         return fail(f"graphify query rc={rc}: {out.strip()[:200]}")
     if not out.strip():

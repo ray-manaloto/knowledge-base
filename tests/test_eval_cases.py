@@ -363,13 +363,22 @@ def test_the_node_line_parser_ignores_everything_else() -> None:
 
 
 def test_the_retrieval_case_skips_without_the_slow_flag() -> None:
-    """It must not silently ride the free tier it was excluded from."""
-    report = evals.run_cases(_cases())
+    """It must not silently ride the free tier it was excluded from.
+
+    Runs ONLY that case (#838). The `slow` filter is decided per case, so the
+    other cases cannot change this row's verdict — but running all of them made
+    this test a second full parse of the real graph via `tier1.graph-answers`,
+    one of the concurrent graph loads that starved the bounded ones under xdist.
+    """
+    retrieval = [c for c in _cases() if c.name == "tier2.kb-retrieval"]
+    assert len(retrieval) == 1, "the case this test is about no longer exists"
+    report = evals.run_cases(retrieval)
     row = next(r for r in report.results if r.case.name == "tier2.kb-retrieval")
     assert row.outcome.verdict is evals.Verdict.SKIP
     assert "--slow" in row.outcome.detail
 
 
+@pytest.mark.xdist_group("real_graph")  # #838 — see [tasks.test] in mise.toml
 def test_the_real_offline_run_is_green_on_this_tree() -> None:
     """The live gate: this repo's own offline cases must pass here.
 
