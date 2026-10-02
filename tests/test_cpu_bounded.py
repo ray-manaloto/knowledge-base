@@ -91,7 +91,9 @@ def test_a_group_with_no_live_process_is_could_not_ask_not_zero() -> None:
 
 
 def test_a_healthy_command_returns_its_output() -> None:
-    rc, out = evals.run_command_cpu_bounded(_py(_spin(0.2)), cpu_budget=30, stall_window=5)
+    rc, out = evals.run_command_cpu_bounded(
+        _py(_spin(0.2)), bound=evals.CpuBound(30, stall_window=5)
+    )
     assert (rc, out.strip()) == (0, "done")
 
 
@@ -99,7 +101,8 @@ def test_a_wedged_command_is_killed_as_stalled() -> None:
     """NEGATIVE ARM: 0% CPU is a hang, and still fails fast."""
     start = time.monotonic()
     rc, out = evals.run_command_cpu_bounded(
-        _py("import time; time.sleep(60)"), cpu_budget=30, stall_window=1, min_progress=0.2
+        _py("import time; time.sleep(60)"),
+        bound=evals.CpuBound(30, stall_window=1, min_progress=0.2),
     )
     assert rc == -1
     assert "stalled" in out
@@ -109,7 +112,7 @@ def test_a_wedged_command_is_killed_as_stalled() -> None:
 def test_a_runaway_command_is_killed_on_its_cpu_budget() -> None:
     """NEGATIVE ARM: real slowness, more CPU than budgeted, still fails."""
     rc, out = evals.run_command_cpu_bounded(
-        _py("while True: pass"), cpu_budget=1.5, stall_window=1, min_progress=0.1
+        _py("while True: pass"), bound=evals.CpuBound(1.5, stall_window=1, min_progress=0.1)
     )
     assert rc == -1
     assert "exceeded CPU budget" in out
@@ -123,14 +126,53 @@ def test_a_descendants_cpu_counts_against_the_budget() -> None:
     """
     code = "import subprocess, sys\nsubprocess.run([sys.executable, '-c', 'while True: pass'])\n"
     rc, out = evals.run_command_cpu_bounded(
-        _py(code), cpu_budget=1.5, stall_window=1, min_progress=0.1
+        _py(code), bound=evals.CpuBound(1.5, stall_window=1, min_progress=0.1)
     )
     assert rc == -1
     assert "exceeded CPU budget" in out, out
 
 
+def test_an_exit_just_after_a_sample_is_not_a_stall(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Round-2 P1: an exit racing a slow `ps` must not become a false verdict.
+
+    The command finishes just after a tick; a slowed `ps` then lists its
+    ZOMBIE, which macOS shows at 0 CPU. Reading that as "no progress" called a
+    successful run stalled, and the follow-up `killpg` raised EPERM. Every run
+    must return the command's own rc and output.
+    """
+    real = evals.group_cpu_seconds
+
+    def slow_ps(pgid: int) -> float | None:
+        time.sleep(0.5)
+        return real(pgid)
+
+    monkeypatch.setattr(evals, "group_cpu_seconds", slow_ps)
+    for _ in range(5):
+        rc, out = evals.run_command_cpu_bounded(
+            _py(_spin(0.6)), bound=evals.CpuBound(30, stall_window=0.5, min_progress=0.05)
+        )
+        assert (rc, out.strip()) == (0, "done"), out
+
+
+def test_a_descendant_holding_the_pipe_cannot_wait_forever() -> None:
+    """Round-2 P2-1: an escaped (setsid) descendant must not hang the reap."""
+    code = (
+        "import subprocess, sys\n"
+        "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(8)'],"
+        " start_new_session=True)\n"
+        "print('parent done', flush=True)\n"
+    )
+    start = time.monotonic()
+    rc, out = evals.run_command_cpu_bounded(
+        _py(code), bound=evals.CpuBound(30, stall_window=1, min_progress=0.05)
+    )
+    assert time.monotonic() - start < 6
+    assert rc == -1
+    assert "kept its output open" in out
+
+
 def test_a_starved_command_completes_where_a_wall_bound_fails() -> None:
-    """#838 reproduced. 1.5 CPU-s of work at a 25% duty cycle needs ~6 s of wall.
+    """#838 reproduced. 1.5 CPU-s of work, starved by the throttle, needs ~5 s of wall.
 
     The wall-clock bound the canary used fails it. The CPU bound lets it finish,
     because it keeps making progress.
@@ -144,7 +186,7 @@ def test_a_starved_command_completes_where_a_wall_bound_fails() -> None:
 
     with _Throttle(marker, duty=0.25):
         rc, out = evals.run_command_cpu_bounded(
-            work, cpu_budget=30, stall_window=1, min_progress=0.05
+            work, bound=evals.CpuBound(30, stall_window=1, min_progress=0.05)
         )
     assert (rc, out.strip()) == (0, "done"), out
 
@@ -167,4 +209,4 @@ def test_the_graph_canary_is_cpu_bounded(tmp_path: Path, monkeypatch: pytest.Mon
     monkeypatch.setattr(evals, "run_command_cpu_bounded", fake)
     monkeypatch.setattr(evals, "run_command", wall)
     assert case.probe().verdict is evals.Verdict.PASS
-    assert seen == [{"cwd": tmp_path, "cpu_budget": eval_cases.CANARY_CPU_BUDGET}]
+    assert seen == [{"cwd": tmp_path, "bound": evals.CpuBound(eval_cases.CANARY_CPU_BUDGET)}]

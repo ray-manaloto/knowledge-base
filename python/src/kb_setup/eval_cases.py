@@ -412,9 +412,12 @@ RETRIEVAL_TIMEOUT = 180
 #: CPU-seconds the `tier1.graph-answers` canary may spend (#838). Measured
 #: 2026-10-02 on the 756 MB graph: 31.7 CPU-s (30.69 user + 1.02 sys, 4.4 GB
 #: RSS, single process). That leaves ~5.7x headroom. It is the same number the
-#: wall bound carried, now in CPU-seconds, so on an idle host it is no looser:
-#: a single-threaded process never accrues more CPU than wall time. What it
-#: drops is the failure a busy host caused while the query itself was fine.
+#: wall bound carried, now in CPU-seconds. On an idle host it is looser by at
+#: most one `evals.SAMPLE_EVERY` interval (10 s): a single-threaded process never
+#: accrues more CPU than wall time, and the budget is sampled every 10 s, so a
+#: runaway dies by ~190 s. Round 2 of the cold review measured the 60 s sampling
+#: this replaced at ~240 s. What the change drops is the failure a busy host
+#: caused while the query itself was fine.
 CANARY_CPU_BUDGET = 180.0
 
 
