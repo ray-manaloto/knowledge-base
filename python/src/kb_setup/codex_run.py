@@ -669,7 +669,7 @@ def run(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--model",
         default=None,
-        help="model override, e.g. gpt-5.6-sol or gpt-6-astra; in --review mode "
+        help="model override, e.g. gpt-6.1-sol or gpt-6-astra; in --review mode "
         "this is sent as `-c review_model=`, the only channel that exists (#678)",
     )
     parser.add_argument(
