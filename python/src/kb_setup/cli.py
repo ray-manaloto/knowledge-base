@@ -219,6 +219,13 @@ def _run(argv: list[str] | None = None) -> int:
         # mise's own `lock --dry-run` and reading the REPORT — mise exits 0
         # either way, so the rc is not the answer.
         return lock_drift.main(repo_root, rest)
+    if cmd == "ccdocs":
+        from kb_setup import ccdocs_mirror
+
+        # A bare arm on `funnel`'s precedent: no graph read or write. `refresh`
+        # re-fetches the vendored Claude Code docs mirror (#829); `check` is the
+        # offline freshness probe `currency check` also runs at SessionStart.
+        return ccdocs_mirror.main(repo_root, rest)
     if cmd == "graphify-catalog":
         from kb_setup import graphify_catalog
 

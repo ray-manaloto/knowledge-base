@@ -1175,6 +1175,24 @@ run = "uv run kb-setup lock-drift"
 # this is the outer one.
 timeout = "300s"
 
+[tasks.kb-ccdocs-refresh]
+description = "Re-fetch the vendored Claude Code docs mirror (sources/media/claude-code-docs) and check it is complete"
+# #829. The mirror is vendored because a live site has no commit a manifest could
+# pin, so nothing else ever updates it: 107 of 231 pages changed in its first
+# day. Re-fetches every page as native .md, adds pages llms.txt/sitemap.xml newly
+# list, keeps a previous copy (and says so) when a fetch fails, and exits 1 when
+# a listed page can be neither fetched nor kept. An unreadable inventory exits
+# 127 and writes nothing. Logic in kb_setup.ccdocs_mirror; commit the result.
+run = "uv run kb-setup ccdocs refresh"
+timeout = "15m"
+
+[tasks.kb-ccdocs-check]
+description = "Offline: is the vendored Claude Code docs mirror older than 7 days? (rc 1 = stale)"
+# The same probe `kb-currency-check` prints at SessionStart, as a task with a
+# real exit code.
+run = "uv run kb-setup ccdocs check"
+timeout = "30s"
+
 [tasks.kb-graphify-catalog]
 description = "Gate: sources/graphify.dispositions.json + the baseline authority still describe the PINNED commit"
 # Built because the 0.9.57 pin move advanced `source_commit` and left FIVE

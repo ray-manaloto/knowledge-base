@@ -1,0 +1,61 @@
+# Mutation arms for the vendored Claude Code docs mirror refresh/staleness (#829), lane KB2 2026-10-02.
+# Run: mise run kb-arms -- docs/research/arms/2026-10-02-ccdocs-mirror.toml
+suites = [
+  "tests/test_ccdocs_mirror.py",
+  "tests/test_vendored_claude_code_docs.py",
+]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''        if not urls:'''
+new = '''        if not urls:  # (control)'''
+
+# The SessionStart call site deleted — the realistic way a warning goes silent.
+[[arm]]
+id = "W1"
+test = "test_the_sessionstart_currency_check_runs_the_staleness_probe"
+file = "python/src/kb_setup/currency/run.py"
+old = '''    ccdocs_mirror.report_staleness(repo_root)'''
+new = '''    pass'''
+
+# Accept any 200 as a page — an HTML redirect target would overwrite a real page.
+[[arm]]
+id = "M1"
+test = "test_an_html_answer_is_not_accepted_as_a_page"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''resp.status == HTTPStatus.OK and "markdown" in ctype:'''
+new = '''resp.status == HTTPStatus.OK:'''
+
+# Drop the keep-previous branch: a failed fetch silently loses a page.
+[[arm]]
+id = "K1"
+test = "test_a_failed_page_keeps_its_previous_copy_and_row"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''        elif url in old and target.is_file():'''
+new = '''        elif False:'''
+
+# An empty inventory accepted: a format change shrinks the page set silently.
+[[arm]]
+id = "E1"
+test = "test_an_inventory_listing_no_pages_is_unreadable"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''        if not urls:'''
+new = '''        if False:'''
+
+# Missing pages no longer fail the run.
+[[arm]]
+id = "R1"
+test = "test_main_exits_findings_when_a_page_is_missing"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''    return Rc.FINDINGS if out.missing else Rc.OK'''
+new = '''    return Rc.OK'''
+
+# Staleness threshold disabled.
+[[arm]]
+id = "S1"
+test = "test_staleness_reports_an_old_mirror"
+file = "python/src/kb_setup/ccdocs_mirror.py"
+old = '''    if age >= STALE_AFTER_DAYS:'''
+new = '''    if age > 10_000:'''

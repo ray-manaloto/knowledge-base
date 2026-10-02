@@ -38,24 +38,33 @@ def _page_name(url: str) -> str:
     return url.removeprefix(_PREFIX).replace("/", "__") + ".md"
 
 
-def _ignored(rel: str) -> bool:
-    """True when git would ignore `rel` (`git check-ignore` rc 0 = ignored, 1 = not)."""
+def _ignored(*rels: str) -> set[str]:
+    """The subset of `rels` git would ignore (`check-ignore` rc 0 = some, 1 = none)."""
     result = subprocess.run(
-        ["git", "-C", str(_REPO), "check-ignore", "-q", "--no-index", rel],
+        ["git", "-C", str(_REPO), "check-ignore", "--no-index", "--stdin"],
         check=False,
         capture_output=True,
+        input="\n".join(rels) + "\n",
+        text=True,
     )
     assert result.returncode in {0, 1}, result.stderr
-    return result.returncode == 0
+    return set(result.stdout.splitlines())
 
 
-def test_mirror_path_is_not_gitignored() -> None:
-    assert not _ignored(f"{_MIRROR}/costs.md")
+def _mirror_files() -> list[str]:
+    return sorted(f"{_MIRROR}/{p.name}" for p in (_REPO / _MIRROR).iterdir())
+
+
+def test_no_mirror_file_is_gitignored() -> None:
+    # EVERY file, not a sample: a pattern ignoring one prefix (`agent-sdk__*`)
+    # would drop those pages from every fresh clone while a sampled probe passed.
+    assert _ignored(*_mirror_files()) == set()
 
 
 def test_ignore_probe_discriminates() -> None:
     # Control arm: the path #829 first named IS ignored, so the probe above can fail.
-    assert _ignored("sources/claude-code-docs/costs.md")
+    probe = "sources/claude-code-docs/costs.md"
+    assert _ignored(probe, f"{_MIRROR}/costs.md") == {probe}
 
 
 def test_every_row_has_its_page_and_every_page_its_row() -> None:
@@ -63,6 +72,12 @@ def test_every_row_has_its_page_and_every_page_its_row() -> None:
     present = {p.name for p in (_REPO / _MIRROR).glob("*.md")}
     assert expected - present == set(), "rows with no page"
     assert present - expected == set(), "pages with no row"
+
+
+def test_the_mirror_holds_only_pages_and_provenance() -> None:
+    allowed = {"fetch.tsv", "fetch.stamp.json"}
+    strays = [p.name for p in (_REPO / _MIRROR).iterdir() if p.suffix != ".md"]
+    assert set(strays) <= allowed, strays
 
 
 def test_rows_are_unique_successful_fetches() -> None:

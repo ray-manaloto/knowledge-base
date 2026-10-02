@@ -11,47 +11,63 @@
 `sources/<name>.manifest` pin, and `kb-build` deletes and re-clones it. A live
 documentation site has no commit to pin, so a manifest cannot reproduce it.
 Vendoring under `sources/media/` is what makes the mirror reach git and other
-machines (Invariant 3). `tests/test_vendored_claude_code_docs.py` fails if the
-mirror ever moves under an ignored path, or if a page and its provenance row
-disagree.
+machines (Invariant 3). `tests/test_vendored_claude_code_docs.py` fails if any
+mirror file is gitignored, if a page and its provenance row disagree, or if a
+file appears that is neither a page nor provenance.
 
 This does not replace `sources/claude-code-docs.manifest` (the
 `thevibeworks/claude-code-docs` clone). That source stays, because
 `currency.toml` reads Claude Code release notes from its `changelog.md`.
 
-## Provenance: `fetch.tsv`
+**Not in the graph yet.** `kb-build` reads only manifests and
+`sources/extractions/*.json`, so these pages are greppable on disk but invisible
+to `kb-query`/`kb-serve` until a host-agent extraction chunk is committed — a
+token-cost decision tracked with #118.
 
-One row per page: `url`, `http-status|content-type`, method, bytes.
+## Keeping it current
 
-- **232 pages** fetched 2026-10-02: 231 native `.md` and 1 `webclaw` fallback.
-- `claude-tag` is the fallback. Its `.md` URL redirects off-site to
-  `claude.com/docs/claude-tag/overview`, so the page is the 2026-10-01 webclaw
-  capture.
-- The set is the union of three inventories: the sitemap, `llms.txt` and a
-  webclaw site map. It also includes six plugin pages the site still serves
-  but no inventory lists: `discover-plugins`, `plugin-dependencies`,
-  `plugin-hints`, `plugin-marketplaces`, `plugin-relevance`,
-  `plugins-reference`. They are kept because existing `$CC/…` citations name
-  them.
+- `mise run kb-ccdocs-refresh` re-fetches every page, adds any page `llms.txt`
+  or `sitemap.xml` newly lists, keeps a previous copy (and says so) when a fetch
+  fails, and exits 1 if a listed page can be neither fetched nor kept. It
+  rewrites `fetch.tsv` and `fetch.stamp.json`; commit the result.
+- `kb-currency-check` (the SessionStart hook) prints a `[ccdocs]` warning once
+  `fetch.stamp.json` is 7 or more days old, or unreadable.
+  `mise run kb-ccdocs-check` is the same probe with a real exit code.
+- Logic: `python/src/kb_setup/ccdocs_mirror.py`.
+
+## Provenance: `fetch.tsv` and `fetch.stamp.json`
+
+One row per page: `url`, `http-status|content-type`, method, bytes. The stamp
+records when the last refresh ran and how many pages it kept.
+
+- **232 pages**: 231 native `.md` fetched 2026-10-02, and 1 `webclaw` fallback.
+- `claude-tag` is the fallback, captured 2026-10-01. Its `.md` URL now
+  redirects off-site to `claude.com/docs/claude-tag/overview`, so every refresh
+  keeps that capture rather than storing a redirect.
+- The set is the union of the sitemap, `llms.txt`, a 2026-10-01 webclaw site
+  map, and six plugin pages the site still serves but no inventory lists:
+  `discover-plugins`, `plugin-dependencies`, `plugin-hints`,
+  `plugin-marketplaces`, `plugin-relevance`, `plugins-reference`. Four of the
+  six are named by existing `$CC/…` citations; all six are kept because the
+  site still serves them and the old tree held them.
+- The old `$CC` tree's `docs_manifest.json` is not a docs page and is not here.
 - `routines.md` contains a placeholder `Authorization: Bearer sk-ant-oat01-…`
   example that a default-config gitleaks reports as `curl-auth-header`. It is
   the vendor's illustrative value, not a credential. The repo's
-  `.gitleaks.toml` allowlists `^sources/`, so this tree is scanned only by an
-  explicit default-config run.
+  `.gitleaks.toml` allowlists `^sources/`, and gitleaks auto-loads that file
+  when run inside this repo, so the tree is scanned only by a default-config
+  run from OUTSIDE the repo.
 
-## Per-machine step: point `$CC` at this mirror
+## Pointing `$CC` at this mirror
 
-`$CC` (dotfiles `research-doc-sources.md` step 00) is
-`<kb>/sources/agent-harness-docs/docs/claude-code`. That path is inside a
-gitignored clone, so the link cannot be committed. Run this once per machine,
-from the knowledge-base root:
+`$CC` (dotfiles `research-doc-sources.md` step 00) is defined as
+`$KB/agent-harness-docs/docs/claude-code`. **Redefine it rather than linking
+inside that clone:** `CC=$KB/media/claude-code-docs`. Page names are the same
+flat `a__b.md` scheme, so every existing `$CC/<page>.md` citation still resolves.
 
-```bash
-cc=sources/agent-harness-docs/docs/claude-code
-[ -L "$cc" ] || mv "$cc" "$cc.orig"
-ln -sfn ../../../sources/media/claude-code-docs "$cc"
-```
-
-The `.orig` copy keeps the clone's tracked files on disk. Restore it (remove
-the link, move `.orig` back) before advancing `agent-harness-docs`, so the
-clone's checkout does not see deleted files.
+**Do NOT replace `sources/agent-harness-docs/docs/claude-code` with a symlink.**
+It is a tracked directory of a pinned clone; replacing it makes git see its
+files as deleted, and `kb-build`'s `git checkout --detach <pin>` then aborts
+with *"Your local changes … would be overwritten"* whenever the clone is off its
+pin — which this host's clone already is. Reproduced in a scratch clone,
+2026-10-02 (cold review of `3a02f2de`).

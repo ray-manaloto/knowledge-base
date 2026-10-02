@@ -1,0 +1,19 @@
+# Mutation arms for tests/test_vendored_claude_code_docs.py (#829): the two the cold review found surviving.
+suites = ["tests/test_vendored_claude_code_docs.py"]
+
+[[arm]]
+id = "V0"
+control = true
+file = ".gitignore"
+old = '''!sources/media/'''
+new = '''!sources/media/
+# (control)'''
+
+# Review P3-5: a prefix pattern that ignores only the agent-sdk pages.
+[[arm]]
+id = "V1"
+test = "test_no_mirror_file_is_gitignored"
+file = ".gitignore"
+old = '''!sources/media/'''
+new = '''!sources/media/
+sources/media/claude-code-docs/agent-sdk__*'''
