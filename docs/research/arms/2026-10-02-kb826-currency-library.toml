@@ -1,0 +1,152 @@
+# Mutation arms for #826 — `library = true`, a binaryless Python library as a
+# currency target.
+#
+# Each arm severs ONE detection the change added and requires the NAMED test in
+# `tests/test_currency_library.py` to go red. The breaks are the realistic
+# ones: a routing call dropped, a comparison neutered, a refusal deleted, a
+# reader pointed at the wrong environment. A0 is the comment-only control and
+# must SURVIVE; if it dies every other row is void.
+#
+# A8 is the one most worth having: pointing `importlib.metadata` at the RUNNING
+# interpreter rather than the project venv answers for kb_setup's own
+# environment. It dies here only because githubkit is absent from this repo's
+# venv (checked 2026-10-02: `importlib.util.find_spec('githubkit')` -> None).
+
+suites = ["tests/test_currency_library.py"]
+
+[[arm]]
+id = "A0"
+control = true
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    """A git-pinned package: compare the commit its install recorded with the pin."""'''
+new = '''    """A git-pinned package: compare the commit its install recorded with the pin (control)."""'''
+
+# A1 — drop the library route: resolution falls back to `.venv/bin/<binary>`,
+# the founding defect.
+[[arm]]
+id = "A1"
+test = "test_installed_library_at_the_pin_is_in_sync"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''        return _check_library_resolution(repo_root, spec, pinned)'''
+new = '''        pass'''
+
+# A2 — never compare the installed version with the pin.
+[[arm]]
+id = "A2"
+test = "test_installed_library_at_another_version_is_drift"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    if observed != pinned:
+        return (
+            Finding(
+                "resolution",
+                DRIFT,
+                f"{venv} has'''
+new = '''    if False:
+        return (
+            Finding(
+                "resolution",
+                DRIFT,
+                f"{venv} has'''
+
+# A3 — an absent library reads as green.
+[[arm]]
+id = "A3"
+test = "test_library_absent_from_the_venv_is_drift_not_ok"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''        return Finding("resolution", DRIFT, f"{spec.python_package} {why} in {venv}"), ""'''
+new = '''        return Finding("resolution", OK, f"{spec.python_package} {why} in {venv}"), ""'''
+
+# A4 — `binary` keeps defaulting to the tool name for a library.
+[[arm]]
+id = "A4"
+test = "test_library_flag_parses_and_leaves_binary_empty"
+file = "python/src/kb_setup/currency/config.py"
+old = '''        binary=_str("binary") or ("" if library else name),'''
+new = '''        binary=_str("binary") or name,'''
+
+# A5 — a library with no python_package is accepted.
+[[arm]]
+id = "A5"
+test = "test_library_without_python_package_is_refused"
+file = "python/src/kb_setup/currency/config.py"
+old = '''    if library and not table.get("python_package"):'''
+new = '''    if False:'''
+
+# A6 — a library declaring a binary is accepted.
+[[arm]]
+id = "A6"
+test = "test_library_declaring_a_binary_is_refused"
+file = "python/src/kb_setup/currency/config.py"
+old = '''    if library and table.get("binary"):'''
+new = '''    if False:'''
+
+# A7 — the venv path leaks the host's absolute path into a committed report.
+[[arm]]
+id = "A7"
+test = "test_library_detail_carries_no_absolute_host_path"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    venv = _redacted_path(str(repo_root / (spec.python_project_dir or ".") / ".venv"), repo_root)'''
+new = '''    venv = str(repo_root / (spec.python_project_dir or ".") / ".venv")'''
+
+# A8 — read the RUNNING interpreter's metadata instead of the project venv's.
+[[arm]]
+id = "A8"
+test = "test_installed_library_at_the_pin_is_in_sync"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''importlib.metadata.distributions(name=spec.python_package, path=[str(site)])'''
+new = '''importlib.metadata.distributions(name=spec.python_package)'''
+
+# A9 — ignore `python_project_dir` when locating the venv.
+[[arm]]
+id = "A9"
+test = "test_library_in_a_nested_project_reads_that_projects_venv"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''        "",
+        deep=False,
+        repo_root=repo_root / (spec.python_project_dir or "."),'''
+new = '''        "",
+        deep=False,
+        repo_root=repo_root,'''
+
+# A10 — a git-pinned library compares a version string against a SHA.
+[[arm]]
+id = "A10"
+test = "test_git_pinned_library_resolves_through_direct_url_without_an_executable"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    if spec.library:
+        if re.fullmatch(r"[0-9a-f]{40}", pinned):'''
+new = '''    if spec.library:
+        if False:'''
+
+# A11 — two installed versions: pick one instead of refusing.
+[[arm]]
+id = "A11"
+test = "test_two_installed_versions_of_one_library_is_drift_not_a_guess"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    if len(versions) > 1:'''
+new = '''    if False:'''
+
+# A12 — the undeclared-library false alarm goes back to recommending `mise deps`,
+# a remedy that can never clear it (the side-agent finding, 2026-10-02).
+[[arm]]
+id = "A12"
+test = "test_undeclared_library_drift_names_library_true_as_the_fix"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    if installed and not _declares_console_scripts(repo_root, spec):'''
+new = '''    if False:'''
+
+# A13 — the hint fires for a CLI package whose executable is merely missing.
+[[arm]]
+id = "A13"
+test = "test_installed_cli_package_missing_its_executable_gets_no_library_hint"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    return any(ep.group == "console_scripts" for ep in dists[0].entry_points)'''
+new = '''    return False'''
+
+# A14 — the missing-executable message leaks the absolute host path again.
+[[arm]]
+id = "A14"
+test = "test_uninstalled_package_missing_its_executable_gets_no_library_hint"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    shown = _redacted_path(str(executable), repo_root)'''
+new = '''    shown = str(executable)'''
