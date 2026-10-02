@@ -296,6 +296,19 @@ class ToolSpec:
     # remedy is `mise run kb-update -- <name>`, never a pin edit, so an auto-apply
     # is refused in `currency.apply`.
     source_only: bool = False
+    # A `python_package` that installs NO executable — a library a consuming repo
+    # imports (`githubkit` is the founding case, #826). Without it, `binary`
+    # defaults to the tool's own name and resolution looks for
+    # `<project>/.venv/bin/<binary>`, reporting DRIFT forever when the library
+    # correctly ships none: the same permanent-red-that-is-not-a-defect
+    # `source_only` exists to avoid, for a thing that IS installed.
+    #
+    # Resolution then reads the version from the venv's installed distribution
+    # metadata (`importlib.metadata`, the stdlib reader) rather than running a
+    # binary. The pin, the new-release probe, release notes and watch items are
+    # unchanged. Requires `python_package` and refuses a `binary`, since either
+    # combination contradicts the claim.
+    library: bool = False
     # Regex with ONE capture group pulling the version out of `--version` output.
     # Needed because the default heuristic (last whitespace field) is wrong for
     # any tool that prints more than "<name> <version>": mise prints
@@ -519,6 +532,23 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         # would report a cheerful all-clear over an empty set of checks. Refuse the
         # config rather than let it render as green.
         raise ValueError(f"{CONFIG_NAME}: [tool.{name}] is source_only and needs a 'manifest'")
+    library = bool(table.get("library", False))
+    if library and not table.get("python_package"):
+        # Only the uv-managed owner has a venv whose distribution metadata can be
+        # read; a "library" owned by mise or self-managed has nowhere to look.
+        raise ValueError(f"{CONFIG_NAME}: [tool.{name}] is a library and needs 'python_package'")
+    if library:
+        # `binary` contradicts the claim outright. `expected` is worse than dead
+        # config: it switches the row onto the self-managed path
+        # (`ToolSpec.self_managed`), which reads `<binary> --version`, so the
+        # library check would silently never run. (`stamp` is NOT refused: it is a
+        # build-stamp path, and `run.stamp` takes an explicit `--version`.)
+        clashing = [key for key in ("binary", "expected") if table.get(key)]
+        if clashing:
+            raise ValueError(
+                f"{CONFIG_NAME}: [tool.{name}] is a library (no executable) yet declares "
+                f"{clashing}; drop them or drop 'library'"
+            )
 
     def _str(key: str) -> str:
         value = table.get(key, "")
@@ -540,7 +570,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         mise_key=_str("mise_key"),
         python_package=_str("python_package"),
         python_project_dir=project_dir,
-        binary=_str("binary") or name,
+        binary=_str("binary") or ("" if library else name),
         pypi=_str("pypi"),
         github=_str("github"),
         extras=_tuple("extras"),
@@ -559,6 +589,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         stamp=_str("stamp"),
         expected=_str("expected"),
         source_only=bool(table.get("source_only", False)),
+        library=library,
         version_pattern=_str("version_pattern"),
         version_args=_tuple("version_args") or ("--version",),
         os=_tuple("os"),

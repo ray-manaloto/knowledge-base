@@ -19,7 +19,9 @@ opt-in exceptions, never reached from the hook: `observed_version` (executes
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import importlib.metadata
 import json
 import os
 import re
@@ -1042,23 +1044,21 @@ def _check_python_resolution(
     spec: ToolSpec,
     pinned: str,
 ) -> tuple[Finding, str]:
-    """Compare the locked project executable with its exact pyproject pin."""
+    """Compare the locked project executable with its exact pyproject pin.
+
+    A `library` (#826) has no executable by declaration, so its version comes from
+    the venv's installed distribution metadata instead; every other branch is
+    shared, including the git-pinned `direct_url` path, which never needed one.
+    """
+    if spec.library:
+        if re.fullmatch(r"[0-9a-f]{40}", pinned):
+            return _check_direct_url_resolution(repo_root, spec, pinned)
+        return _check_library_resolution(repo_root, spec, pinned)
     executable = repo_root / (spec.python_project_dir or ".") / ".venv" / "bin" / spec.binary
     if not executable.is_file():
-        return Finding("resolution", DRIFT, f"{executable} is missing; run `mise deps`"), ""
+        return _missing_executable(repo_root, spec, executable), ""
     if re.fullmatch(r"[0-9a-f]{40}", pinned):
-        observed = _installed_direct_url_commit(repo_root, spec)
-        if observed != pinned:
-            return (
-                Finding(
-                    "resolution",
-                    DRIFT,
-                    f"{spec.python_package} direct_url records {observed or 'UNKNOWN'} "
-                    f"but pyproject pins {pinned}",
-                ),
-                observed,
-            )
-        return Finding("resolution", OK, f"locked uv environment runs {pinned[:12]}"), observed
+        return _check_direct_url_resolution(repo_root, spec, pinned)
     observed = (
         observed_version(str(executable), spec.version_pattern)
         if spec.version_args == ("--version",)
@@ -1076,11 +1076,155 @@ def _check_python_resolution(
     return Finding("resolution", OK, f"locked uv environment runs {observed}"), observed
 
 
+def _missing_executable(repo_root: Path, spec: ToolSpec, executable: Path) -> Finding:
+    """DRIFT for an absent `.venv/bin/<binary>`, with the remedy that can clear it.
+
+    When the package IS installed and declares no executable at all, `mise deps`
+    can never make this go green: the config is wrong, not the install. Saying so
+    is what stops an undeclared library reading as a broken venv (#826) — the fix
+    is opt-in, so a consumer that bumps the engine without adding the line lands
+    here.
+    """
+    shown = _redacted_path(str(executable), repo_root)
+    installed, _ = _installed_distribution_version(repo_root, spec)
+    if installed and not _ships_an_executable(repo_root, spec):
+        # "and drop any `binary`": `library` refuses one, so a hint that only said
+        # "add the flag" would send a reader with an explicit `binary` straight
+        # into a config error.
+        return Finding(
+            "resolution",
+            DRIFT,
+            f"{shown} is missing, but {spec.python_package} {installed} is installed "
+            f"and ships no executable — if it is a library, declare `library = true` "
+            f"(and drop any `binary`) in [tool.{spec.name}]",
+        )
+    return Finding("resolution", DRIFT, f"{shown} is missing; run `mise deps`")
+
+
+def _check_direct_url_resolution(
+    repo_root: Path, spec: ToolSpec, pinned: str
+) -> tuple[Finding, str]:
+    """A git-pinned package: compare the commit its install recorded with the pin."""
+    observed = _installed_direct_url_commit(repo_root, spec)
+    if observed != pinned:
+        return (
+            Finding(
+                "resolution",
+                DRIFT,
+                f"{spec.python_package} direct_url records {observed or 'UNKNOWN'} "
+                f"but pyproject pins {pinned}",
+            ),
+            observed,
+        )
+    return Finding("resolution", OK, f"locked uv environment runs {pinned[:12]}"), observed
+
+
+def _check_library_resolution(repo_root: Path, spec: ToolSpec, pinned: str) -> tuple[Finding, str]:
+    """A binaryless library: compare the installed distribution's version with the pin."""
+    venv = _redacted_path(str(repo_root / (spec.python_project_dir or ".") / ".venv"), repo_root)
+    observed, why = _installed_distribution_version(repo_root, spec)
+    if not observed:
+        return Finding("resolution", DRIFT, f"{spec.python_package} {why} in {venv}"), ""
+    if observed != pinned:
+        return (
+            Finding(
+                "resolution",
+                DRIFT,
+                f"{venv} has {spec.python_package} {observed} but pyproject pins {pinned}",
+            ),
+            observed,
+        )
+    return Finding("resolution", OK, f"locked uv environment has {observed}"), observed
+
+
+def _installed_distributions(
+    repo_root: Path, spec: ToolSpec
+) -> list[importlib.metadata.Distribution] | None:
+    """Every installed distribution of `spec.python_package` in the PROJECT venv.
+
+    `None` when the venv has no site-packages at all. Read through
+    `importlib.metadata` pointed at the project venv — never the running
+    interpreter's, which is kb_setup's own environment and would answer for the
+    wrong project. Name normalisation (`-`/`_`/case) is the stdlib's, not ours.
+
+    EVERY `python*/site-packages` is searched, not the first one sorted (which is
+    what `install_site_packages` returns). A stale `python3.13` left beside a live
+    `python3.14` would otherwise answer alone, and report the pin as installed
+    while the interpreter that runs imports something else. Searching all of them
+    lets the conflicting-versions refusal see both; `_installed_direct_url_commit`
+    refuses two disagreeing commits the same way. (`_check_extra_probes` still
+    reads only the first directory via `install_site_packages` — pre-existing,
+    and out of #826's scope.)
+    """
+    lib = repo_root / (spec.python_project_dir or ".") / ".venv" / "lib"
+    sites = [str(site) for site in sorted(lib.glob("python*/site-packages"))]
+    if not sites:
+        return None
+    return list(importlib.metadata.distributions(name=spec.python_package, path=sites))
+
+
+def _installed_distribution_version(repo_root: Path, spec: ToolSpec) -> tuple[str, str]:
+    """The installed version of `spec.python_package`: `(version, "")` or `("", why)`."""
+    dists = _installed_distributions(repo_root, spec)
+    if dists is None:
+        return "", "is not installed (no site-packages; run `mise deps`)"
+    versions = {dist.version for dist in dists}
+    if not versions:
+        return "", "is not installed; run `mise deps`"
+    if len(versions) > 1:
+        # Two dist-info directories for one package is a corrupted venv, and
+        # picking either would report a version nothing guarantees is imported.
+        return "", f"has conflicting installed versions {sorted(versions)}"
+    return versions.pop(), ""
+
+
+def _ships_an_executable(repo_root: Path, spec: ToolSpec) -> bool:
+    """Whether the installed distribution ships any executable at all.
+
+    Three ways a wheel can: a `console_scripts` or `gui_scripts` entry point, or
+    a legacy `scripts=` file, which only shows up in RECORD as a path through a
+    `bin` directory. Checking `console_scripts` alone would call a `gui_scripts`
+    package binaryless and recommend `library = true` — a remedy that turns the
+    row green while its executable is still missing.
+
+    True when unknown, so an unreadable install never produces the library hint:
+    the hint is advice to change config, and advice resting on a read that failed
+    is a guess.
+    """
+    dists = _installed_distributions(repo_root, spec) or []
+    if len(dists) != 1:
+        return True
+    dist = dists[0]
+    if any(ep.group in {"console_scripts", "gui_scripts"} for ep in dist.entry_points):
+        return True
+    # The RAW RECORD, never `dist.files`: on this interpreter `files` silently
+    # omits paths that do not exist on disk (measured 2026-10-02, Python 3.14.7 —
+    # a RECORD naming `../../../bin/x` with no such file yields `[]`). The script
+    # being ABSENT is exactly the state this function is asked about, so the
+    # filtered view would always answer "ships nothing".
+    record = dist.read_text("RECORD")
+    if record is None:
+        return True  # no RECORD: a legacy script cannot be ruled out
+    # An installed script sits OUTSIDE site-packages, so its RECORD path climbs
+    # out with `..` (uv writes `../../../bin/<name>` for legacy and gui scripts
+    # alike). Requiring the climb keeps a library with a package directory that
+    # merely happens to be called `bin` from reading as one that ships a script.
+    paths = (Path(row[0]).parts for row in csv.reader(record.splitlines()) if row)
+    return any(parts[:1] == ("..",) and "bin" in parts for parts in paths)
+
+
 def _installed_direct_url_commit(repo_root: Path, spec: ToolSpec) -> str:
-    """Read the VCS commit recorded by the installed distribution."""
+    """Read the VCS commit recorded by the installed distribution.
+
+    `""` (reported as DRIFT, never a pass) when no commit is recorded OR when
+    two `python*` directories record DIFFERENT commits. Returning the first one
+    sorted let a stale `python3.13` holding the pin answer for a live
+    `python3.14` holding something else — a false green (#826 round-2 review).
+    """
     venv = repo_root / (spec.python_project_dir or ".") / ".venv"
     normalized = spec.python_package.replace("-", "_")
     pattern = f"lib/python*/site-packages/{normalized}-*.dist-info/direct_url.json"
+    commits: set[str] = set()
     for direct_url in sorted(venv.glob(pattern)):
         try:
             payload = json.loads(direct_url.read_text(encoding="utf-8"))
@@ -1090,8 +1234,8 @@ def _installed_direct_url_commit(repo_root: Path, spec: ToolSpec) -> str:
         if isinstance(vcs_info, dict):
             commit = str(vcs_info.get("commit_id") or "")
             if re.fullmatch(r"[0-9a-f]{40}", commit):
-                return commit
-    return ""
+                commits.add(commit)
+    return commits.pop() if len(commits) == 1 else ""
 
 
 def _redacted_path(found: str, repo_root: Path) -> str:
