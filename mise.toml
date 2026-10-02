@@ -457,7 +457,18 @@ description = "Run the Python test suite (pytest-xdist, one worker per core)"
 # gets fewer workers instead of thrashing. `-x` still stops the run, though under
 # xdist sibling workers may finish an in-flight test first, so more than one
 # failure can be reported. That is more information, not less.
-run = "uv run pytest tests/ -x -q -n auto"
+#
+# `--dist loadgroup` (#838, escalating #748): the tests that parse the REAL
+# aggregate graph (~756 MB, ~4 GB RSS and 11-31 s of CPU each, measured
+# 2026-10-02) carry `xdist_group("real_graph")`, and loadgroup sends one group to
+# ONE worker, so they run one after another instead of four parses at once on four
+# workers. Under the default `load` they landed on separate workers. That made
+# every one of them fight the others for memory bandwidth and cores, while two
+# carry wall-clock bounds (kb-serve's 120 s, the eval canary's 180 s). The bounds
+# were not raised. Ungrouped tests schedule exactly as under `load` (loadgroup is
+# LoadScope keyed per node id). Add the mark to any new test that loads
+# `graphify-out/graph.json`. `tests/test_real_graph_group.py` pins this wiring.
+run = "uv run pytest tests/ -x -q -n auto --dist loadgroup"
 # Bound: the full suite under 12 xdist workers; a wedged worker is the failure mode, not a slow one. See [tasks.lint] for the measurement behind this key.
 # 25m and NOT 30m: `kb_setup.gates._GATE_TIMEOUT` is 1800s, so an equal bound is a
 # RACE — whichever fires first decides the message, and the outer one names no

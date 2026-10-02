@@ -39,6 +39,10 @@ from pathlib import Path
 import pytest
 from kb_setup.graphify_env import clean_env, graphify_exe
 
+#: Every test here parses the real aggregate graph (#838 — see [tasks.test] in
+#: mise.toml), so the whole module joins the one serialised xdist group.
+pytestmark = pytest.mark.xdist_group("real_graph")
+
 #: A symbol defined under `python/src/kb_setup/` that tests really do reference.
 #:
 #: THIS TARGET WAS CHANGED ONCE, AND THE REASON MATTERS more than the target.

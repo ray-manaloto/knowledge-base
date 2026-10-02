@@ -151,6 +151,7 @@ def test_probe_bounds_a_silent_server(tmp_path):
 # --------------------------------------------------------------------------
 
 
+@pytest.mark.xdist_group("real_graph")  # #838 — see [tasks.test] in mise.toml
 def test_kb_serve_actually_answers_mcp():
     """`mise run kb-serve` completes a real MCP handshake and advertises tools.
 
