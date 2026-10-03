@@ -44,7 +44,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 #: after #838). Its 120 s wall bound failed at load 47-57 while the same test
 #: passed alone in 28.9-35.0 s, so the bound measured the host. A server that
 #: wedges (no CPU progress for a minute) or burns past this budget still fails.
-#: The budget is set against measured cost; see the evidence report.
+#: Budget: the whole `mise run kb-serve` group (mise + uv + graphify-mcp) spent
+#: ~28.4 CPU-s to its first reply on the 756 MB graph (measured 2026-10-02, load
+#: ~15), so 180 is ~6x headroom, the same ratio as the eval canary's. Starved by
+#: SIGSTOP at the same duty, the old 120 s wall bound failed at 120.1 s, and this
+#: bound answered in 154.7 s (docs/research/reports/2026-10-02-kb-748-evidence.md).
 LIVE_CPU_BUDGET_S = 180.0
 
 #: A responsive stdio MCP server. Deliberately minimal and deliberately NOT
