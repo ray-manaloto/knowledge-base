@@ -1,0 +1,205 @@
+{
+  "type": "object",
+  "properties": {
+    "vendors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/VendorReport"
+      }
+    },
+    "registry_source": {
+      "type": "string"
+    },
+    "registry_sha256": {
+      "type": "string"
+    },
+    "resolved_model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "disabled_by_baseline": {
+      "type": "boolean"
+    },
+    "checked_at": {
+      "type": "string"
+    },
+    "overrides": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "vendors",
+    "registry_source",
+    "registry_sha256",
+    "resolved_model",
+    "disabled_by_baseline",
+    "checked_at",
+    "overrides"
+  ],
+  "additionalProperties": false,
+  "title": "RegistryReport",
+  "$defs": {
+    "Vendor": {
+      "title": "Vendor",
+      "type": "string",
+      "enum": [
+        "codex",
+        "agy",
+        "claude"
+      ]
+    },
+    "Verdict": {
+      "title": "Verdict",
+      "type": "string",
+      "enum": [
+        "ok",
+        "drift",
+        "invalid",
+        "not_checked"
+      ]
+    },
+    "FeedStatus": {
+      "title": "FeedStatus",
+      "type": "string",
+      "enum": [
+        "live",
+        "bundled",
+        "unreadable",
+        "shape_broken"
+      ]
+    },
+    "OverlayStatus": {
+      "title": "OverlayStatus",
+      "type": "string",
+      "enum": [
+        "read",
+        "unreadable",
+        "not_needed"
+      ]
+    },
+    "VendorReport": {
+      "type": "object",
+      "properties": {
+        "vendor": {
+          "$ref": "#/$defs/Vendor"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        },
+        "feed": {
+          "$ref": "#/$defs/FeedStatus"
+        },
+        "overlay": {
+          "$ref": "#/$defs/OverlayStatus"
+        },
+        "invalid_pins": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "unknown_slugs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "retiring": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "current_pins": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "display_names": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "agent_roles": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "vendor",
+        "verdict",
+        "feed",
+        "overlay",
+        "invalid_pins",
+        "unknown_slugs",
+        "retiring",
+        "findings",
+        "current_pins",
+        "display_names",
+        "agent_roles"
+      ],
+      "additionalProperties": false
+    },
+    "TrustStatus": {
+      "title": "TrustStatus",
+      "type": "string",
+      "enum": [
+        "trusted",
+        "untrusted",
+        "unreadable"
+      ]
+    },
+    "TrustResult": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/TrustStatus"
+        },
+        "path": {
+          "type": "string"
+        },
+        "finding": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "path",
+        "finding"
+      ],
+      "additionalProperties": false
+    },
+    "LaunchDecision": {
+      "type": "object",
+      "properties": {
+        "allow": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "allow",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

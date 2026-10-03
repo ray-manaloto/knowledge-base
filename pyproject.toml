@@ -467,3 +467,25 @@ set-default-enum-member = true
 custom-template-dir = "schemas/templates/deps-dev"
 custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
 """Generated deps.dev package models; edit the pinned protobuf and rerun the generator."""'''
+
+[tool.datamodel-codegen.jobs.models-registry]
+capitalise-enum-members = true
+input = "schemas/models-registry.schema.json"
+output = "python/src/kb_setup/generated/models_registry.py"
+custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
+"""Generated model-registry contract; edit its schema and rerun kb-codegen."""'''
+
+[tool.datamodel-codegen.jobs.models-report]
+capitalise-enum-members = true
+input = "schemas/models-report.schema.json"
+output = "python/src/kb_setup/generated/models_report.py"
+custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
+"""Generated model-registry contract; edit its schema and rerun kb-codegen."""'''
+
+[tool.datamodel-codegen.jobs.vendor-feeds]
+capitalise-enum-members = true
+input = "schemas/vendor-feeds.schema.json"
+output = "python/src/kb_setup/generated/vendor_feeds.py"
+extra-fields = "ignore"
+custom-file-header = '''# Copyright (c) 2026 Raymond Manaloto
+"""Generated model-registry contract; edit its schema and rerun kb-codegen."""'''

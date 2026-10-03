@@ -1,0 +1,275 @@
+# Copyright (c) 2026 Raymond Manaloto
+schema_version = 1
+
+[codex.pins.sol]
+slug = "gpt-6.1-sol"
+effort = "xhigh"
+
+[codex.pins.astra]
+slug = "gpt-6-astra"
+effort = "xhigh"
+
+[codex.dispatch.sdlc_team]
+role = "sol"
+effort = "xhigh"
+
+[codex.dispatch.codex_lane]
+role = "sol"
+effort = "xhigh"
+
+[codex.dispatch.review_lens]
+role = "astra"
+effort = "xhigh"
+
+[codex.dispatch.kb_codex]
+role = "sol"
+effort = "xhigh"
+
+[codex.agents]
+"codex-sol-*" = { role = "sol", effort = "xhigh" }
+"codex-astra-*" = { role = "astra", effort = "xhigh" }
+"codex-sdlc-*" = { role = "sol", effort = "high", authored = true }
+"kb-codex-advisor" = { role = "sol", effort = "xhigh", authored = true }
+"kb-codex-implementer" = { role = "sol", effort = "xhigh", authored = true }
+"kb-codex-astra-advisor" = { role = "astra", effort = "spawn" }
+"kb-codex-astra-reviewer" = { role = "astra", effort = "xhigh", authored = true }
+"premise-verifier" = { role = "sol", effort = "xhigh", authored = true }
+"kb-adversarial-verifier" = { role = "sol", effort = "high", authored = true }
+"kb-synthesist" = { role = "sol", effort = "high", authored = true }
+"kb-tool-researcher" = { role = "sol", effort = "high", authored = true }
+"kb-corpus-curator" = { role = "sol", effort = "medium", authored = true }
+"kb-extraction-worker" = { role = "sol", effort = "medium", authored = true }
+
+# Claude subagent launch behavior, independent of the Codex TOML roster above.
+[codex.launch_agents]
+"codex-sol-*" = "sol"
+"codex-astra-*" = "astra"
+"codex-sdlc-*" = "sol"
+"kb-codex-advisor" = "sol"
+"kb-codex-implementer" = "sol"
+"kb-codex-astra-advisor" = "astra"
+"kb-codex-astra-reviewer" = "astra"
+
+[codex.config_fallback]
+role = "sol"
+effort = "high"
+
+[codex.known."gpt-6.1-sol"]
+status = "adopted"
+family = "sol"
+reason = "Ratified post-A pin"
+
+[codex.known."gpt-6-astra"]
+status = "adopted"
+family = "astra"
+reason = "Ratified post-A pin"
+
+[codex.known."gpt-6-sol"]
+status = "acknowledged"
+family = "sol"
+reason = "Acknowledged in ratified native-catalog inventory"
+
+[codex.known."gpt-5.6-sol"]
+status = "acknowledged"
+family = "sol"
+reason = "Acknowledged in ratified native-catalog inventory"
+
+[codex.known."gpt-6-luna"]
+status = "acknowledged"
+family = "luna"
+reason = "Acknowledged in ratified native-catalog inventory"
+
+[codex.known."gpt-5.6-luna"]
+status = "acknowledged"
+family = "luna"
+reason = "Acknowledged in ratified native-catalog inventory"
+
+[codex.known."gpt-5.6-terra"]
+status = "acknowledged"
+family = "terra"
+reason = "Acknowledged in ratified native-catalog inventory"
+
+[codex.known."gpt-5.5"]
+status = "acknowledged"
+family = "legacy"
+reason = "upgrade to gpt-6.1-sol; retires 2026-10-14T19:00Z"
+
+[agy.pins.flash]
+slug = "gemini-3.8-flash-high"
+
+[agy.pins.flash-lo]
+slug = "gemini-3.8-flash-low"
+
+[agy.pins.pro]
+slug = "gemini-3.1-pro-high"
+
+[agy.dispatch.repo_calls]
+role = "flash"
+
+[agy.known."gemini-3.8-flash-high"]
+status = "adopted"
+family = "flash"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gemini-3.8-flash-low"]
+status = "adopted"
+family = "flash-lo"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gemini-3.8-flash-medium"]
+status = "acknowledged"
+family = "flash-medium"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gemini-3.7-flash-high"]
+status = "acknowledged"
+family = "flash"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gemini-3.7-flash-low"]
+status = "acknowledged"
+family = "flash-lo"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gemini-3.7-flash-medium"]
+status = "acknowledged"
+family = "flash-medium"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gemini-3.6-flash-high"]
+status = "acknowledged"
+family = "flash"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gemini-3.6-flash-low"]
+status = "acknowledged"
+family = "flash-lo"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gemini-3.6-flash-medium"]
+status = "acknowledged"
+family = "flash-medium"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gemini-3.1-pro-high"]
+status = "adopted"
+family = "pro"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gemini-3.1-pro-low"]
+status = "acknowledged"
+family = "pro-lo"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."claude-sonnet-4-6"]
+status = "acknowledged"
+family = "agy-other"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."claude-opus-4-6-thinking"]
+status = "acknowledged"
+family = "agy-other"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[agy.known."gpt-oss-120b-medium"]
+status = "acknowledged"
+family = "agy-other"
+reason = "Ratified native agy inventory (LN row 2)"
+
+[claude]
+aliases = ["opus", "sonnet", "haiku", "fable"]
+
+[claude.pins]
+fallback = ["opus", "sonnet"]
+subagent = ["opus", "sonnet", "haiku", "fable"]
+
+[claude.api]
+graphify_native_extract = "claude-opus-5"
+model_limits = [
+  "claude-opus-5",
+  "claude-sonnet-5",
+  "claude-haiku-4-5",
+  "claude-fable-5",
+  "claude-fable-5-1",
+  "claude-opus-5-5",
+]
+
+[claude.known."claude-fable-5"]
+status = "adopted"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-fable-5-1"]
+status = "adopted"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-haiku-4-5"]
+status = "adopted"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-haiku-4-5-20251001"]
+status = "acknowledged"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-opus-4-5"]
+status = "acknowledged"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-opus-4-5-20251101"]
+status = "acknowledged"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-opus-4-6"]
+status = "acknowledged"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-opus-4-7"]
+status = "acknowledged"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-opus-4-8"]
+status = "acknowledged"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-opus-5"]
+status = "adopted"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-opus-5-5"]
+status = "adopted"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-sonnet-4-5"]
+status = "acknowledged"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-sonnet-4-5-20250929"]
+status = "acknowledged"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-sonnet-4-6"]
+status = "acknowledged"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-sonnet-5"]
+status = "adopted"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"
+
+[claude.known."claude-sonnet-5-5"]
+status = "acknowledged"
+family = "anthropic"
+reason = "models.dev anthropic provider; observed 2026-10-02"

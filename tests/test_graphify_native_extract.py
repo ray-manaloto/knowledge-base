@@ -19,7 +19,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import artifacts
+from kb_setup import artifacts, models
 from kb_setup import graphify_native_extract as gne
 from kb_setup.result import Rc
 
@@ -129,10 +129,12 @@ def test_resolve_env_sets_parallel_override_only_when_explicitly_allowed(tmp_pat
 
 def test_custom_model_flows_through_to_the_environment(tmp_path: Path) -> None:
     opts = gne.Options(
-        target=tmp_path / "sources/graphify", out=tmp_path / "out", model="claude-sonnet-5"
+        target=tmp_path / "sources/graphify",
+        out=tmp_path / "out",
+        model=models.claude_api("model_limits")[1],
     )
     env = gne.resolve_env(opts)
-    assert env[gne._MODEL_ENV] == "claude-sonnet-5"
+    assert env[gne._MODEL_ENV] == models.claude_api("model_limits")[1]
 
 
 # --- refusals --------------------------------------------------------------

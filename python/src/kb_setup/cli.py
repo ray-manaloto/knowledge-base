@@ -116,6 +116,7 @@ def _print_usage() -> int:
         "detect-census [--output .agent/<path>.json] | "
         "source-groups-check [path] | "
         "artifact-download --provider P --source O/R --revision SHA --destination PATH | "
+        "models [check|ship-check|classify-launch] | codex-log-check <LOG> | "
         "ensure-deps | version"
     )
     return 0
@@ -723,6 +724,15 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import fetch as fetch_mod
 
         return fetch_mod.fetch_verify_main(repo_root, [Path(arg) for arg in rest])
+
+    if cmd == "models":
+        from kb_setup import models
+
+        return models.main(repo_root, rest)
+    if cmd == "codex-log-check":
+        from kb_setup import codex_log
+
+        return codex_log.main(rest)
 
     print(
         f"kb-setup: unknown command {cmd!r} "

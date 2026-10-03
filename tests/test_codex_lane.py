@@ -837,3 +837,25 @@ def test_run_review_does_not_touch_evidence_when_output_is_omitted(
 
     assert codex_run.run(["--review"]) == 0
     assert seen["output_path"] is None
+
+
+def test_lane_default_model_and_effort_read_the_registry():
+    from kb_setup import models
+
+    dispatch = models.load_registry().codex.dispatch["kb_codex"]
+    argv = codex_run._codex_argv(codex_run.LaneSpec())
+    assert argv[argv.index("--model") + 1] == dispatch.slug
+    assert f"model_reasoning_effort={dispatch.effort}" in argv
+
+
+def test_malformed_stderr_changes_a_successful_lane_to_failure():
+    argv = [
+        sys.executable,
+        "-c",
+        (
+            "import sys; "
+            "print('Ignoring malformed agent role definition: fixture-role', file=sys.stderr)"
+        ),
+    ]
+    assert codex_run._spawn(argv) == 1
+    assert codex_run._spawn([sys.executable, "-c", "print('clean')"]) == 0

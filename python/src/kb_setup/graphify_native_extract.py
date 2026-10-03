@@ -225,7 +225,7 @@ import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from kb_setup import events
+from kb_setup import events, models
 from kb_setup.graphify_env import (
     assert_pinned_graphify,
     clean_env,
@@ -265,7 +265,7 @@ DEFAULT_OUT = ".agent/kb/native-extract"
 #: Note it deliberately DIFFERS from graphify's own `claude-cli` default
 #: (`claude-code-plan`): overriding that is the point of setting the variable at
 #: all, and the paragraph above is why this identifier and not another.
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = models.claude_api("graphify_native_extract")
 
 #: `claude-cli`'s env keys, kept ONLY as the expected value in tests that assert
 #: what the default backend resolves to. Production code must call
