@@ -401,11 +401,11 @@ def _register_ts_fixture(tmp_path: Path, body: str) -> Path:
 
 
 _REGISTER_LOOP_BODY = (
-    "export function register(on: any): void {\n"
+    "export const register: Register = (on) => {\n"
     "  for (const tool of WRITE_TOOLS) {\n"
-    '    on("tool.call", { tool }, handler);\n'
+    '    on("tool.call", { tool: new RegExp(`^${tool}$`) }, handler);\n'
     "  }\n"
-    "}\n"
+    "};\n"
 )
 
 
@@ -417,7 +417,7 @@ def test_function_hook_write_tools_extracts_edit_write_notebookedit() -> None:
 def test_a_doc_comment_literal_tool_is_never_mistaken_for_a_registration(
     tmp_path: Path,
 ) -> None:
-    """`register.ts:68`'s only literal `{ tool: "Edit" }` sits in a comment."""
+    """`register.ts:69`'s only literal `{ tool: "Edit" }` sits in a comment."""
     body = (
         '// a fake { tool: "Bogus" } mention, purely prose\n'
         'const WRITE_TOOLS: readonly string[] = ["Edit", "Write"];\n'
@@ -826,3 +826,11 @@ def test_removing_the_function_hook_env_flag_falsifies_its_predicate(repo_copy: 
         settings.get("env", {}).pop("CLAUDE_CODE_ENABLE_FUNCTION_HOOKS", None)
 
     assert _settings_with(repo_copy, patch)["function_hooks_enabled"] is False
+
+
+def test_untyped_registration_is_not_run(tmp_path: Path) -> None:
+    body = 'const WRITE_TOOLS: readonly string[] = ["Edit"];\n'
+    body += _REGISTER_LOOP_BODY.replace(
+        "export const register: Register = (on) => {", "export function register(on: any): void {"
+    )
+    assert guard_inventory.function_hook_write_tools(_register_ts_fixture(tmp_path, body)) is None

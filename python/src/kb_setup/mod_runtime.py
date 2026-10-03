@@ -299,7 +299,7 @@ _PROPERTY_ACCESS = re.compile(r"(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)")
 _ON_EVENT = re.compile(r'on\s*\(\s*"(?P<event>[^"]+)"')
 
 #: `on("<event>", { <matcher> }, ...)` — the matcher keys.
-_ON_MATCHER = re.compile(r'on\s*\(\s*"[^"]+"\s*,\s*\{(?P<matcher>[^}]*)\}')
+_ON_MATCHER = re.compile(r'on\s*\(\s*"[^"]+"\s*,\s*(?P<matcher>\{)')
 
 #: Object-literal keys, which is how the hook's RETURN shape (`{ deny: ... }`)
 #: enters the contract. Run over the string-stripped source so a colon inside
@@ -473,6 +473,54 @@ def _bracket_access_outside_strings(no_comments: str) -> set[str]:
     return found
 
 
+def _matcher_entries(source: str, opening: int) -> list[str] | None:
+    """Scan a balanced matcher object, skipping TS strings and templates."""
+    stack = ["}"]
+    entries: list[str] = []
+    cursor = opening + 1
+    start = cursor
+    pairs = {"{": "}", "(": ")", "[": "]"}
+    while cursor < len(source):
+        character = source[cursor]
+        if character in "\"'`":
+            literal = _TS_STRING.match(source, cursor)
+            if literal is None:
+                return None
+            cursor = literal.end()
+            continue
+        if character in pairs:
+            stack.append(pairs[character])
+        elif character in "})]":
+            if not stack or character != stack.pop():
+                return None
+            if not stack:
+                entries.append(source[start:cursor].strip())
+                return entries
+        elif character == "," and len(stack) == 1:
+            entries.append(source[start:cursor].strip())
+            start = cursor + 1
+        cursor += 1
+    return None
+
+
+def _matcher_keys(source: str) -> set[str] | None:
+    """Return keys only; an unsupported entry invalidates the whole contract."""
+    keys: set[str] = set()
+    for match in _ON_MATCHER.finditer(source):
+        entries = _matcher_entries(source, match.start("matcher"))
+        if entries is None:
+            return None
+        for entry in entries:
+            if not entry:
+                continue
+            key, colon, value = entry.partition(":")
+            key = key.strip()
+            if not _IDENTIFIER.fullmatch(key) or (colon and not value.strip()):
+                return None
+            keys.add(key)
+    return keys
+
+
 def required_runtime_tokens(register_source: str) -> frozenset[str] | None:
     """What `register.ts` requires OF THE RUNTIME, derived from its own text.
 
@@ -518,16 +566,19 @@ def required_runtime_tokens(register_source: str) -> frozenset[str] | None:
         for prop in _PROPERTY_ACCESS.findall(source)
         if prop not in _JS_BUILTIN_MEMBERS
     }
-    #: Kept for the object-key and destructuring passes below, which want one
-    #: string-free text; the union above is specific to property access, where
-    #: both losses were measured.
+    #: Kept for the destructuring pass below, which wants one string-free text.
     no_strings = no_strings_strings_first
     # Event names and matcher keys come from the source WITH strings intact —
     # the event name IS a string literal, so blanking it first would erase it.
     tokens.update(_ON_EVENT.findall(no_comments))
-    for matcher in _ON_MATCHER.findall(no_comments):
-        tokens.update(_IDENTIFIER.findall(matcher))
-    tokens.update(_OBJECT_KEY.findall(no_strings))
+    matcher_keys = _matcher_keys(no_comments)
+    if matcher_keys is None:
+        return None
+    tokens.update(matcher_keys)
+    # Object keys need both strip orders too: a stray comment backtick can
+    # consume the handler's `deny` key when strings are stripped first.
+    for source in (no_strings_comments_first, no_strings_strings_first):
+        tokens.update(_OBJECT_KEY.findall(source))
     tokens.update(_bracket_access_outside_strings(no_comments))
     for group in _DESTRUCTURE.findall(no_strings):
         for part in group.split(","):

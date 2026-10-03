@@ -344,6 +344,14 @@ def test_a_stray_backtick_in_a_comment_does_not_swallow_the_code_beneath_it() ->
     assert derived >= _COMMITTED, "the committed contract must survive a backtick in a comment"
 
 
+def test_a_stray_backtick_in_a_comment_above_a_matcher_preserves_the_contract() -> None:
+    """Comment backticks must not consume a matcher template or its handler."""
+    registration = 'on("tool.call", { tool: new RegExp(`^${tool}$`) }, handler);'
+    assert registration in _SRC
+    source = _SRC.replace(registration, "// a stray ` in a comment\n    " + registration)
+    assert mod_runtime.required_runtime_tokens(source) == _COMMITTED
+
+
 @pytest.mark.parametrize(
     "form",
     [
@@ -410,3 +418,51 @@ def test_a_relative_path_from_which_is_made_absolute(monkeypatch: pytest.MonkeyP
 
     assert resolved is not None
     assert resolved.is_absolute()
+
+
+def test_regex_matcher_values_never_join_the_runtime_contract() -> None:
+    assert mod_runtime.required_runtime_tokens(_SRC) == _COMMITTED
+
+
+@pytest.mark.parametrize(
+    ("matcher", "new_key"),
+    [
+        ("{ tool, permissionMode: x }", "permissionMode"),
+        ("{ tool, effort }", "effort"),
+    ],
+)
+def test_matcher_keys_keep_new_named_and_shorthand_keys(matcher: str, new_key: str) -> None:
+    source = _SRC.replace("{ tool: new RegExp(`^${tool}$`) }", matcher)
+    assert mod_runtime.required_runtime_tokens(source) == _COMMITTED | {new_key}
+
+
+@pytest.mark.parametrize(
+    "matcher",
+    [
+        "{ tool, ",
+        '{ "tool": x }',
+        "{ [tool]: x }",
+        "{ ...tools }",
+        "{ tool: }",
+    ],
+)
+def test_unsupported_matchers_are_not_run(matcher: str) -> None:
+    source = _SRC.replace("{ tool: new RegExp(`^${tool}$`) }", matcher)
+    assert mod_runtime.required_runtime_tokens(source) is None
+
+
+def test_anchored_regex_tools_and_unanchored_control() -> None:
+    script = """
+const tools = ['Edit', 'Write', 'NotebookEdit'];
+for (const tool of tools) {
+  const matcher = new RegExp(`^${tool}$`);
+  for (const name of tools) {
+    if (matcher.test(name) !== (tool === name)) process.exit(1);
+  }
+}
+if (!new RegExp('Edit').test('NotebookEdit')) process.exit(1);
+"""
+    result = subprocess.run(
+        ["mise", "exec", "--", "node", "-e", script], capture_output=True, check=False
+    )
+    assert result.returncode == 0, result.stderr

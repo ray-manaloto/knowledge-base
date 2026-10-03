@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "types": [],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "jsx": "react",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment"
+  },
+  "files": [
+    ".claude/types/claude-code.d.ts",
+    ".claude/types/claude-code-mcp.d.ts",
+    ".claude/mods/kb-settings-guard/hooks/protected-paths.ts",
+    ".claude/mods/kb-settings-guard/hooks/register.ts",
+    ".claude/skills/model-registry/hooks/register.ts",
+    "python/src/kb_setup/plugins/model-registry/hooks/register.ts"
+  ],
+  "include": [],
+  "exclude": ["tests/fixtures/fnhook"]
+}

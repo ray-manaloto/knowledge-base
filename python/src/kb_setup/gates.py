@@ -212,6 +212,7 @@ GATE_TASKS = (
     # `eval` was removed from that set for exactly that unexamined assumption.
     # So it stays OUT, on the same fail-closed default as the four above.
     "kb-mod-runtime-check",
+    "fnhook-gates",
 )
 #: `kb-corpus-integrity` WAS here, gating the semantic-corpus layer's staged
 #: evidence tree. It left with that layer's removal (2026-08-24) — see

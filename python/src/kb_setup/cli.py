@@ -116,6 +116,7 @@ def _print_usage() -> int:
         "detect-census [--output .agent/<path>.json] | "
         "source-groups-check [path] | "
         "artifact-download --provider P --source O/R --revision SHA --destination PATH | "
+        "fnhook-gates | claude-types-refresh | claude-types-check | "
         "models [check|ship-check|classify-launch] | codex-log-check <LOG> | "
         "ensure-deps | version"
     )
@@ -725,6 +726,14 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
 
         return fetch_mod.fetch_verify_main(repo_root, [Path(arg) for arg in rest])
 
+    if cmd == "fnhook-gates":
+        from kb_setup import fnhook_gates
+
+        return fnhook_gates.fnhook_gates_main(rest, repo_root=repo_root)
+    if cmd in {"claude-types-refresh", "claude-types-check"}:
+        from kb_setup import claude_types
+
+        return claude_types.main(repo_root, rest, do_refresh=cmd == "claude-types-refresh")
     if cmd == "models":
         from kb_setup import models
 

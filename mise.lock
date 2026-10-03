@@ -6678,6 +6678,10 @@ backend = "npm:ctx7"
 version = "1.23.3"
 backend = "npm:firecrawl-cli"
 
+[[tools."npm:typescript"]]
+version = "7.0.2"
+backend = "npm:typescript"
+
 [[tools.pkl]]
 version = "0.32.1"
 backend = "aqua:apple/pkl"

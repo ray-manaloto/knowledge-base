@@ -67,7 +67,7 @@ def _normalize(path: str) -> str:
     ALLOW signal in this guard, so a spelling the matcher does not recognise is a
     hole, not a miss.
 
-    `register.ts:87` still carries the unfixed form and is FROZEN for this ticket
+    `register.ts:88` still carries the unfixed form and is FROZEN for this ticket
     (`guard_inventory`'s anchored regexes parse it). So the two implementations
     are **no longer behaviourally identical**, which the docstring below used to
     claim outright. The TS half must land before #757 registers the mod — that is

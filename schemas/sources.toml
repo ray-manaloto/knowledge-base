@@ -1,0 +1,7 @@
+[[schema]]
+tool = "claude-code"
+file = ".claude/types/claude-code.d.ts"
+version = "2.1.287"
+source = "https://raw.githubusercontent.com/anthropics/claude-code/v2.1.287/mods/types/claude-code.d.ts"
+pin_source = "schemas/sources.toml (vendored; no mise [tools] pin)"
+sha256 = "8ae1244d19d4b393261605fe72d517b66be0d7e1c214c378cdec5107e8b0b46c"

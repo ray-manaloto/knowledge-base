@@ -43,6 +43,7 @@ min_version = { hard = "2026.9.0", soft = "2026.9.0" }
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.7"
 uv = "0.12.8"
+"npm:typescript" = "7.0.2"
 hk = "2.4.0"
 pkl = "0.32.1"
 typos = "1.50.0"
@@ -2069,3 +2070,13 @@ run = "uv run --project {{config_root}} kb-setup mod-runtime-check"
 # One `claude --version` plus one `/plugin-types` run, measured at ~4s wall.
 # The module carries its own 300s bound on the generation; this is the outer one.
 timeout = "360s"
+
+[tasks.fnhook-gates]
+description = "Gate typed Claude function-hook modules using the shared engine"
+run = "uv run kb-setup fnhook-gates"
+timeout = "5m"
+
+[tasks.claude-types-refresh]
+description = "Refresh the pinned Claude declarations through the shared hygiene pipeline"
+run = "uv run kb-setup claude-types-refresh"
+timeout = "2m"

@@ -589,6 +589,24 @@ local lintSteps: Mapping<String, Step> = new {
   //     `depends` is a standing decision (Ray, 2026-07-31), kept after upstream
   //     fixed the deadlock in v1.53.0 because the doctrine spans both repos and
   //     dotfiles machine-enforces it. A 10 ms gain is not a reason to split them.
+  ["fnhook_gates"] = new Step {
+    // Keep the repo-wide clone/artifact exclusions on this whole-project gate.
+    // Git ownership is also enforced by the engine before tsc runs.
+    exclude = baseExclude
+    glob = List(
+      "**/.claude-plugin/plugin.json",
+      "**/hooks/hooks.json",
+      "**/hooks/*.ts",
+      ".claude/types/**",
+      "tsconfig.json",
+      "schemas/sources.toml",
+      "python/src/kb_setup/fnhook_gates.py",
+      "python/src/kb_setup/claude_types.py",
+      "tests/test_fnhook_gates.py",
+      "tests/fixtures/fnhook/**",
+    )
+    check = "uv run kb-setup fnhook-gates"
+  }
   ["ruff_format"] = new Step {
     glob = pyGlob
     check = "uv run ruff format --check {{files}}"

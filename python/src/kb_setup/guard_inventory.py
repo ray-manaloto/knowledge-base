@@ -824,11 +824,13 @@ _WRITE_TOOLS_ARRAY = re.compile(
     r"const\s+WRITE_TOOLS\s*:\s*readonly\s+string\[\]\s*=\s*\[(?P<body>[^\]]*)\]\s*;"
 )
 _REGISTER_LOOP = re.compile(
-    r"export\s+function\s+register\s*\([^)]*\)\s*:\s*void\s*\{\s*"
+    r"export\s+const\s+register\s*:\s*Register\s*=\s*\(\s*on\s*\)\s*=>\s*\{\s*"
     r"for\s*\(\s*const\s+tool\s+of\s+WRITE_TOOLS\s*\)\s*\{\s*"
-    r'on\s*\(\s*"tool\.call"\s*,\s*\{\s*tool\s*\}\s*,\s*\w+\s*\)\s*;?\s*'
-    r"\}\s*\}"
+    r'on\s*\(\s*"tool\.call"\s*,\s*\{\s*tool\s*:\s*new\s+RegExp\s*\(\s*'
+    + re.escape("`^${tool}$`")
+    + r"\s*\)\s*\}\s*,\s*\w+\s*\)\s*;?\s*\}\s*\}\s*;?"
 )
+
 _STRING_LITERAL = re.compile(r'"([^"\\]*)"')
 _MATCHER_TOOL = re.compile(r'tool\s*:\s*"([^"]*)"')
 
@@ -849,7 +851,7 @@ def strip_ts_comments(source: str) -> str:
     """Remove `//` and `/* */` comments before any structural match.
 
     Load-bearing: the module's only literal `{ tool: "Edit" }` sits inside a
-    doc comment (`register.ts:68`), and the two CORRECT rows (`Write`,
+    doc comment (`register.ts:69`), and the two CORRECT rows (`Write`,
     `NotebookEdit`) have ZERO literal hits in the source — a presence check
     over raw text is wrong in both directions.
 

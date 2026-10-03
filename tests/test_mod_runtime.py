@@ -73,11 +73,11 @@ async function handler($: any, e: any, next: any): Promise<any> {
   return next(e);
 }
 
-export function register(on: any): void {
+export const register: Register = (on) => {
   for (const tool of WRITE_TOOLS) {
-    on("tool.call", { tool }, handler);
+    on("tool.call", { tool: new RegExp(`^${tool}$`) }, handler);
   }
-}
+};
 """
 
 
