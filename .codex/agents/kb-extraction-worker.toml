@@ -1,6 +1,7 @@
 name = "kb-extraction-worker"
 description = "Turn ONE raw or vendored source file into one graphify {nodes, edges, hyperedges} extraction chunk and write it to disk. Use as the per-file unit of a kb-extract fan-out, when the caller has already decided what to ingest and where the chunk goes."
 model_reasoning_effort = "medium"
+model = "gpt-6.1-sol"
 developer_instructions = """
 # kb-extraction-worker — one file in, one complete chunk out
 

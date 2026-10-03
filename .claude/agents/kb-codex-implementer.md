@@ -41,8 +41,11 @@ cat "$KB_LANE/spec.md" | mise run kb-codex -- --write \
   --effort xhigh \
   --timeout 3000 \
   --output "$KB_LANE/codex-final.md" \
-  > "$KB_LANE/lane.log" 2>&1; echo "rc=$?" > "$KB_LANE/lane.rc"
+  > "$KB_LANE/lane.log" 2>&1; rc=$?; echo "rc=$rc" > "$KB_LANE/lane.rc"
+mise run codex-log-check -- "$KB_LANE/lane.log"; echo "$?" > "$KB_LANE/lane.log.rolecheck"; exit "$rc"
 ```
+
+A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role.
 
 Add `--network` only when the spec's verification fetches (`kb-build`,
 `kb-update`, `gh`, `git ls-remote`); without it the sandbox has no egress and a

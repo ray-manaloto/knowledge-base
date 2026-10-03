@@ -1,6 +1,7 @@
 name = "kb-corpus-curator"
 description = "Register, ingest and verify a source in this knowledge base through the kb-* mise tasks, and close the loop with work-memory. Use when adding or refreshing corpus or study sources."
 model_reasoning_effort = "medium"
+model = "gpt-6.1-sol"
 developer_instructions = """
 # kb-corpus-curator — move a source into the graph, with evidence
 

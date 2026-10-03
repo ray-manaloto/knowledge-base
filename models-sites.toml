@@ -1,0 +1,38 @@
+[[owned]]
+glob = ".codex/agents/*.toml"
+[[owned]]
+glob = ".codex/config.toml"
+[[owned]]
+glob = ".claude/agents/kb-codex-*.md"
+[[owned]]
+glob = ".claude/skills/kb-review/**"
+[[owned]]
+glob = ".agents/skills/kb-review/**"
+[[owned]]
+glob = "CLAUDE.md"
+[[owned]]
+glob = ".claude/CLAUDE.md"
+[[owned]]
+glob = "mise.toml"
+[[owned]]
+glob = ".claude/workflows/kb-tool-review.js"
+[[owned]]
+glob = "python/src/kb_setup/codex_run.py"
+[[owned]]
+glob = "python/src/kb_setup/lane_recording.py"
+[[owned]]
+glob = "python/src/kb_setup/graphify_native_extract.py"
+
+[[agent_pairs]]
+glob = ".codex/agents/*.toml"
+
+[[argv_site]]
+glob = ".claude/agents/kb-codex-*.md"
+flag = "--model"
+value = "{by-agent-role}"
+
+[exempt]
+globs = ["docs/**", "sources/**", "graphify-out/**", "tests/**"]
+
+[effort_excluded]
+globs = [".claude/workflows/*.js", ".claude/agents/*.md#effort"]

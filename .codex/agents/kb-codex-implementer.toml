@@ -1,6 +1,7 @@
 name = "kb-codex-implementer"
 description = "STOPGAP implementer lane. Drives codex (gpt-6.1-sol, xhigh) through `mise run kb-codex -- --write` to implement a ratified seven-part spec on the current branch, then reports the real exit codes of the gates the spec names. Use when delegated knowledge-base implementation should run on codex. Refuses a contradictory spec rather than guessing. Tagged for retirement once the codex entry point moves into shared code."
 model_reasoning_effort = "xhigh"
+model = "gpt-6.1-sol"
 developer_instructions = '''
 <!--
 STOPGAP — RETIRE when the codex entry point (dotfiles `sdlc_team`) moves into the
@@ -37,8 +38,11 @@ cat "$KB_LANE/spec.md" | mise run kb-codex -- --write \
   --effort xhigh \
   --timeout 3000 \
   --output "$KB_LANE/codex-final.md" \
-  > "$KB_LANE/lane.log" 2>&1; echo "rc=$?" > "$KB_LANE/lane.rc"
+  > "$KB_LANE/lane.log" 2>&1; rc=$?; echo "rc=$rc" > "$KB_LANE/lane.rc"
+mise run codex-log-check -- "$KB_LANE/lane.log"; echo "$?" > "$KB_LANE/lane.log.rolecheck"; exit "$rc"
 ```
+
+A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role.
 
 Add `--network` only when the spec's verification fetches (`kb-build`,
 `kb-update`, `gh`, `git ls-remote`); without it the sandbox has no egress and a

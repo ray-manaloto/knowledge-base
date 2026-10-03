@@ -117,7 +117,7 @@ def _print_usage() -> int:
         "source-groups-check [path] | "
         "artifact-download --provider P --source O/R --revision SHA --destination PATH | "
         "fnhook-gates | claude-types-refresh | claude-types-check | "
-        "models [check|ship-check|classify-launch] | codex-log-check <LOG> | "
+        "models [check|apply|ship-check|classify-launch] | codex-log-check <LOG> | "
         "ensure-deps | version"
     )
     return 0

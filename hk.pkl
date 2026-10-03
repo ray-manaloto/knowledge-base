@@ -613,6 +613,11 @@ local lintSteps: Mapping<String, Step> = new {
     fix = "uv run ruff format {{files}}"
     exclusive = true
   }
+  ["models_apply"] = new Step {
+    // Check (d) covers every tracked file, including newly staged pin sites.
+    glob = "**/*"
+    check = "uv run kb-setup models apply --check --sites models-sites.toml"
+  }
 }
 
 hooks {

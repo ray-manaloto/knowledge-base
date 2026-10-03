@@ -47,6 +47,8 @@ from kb_setup.generated.vendor_feeds import FeedStatus as NativeFeedStatus
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
+    from kb_setup.models_apply import SitesConfig
+
 OVERLAY_URL = (
     "https://raw.githubusercontent.com/ray-manaloto/knowledge-base/main/"
     "python/src/kb_setup/models.toml"
@@ -153,6 +155,20 @@ def tracked_files(root: Path) -> list[str]:
     """Use Git's tracked inventory; ignored agent exports are not registry sites."""
     result = subprocess.run(["git", "ls-files", "-z"], cwd=root, capture_output=True, check=True)
     return [name for name in result.stdout.decode().split("\0") if name]
+
+
+def check_aliases_only(root: Path, sites: SitesConfig) -> list[str]:
+    """Expose the offline literal-pin check through the public registry API."""
+    from kb_setup import models_apply
+
+    return models_apply.check_aliases_only(root, sites)
+
+
+def check_pin_sites(root: Path, sites: SitesConfig, registry: Registry) -> list[str]:
+    """Expose the shared deterministic pin-site checks without acquiring feeds."""
+    from kb_setup import models_apply
+
+    return models_apply.check_pin_sites(root, sites, registry)
 
 
 def codex_trust(repo_root: Path, user_config: Path = _CODEX_USER_CONFIG) -> TrustResult:
@@ -1163,6 +1179,10 @@ def _ship_rc(report: RegistryReport) -> int:
 
 def main(root: Path, argv: list[str]) -> int:
     """Identical baseline-aware CLI for both consumers of kb_setup."""
+    if argv and argv[0] == "apply":
+        from kb_setup import models_apply
+
+        return models_apply.main(root, argv[1:])
     parser = argparse.ArgumentParser(prog="kb-setup models")
     sub = parser.add_subparsers(dest="mode", required=True)
     for mode in ("check", "ship-check"):

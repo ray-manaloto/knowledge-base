@@ -95,8 +95,11 @@ EOF
 cat "$KB_LANE/prompt.md" | mise run kb-codex -- \
   --model gpt-6.1-sol \
   --effort xhigh \
-  --output ".agent/kb/reports/agents/<your-agent-name>-verdict.md"
+  --output ".agent/kb/reports/agents/<your-agent-name>-verdict.md" > "$KB_LANE/lane.log" 2>&1; rc=$?
+mise run codex-log-check -- "$KB_LANE/lane.log"; echo "$?" > "$KB_LANE/lane.log.rolecheck"; exit "$rc"
 ```
+
+A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role.
 
 **No `--ephemeral`, deliberately.** It means "run without persisting session
 files to disk" (`codex exec --help`), and a lane that persists nothing cannot be

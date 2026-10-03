@@ -1,6 +1,7 @@
 name = "kb-adversarial-verifier"
 description = "Try to REFUTE a specific claim by finding the probe that produces the opposite answer. Use before any negative or comparative finding is written down."
 model_reasoning_effort = "high"
+model = "gpt-6.1-sol"
 developer_instructions = """
 # kb-adversarial-verifier — refute, don't confirm
 

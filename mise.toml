@@ -2080,3 +2080,28 @@ timeout = "5m"
 description = "Refresh the pinned Claude declarations through the shared hygiene pipeline"
 run = "uv run kb-setup claude-types-refresh"
 timeout = "2m"
+
+[tasks.models-apply]
+description = "Render reviewed model pin sites and the shared function-hook plugin"
+run = "uv run kb-setup models apply --sites models-sites.toml"
+timeout = "60s"
+
+[tasks.models-check]
+description = "Report launch-scoped model verdicts against the native catalogs"
+run = "uv run kb-setup models check --baseline doctor.toml"
+timeout = "45s"
+
+[tasks.models-classify]
+description = "Classify a proposed launch against a supplied registry report"
+run = "uv run kb-setup models classify-launch"
+timeout = "45s"
+
+[tasks.kb-models-ship-check]
+description = "When enabled, fail shipping for invalid pins or all feeds NOT CHECKED; doctor.toml can disable the gate"
+run = "uv run kb-setup models ship-check --baseline doctor.toml"
+timeout = "45s"
+
+[tasks.codex-log-check]
+description = "Fail a lane whose stderr reports a malformed agent role"
+run = "uv run kb-setup codex-log-check"
+timeout = "60s"

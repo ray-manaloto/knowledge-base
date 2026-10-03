@@ -89,6 +89,7 @@ class LaneSpec:
     output: str | None = None
 
 
+# models-apply: off
 def _codex_argv(spec: LaneSpec) -> list[str]:
     """Build the argv. Separated from `run` so a test can assert it without spawning.
 
@@ -100,8 +101,9 @@ def _codex_argv(spec: LaneSpec) -> list[str]:
     recorded lesson: *a guard whose redirect target cannot perform the redirected
     action is not enforcement, it is an outage.*
     """
+    # models-apply: on
     sandbox = spec.sandbox_override or ("workspace-write" if spec.write else "read-only")
-    argv = ["codex", "exec", "--sandbox", sandbox]
+    argv = ["codex", "exec", "--strict-config", "--sandbox", sandbox]
     if spec.model:
         argv += ["--model", spec.model]
     if spec.output:
@@ -539,7 +541,7 @@ def _review_argv(spec: ReviewSpec) -> list[str]:
     sub-agent's is hard-set to `Never` at `review.rs:121`, so passing one would
     be a flag that does nothing, which is the defect #678 was about.
     """
-    argv = ["codex", "review", "--base", spec.base]
+    argv = ["codex", "review", "--strict-config", "--base", spec.base]
     if spec.title and spec.commit:
         argv += ["--title", spec.title]
     if spec.sandbox:
