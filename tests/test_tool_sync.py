@@ -319,11 +319,12 @@ def test_legacy_tool_sync_eligibility_census() -> None:
 
     GREW DELIBERATELY on 2026-10-03 (#837): `webclaw` is a mise-only github pin
     with no source manifest (nothing upstream is vendored or extracted; it is the
-    docs mirror's fetch tool), so the automated sync is the right owner of its
-    version, under Ray's standing "always pin to the latest". That makes 3 of
-    21 eligible (measured 2026-10-03 via `config.load` + `eligible_tools`); the
-    "12 of 20 without that refusal" figure above is the 2026-09-09 measurement
-    and was not re-derived.
+    docs mirror's fetch tool), so nothing blocks the automated sync from
+    locking, installing and verifying its pin. (`kb-tool-sync` syncs the pin as
+    written; it never advances it.) Measured 2026-10-03 with `config.load` and
+    `eligible_tools`: 3 of 21 eligible; 12 of 21 if the manifest refusal were
+    lifted (webclaw included), so the "12 of 20" and "other 8" above are the
+    2026-09-09 snapshot.
     """
     repo_root = Path(__file__).parents[1]
     assert tool_sync.eligible_tools(repo_root) == ("coreutils", "lychee", "webclaw")
