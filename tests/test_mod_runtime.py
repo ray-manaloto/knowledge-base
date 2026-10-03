@@ -335,10 +335,6 @@ def test_an_unreadable_register_ts_reports_not_run(tmp_path: Path) -> None:
     assert mod_runtime.check(tmp_path) == Rc.NOT_RUN
 
 
-def test_an_unknown_argument_is_a_bad_request() -> None:
-    assert mod_runtime.main(REPO, ["--nonsense"]) == int(Rc.BAD_REQUEST)
-
-
 # --------------------------------------------------------------------------
 # `check()` end to end, with ONLY the live half stubbed.
 #

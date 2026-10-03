@@ -1,5 +1,9 @@
 # Copyright (c) 2026 Raymond Manaloto
-"""`kb-mod-runtime-check` — pin the function-hook runtime contract with LIVE probes (G01, #754).
+"""Legacy function-hook contract extraction and probe helpers (G01, #754).
+
+The task and CLI were retired in model-registry K4 after V-FNHOOK-TYPES-K.
+The shared fnhook-gates engine now owns the ship gate. These helpers and their
+historical probe evidence remain available to the parser and research tests.
 
 This repo reasons about function hooks from
 `sources/media/claude-code-function-hooks-types.d.ts`, vendored at Claude Code
@@ -1005,27 +1009,3 @@ def check(repo_root: Path) -> Rc:
     )
     _report_vendored_delta(repo_root, fresh, required)
     return Rc.OK
-
-
-#: The committed arms spec `--arms` proves this module against. Named here rather
-#: than passed in, because `--arms` is a fixed proving mode of THIS check, not a
-#: general runner: `mise run kb-arms -- <spec>` is the general one.
-ARMS_SPEC = Path("docs/research/arms/2026-09-12-g01-mod-runtime.toml")
-
-
-def main(repo_root: Path, argv: list[str]) -> int:
-    """`kb-setup mod-runtime-check [--arms [--dry-run]]`.
-
-    The bare form is the gate. `--arms` is the PROVING mode and is deliberately
-    not what enters `GATE_TASKS`: `kb_setup.arms` mutates tracked files while it
-    runs, which no gate may do.
-    """
-    if "--arms" in argv:
-        from kb_setup import arms
-
-        rest = [a for a in argv if a != "--arms"]
-        return arms.main([str(ARMS_SPEC), *rest], repo_root)
-    if argv:
-        print(f"[mod-runtime-check] unknown argument(s): {' '.join(argv)}")
-        return int(Rc.BAD_REQUEST)
-    return int(check(repo_root))

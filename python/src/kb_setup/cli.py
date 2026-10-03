@@ -64,7 +64,7 @@ def _print_usage() -> int:
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | graphify-catalog | "
         "lock-drift | docs refresh <site>|all | docs check | ccdocs refresh|check | "
-        "mod-runtime-check [--arms] | worktree-ready [--target PATH] | "
+        "worktree-ready [--target PATH] | "
         "telemetry-prune | serve | serve-memory | env-refresh [--sentinel] | "
         "codex-config-check | "
         "instruction-edit-guard | "
@@ -252,16 +252,6 @@ def _run(argv: list[str] | None = None) -> int:
         # has neither and two end-to-end tests fail there and pass in the main
         # checkout at the same base.
         return worktree.main(repo_root, rest)
-    if cmd == "mod-runtime-check":
-        from kb_setup import mod_runtime
-
-        # A bare arm on `funnel`'s precedent, and it takes `rest` — which is why
-        # it is HERE rather than in `_dispatch_lint` beside the other two guard
-        # checks: `--arms` is a real argument, and that dispatcher takes no argv.
-        # Unlike every other gate in this chain it SHELLS OUT to the installed
-        # `claude` (deliberately — see the module docstring), generating into a
-        # temp CWD so the repo tree is never written.
-        return mod_runtime.main(repo_root, rest)
     if cmd == "manifest-audit":
         from kb_setup import manifest_audit
 
@@ -759,7 +749,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "guard-inventory-check | guard-codegen | guard-codegen-check | "
         "handoff-check [path] | gates [task...] [--stop] | "
         "check <path...> | funnel | "
-        "graphify-catalog | lock-drift | mod-runtime-check [--arms] | "
+        "graphify-catalog | lock-drift | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
         "research-links <URL...> [--out PATH] | "
