@@ -52,6 +52,8 @@ from dataclasses import dataclass
 from queue import Empty, Queue
 from typing import TYPE_CHECKING
 
+from kb_setup.evals import CpuBound, CpuWatch
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
@@ -119,12 +121,16 @@ def _pump(stream: IO[str], sink: Queue[str | None]) -> None:
 class _Session:
     """One stdio JSON-RPC conversation with a server subprocess."""
 
-    def __init__(self, proc: subprocess.Popen[str], deadline: float) -> None:
+    def __init__(
+        self, proc: subprocess.Popen[str], deadline: float, watch: CpuWatch | None = None
+    ) -> None:
         if proc.stdin is None or proc.stdout is None:
             raise ValueError("server subprocess must be started with piped stdin and stdout")
         self._proc = proc
         self._stdin: IO[str] = proc.stdin
         self._deadline = deadline
+        self._watch = watch
+        self._next_sample = time.monotonic() + (watch.tick if watch else 0.0)
         self._lines: Queue[str | None] = Queue()
         self._eof = False
         threading.Thread(target=_pump, args=(proc.stdout, self._lines), daemon=True).start()
@@ -152,6 +158,8 @@ class _Session:
                 return None, f"timed out waiting for reply id={want}"
             if self._eof:
                 return None, self._exit_detail(want)
+            if (verdict := self._sample()) is not None:
+                return None, f"no reply to id={want}: {verdict}"
             try:
                 line = self._lines.get(timeout=min(remaining, 1.0))
             except Empty:
@@ -165,6 +173,18 @@ class _Session:
                 continue
             if isinstance(message, dict) and message.get("id") == want:
                 return message, ""
+
+    def _sample(self) -> str | None:
+        """The CPU watch's failure detail when one is due and has fired.
+
+        A server that has exited is never judged here (``CpuWatch.verdict``
+        returns None for it), so the EOF path keeps reporting its rc.
+        """
+        if self._watch is None or time.monotonic() < self._next_sample:
+            return None
+        self._next_sample = time.monotonic() + self._watch.tick
+        verdict = self._watch.verdict()
+        return None if verdict is None else verdict[1]
 
     def _exit_detail(self, want: int) -> str:
         """Why an EOF happened, in the terms a reader needs to act on.
@@ -212,6 +232,7 @@ def probe(
     *,
     cwd: Path | None = None,
     timeout: float = DEFAULT_TIMEOUT_S,
+    bound: CpuBound | None = None,
 ) -> Advertised:
     """Run ``cmd`` as a stdio MCP server and report the surface it advertises.
 
@@ -222,14 +243,20 @@ def probe(
     Args:
         cmd: argv of the server, e.g. ``["mise", "run", "kb-serve"]``.
         cwd: working directory for the server, or the caller's.
-        timeout: hard bound on the whole handshake.
+        timeout: hard wall-clock bound on the whole handshake. Ignored when
+            ``bound`` is given.
+        bound: bound the handshake by the server group's CPU WORK instead, the
+            #838 pattern (`evals.CpuWatch`). A busy host then cannot fail it, but a
+            server that stops making progress, or burns past its budget, still
+            does. Used by the live kb-serve arm, whose 120 s wall bound failed at
+            load 47-57 while the server was fine (#748).
 
     Returns:
         An :class:`Advertised` whose ``detail`` names the failure when there is
         one, and is empty when the handshake completed.
     """
     started = time.monotonic()
-    deadline = started + timeout
+    deadline = float("inf") if bound is not None else started + timeout
     proc = subprocess.Popen(
         list(cmd),
         cwd=cwd,
@@ -243,7 +270,7 @@ def probe(
         # the `killpg` below would take down the caller — pytest included.
         start_new_session=True,
     )
-    session = _Session(proc, deadline)
+    session = _Session(proc, deadline, CpuWatch(proc, bound) if bound is not None else None)
     try:
         return _handshake(session, started)
     finally:

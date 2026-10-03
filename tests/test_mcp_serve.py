@@ -29,18 +29,23 @@ import signal
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import cast
 
 import pytest
-from kb_setup import mcp_probe
+from kb_setup import evals, mcp_probe
+from kb_setup.evals import CpuBound
+from test_cpu_bounded import _Throttle
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-#: The aggregate graph takes ~9.2s to load (3.4 MB prose graph answers in 0.6s,
-#: the 393 MB aggregate in 9.8s), so the live arm needs real headroom. Bounded
-#: rather than absent — `long-running-command-hangs.md`.
-LIVE_TIMEOUT_S = 120.0
+#: The live arm is bounded by the server group's CPU WORK, not wall clock (#748,
+#: after #838). Its 120 s wall bound failed at load 47-57 while the same test
+#: passed alone in 28.9-35.0 s, so the bound measured the host. A server that
+#: wedges (no CPU progress for a minute) or burns past this budget still fails.
+#: The budget is set against measured cost; see the evidence report.
+LIVE_CPU_BUDGET_S = 180.0
 
 #: A responsive stdio MCP server. Deliberately minimal and deliberately NOT
 #: graphify: it exists to prove the probe can read a success, so it must not be
@@ -166,7 +171,7 @@ def test_kb_serve_actually_answers_mcp():
             f"real graph the task pins; it is NOT a pass."
         )
 
-    result = mcp_probe.probe(["mise", "run", "kb-serve"], cwd=REPO_ROOT, timeout=LIVE_TIMEOUT_S)
+    result = _live_probe()
 
     assert result.initialized is True, result.detail
     # graphify 0.9.31/0.9.32 both advertise 10 tools + 6 resources. Asserted as a
@@ -175,6 +180,120 @@ def test_kb_serve_actually_answers_mcp():
     assert len(result.tools) >= 1, result.detail
     assert "query_graph" in result.tools
     assert result.tool_schema_bytes > 0
+
+
+def _live_probe() -> mcp_probe.Advertised:
+    """The live arm's one probe call, so its bound can be pinned without a graph."""
+    return mcp_probe.probe(
+        ["mise", "run", "kb-serve"], cwd=REPO_ROOT, bound=CpuBound(LIVE_CPU_BUDGET_S)
+    )
+
+
+def test_the_live_arm_is_bounded_by_cpu_not_wall_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """#748 wiring: the kb-serve arm must use the CPU bound, never `timeout`."""
+    seen: dict[str, object] = {}
+
+    def fake(cmd: object, **kwargs: object) -> mcp_probe.Advertised:
+        seen.update(kwargs, cmd=cmd)
+        return mcp_probe.Advertised(
+            initialized=True,
+            tools=("query_graph",),
+            resources=(),
+            tool_schema_bytes=1,
+            elapsed_s=0.0,
+            detail="",
+        )
+
+    monkeypatch.setattr(mcp_probe, "probe", fake)
+    _live_probe()
+    assert seen.get("bound") == CpuBound(LIVE_CPU_BUDGET_S)
+    assert "timeout" not in seen
+
+
+# --------------------------------------------------------------------------
+# The CPU bound on the probe (#748). Fake servers, so no graph is needed.
+# --------------------------------------------------------------------------
+
+#: Reads `initialize`, then works for a fixed amount of CPU before answering.
+#: Starved by the throttle, it is the kb-serve failure in miniature: slow on the
+#: wall clock, healthy in fact.
+_FAKE_SLOW_WORKER = """
+import json, sys, time
+line = sys.stdin.readline()
+mid = json.loads(line)["id"]
+while time.process_time() < 1.5:
+    pass
+reply = {"jsonrpc": "2.0", "id": mid, "result": {"protocolVersion": "2024-11-05"}}
+sys.stdout.write(json.dumps(reply) + "\\n")
+sys.stdout.flush()
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg.get("id") is not None:
+        result = {"tools": []} if msg["method"] == "tools/list" else {"resources": []}
+        sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}) + "\\n")
+        sys.stdout.flush()
+"""
+
+#: Never answers and never computes: a wedge.
+_FAKE_WEDGED = "import sys, time\nsys.stdin.readline()\ntime.sleep(60)\n"
+
+#: Never answers and spins: a runaway.
+_FAKE_RUNAWAY = "import sys\nsys.stdin.readline()\nwhile True: pass\n"
+
+#: Exits cleanly, after a delay, without answering. The zombie guard must
+#: report the rc=0 exit, not a stall.
+_FAKE_LATE_CLEAN_EXIT = "import sys, time\nsys.stdin.readline()\ntime.sleep(1.2)\n"
+
+
+def test_a_wedged_server_fails_as_stalled_under_the_cpu_bound(tmp_path):
+    started = time.monotonic()
+    result = mcp_probe.probe(
+        _script(tmp_path, "wedged.py", _FAKE_WEDGED),
+        bound=CpuBound(30, stall_window=1, min_progress=0.2),
+    )
+    assert result.initialized is False
+    assert "stalled" in result.detail, result.detail
+    assert time.monotonic() - started < 15
+
+
+def test_a_runaway_server_fails_on_its_cpu_budget(tmp_path):
+    result = mcp_probe.probe(
+        _script(tmp_path, "runaway.py", _FAKE_RUNAWAY),
+        bound=CpuBound(1.5, stall_window=1, min_progress=0.1),
+    )
+    assert result.initialized is False
+    assert "exceeded CPU budget" in result.detail, result.detail
+
+
+def test_a_clean_exit_is_not_misread_as_a_stall(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """The #838 zombie guard, reached through the probe with a slow `ps`."""
+    real = evals.group_cpu_seconds
+
+    def slow_ps(pgid: int) -> float | None:
+        time.sleep(0.5)
+        return real(pgid)
+
+    monkeypatch.setattr(evals, "group_cpu_seconds", slow_ps)
+    result = mcp_probe.probe(
+        _script(tmp_path, "late-exit.py", _FAKE_LATE_CLEAN_EXIT),
+        bound=CpuBound(30, stall_window=0.5, min_progress=0.05),
+    )
+    assert result.initialized is False
+    assert "rc=0" in result.detail, result.detail
+
+
+def test_a_starved_server_answers_where_the_wall_bound_fails(tmp_path):
+    """#748 reproduced in miniature, with SIGSTOP starvation, as in #838."""
+    marker = f"kb748-{uuid.uuid4().hex}"
+    argv = [*_script(tmp_path, "slow.py", _FAKE_SLOW_WORKER), marker]
+    with _Throttle(marker, duty=0.25):
+        walled = mcp_probe.probe(argv, timeout=3)
+    assert walled.initialized is False, "control: the wall bound must fail the starved server"
+    assert "timed out" in walled.detail
+
+    with _Throttle(marker, duty=0.25):
+        bounded = mcp_probe.probe(argv, bound=CpuBound(30, stall_window=1, min_progress=0.05))
+    assert bounded.initialized is True, bounded.detail
 
 
 # --------------------------------------------------------------------------
