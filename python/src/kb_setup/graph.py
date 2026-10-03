@@ -373,8 +373,15 @@ _EXPECTED_METADATA_ONLY = (
         # describes: tier 1 flags DRIFT on a pin bump even when the file did not
         # change, because a cheap re-stamp is the correct direction to be wrong
         # in. Do not read the unchanged hash as evidence the gate misfired.
-        content_sha256="3ee45be83e41d61eb7d77dedf9e4c2c499ee080ef1b3aac96ee739e302b8192f",
-        pinned_commit="262d53df92e9cf7495206e64e3f6c4edc757116f",
+        #
+        # RE-APPROVED again at 4f2dd1b7 (2026-10-03, #837's pin advance). Premise
+        # re-verified in the clone at that commit: 254 bytes, `grep -c
+        # '^\[project\]'` -> 0, tables still only `[tool.ruff]`,
+        # `[tool.ruff.lint]`, `[tool.coverage.run]`, `[tool.coverage.report]`.
+        # This time the bytes DID change (sha256 3ee45be8… -> f503969b…, same
+        # size), so both values moved; the zero-node reason still holds.
+        content_sha256="f503969b09777f34bddca65b97a221c50b29f172baca7fd197afd94c4ac25312",
+        pinned_commit="4f2dd1b793dcb0e5fc08d4fe6c76f9b7acb5d3b3",
         skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
     graphify_health.ExpectedMetadataOnly(
