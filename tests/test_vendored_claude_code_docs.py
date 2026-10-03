@@ -75,7 +75,7 @@ def test_every_row_has_its_page_and_every_page_its_row() -> None:
 
 
 def test_the_mirror_holds_only_pages_and_provenance() -> None:
-    allowed = {"fetch.tsv", "fetch.stamp.json"}
+    allowed = {"fetch.tsv", "fetch.stamp.json", "fetch.misses.json"}
     strays = [p.name for p in (_REPO / _MIRROR).iterdir() if p.suffix != ".md"]
     assert set(strays) <= allowed, strays
 

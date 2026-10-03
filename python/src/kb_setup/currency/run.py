@@ -2,7 +2,7 @@
 """Orchestration and the three entry points the outside world uses.
 
 * `check`  — offline step 1 only. This is what the SessionStart hook runs, so it
-             must stay subprocess-free and finish in milliseconds, and it must
+             uses only local state (with bounded git reads for docs), and must
              print NOTHING when everything is in sync. Always exits 0: a hook
              that blocks a session over a version pin would be worse than the
              drift it reports.
@@ -23,7 +23,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from kb_setup import ccdocs_mirror
+from kb_setup import docs_mirror
 from kb_setup.currency import (
     baseline,
     config,
@@ -129,10 +129,9 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
     # walk over `wiki/`, 35.6-63.3 ms) is paid at stamp time, after an operation
     # that already took minutes.
     views.report(views.check_views(repo_root, spec) for spec in _specs(repo_root, only))
-    # The vendored Claude Code docs mirror (#829) has no pin for any check above
-    # to compare, so its only freshness signal is its own stamp. Offline (one
-    # small JSON read), and silent in a repo that vendors no mirror.
-    ccdocs_mirror.report_staleness(repo_root)
+    # Vendored docs use local stamps; the Codex source uses its pin's git age.
+    # These offline probes never fetch or invoke webclaw (#829/#837/#847).
+    docs_mirror.report_staleness(repo_root)
     if stale:
         print("[currency] tracked docs pages not verified recently (this is not drift):")
         for tool, finding in stale:

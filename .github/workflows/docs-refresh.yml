@@ -1,0 +1,31 @@
+name: Docs mirror refresh check
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        with:
+          install: false
+      - name: Install docs refresh tools
+        run: mise install github:0xMassi/webclaw uv
+      - name: Refresh and report without committing
+        shell: bash
+        run: |
+          rc=0
+          PYTHONPATH=python/src uv run --no-project --python 3.14.7 --with structlog==26.1.0 python -m kb_setup.docs_mirror refresh all || rc=$?
+          git status --porcelain -- sources/media >> "$GITHUB_STEP_SUMMARY"
+          echo "Refresh exit code: $rc" >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"

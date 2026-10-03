@@ -63,7 +63,8 @@ def _print_usage() -> int:
         "affected <symbol> [--depth N] | "
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | graphify-catalog | "
-        "lock-drift | mod-runtime-check [--arms] | worktree-ready [--target PATH] | "
+        "lock-drift | docs refresh <site>|all | docs check | ccdocs refresh|check | "
+        "mod-runtime-check [--arms] | worktree-ready [--target PATH] | "
         "telemetry-prune | serve | serve-memory | env-refresh [--sentinel] | "
         "codex-config-check | "
         "instruction-edit-guard | "
@@ -219,6 +220,10 @@ def _run(argv: list[str] | None = None) -> int:
         # mise's own `lock --dry-run` and reading the REPORT — mise exits 0
         # either way, so the rc is not the answer.
         return lock_drift.main(repo_root, rest)
+    if cmd == "docs":
+        from kb_setup import docs_mirror
+
+        return docs_mirror.main(repo_root, rest)
     if cmd == "ccdocs":
         from kb_setup import ccdocs_mirror
 

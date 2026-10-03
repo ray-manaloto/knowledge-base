@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from kb_setup import ccdocs_mirror as cm
+from kb_setup import docs_mirror as dm
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -19,6 +20,16 @@ if TYPE_CHECKING:
 _MD = "text/markdown; charset=utf-8"
 _NOW = datetime(2026, 10, 2, tzinfo=UTC)
 _LLMS, _SITEMAP = cm.INVENTORIES
+_MAPPED_URLS: list[str] = []
+
+
+@pytest.fixture(autouse=True)
+def _offline_webclaw(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Map contributes the test's own inventory URLs; fallback cannot turn the
+    # existing HTML/307 negative arms into successful fetches.
+    _MAPPED_URLS.clear()
+    monkeypatch.setattr(dm, "webclaw_map", lambda _site: list(_MAPPED_URLS))
+    monkeypatch.setattr(dm, "webclaw_fetch", lambda _url: None)
 
 
 def _url(name: str) -> str:
@@ -30,6 +41,7 @@ def _ok(body: str, ctype: str = _MD) -> cm.Response:
 
 
 def _fetcher(pages: dict[str, cm.Response], *, llms: str, sitemap: str) -> cm.Fetcher:
+    _MAPPED_URLS[:] = sorted(cm.inventory_urls(llms) | cm.inventory_urls(sitemap))
     table = {_LLMS: _ok(llms, "text/plain"), _SITEMAP: _ok(sitemap, "application/xml")}
     table |= {url + ".md": resp for url, resp in pages.items()}
 
@@ -153,6 +165,7 @@ def test_inventory_urls_normalise_md_suffix_and_sentence_dots() -> None:
 def _stamp(root: Path, when: datetime) -> None:
     mirror = root / cm.MIRROR
     mirror.mkdir(parents=True, exist_ok=True)
+    (mirror / cm.FETCH_TSV).touch()
     (mirror / cm.STAMP).write_text(json.dumps({"fetched_at": when.isoformat(), "pages": 1}))
 
 
@@ -168,6 +181,7 @@ def test_staleness_reports_an_old_mirror(tmp_path: Path) -> None:
 
 def test_staleness_never_reads_a_missing_stamp_as_fresh(tmp_path: Path) -> None:
     (tmp_path / cm.MIRROR).mkdir(parents=True)
+    (tmp_path / cm.MIRROR / cm.FETCH_TSV).touch()
     assert "freshness UNKNOWN" in cm.staleness(tmp_path, now=_NOW)
 
 
@@ -208,7 +222,7 @@ def test_the_sessionstart_currency_check_runs_the_staleness_probe(
 
     from kb_setup.currency import run as currency_run
 
-    monkeypatch.setattr(cm, "staleness", lambda _root: "SENTINEL-stale-mirror")
+    monkeypatch.setattr(dm, "staleness", lambda _root, _site: "SENTINEL-stale-mirror")
     assert currency_run.check(_Path(__file__).parent.parent) == 0
     assert "SENTINEL-stale-mirror" in capsys.readouterr().out
 
@@ -322,6 +336,7 @@ def test_a_trailing_slash_url_is_the_same_page() -> None:
 )
 def test_an_unusable_stamp_is_unknown_never_fresh(tmp_path: Path, stamp: str, reason: str) -> None:
     (tmp_path / cm.MIRROR).mkdir(parents=True)
+    (tmp_path / cm.MIRROR / cm.FETCH_TSV).touch()
     (tmp_path / cm.MIRROR / cm.STAMP).write_text(stamp)
     line = cm.staleness(tmp_path, now=_NOW)
     assert "freshness UNKNOWN" in line

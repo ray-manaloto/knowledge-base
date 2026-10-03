@@ -114,6 +114,12 @@ gitleaks = "8.30.1"
 # valid. Do not drop below 0.44.0 to "match dotfiles" — bump dotfiles instead.
 # 0.45.0 additionally accepts parameterized ids such as `claude-opus-5[effort=high]`.
 "github:agent-sh/agnix" = "0.52.1"
+# webclaw: the third docs inventory and guarded HTML-to-markdown fallback
+# (#837/#847). The user-global-only pin was #829's reproducibility gap: a
+# checkout or CI runner could not rely on it. Pin the measured version here;
+# discovery uses the origin's sitemap without crawl fallback, and the engine
+# validates redirect targets before accepting a fallback page.
+"github:0xMassi/webclaw" = "0.6.23"
 # fnox: the credential tool the shell's secrets come from (jdx/fnox, in mise's
 # registry as `github:jdx/fnox`). Pinned here rather than left to the user's
 # GLOBAL mise, which at the time installed into a directory literally named
@@ -1200,6 +1206,21 @@ description = "Offline: is the vendored Claude Code docs mirror older than 7 day
 # The same probe `kb-currency-check` prints at SessionStart, as a task with a
 # real exit code.
 run = "uv run kb-setup ccdocs check"
+timeout = "30s"
+
+[tasks.kb-avdocs-refresh]
+description = "Refresh the agentsview offline docs mirror with completeness checks"
+run = "uv run kb-setup docs refresh agentsview"
+timeout = "15m"
+
+[tasks.kb-docs-refresh]
+description = "Refresh every offline docs mirror with guarded fallback and retirement"
+run = "uv run kb-setup docs refresh all"
+timeout = "30m"
+
+[tasks.kb-docs-check]
+description = "Offline freshness of every docs mirror and the Codex docs pin"
+run = "uv run kb-setup docs check"
 timeout = "30s"
 
 [tasks.kb-graphify-catalog]
