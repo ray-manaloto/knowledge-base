@@ -358,6 +358,38 @@ def _judge(bound: CpuBound, used: float | None, seen: _Progress) -> tuple[int, s
     )
 
 
+class CpuWatch:
+    """Sample ``proc``'s process group and judge it against a :class:`CpuBound`.
+
+    Shared by :func:`run_command_cpu_bounded` and `mcp_probe.probe`, so the
+    runaway/wedge rules and the zombie guard exist once. The command must have
+    been started with ``start_new_session=True``, which makes its pid its pgid.
+    """
+
+    def __init__(self, proc: subprocess.Popen[str], bound: CpuBound) -> None:
+        """Start the progress clock now, with zero CPU seen."""
+        self.proc, self.bound = proc, bound
+        self._seen = _Progress(cpu=0.0, at=time.monotonic())
+
+    @property
+    def tick(self) -> float:
+        """Seconds between samples: often enough for both the budget and the stall rule."""
+        return min(self.bound.sample_every, self.bound.stall_window)
+
+    def verdict(self) -> tuple[int, str] | None:
+        """A failure ``(rc, detail)``, or None to keep waiting.
+
+        Samples FIRST and checks for exit SECOND. A command that exited is never
+        judged: a zombie reads as zero CPU on macOS, and judging it turned a clean
+        exit into a false "stalled" (#838 review, round 2). After an exit,
+        ``proc.returncode`` is set, so the caller can tell the two None cases apart.
+        """
+        used = group_cpu_seconds(self.proc.pid)
+        if self.proc.poll() is not None:
+            return None
+        return _judge(self.bound, used, self._seen)
+
+
 def _collect_after_exit(proc: subprocess.Popen[str], bound: CpuBound) -> tuple[int, str]:
     """The command has exited: collect its output, bounded.
 
@@ -419,19 +451,17 @@ def run_command_cpu_bounded(
         )
     except (FileNotFoundError, PermissionError) as exc:
         return -2, str(exc)
-    tick = min(bound.sample_every, bound.stall_window)
-    seen = _Progress(cpu=0.0, at=time.monotonic())
+    watch = CpuWatch(proc, bound)
     while True:
         try:
-            out, err = proc.communicate(timeout=tick)
+            out, err = proc.communicate(timeout=watch.tick)
         except subprocess.TimeoutExpired:
             pass
         else:
             return proc.returncode, out + err
-        used = group_cpu_seconds(proc.pid)
-        if proc.poll() is not None:
+        verdict = watch.verdict()
+        if proc.returncode is not None:
             return _collect_after_exit(proc, bound)  # never trust a post-exit sample
-        verdict = _judge(bound, used, seen)
         if verdict is not None:
             _kill_group(proc)
             return verdict

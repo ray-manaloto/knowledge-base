@@ -154,6 +154,32 @@ def test_an_exit_just_after_a_sample_is_not_a_stall(monkeypatch: pytest.MonkeyPa
         assert (rc, out.strip()) == (0, "done"), out
 
 
+def test_a_watch_never_judges_an_exited_command(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The zombie guard, deterministically: an exited command is never a verdict.
+
+    `ps` is made to report 0 CPU, as macOS does for a zombie, against a bound
+    that would call that stalled at once. The watch must return None for the
+    exited command, and it must call the SAME reading on a live one stalled.
+    """
+    monkeypatch.setattr(evals, "group_cpu_seconds", lambda _pgid: 0.0)
+    bound = evals.CpuBound(30, stall_window=0, min_progress=1)
+
+    done = subprocess.Popen([sys.executable, "-c", "pass"], text=True, start_new_session=True)
+    done.wait()
+    assert evals.CpuWatch(done, bound).verdict() is None
+
+    live = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"], text=True, start_new_session=True
+    )
+    try:
+        verdict = evals.CpuWatch(live, bound).verdict()
+    finally:
+        live.kill()
+        live.wait()
+    assert verdict is not None, "control: the same reading on a live command must judge"
+    assert "stalled" in verdict[1]
+
+
 def test_a_descendant_holding_the_pipe_cannot_wait_forever() -> None:
     """Round-2 P2-1: an escaped (setsid) descendant must not hang the reap."""
     code = (
