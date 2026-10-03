@@ -263,10 +263,16 @@ experimental = true
 # same set as the global config), not just the two this file used to pin.
 disable_tools = [
   "antigravity-cli",
+  "agy",
+  "aqua:google-antigravity/antigravity-cli",
   "npm:@openai/codex",
   "aqua:openai/codex",
+  "github:openai/codex",
   "codex",
+  "claude",
   "claude-code",
+  "aqua:anthropics/claude-code",
+  "http:claude",
   "npm:@anthropic-ai/claude-code",
   "github:anthropics/claude-code",
 ]
