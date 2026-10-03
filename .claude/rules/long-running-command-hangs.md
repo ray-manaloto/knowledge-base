@@ -74,6 +74,8 @@ incident: unbounded wait + pipe-masked exit code.
    `returncode`, with nothing in between to discard it. The redirect form
    (`cmd > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log`, then read the file)
    remains correct for a command **no task owns** — a `git`, a `gh`, a one-off.
+   Worktree-isolated and the guard refuses it (git/`$(…)`/heredoc)? Put it in a
+   script, run `bash <file>`; never drop the rc capture (dotfiles 2026-10-01).
 
    Two reasons the redirect stopped being the headline advice. It is shell
    logic, recommended by the repo whose first invariant is `zero-bash-logic`;

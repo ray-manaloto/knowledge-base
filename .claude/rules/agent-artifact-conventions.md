@@ -59,6 +59,14 @@ to guarantee. Leave it; fix the pointer in the authored doc instead.
 | `graphify-out/` | DERIVED — rebuilt by `kb-build`/`kb-artifacts`; only `memory/` is committed |
 | `sources/<name>/` | Gitignored clone, re-fetched from its pinned manifest SHA |
 
+## Worktrees
+
+A session moves between sibling worktrees (`<repo>.worktrees/<name>`) by
+`ExitWorktree keep` then `EnterWorktree path=<sibling>`; a direct switch is
+refused unless the target is under `.claude/worktrees/`. Coordinators and
+read-only review/research lanes run NON-isolated; only implementer lanes
+isolate (Ray, 2026-10-02).
+
 ## Rules
 
 1. **No ad-hoc directories.** Do not create `.agent/temp/`, `.agent/output/`,
