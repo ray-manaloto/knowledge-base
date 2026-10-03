@@ -45,7 +45,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 #: passed alone in 28.9-35.0 s, so the bound measured the host. A server that
 #: wedges (no CPU progress for a minute) or burns past this budget still fails.
 #: Budget: the whole `mise run kb-serve` group (mise + uv + graphify-mcp) spent
-#: ~28.4 CPU-s to its first reply on the 756 MB graph (measured 2026-10-02, load
+#: ~28.4 CPU-s over the full handshake on the 756 MB graph (measured 2026-10-02, load
 #: ~15), so 180 is ~6x headroom, the same ratio as the eval canary's. Starved by
 #: SIGSTOP at the same duty, the old 120 s wall bound failed at 120.1 s, and this
 #: bound answered in 154.7 s (docs/research/reports/2026-10-02-kb-748-evidence.md).
@@ -244,9 +244,20 @@ _FAKE_WEDGED = "import sys, time\nsys.stdin.readline()\ntime.sleep(60)\n"
 #: Never answers and spins: a runaway.
 _FAKE_RUNAWAY = "import sys\nsys.stdin.readline()\nwhile True: pass\n"
 
-#: Exits cleanly, after a delay, without answering. The zombie guard must
-#: report the rc=0 exit, not a stall.
-_FAKE_LATE_CLEAN_EXIT = "import sys, time\nsys.stdin.readline()\ntime.sleep(1.2)\n"
+#: Works for a moment, then exits cleanly without answering. It spins rather
+#: than sleeps, so it is never a real stall under its own bound (review P2).
+_FAKE_LATE_CLEAN_EXIT = (
+    "import sys, time\nsys.stdin.readline()\nwhile time.process_time() < 0.6:\n    pass\n"
+)
+
+#: Its leader exits 0 at once, but a `setsid` child inherits stdout and holds it
+#: open, so EOF never comes. That is the orphaned-graphify-mcp shape
+#: `mcp_serve.py` records.
+_FAKE_ESCAPED_HOLDER = (
+    "import subprocess, sys\nsys.stdin.readline()\n"
+    "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'],"
+    " start_new_session=True)\n"
+)
 
 
 def test_a_wedged_server_fails_as_stalled_under_the_cpu_bound(tmp_path):
@@ -263,14 +274,19 @@ def test_a_wedged_server_fails_as_stalled_under_the_cpu_bound(tmp_path):
 def test_a_runaway_server_fails_on_its_cpu_budget(tmp_path):
     result = mcp_probe.probe(
         _script(tmp_path, "runaway.py", _FAKE_RUNAWAY),
-        bound=CpuBound(1.5, stall_window=1, min_progress=0.1),
+        bound=CpuBound(1.5, stall_window=5, min_progress=0.1),
     )
     assert result.initialized is False
     assert "exceeded CPU budget" in result.detail, result.detail
 
 
 def test_a_clean_exit_is_not_misread_as_a_stall(tmp_path, monkeypatch: pytest.MonkeyPatch):
-    """The #838 zombie guard, reached through the probe with a slow `ps`."""
+    """A clean exit reports rc=0 through the probe, with a slow `ps` in the loop.
+
+    The zombie guard itself is pinned deterministically by
+    `test_cpu_bounded::test_a_watch_never_judges_an_exited_command`; this is the
+    probe-level path, which must not regress to a "stalled" verdict.
+    """
     real = evals.group_cpu_seconds
 
     def slow_ps(pgid: int) -> float | None:
@@ -280,10 +296,26 @@ def test_a_clean_exit_is_not_misread_as_a_stall(tmp_path, monkeypatch: pytest.Mo
     monkeypatch.setattr(evals, "group_cpu_seconds", slow_ps)
     result = mcp_probe.probe(
         _script(tmp_path, "late-exit.py", _FAKE_LATE_CLEAN_EXIT),
-        bound=CpuBound(30, stall_window=0.5, min_progress=0.05),
+        bound=CpuBound(30, stall_window=5, min_progress=0.05),
     )
     assert result.initialized is False
     assert "rc=0" in result.detail, result.detail
+
+
+def test_a_descendant_holding_stdout_cannot_hold_the_probe_forever(tmp_path):
+    """Review P1: a never-coming EOF is bounded by the exit grace.
+
+    With `bound=` the deadline is infinite, so after the leader exits only
+    ``stall_window`` stands between the probe and a descendant holding stdout.
+    """
+    started = time.monotonic()
+    result = mcp_probe.probe(
+        _script(tmp_path, "escaped.py", _FAKE_ESCAPED_HOLDER),
+        bound=CpuBound(30, stall_window=2, min_progress=0.05),
+    )
+    assert time.monotonic() - started < 12, "the 30 s holder must not set the pace"
+    assert result.initialized is False
+    assert "kept its stdout open" in result.detail, result.detail
 
 
 def test_a_starved_server_answers_where_the_wall_bound_fails(tmp_path):
@@ -296,7 +328,7 @@ def test_a_starved_server_answers_where_the_wall_bound_fails(tmp_path):
     assert "timed out" in walled.detail
 
     with _Throttle(marker, duty=0.25):
-        bounded = mcp_probe.probe(argv, bound=CpuBound(30, stall_window=1, min_progress=0.05))
+        bounded = mcp_probe.probe(argv, bound=CpuBound(30, stall_window=5, min_progress=0.05))
     assert bounded.initialized is True, bounded.detail
 
 

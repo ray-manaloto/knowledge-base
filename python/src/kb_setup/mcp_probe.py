@@ -131,6 +131,7 @@ class _Session:
         self._deadline = deadline
         self._watch = watch
         self._next_sample = time.monotonic() + (watch.tick if watch else 0.0)
+        self._exited_at: float | None = None
         self._lines: Queue[str | None] = Queue()
         self._eof = False
         threading.Thread(target=_pump, args=(proc.stdout, self._lines), daemon=True).start()
@@ -158,32 +159,52 @@ class _Session:
                 return None, f"timed out waiting for reply id={want}"
             if self._eof:
                 return None, self._exit_detail(want)
-            if (verdict := self._sample()) is not None:
-                return None, f"no reply to id={want}: {verdict}"
+            # Read BEFORE judging, so a reply already queued is never reported as
+            # a budget or stall failure that happened after it (#748 review, P3).
             try:
                 line = self._lines.get(timeout=min(remaining, 1.0))
             except Empty:
-                continue
+                line = ""
             if line is None:
                 self._eof = True
                 return None, self._exit_detail(want)
-            try:
-                message = json.loads(line)
-            except TypeError, ValueError:
-                continue
-            if isinstance(message, dict) and message.get("id") == want:
-                return message, ""
+            if line:
+                try:
+                    message = json.loads(line)
+                except TypeError, ValueError:
+                    message = None
+                if isinstance(message, dict) and message.get("id") == want:
+                    return message, ""
+            if (verdict := self._sample()) is not None:
+                return None, f"no reply to id={want}: {verdict}"
 
     def _sample(self) -> str | None:
         """The CPU watch's failure detail when one is due and has fired.
 
-        A server that has exited is never judged here (``CpuWatch.verdict``
-        returns None for it), so the EOF path keeps reporting its rc.
+        A server whose leader has exited is never judged on CPU (``CpuWatch``
+        returns None for it), so the EOF path keeps reporting its rc. But EOF
+        never comes while a descendant still holds stdout. Under ``bound=`` the
+        deadline is infinite, so that case gets its own bound: ``stall_window``
+        after the exit is seen, the same bound `evals._collect_after_exit` gives
+        it (#748 review, P1).
         """
-        if self._watch is None or time.monotonic() < self._next_sample:
+        if self._watch is None:
             return None
-        self._next_sample = time.monotonic() + self._watch.tick
+        now = time.monotonic()
+        if self._exited_at is not None:
+            if now - self._exited_at < self._watch.bound.stall_window:
+                return None
+            return (
+                f"server exited rc={self._proc.returncode}, but a descendant kept its "
+                f"stdout open past {self._watch.bound.stall_window:g}s"
+            )
+        if now < self._next_sample:
+            return None
+        self._next_sample = now + self._watch.tick
         verdict = self._watch.verdict()
+        if self._proc.returncode is not None:
+            self._exited_at = now
+            return None
         return None if verdict is None else verdict[1]
 
     def _exit_detail(self, want: int) -> str:
