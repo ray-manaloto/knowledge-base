@@ -23,7 +23,7 @@ refresh" — it does).
 
 | URL (www.agentsview.io) | result |
 |---|---|
-| `/llms.txt` | 200 text/plain, 41 `.md` entries |
+| `/llms.txt` | 200 text/plain, 33 unique `.md` entries (an earlier draft said 41 — a miscount; re-derived with `grep -o … \| sort -u \| wc -l`, and the live refresh mirrored exactly 33) |
 | `/sitemap.xml` | 200 application/xml, 33 `<loc>` |
 | `/docs/configuration.md` | **200 text/markdown** (positive arm) |
 | `/docs/bogus-xyz-404.md` | **404 text/html** (negative arm) |
@@ -48,6 +48,17 @@ not uniform: `/docs/` → `docs/index.md` and `/` → `index.md`, while `/docs/x
   ("no URLs found"), so the root must be the site origin.
 - `--map` WITH the crawl fallback adds `?tab=` query URLs and `.png` assets — noise,
   so the sitemap-only form is the inventory.
+
+## Live arms (host slot, 2026-10-02)
+
+| run | rc | result |
+|---|---|---|
+| `mise run kb-docs-refresh` (positive) | 0 | ccdocs 53 changed / 178 unchanged / 1 kept / 0 missing, stamped; avdocs 33 added / 0 missing, stamped |
+| bogus agentsview row seeded, `kb-avdocs-refresh` (negative) | 1 | kept, `retire_candidate` count 1, stamp NOT advanced; mirror restored afterwards |
+| `mise run kb-update -- codex-docs` | 0 | pin `262d53df` → `4f2dd1b7`; 195 docs listed for re-extract (graph work, not done here) |
+
+`claude-tag` is now MOVED: `.md` 307 → `https://claude.com/docs/claude-tag`, off-site. It
+stays as its grandfathered `webclaw` copy and is reported each run.
 
 ## GitHub repos touched
 

@@ -172,3 +172,44 @@ test = "test_webclaw_never_runs_on_not_found_server_or_network_failure"
 file = "python/src/kb_setup/docs_mirror.py"
 old = '''    if not eligible or not (resp.status == HTTPStatus.OK or same_page_redirect):'''
 new = '''    if not eligible:'''
+
+# Round-1 fixes (cold review of 8e40ed1b), each armed against its own test.
+# Dot/empty segments accepted again — one page mirrored under two names.
+[[arm]]
+id = "X1"
+test = "test_dot_and_empty_segments_are_not_pages"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''    if any(part in {"", ".", ".."} for part in path.split("/")):'''
+new = '''    if False:'''
+
+# A row that is not a page reaches page_name and crashes instead of NOT_RUN.
+[[arm]]
+id = "X2"
+test = "test_a_row_that_is_not_a_page_refuses_before_writing"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''        if normalise(site, url) != url:'''
+new = '''        if False:'''
+
+# Orphan miss records survive forever.
+[[arm]]
+id = "X3"
+test = "test_an_orphan_miss_is_pruned"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''        del misses[url]'''
+new = '''        pass'''
+
+# A mirror with pages but no stamp reads as silent (the pre-fix weakening).
+[[arm]]
+id = "X4"
+test = "test_a_mirror_with_pages_but_no_stamp_is_unknown"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''or any(mirror.glob("*.md"))'''
+new = '''or False'''
+
+# SessionStart asks the codex pin again (a git spawn on a stat-only path).
+[[arm]]
+id = "X5"
+test = "test_sessionstart_staleness_never_asks_the_codex_pin"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''include_codex: bool = False'''
+new = '''include_codex: bool = True'''
