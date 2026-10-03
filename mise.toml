@@ -1196,8 +1196,10 @@ description = "Re-fetch the vendored Claude Code docs mirror (sources/media/clau
 # pin, so nothing else ever updates it: 107 of 231 pages changed in its first
 # day. Re-fetches every page as native .md, adds pages llms.txt/sitemap.xml newly
 # list, keeps a previous copy (and says so) when a fetch fails, and exits 1 when
-# a listed page can be neither fetched nor kept. An unreadable inventory exits
-# 127 and writes nothing. Logic in kb_setup.ccdocs_mirror; commit the result.
+# a listed page can be neither fetched nor kept. An unreadable inventory — the
+# webclaw map included, so a missing `webclaw` binary too — exits 127 and writes
+# nothing. Logic in kb_setup.docs_mirror (ccdocs_mirror is its Claude Code
+# compatibility layer, #837); `kb-docs-refresh` runs every site. Commit the result.
 run = "uv run kb-setup ccdocs refresh"
 timeout = "15m"
 
