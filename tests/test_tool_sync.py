@@ -301,7 +301,7 @@ def test_legacy_tool_sync_eligibility_census() -> None:
     carrying a `manifest =` key — "manifest-bearing tools require the separate
     provenance workflow". So declaring that a tool HAS a source to check also
     removes it from the only automated sync there is, and the workflow it defers
-    to does not exist as a command. Measured: 2 of 20 eligible today; 12 of 20 if
+    to does not exist as a command. Measured 2026-09-09: 2 of 20 eligible; 12 of 20 if
     that one refusal were lifted, the other 8 being blocked for reasons genuinely
     their own (self-managed, python-owned, generated-skill).
 
@@ -316,9 +316,17 @@ def test_legacy_tool_sync_eligibility_census() -> None:
     leaving, without anyone intending it must turn this red. What changed is that
     a shrink is no longer written up as correct. Tracked in #314; the relationship
     model that resolves it belongs to #730.
+
+    GREW DELIBERATELY on 2026-10-03 (#837): `webclaw` is a mise-only github pin
+    with no source manifest (nothing upstream is vendored or extracted; it is the
+    docs mirror's fetch tool), so the automated sync is the right owner of its
+    version, under Ray's standing "always pin to the latest". That makes 3 of
+    21 eligible (measured 2026-10-03 via `config.load` + `eligible_tools`); the
+    "12 of 20 without that refusal" figure above is the 2026-09-09 measurement
+    and was not re-derived.
     """
     repo_root = Path(__file__).parents[1]
-    assert tool_sync.eligible_tools(repo_root) == ("coreutils", "lychee")
+    assert tool_sync.eligible_tools(repo_root) == ("coreutils", "lychee", "webclaw")
 
 
 def test_unexpected_exception_is_redacted_after_rollback(tmp_path, monkeypatch, capsys) -> None:
