@@ -1,5 +1,9 @@
 name: Docs mirror refresh check
 
+# Read-only (#837/#847): re-fetches every vendored docs mirror and reports what
+# changed, then asks the offline freshness check (which includes the codex-docs
+# pin age). It never commits or pushes; the rolling bot PR is KB#834's.
+
 on:
   schedule:
     - cron: '23 */6 * * *'
@@ -12,20 +16,26 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      PYTHONPATH: python/src
     steps:
+      # Full history: the codex-docs pin age is `git log -1` on its manifest,
+      # which a depth-1 checkout would report as the checkout commit's date.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
         with:
           install: false
       - name: Install docs refresh tools
         run: mise install github:0xMassi/webclaw uv
-      - name: Refresh and report without committing
+      - name: Refresh, check and report without committing
         shell: bash
         run: |
-          rc=0
-          PYTHONPATH=python/src uv run --no-project --python 3.14.7 --with structlog==26.1.0 python -m kb_setup.docs_mirror refresh all || rc=$?
+          run() { uv run --no-project --python 3.14.7 --with structlog==26.1.0 python -m kb_setup.docs_mirror "$@"; }
+          refresh=0; run refresh all || refresh=$?
+          check=0; run check || check=$?
           git status --porcelain -- sources/media >> "$GITHUB_STEP_SUMMARY"
-          echo "Refresh exit code: $rc" >> "$GITHUB_STEP_SUMMARY"
-          exit "$rc"
+          echo "refresh rc=$refresh, check rc=$check" >> "$GITHUB_STEP_SUMMARY"
+          exit $(( refresh > check ? refresh : check ))

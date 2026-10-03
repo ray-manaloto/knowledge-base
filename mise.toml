@@ -246,8 +246,8 @@ gh = "2.98.0"
 # 2026-10-01): claude, codex and agy come ONLY from their native installers on
 # this Mac (`~/.local/bin/{codex,agy}`, self-updating), and every mise name for
 # them is in `[settings] disable_tools` below. Nothing else needs the pin: this
-# repo's only CI workflow (graphify-live-receipt.yml) runs bare python3, and there
-# is no image. Their currency rows in currency.toml are self-managed (`expected`,
+# repo's CI workflows (graphify-live-receipt.yml, docs-refresh.yml) install only
+# what they name, and there is no image. Their currency rows in currency.toml are self-managed (`expected`,
 # no `mise_key`). The comments above describe the retired pins' history.
 "npm:ctx7" = { version = "0.5.9", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.3"

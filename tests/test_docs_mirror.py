@@ -173,6 +173,40 @@ def test_a_candidate_holds_stamp_and_logs_retire_candidate(
     assert (mirror / dm.MISSES).read_text().endswith("\n")
 
 
+def test_an_orphan_miss_is_pruned(tmp_path: Path) -> None:
+    # Neither a row nor listed: nothing will ever fetch it again, so its miss
+    # record would otherwise be rewritten forever.
+    mirror = _seed(tmp_path, _AV, {"alive": "old"})
+    _miss(mirror, _url("gone-long-ago"), 2, _NOW - timedelta(days=3))
+    listed = [_url("alive")]
+    out = dm.refresh(
+        tmp_path,
+        _AV,
+        fetcher=_native(_AV, {_url("alive"): _ok()}, listed),
+        mapper=_mapper(listed),
+        now=_NOW,
+    )
+    assert out.stamped
+    assert not (mirror / dm.MISSES).exists()
+
+
+@pytest.mark.parametrize(
+    "bad", ["https://www.agentsview.io/docs/x?tab=1", "https://elsewhere.example/docs/x"]
+)
+def test_a_row_that_is_not_a_page_refuses_before_writing(tmp_path: Path, bad: str) -> None:
+    mirror = _seed(tmp_path, _AV, {"alive": "old"})
+    with (mirror / dm.FETCH_TSV).open("a", encoding="utf-8") as f:
+        f.write(dm.Row(bad, "200|text/markdown", "md", 1).line() + "\n")
+    before = _snapshot(mirror)
+    listed = [_url("alive")]
+    native = _native(_AV, {_url("alive"): _ok()}, listed)
+    with pytest.raises(dm.MirrorUnreadableError):
+        dm.refresh(tmp_path, _AV, fetcher=native, mapper=_mapper(listed), now=_NOW)
+    assert _snapshot(mirror) == before
+    rc = dm.main(tmp_path, ["refresh", "agentsview"], fetcher=native, mapper=_mapper(listed))
+    assert rc == dm.Rc.NOT_RUN
+
+
 @pytest.mark.parametrize("inventory", ["llms", "sitemap", "map"])
 def test_a_page_listed_in_any_inventory_is_never_counted(tmp_path: Path, inventory: str) -> None:
     mirror = _seed(tmp_path, _AV, {"alive": "old", "listed": "previous"})
@@ -550,43 +584,63 @@ def test_codex_staleness_reports_unparsable_or_naive_dates(tmp_path: Path, date:
 
 @pytest.mark.parametrize("clone", [False, True])
 @pytest.mark.parametrize("age", [6, 7])
-def test_codex_staleness_reads_commit_or_last_pin_advance(
+def test_codex_staleness_reads_the_last_pin_advance_on_every_host(
     tmp_path: Path, *, clone: bool, age: int
 ) -> None:
+    # Whether the gitignored clone exists must not change the question asked:
+    # the same committed state answers the same on every host.
     _manifest(tmp_path, clone=clone)
 
     def git(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         assert kwargs == {"capture_output": True, "text": True, "check": True, "timeout": 10}
-        if clone:
-            assert args == [
-                "git",
-                "-C",
-                str(tmp_path / "sources/codex-docs"),
-                "show",
-                "-s",
-                "--format=%cI",
-                "abc123",
-            ]
-        else:
-            assert args == [
-                "git",
-                "-C",
-                str(tmp_path),
-                "log",
-                "-1",
-                "--format=%cI",
-                "--",
-                "sources/codex-docs.manifest",
-            ]
+        assert args == [
+            "git",
+            "-C",
+            str(tmp_path),
+            "log",
+            "-1",
+            "--format=%cI",
+            "--",
+            "sources/codex-docs.manifest",
+        ]
         return subprocess.CompletedProcess(args, 0, (_NOW - timedelta(days=age)).isoformat())
 
     line = dm.codex_docs_staleness(tmp_path, _NOW, git=git)
     if age < dm.STALE_AFTER_DAYS:
         assert line == ""
     else:
-        assert ("age of the pinned commit" if clone else "age of the last pin advance") in line
+        assert "age of the last pin advance" in line
         assert "7 days" in line
         assert "mise run kb-update -- codex-docs" in line
+
+
+def test_sessionstart_staleness_never_asks_the_codex_pin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # SessionStart is documented stat-only; the codex pin age spawns `git`.
+    def boom(*_a: object, **_k: object) -> str:
+        raise AssertionError("SessionStart asked the codex pin")
+
+    monkeypatch.setattr(dm, "codex_docs_staleness", boom)
+    dm.report_staleness(tmp_path)
+    assert capsys.readouterr().out == ""
+
+
+def test_a_mirror_with_pages_but_no_stamp_is_unknown(tmp_path: Path) -> None:
+    site = dm.SITES["agentsview"]
+    mirror = tmp_path / site.mirror
+    mirror.mkdir(parents=True)
+    (mirror / "docs__quickstart.md").write_text("x", encoding="utf-8")
+    assert "freshness UNKNOWN" in dm.staleness(tmp_path, site, now=_NOW)
+
+
+@pytest.mark.parametrize(
+    "raw", ["a/../b", "a/./b", "a//b", "../b", "a/.."], ids=["up", "dot", "empty", "lead", "tail"]
+)
+def test_dot_and_empty_segments_are_not_pages(raw: str) -> None:
+    site = dm.SITES["claude-code"]
+    assert dm.normalise(site, site.prefix + raw) is None
+    assert dm.normalise(site, site.prefix + "a/b") == site.prefix + "a/b"  # control
 
 
 @pytest.fixture

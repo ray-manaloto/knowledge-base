@@ -11,7 +11,9 @@ Unlisted 404/410 pages retire after three consecutive misses spanning seven
 days. All writes are deferred until every fetch returns; they are not
 transactional. An unavailable inventory writes nothing. CI never commits, so
 misses accumulate only through committed refresh runs: local runs or #834's
-future rolling PR. Check and SessionStart are offline and never invoke webclaw.
+future rolling PR. Check and SessionStart are offline and never invoke webclaw;
+SessionStart also spawns nothing, so the codex-docs pin age (one `git log`) is
+reported by `check` only.
 
 This module's import closure is stdlib plus structlog, allowing the read-only CI
 job to run without the project's graphify environment.
@@ -162,6 +164,10 @@ def normalise(site: Site, url: str) -> str | None:
     if path in site.index_sections:
         path = f"{path}/index" if path else "index"
     if not path or not re.fullmatch(r"[A-Za-z0-9_./-]+", path):
+        return None
+    # `a/../b`, `a/./b` and `a//b` name a page another spelling also names, and
+    # would mirror it twice under different flat filenames (cold review of 8e40ed1b).
+    if any(part in {"", ".", ".."} for part in path.split("/")):
         return None
     return site.prefix + path
 
@@ -451,8 +457,17 @@ def refresh(
     instant = now or datetime.now(UTC)
     mirror = repo_root / site.mirror
     old = read_rows(mirror)
+    for url in old:
+        # A row that no longer names a page of this site would crash `page_name`
+        # mid-loop; refuse before anything is fetched or written instead.
+        if normalise(site, url) != url:
+            raise MirrorUnreadableError(f"{mirror / FETCH_TSV}: not a {site.key} page: {url}")
     misses = _read_misses(mirror)
     listed = discover(site, native, mapper=adapters.get("mapper"))
+    # A miss is only meaningful for a page this run is responsible for; one whose
+    # row is gone and that no inventory lists would otherwise be rewritten forever.
+    for url in [u for u in misses if u not in listed and u not in old]:
+        del misses[url]
     state = _Refresh(site, instant, listed, misses)
     rows, writes, out = state.rows, state.writes, state.out
     stale_pages = 0
@@ -501,9 +516,16 @@ def _write_refresh(mirror: Path, state: _Refresh) -> None:
 def staleness(
     repo_root: Path, site: Site = SITES["claude-code"], *, now: datetime | None = None
 ) -> str:
-    """Offline warning for an initialized mirror; a .gitkeep-only site is silent."""
+    """Offline warning for an initialized mirror; a never-fetched site is silent.
+
+    "Never fetched" means no `fetch.tsv`, no stamp and no page: a `.gitkeep`-only
+    directory. A mirror holding pages but no readable stamp is still UNKNOWN, as
+    it was before the engine became multi-site (cold review of 8e40ed1b).
+    """
     mirror = repo_root / site.mirror
-    if not (mirror / FETCH_TSV).exists():
+    if not mirror.is_dir():
+        return ""
+    if not ((mirror / FETCH_TSV).exists() or (mirror / STAMP).exists() or any(mirror.glob("*.md"))):
         return ""
     unknown = f"{site.mirror}: freshness UNKNOWN ({{}}) — run `mise run {site.refresh_task}`"
     try:
@@ -522,28 +544,31 @@ def staleness(
 def codex_docs_staleness(
     repo_root: Path, now: datetime | None = None, *, git: Git | None = None
 ) -> str:
-    """Offline age of the pinned commit, or last pin advance when no clone exists."""
+    """Offline age of the last advance of the codex-docs pin.
+
+    ONE measure on every host: the commit that last touched the manifest. The
+    pinned upstream commit's own date would need the gitignored clone, so the
+    same committed state would answer differently on a host that has run
+    `kb-build` and one that has not (cold review of 8e40ed1b). The manifest is
+    still parsed, so a malformed one reads as UNKNOWN rather than as fresh.
+    """
     path = repo_root / "sources/codex-docs.manifest"
     if not path.exists():
         return ""
-    label = "age of the pinned commit"
+    label = "age of the last pin advance"
     remedy = "run `mise run kb-update -- codex-docs`"
     try:
-        pin = manifest.load(path)
-        if pin.clone_dir.is_dir():
-            args = ["git", "-C", str(pin.clone_dir), "show", "-s", "--format=%cI", pin.commit]
-        else:
-            label = "age of the last pin advance"
-            args = [
-                "git",
-                "-C",
-                str(repo_root),
-                "log",
-                "-1",
-                "--format=%cI",
-                "--",
-                str(path.relative_to(repo_root)),
-            ]
+        manifest.load(path)
+        args = [
+            "git",
+            "-C",
+            str(repo_root),
+            "log",
+            "-1",
+            "--format=%cI",
+            "--",
+            str(path.relative_to(repo_root)),
+        ]
         result = (git or subprocess.run)(
             args, capture_output=True, text=True, check=True, timeout=_GIT_TIMEOUT_S
         )
@@ -563,9 +588,14 @@ def codex_docs_staleness(
 
 
 def report_staleness(
-    repo_root: Path, *, sites: Sequence[Site] | None = None, include_codex: bool = True
+    repo_root: Path, *, sites: Sequence[Site] | None = None, include_codex: bool = False
 ) -> None:
-    """Print SessionStart findings, preserving Claude Code's exact header shape."""
+    """Print SessionStart findings, preserving Claude Code's exact header shape.
+
+    The codex pin is OFF by default here: its age costs a `git` spawn (~200 ms,
+    measured in the cold review of 8e40ed1b) on a path documented as ~10 ms and
+    stat-only. `kb-docs-check` and the CI job ask it instead.
+    """
     for site in sites if sites is not None else SITES.values():
         line = staleness(repo_root, site)
         if line:

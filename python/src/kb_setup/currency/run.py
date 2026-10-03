@@ -2,7 +2,7 @@
 """Orchestration and the three entry points the outside world uses.
 
 * `check`  — offline step 1 only. This is what the SessionStart hook runs, so it
-             uses only local state (with bounded git reads for docs), and must
+             must stay subprocess-free and finish in milliseconds, and it must
              print NOTHING when everything is in sync. Always exits 0: a hook
              that blocks a session over a version pin would be worse than the
              drift it reports.
@@ -129,8 +129,10 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
     # walk over `wiki/`, 35.6-63.3 ms) is paid at stamp time, after an operation
     # that already took minutes.
     views.report(views.check_views(repo_root, spec) for spec in _specs(repo_root, only))
-    # Vendored docs use local stamps; the Codex source uses its pin's git age.
-    # These offline probes never fetch or invoke webclaw (#829/#837/#847).
+    # The vendored docs mirrors (#829/#837) have no pin for any check above to
+    # compare, so their only freshness signal is their own stamps. Offline (one
+    # small JSON read each), silent for a site never fetched, and NO subprocess:
+    # the codex-docs pin age needs `git`, so it lives in `kb-docs-check` instead.
     docs_mirror.report_staleness(repo_root)
     if stale:
         print("[currency] tracked docs pages not verified recently (this is not drift):")
