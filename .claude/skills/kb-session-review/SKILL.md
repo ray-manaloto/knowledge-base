@@ -276,7 +276,9 @@ reason a second time, and a worse version of it: that lane was never in the
 lane list AT ALL, so the ad-hoc run that found the #426 P0 could not repeat and
 five of its thirteen findings sat unfiled until a fresh sweep re-derived them).
 `unpinned` and `context` are round-level and stand down.
-The `telemetry` lane joined handoff mode on 2026-08-23 to close #461's unread-sink gap and was retired 2026-10-04 with the sink (KB#870).
+The `telemetry` lane joined handoff mode on 2026-08-23 because the raw-API sink
+had no consumer (the #461 shape); it was retired 2026-10-04 after #870 retired
+the sink.
 
 The composer is told the shape `kb-handoff-check` parses — branch in the lead,
 every gate claim carrying its commit with the sha backticked, `(absent)` on any

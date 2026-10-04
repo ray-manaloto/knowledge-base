@@ -176,7 +176,7 @@ return {{ audits: audits.filter(Boolean), label }}
 def test_line_numbers_survive_the_transform(tmp_path: Path) -> None:
     """Break line N of a real file; confirm the reported line is N.
 
-    Not "close to" N. `.claude/workflows/session-review.js` is 1,408 lines; a
+    Not "close to" N. `.claude/workflows/session-review.js` is 1,307 lines; a
     transform that shifts everything after the meta block would misreport
     almost every finding in that file. This is rev2's explicit requirement.
     """
