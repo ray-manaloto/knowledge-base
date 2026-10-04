@@ -52,6 +52,7 @@ class WrapperLogSite:
     check: str
     lane_rc: str
     note: str = ""
+    exclude: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Reject unsafe wrapper values before rendering or resolution checks."""
@@ -59,6 +60,15 @@ class WrapperLogSite:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"wrapper_logs.{name} must be a non-empty str")
+        if not isinstance(self.exclude, (list, tuple)) or not all(
+            isinstance(item, str) and item.strip() for item in self.exclude
+        ):
+            raise ValueError("wrapper_logs.exclude must be a list of non-empty str")
+        object.__setattr__(self, "exclude", tuple(self.exclude))
+
+    def selects(self, name: str) -> bool:
+        """Whether this site binds ``name``: its glob matches and no exclusion does."""
+        return fnmatch.fnmatchcase(name, self.glob) and not _matches(name, self.exclude)
 
 
 @dataclass(frozen=True)
@@ -449,7 +459,7 @@ def render(name: str, source: str, sites: SitesConfig, registry: Registry) -> st
                 text = _argv_render(text, site, name, registry)
         text = _strict_commands(text, name=name)
         for site in sites.wrapper_logs:
-            if fnmatch.fnmatchcase(name, site.glob):
+            if site.selects(name):
                 text = _wrapper_logs(text, site)
         return text
 
@@ -550,7 +560,7 @@ def _wrapper_findings(name: str, text: str, sites: SitesConfig) -> list[str]:
     return [
         f"(b) {name}: wrapper launch does not resolve: {site.launch}"
         for site in sites.wrapper_logs
-        if fnmatch.fnmatchcase(name, site.glob) and not any(site.launch in line for line in lines)
+        if site.selects(name) and not any(site.launch in line for line in lines)
     ]
 
 
@@ -632,8 +642,17 @@ def check_pin_sites(root: Path, sites: SitesConfig, registry: Registry) -> list[
     findings.extend(
         f"(b) wrapper log glob does not resolve: {site.glob}"
         for site in sites.wrapper_logs
+        if not any(site.selects(name) and _matches(name, sites.owned) for name in names)
+    )
+    # A stale exclusion must fail closed: one that excludes nothing the glob
+    # selects is either a typo (so the file it meant is still bound) or dead.
+    findings.extend(
+        f"(b) wrapper log exclude does not resolve: {pattern}"
+        for site in sites.wrapper_logs
+        for pattern in site.exclude
         if not any(
-            fnmatch.fnmatchcase(name, site.glob) and _matches(name, sites.owned) for name in names
+            fnmatch.fnmatchcase(name, site.glob) and fnmatch.fnmatchcase(name, pattern)
+            for name in names
         )
     )
     findings.extend(check_aliases_only(root, sites))

@@ -338,6 +338,41 @@ def test_f2_wrapper_site_requires_owned_files_and_each_fenced_launch(
     assert not any("owned-control.md: wrapper launch" in finding for finding in findings)
 
 
+_LAUNCHING = "```bash\ncodex exec --strict-config -\n```\n"
+
+
+@pytest.mark.parametrize("arm", ["excluded", "control"])
+def test_wrapper_exclude_keeps_new_launchers_bound(tmp_path: Path, arm: str):
+    """N1: an exclusion, not a narrowed glob, so a NEW launching file stays bound."""
+    content = {"owned-lane.md": "You ARE the lane.\n", "owned-new.md": _LAUNCHING}
+    path = _owned_wrapper_sites_file(tmp_path, content)
+    excluded = arm == "excluded"
+    if excluded:
+        path.write_text(path.read_text() + 'exclude = ["owned-lane.md"]\n')
+    findings = models.check_pin_sites(
+        tmp_path, models_apply.load_sites(path), models.load_registry()
+    )
+    launchless = "(b) owned-lane.md: wrapper launch does not resolve: codex exec"
+    assert (launchless in findings) is not excluded
+    assert "(a) owned-new.md: differs from models-apply render" in findings
+
+
+def test_wrapper_exclude_that_matches_nothing_is_reported(tmp_path: Path):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": _LAUNCHING})
+    path.write_text(path.read_text() + 'exclude = ["owned-typo.md"]\n')
+    findings = models.check_pin_sites(
+        tmp_path, models_apply.load_sites(path), models.load_registry()
+    )
+    assert "(b) wrapper log exclude does not resolve: owned-typo.md" in findings
+
+
+@pytest.mark.parametrize("value", ['""', '[""]', "[5]"], ids=["str", "empty", "non-str"])
+def test_wrapper_exclude_rejects_invalid_values(tmp_path: Path, capsys, value: str):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": _LAUNCHING})
+    path.write_text(path.read_text() + f"exclude = {value}\n")
+    _assert_wrapper_load_failure(path, "exclude", capsys)
+
+
 @pytest.mark.parametrize(
     "unknown",
     ["[[wrapper_log]]\n", "[unknown]\nvalue = 1\n", "unknown = 1\n"],
