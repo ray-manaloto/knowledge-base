@@ -60,6 +60,13 @@ class WrapperLogSite:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"wrapper_logs.{name} must be a non-empty str")
+        for name in ("lane_log", "lane_rc", "rolecheck"):
+            try:
+                words = shlex.split(getattr(self, name))
+            except ValueError as exc:
+                raise ValueError(f"wrapper_logs.{name} is not a shell word: {exc}") from exc
+            if not words or not words[0]:
+                raise ValueError(f"wrapper_logs.{name} must name a path")
         if not isinstance(self.exclude, (list, tuple)) or not all(
             isinstance(item, str) and item.strip() for item in self.exclude
         ):

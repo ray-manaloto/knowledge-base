@@ -338,6 +338,16 @@ def test_f2_wrapper_site_requires_owned_files_and_each_fenced_launch(
     assert not any("owned-control.md: wrapper launch" in finding for finding in findings)
 
 
+@pytest.mark.parametrize("field", ["lane_log", "lane_rc", "rolecheck"])
+@pytest.mark.parametrize("value", ["'\"\"'", "'\"unclosed'"], ids=["empty-word", "unclosed"])
+def test_wrapper_path_fields_must_parse_to_a_path(tmp_path: Path, capsys, field, value):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": "No launch here.\n"})
+    text = path.read_text()
+    line = next(row for row in text.splitlines() if row.startswith(f"{field} = "))
+    path.write_text(text.replace(line, f"{field} = {value}"))
+    _assert_wrapper_load_failure(path, field, capsys)
+
+
 _LAUNCHING = "```bash\ncodex exec --strict-config -\n```\n"
 
 
