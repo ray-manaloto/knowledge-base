@@ -69,7 +69,7 @@ not just ingested).
 | 43 | [martinfowler/Böckeler — harness engineering](https://martinfowler.com/articles/harness-engineering.html) | article | T1 | prose | Foundational harness-engineering overview (user-side). Extracted 2026-07-23. |
 | 44 | [agent-engineering.dev — harness engineering 2026](https://www.agent-engineering.dev/article/harness-engineering-in-2026-the-discipline-that-makes-ai-agents-production-ready) | article | T1 | prose | Harness = 3rd maturity phase; 5 layers. Extracted 2026-07-23. |
 | 45 | [humanlayer — skill-issue harness engineering](https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents) | article | T1 | prose | Most agent failures = config skill-issues, not model weights. Extracted 2026-07-23. |
-| 46 | [platform.claude — code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool) | docs | T1 | prose | Sandboxed Python/bash; powers PTC + dynamic filtering. Fetched via mintlify `.md`. Extracted 2026-07-23. |
+| 46 | [platform.claude — code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool) | docs | T1 | prose | Sandboxed Python/bash; powers PTC + dynamic filtering. Fetched via the `.md` page route. Extracted 2026-07-23. |
 | 47 | [openai — harness engineering (Codex)](https://openai.com/index/harness-engineering/) | article | T1 | prose | Codex agent-first (Ryan Lopopolo): repo-knowledge as system of record, AGENTS.md-as-TOC, increasing autonomy, entropy GC / golden principles. FULL text recovered via logged-in Chrome (graphify fetch got TOC only; WebFetch 403'd). 2026-07-23. |
 | 48 | [platform.claude — programmatic tool calling (PTC)](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling) | docs | T1 | prose | PTC: Claude writes Python calling tools as async fns; 20-40% fewer tokens. Vendored + extracted 2026-07-23. |
 | 49 | framework plan — long-running autonomous framework (ladybug) | designdoc | T1 | prose | OUR design: kb_search read-through, G1 staleness, single-writer lock, quarantine gate, compounding loop. Vendored 2026-07-23. |
@@ -253,7 +253,7 @@ crowding prose out of the query budget (#12). `kind = docs` is the path.
 
 - **2026-07-22 — Claude docs enumerated (wave-1 vendored).** Parsed both Claude
   sitemaps → **173 on-topic English pages** (`sources/claude-docs-backlog.txt`).
-  14 crown-jewel pages fetched (Mintlify `.md`) to the **transient** cache
+  14 crown-jewel pages fetched (`.md` page route) to the **transient** cache
   `sources/raw/claude-docs/` (gitignored): multiagent-orchestration, managed-agents
   overview/define-outcomes, prompting-claude-fable-5, introducing-fable-5,
   choosing-a-model, whats-new-4-8, agent-sdk overview/subagents/cost-tracking/skills,
@@ -331,9 +331,9 @@ crowding prose out of the query budget (#12). `kind = docs` is the path.
   - **Still deferred:** the ~151-page code.claude.com long tail (#2, T2 API/SDK ref), the T2
     catalogs #16/#17/#18 prose, #19 mindstudio tag set, #20/#21 X timelines (T3).
 
-### Freshness policy (mintlify / refetchable prose)
+### Freshness policy (refetchable prose)
 
-Mintlify doc mirrors go stale — do NOT commit raw `.md` as frozen sources. The
+Fetched doc pages go stale — do NOT commit raw `.md` as frozen sources. The
 durable artifact is the **extraction chunk** (records `source_url` + `captured_at`).
 Raw fetches live in gitignored `sources/raw/`. Refetch + re-extract when a
 doc-sourced node is **> 1 month** past its `captured_at`. Going forward, query the
