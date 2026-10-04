@@ -399,7 +399,8 @@ the next reader will hit them:
 
 Surfaced by the `aggregated-research` skill's self-referential run
 (`docs/research/reports/2026-08-27-aggregated-research-prior-art.md`, P3 of the
-Aggregated round). All three are published agent prompts that mechanize a
+Aggregated round; deleted 2026-10-04 under the stale-docs ruling, recoverable at
+`26a84f7f`). All three are published agent prompts that mechanize a
 negative control — the discipline `.claude/rules/probes-need-a-control-arm.md`
 states in prose and `kb_setup.arms` implements. **Read once, not yet ingested.**
 
