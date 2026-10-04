@@ -50,8 +50,15 @@ class WrapperLogSite:
     lane_log: str
     rolecheck: str
     check: str
-    lane_rc: str = ""
+    lane_rc: str
     note: str = ""
+
+    def __post_init__(self) -> None:
+        """Reject unsafe wrapper values before rendering or resolution checks."""
+        for name in ("launch", "check", "lane_log", "rolecheck", "lane_rc"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"wrapper_logs.{name} must be a non-empty str")
 
 
 @dataclass(frozen=True)
@@ -72,6 +79,19 @@ class SitesConfig:
 def load_sites(path: Path) -> SitesConfig:
     """Read the shared sites format, retaining the optional D allowlist."""
     data = tomllib.loads(path.read_text(encoding="utf-8"))
+    unknown = data.keys() - {
+        "owned",
+        "derived",
+        "exempt",
+        "agent_pairs",
+        "argv_site",
+        "wrapper_logs",
+        "post_apply",
+        "effort_excluded",
+        "codex_config",
+    }
+    if unknown:
+        raise ValueError(f"unknown sites keys: {', '.join(sorted(unknown))}")
     return SitesConfig(
         owned=tuple(row["glob"] for row in data.get("owned", [])),
         derived=tuple(row["glob"] for row in data.get("derived", [])),
@@ -520,6 +540,20 @@ def _argv_findings(name: str, text: str, sites: SitesConfig) -> list[str]:
     return findings
 
 
+def _wrapper_findings(name: str, text: str, sites: SitesConfig) -> list[str]:
+    lines = [
+        line
+        for start, end, inline in _command_spans(text, name=name)
+        if not inline
+        for line in text[start:end].splitlines()
+    ]
+    return [
+        f"(b) {name}: wrapper launch does not resolve: {site.launch}"
+        for site in sites.wrapper_logs
+        if fnmatch.fnmatchcase(name, site.glob) and not any(site.launch in line for line in lines)
+    ]
+
+
 def _pair_findings(name: str, source: str, registry: Registry) -> list[str]:
     expected = models.agent_pair(Path(name).stem, registry)
     data = tomllib.loads(source)
@@ -572,6 +606,7 @@ def _file_findings(root: Path, name: str, sites: SitesConfig, registry: Registry
         if render(name, source, sites, registry) != source:
             findings.append(f"(a) {name}: differs from models-apply render")
         findings.extend(_argv_findings(name, text, sites))
+        findings.extend(_wrapper_findings(name, text, sites))
     if _matches(name, sites.owned + sites.derived):
         findings.extend(
             f"(j) {name}: --strict-config missing: {command}"
@@ -597,7 +632,9 @@ def check_pin_sites(root: Path, sites: SitesConfig, registry: Registry) -> list[
     findings.extend(
         f"(b) wrapper log glob does not resolve: {site.glob}"
         for site in sites.wrapper_logs
-        if not any(fnmatch.fnmatchcase(name, site.glob) for name in names)
+        if not any(
+            fnmatch.fnmatchcase(name, site.glob) and _matches(name, sites.owned) for name in names
+        )
     )
     findings.extend(check_aliases_only(root, sites))
     findings.extend(_settings_findings(root, sites, registry))

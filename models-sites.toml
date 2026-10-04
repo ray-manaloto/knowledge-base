@@ -40,8 +40,28 @@ rolecheck = '"$KB_LANE/lane.log.rolecheck"'
 check = "mise run codex-log-check --"
 note = "A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role."
 
+# kb-codex-astra-advisor.toml is deliberately launchless ("You ARE the lane";
+# Ray C-1, Option C model-only), so the .codex rows name the launching roles.
 [[wrapper_logs]]
-glob = ".codex/agents/kb-codex-*.toml"
+glob = ".codex/agents/kb-codex-advisor.toml"
+launch = "mise run kb-codex --"
+lane_log = '"$KB_LANE/lane.log"'
+lane_rc = '"$KB_LANE/lane.rc"'
+rolecheck = '"$KB_LANE/lane.log.rolecheck"'
+check = "mise run codex-log-check --"
+note = "A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role."
+
+[[wrapper_logs]]
+glob = ".codex/agents/kb-codex-astra-reviewer.toml"
+launch = "mise run kb-codex --"
+lane_log = '"$KB_LANE/lane.log"'
+lane_rc = '"$KB_LANE/lane.rc"'
+rolecheck = '"$KB_LANE/lane.log.rolecheck"'
+check = "mise run codex-log-check --"
+note = "A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role."
+
+[[wrapper_logs]]
+glob = ".codex/agents/kb-codex-implementer.toml"
 launch = "mise run kb-codex --"
 lane_log = '"$KB_LANE/lane.log"'
 lane_rc = '"$KB_LANE/lane.rc"'

@@ -274,6 +274,106 @@ def test_wrapper_log_site_rejects_unknown_keys(tmp_path: Path):
     assert models.main(tmp_path, ["apply", "--check", "--sites", str(path)]) == 1
 
 
+def _owned_wrapper_sites_file(tmp_path: Path, content: dict[str, str]) -> Path:
+    _repo(tmp_path, content)
+    path = _wrapper_sites_file(tmp_path)
+    path.write_text(
+        '[[owned]]\nglob = "owned*.md"\n'
+        + path.read_text().replace(".claude/agents/codex-sol-*.md", "owned*.md")
+    )
+    return path
+
+
+def _assert_wrapper_load_failure(
+    path: Path, field: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises((TypeError, ValueError), match=field):
+        models_apply.load_sites(path)
+    assert models.main(path.parent, ["apply", "--check", "--sites", str(path)]) == 1
+    captured = capsys.readouterr()
+    assert "(h) models-apply load/check failure:" in captured.out
+    assert field in captured.out
+    assert "Traceback" not in captured.err
+
+
+@pytest.mark.parametrize("lane_rc", [None, 'lane_rc = ""\n'], ids=["unset", "empty"])
+def test_f1_wrapper_lane_rc_is_required_and_nonempty(tmp_path: Path, capsys, lane_rc):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": "No launch here.\n"})
+    path.write_text(path.read_text().replace("lane_rc = '\"$LOG.rc\"'\n", lane_rc or ""))
+    _assert_wrapper_load_failure(path, "lane_rc", capsys)
+
+
+@pytest.mark.parametrize(
+    ("glob", "content", "expected"),
+    [
+        (
+            "other.md",
+            {"owned.md": "No launch here.\n", "other.md": "```bash\ncodex exec -\n```\n"},
+            "(b) wrapper log glob does not resolve: other.md",
+        ),
+        (
+            "owned*.md",
+            {
+                "owned.md": (
+                    "Mention `codex exec`.\n```python\ncodex exec -\n```\n"
+                    "```bash\necho no-launch\n```\n"
+                ),
+                "owned-control.md": "```bash\ncodex exec --strict-config -\n```\n",
+            },
+            "(b) owned.md: wrapper launch does not resolve: codex exec",
+        ),
+    ],
+    ids=["owned-miss", "launch-miss"],
+)
+def test_f2_wrapper_site_requires_owned_files_and_each_fenced_launch(
+    tmp_path, glob, content, expected
+):
+    path = _owned_wrapper_sites_file(tmp_path, content)
+    text = path.read_text()
+    start = text.index("[[wrapper_logs]]")
+    path.write_text(text[:start] + text[start:].replace("owned*.md", glob))
+    sites = models_apply.load_sites(path)
+    findings = models.check_pin_sites(tmp_path, sites, models.load_registry())
+    assert expected in findings
+    assert not any("owned-control.md: wrapper launch" in finding for finding in findings)
+
+
+@pytest.mark.parametrize(
+    "unknown",
+    ["[[wrapper_log]]\n", "[unknown]\nvalue = 1\n", "unknown = 1\n"],
+    ids=["misspelt-table", "unknown-table", "unknown-key"],
+)
+def test_f3_wrapper_site_rejects_unknown_top_level_keys(tmp_path: Path, capsys, unknown):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": "No launch here.\n"})
+    if unknown.startswith("[[wrapper_log]]"):
+        path.write_text(path.read_text().replace("[[wrapper_logs]]", unknown.strip()))
+        field = "wrapper_log"
+    else:
+        path.write_text(unknown + path.read_text())
+        field = "unknown"
+    _assert_wrapper_load_failure(path, field, capsys)
+
+
+@pytest.mark.parametrize("field", ["launch", "check", "lane_log", "rolecheck", "lane_rc"])
+@pytest.mark.parametrize("value", ['""', "1"], ids=["empty", "non-str"])
+def test_f4_wrapper_site_fields_require_nonempty_strings(tmp_path, capsys, field, value):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": "```bash\ncodex exec -\n```\n"})
+    path.write_text(
+        re.sub(rf"^{field} = .*", f"{field} = {value}", path.read_text(), flags=re.MULTILINE)
+    )
+    _assert_wrapper_load_failure(path, field, capsys)
+
+
+def test_f5_empty_wrapper_lane_log_returns_load_finding_without_traceback(tmp_path: Path, capsys):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": "```bash\ncodex exec -\n```\n"})
+    path.write_text(path.read_text().replace("lane_log = '\"$LOG\"'", 'lane_log = ""'))
+    assert models.main(tmp_path, ["apply", "--check", "--sites", str(path)]) == 1
+    captured = capsys.readouterr()
+    assert "(h) models-apply load/check failure:" in captured.out
+    assert "lane_log" in captured.out
+    assert "Traceback" not in captured.err
+
+
 def test_wrapper_log_site_must_resolve_against_tracked_files(tmp_path: Path):
     _repo(tmp_path, {"owned.md": "No wrapper here.\n"})
     sites = models_apply.load_sites(_wrapper_sites_file(tmp_path))
