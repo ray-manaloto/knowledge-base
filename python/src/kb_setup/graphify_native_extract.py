@@ -225,7 +225,7 @@ import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from kb_setup import events
+from kb_setup import events, models
 from kb_setup.graphify_env import (
     assert_pinned_graphify,
     clean_env,
@@ -245,6 +245,7 @@ DEFAULT_TARGET = "sources/graphify"
 #: see `_refuse_out`). `.agent/` is this repo's gitignored scratch tree.
 DEFAULT_OUT = ".agent/kb/native-extract"
 
+# models-apply: off
 #: Confirmed 2026-08-23: `claude --help` documents `--model <model>` as
 #: accepting "a model's full name (e.g. 'claude-fable-5')" — the CLI's own
 #: example proves the `claude-<tier>-5` spelling — and
@@ -265,7 +266,8 @@ DEFAULT_OUT = ".agent/kb/native-extract"
 #: Note it deliberately DIFFERS from graphify's own `claude-cli` default
 #: (`claude-code-plan`): overriding that is the point of setting the variable at
 #: all, and the paragraph above is why this identifier and not another.
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = models.claude_api("graphify_native_extract")
+# models-apply: on
 
 #: `claude-cli`'s env keys, kept ONLY as the expected value in tests that assert
 #: what the default backend resolves to. Production code must call

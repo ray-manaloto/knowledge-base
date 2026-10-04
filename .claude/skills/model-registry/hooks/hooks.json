@@ -1,0 +1,4 @@
+{
+  "description": "Registry verdicts at SessionStart and launch-scoped enforcement",
+  "modules": ["./register.ts"]
+}

@@ -1,0 +1,3 @@
+# Disable model checks and launch enforcement with enabled = false.
+[models]
+enabled = true

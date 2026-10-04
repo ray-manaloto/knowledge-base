@@ -1,6 +1,7 @@
 name = "kb-tool-researcher"
 description = "Research ONE peer tool against this repo's graph and its pinned source, and write a gap analysis in both directions. Use when comparing an external retrieval/memory/observability tool to graphify."
 model_reasoning_effort = "high"
+model = "gpt-6.1-sol"
 developer_instructions = """
 # kb-tool-researcher — one peer tool, both directions
 

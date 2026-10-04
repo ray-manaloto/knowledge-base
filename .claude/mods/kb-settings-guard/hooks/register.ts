@@ -38,10 +38,11 @@
 // file proves nothing about the live wiring.
 
 import { PROTECTED_SUFFIXES } from "./protected-paths";
+import type { Register } from "claude-code";
 
 /**
- * Registered as ONE LITERAL MATCHER PER TOOL, never as a bare `on("tool.call",
- * hook)`.
+ * Registered as one ANCHORED `RegExp` matcher per tool, never as a bare
+ * `on("tool.call", hook)`; a literal `string` fails the typed `On` (spec §3.8a).
  *
  * 🔴 THE REAL `anthropics/claude-code#92533` INVARIANT IS "NEVER BASH", NOT
  * "use literal matchers". This comment said the latter until 2026-09-11, when
@@ -60,15 +61,15 @@ import { PROTECTED_SUFFIXES } from "./protected-paths";
  * on the TOOL rather than a recommendation about matcher shape.
  *
  * One literal matcher per tool is still how this registers, for the separate and
- * lesser reason below: the covered inventory stays reviewable and each entry is
- * independently armable. A bare `on("tool.call", hook)` would additionally see
- * Bash, which is what makes it forbidden here.
- *
+ * One anchored RegExp per tool keeps the covered inventory reviewable, with
+ * each entry independently armable. Runtime firing is unmeasured (G04 #757).
+ * A bare `on("tool.call", hook)` would additionally see Bash, which is what
+ * makes it forbidden here.
  * Measured on 2.1.268: `on(event, matcher, hook)` is real, the matcher is a
  * partial of the event, and `{ tool: "Edit" }` fired on Edit ONLY while an
  * unmatched control registration in the same module saw Bash, Read, Edit and
- * SendUserMessage. Literals rather than one anchored RegExp so the covered
- * inventory is reviewable and each entry is independently armable.
+ * SendUserMessage. Anchored RegExp matchers now keep the covered inventory
+ * reviewable; literal string matchers fail tsc against typed `On` (spec §3.8a).
  */
 const WRITE_TOOLS: readonly string[] = ["Edit", "Write", "NotebookEdit"];
 
@@ -197,8 +198,8 @@ async function handler($: any, e: any, next: any): Promise<any> {
   }
 }
 
-export function register(on: any): void {
+export const register: Register = (on) => {
   for (const tool of WRITE_TOOLS) {
-    on("tool.call", { tool }, handler);
+    on("tool.call", { tool: new RegExp(`^${tool}$`) }, handler);
   }
-}
+};

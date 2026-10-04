@@ -1,0 +1,6 @@
+{
+  "name": "model-registry",
+  "version": "1.0.0",
+  "description": "Report model drift and deny only positively invalid stale-pin launches.",
+  "author": { "name": "Raymond Manaloto" }
+}

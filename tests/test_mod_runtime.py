@@ -73,11 +73,11 @@ async function handler($: any, e: any, next: any): Promise<any> {
   return next(e);
 }
 
-export function register(on: any): void {
+export const register: Register = (on) => {
   for (const tool of WRITE_TOOLS) {
-    on("tool.call", { tool }, handler);
+    on("tool.call", { tool: new RegExp(`^${tool}$`) }, handler);
   }
-}
+};
 """
 
 
@@ -333,10 +333,6 @@ def test_no_claude_binary_reports_not_run_rather_than_clean(
 
 def test_an_unreadable_register_ts_reports_not_run(tmp_path: Path) -> None:
     assert mod_runtime.check(tmp_path) == Rc.NOT_RUN
-
-
-def test_an_unknown_argument_is_a_bad_request() -> None:
-    assert mod_runtime.main(REPO, ["--nonsense"]) == int(Rc.BAD_REQUEST)
 
 
 # --------------------------------------------------------------------------

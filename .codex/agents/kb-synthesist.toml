@@ -1,6 +1,7 @@
 name = "kb-synthesist"
 description = "Combine several single-tool gap analyses into one cross-tool comparison and a consolidated capability gap list. Use only after each tool's report exists and has been verified."
 model_reasoning_effort = "high"
+model = "gpt-6.1-sol"
 developer_instructions = """
 # kb-synthesist — combine verified reports, don't research
 

@@ -1,0 +1,309 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "codex": {
+      "$ref": "#/$defs/Codex"
+    },
+    "agy": {
+      "$ref": "#/$defs/Agy"
+    },
+    "claude": {
+      "$ref": "#/$defs/Claude"
+    },
+    "registry_source": {
+      "type": "string"
+    },
+    "registry_sha256": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "codex",
+    "agy",
+    "claude",
+    "registry_source",
+    "registry_sha256"
+  ],
+  "additionalProperties": false,
+  "title": "Registry",
+  "$defs": {
+    "Status": {
+      "title": "Status",
+      "type": "string",
+      "enum": [
+        "adopted",
+        "acknowledged"
+      ]
+    },
+    "Effort": {
+      "title": "Effort",
+      "type": "string",
+      "enum": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "AgentEffort": {
+      "title": "AgentEffort",
+      "type": "string",
+      "enum": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "spawn"
+      ]
+    },
+    "Known": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "family": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "family",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "Pin": {
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string"
+        },
+        "effort": {
+          "$ref": "#/$defs/Effort"
+        }
+      },
+      "required": [
+        "slug",
+        "effort"
+      ],
+      "additionalProperties": false
+    },
+    "Role": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "effort": {
+          "$ref": "#/$defs/Effort"
+        },
+        "slug": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "effort",
+        "slug"
+      ],
+      "additionalProperties": false
+    },
+    "Agent": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "effort": {
+          "$ref": "#/$defs/AgentEffort"
+        },
+        "authored": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "role",
+        "effort",
+        "authored"
+      ],
+      "additionalProperties": false
+    },
+    "Codex": {
+      "type": "object",
+      "properties": {
+        "pins": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Pin"
+          }
+        },
+        "dispatch": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Role"
+          }
+        },
+        "agents": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Agent"
+          }
+        },
+        "config_fallback": {
+          "$ref": "#/$defs/Role"
+        },
+        "launch_agents": {
+          "description": "Claude wrappers that launch Codex; separate from its TOML roster",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "known": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Known"
+          }
+        }
+      },
+      "required": [
+        "pins",
+        "dispatch",
+        "agents",
+        "launch_agents",
+        "config_fallback",
+        "known"
+      ],
+      "additionalProperties": false
+    },
+    "AgyPin": {
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "slug"
+      ],
+      "additionalProperties": false
+    },
+    "AgyRole": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "slug"
+      ],
+      "additionalProperties": false
+    },
+    "Agy": {
+      "type": "object",
+      "properties": {
+        "pins": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/AgyPin"
+          }
+        },
+        "dispatch": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/AgyRole"
+          }
+        },
+        "known": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Known"
+          }
+        }
+      },
+      "required": [
+        "pins",
+        "dispatch",
+        "known"
+      ],
+      "additionalProperties": false
+    },
+    "Claude": {
+      "type": "object",
+      "properties": {
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pins": {
+          "type": "object",
+          "properties": {
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "subagent": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "fallback",
+            "subagent"
+          ],
+          "additionalProperties": false
+        },
+        "api": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          }
+        },
+        "known": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Known"
+          }
+        }
+      },
+      "required": [
+        "aliases",
+        "pins",
+        "api",
+        "known"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

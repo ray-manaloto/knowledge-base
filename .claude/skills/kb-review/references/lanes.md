@@ -193,11 +193,13 @@ model, not the reviewer's — `review_model` selects the sub-agent
 `start_review_conversation` spawns (`core/src/tasks/review.rs:123-127`), which
 the banner never names. Measured three ways on 2026-09-09, same machine:
 
+<!-- models-apply: off -->
 | run | argv carried | banner said |
 |---|---|---|
 | Astra arm | `review_model="gpt-6-astra"` | `model: gpt-6-astra` |
 | Sol control | `review_model="gpt-5.6-sol"` | `model: gpt-6-astra` |
 | bogus slug | `review_model="definitely-not-a-real-model-xyz"` | `model: gpt-6-astra` |
+<!-- models-apply: on -->
 
 All three read the same, because `$CODEX_HOME/config.toml:2` (`~/.codex` by default) sets
 `model = "gpt-6-astra"` session-wide. The first row looks like confirmation and
@@ -433,7 +435,7 @@ default here. For the cold lane there is a second route that needs no agent at
 all: drive the CLI directly, per `ai-cli-invocation.md` —
 
 ```bash
-cat prompt.txt | codex exec --ephemeral --sandbox read-only -
+cat prompt.txt | codex exec --strict-config --ephemeral --sandbox read-only -
 ```
 
 Record that variant honestly as `cold:codex-cli-direct`: same model and the same

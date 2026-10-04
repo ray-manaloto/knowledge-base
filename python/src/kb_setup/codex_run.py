@@ -41,7 +41,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO
 
+from kb_setup import codex_log, models
 from kb_setup.result import Rc
+
+_DISPATCH = models.load_registry().codex.dispatch["kb_codex"]
 
 #: uv keeps its cache outside the workspace, and `workspace-write` makes only
 #: the workspace writable. Without this the lane cannot open the cache and dies
@@ -80,12 +83,13 @@ class LaneSpec:
 
     write: bool = False
     network: bool = False
-    effort: str = "xhigh"
+    effort: str = _DISPATCH.effort
     sandbox_override: str | None = None
-    model: str | None = None
+    model: str | None = _DISPATCH.slug
     output: str | None = None
 
 
+# models-apply: off
 def _codex_argv(spec: LaneSpec) -> list[str]:
     """Build the argv. Separated from `run` so a test can assert it without spawning.
 
@@ -97,8 +101,9 @@ def _codex_argv(spec: LaneSpec) -> list[str]:
     recorded lesson: *a guard whose redirect target cannot perform the redirected
     action is not enforcement, it is an outage.*
     """
+    # models-apply: on
     sandbox = spec.sandbox_override or ("workspace-write" if spec.write else "read-only")
-    argv = ["codex", "exec", "--sandbox", sandbox]
+    argv = ["codex", "exec", "--strict-config", "--sandbox", sandbox]
     if spec.model:
         argv += ["--model", spec.model]
     if spec.output:
@@ -232,7 +237,15 @@ def _group_gone(pgid: int, *, own_group: bool, proc: subprocess.Popen[str]) -> b
     return False
 
 
-def _tee(stream: IO[str], path: Path) -> None:
+def _read_stderr(stream: IO[str], warnings: list[str]) -> None:
+    """Drain stderr concurrently with stdin, retaining malformed-role evidence."""
+    for line in stream:
+        sys.stderr.write(line)
+        sys.stderr.flush()
+        warnings.extend(codex_log.malformed_agent_roles(line))
+
+
+def _tee(stream: IO[str], path: Path) -> list[str]:
     """Copy the lane's output to `path` AND to ours, line by line.
 
     The stream handed in carries stdout AND stderr merged (see `_spawn`), because
@@ -249,6 +262,7 @@ def _tee(stream: IO[str], path: Path) -> None:
     gitignored, so a fresh clone does not have it, and losing a 40-minute review
     to a missing directory is the same class of loss with a longer fuse.
     """
+    warnings: list[str] = []
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         for line in stream:
@@ -256,6 +270,19 @@ def _tee(stream: IO[str], path: Path) -> None:
             sys.stdout.flush()
             handle.write(line)
             handle.flush()
+            warnings.extend(codex_log.malformed_agent_roles(line))
+    return warnings
+
+
+def _start_stderr_reader(
+    proc: subprocess.Popen[str], warnings: list[str], *, tee: Path | None
+) -> threading.Thread | None:
+    """Keep stderr draining outside the spawn lifecycle's control branches."""
+    if tee is not None or proc.stderr is None:
+        return None
+    reader = threading.Thread(target=_read_stderr, args=(proc.stderr, warnings), daemon=True)
+    reader.start()
+    return reader
 
 
 def _spawn(
@@ -309,11 +336,14 @@ def _spawn(
         # The cost is real and accepted: hook warnings and MCP errors now land
         # in the report too. A noisy report that exists beats a clean one that
         # is empty exactly when the lane died early.
-        stderr=subprocess.STDOUT if tee is not None else None,
+        stderr=subprocess.STDOUT if tee is not None else subprocess.PIPE,
         text=True,
         env=os.environ.copy(),
         start_new_session=bounded,
     )
+
+    role_warnings: list[str] = []
+    stderr_reader = _start_stderr_reader(proc, role_warnings, tee=tee)
 
     timed_out = threading.Event()
 
@@ -327,7 +357,7 @@ def _spawn(
         watchdog.start()
     try:
         if tee is not None and proc.stdout is not None:
-            _tee(proc.stdout, tee)
+            role_warnings.extend(_tee(proc.stdout, tee))
         if prompt is not None and proc.stdin is not None:
             # A child that exited before reading the prompt leaves us writing to
             # a closed pipe. That is the CHILD's story to tell, not an error of
@@ -340,6 +370,8 @@ def _spawn(
                 proc.stdin.write(prompt)
                 proc.stdin.close()
         rc = proc.wait()
+        if stderr_reader is not None:
+            stderr_reader.join()
     except BaseException:
         # The child is already running, so an exception here (a `_tee` that
         # cannot open its destination is the real case) must not leave it
@@ -373,7 +405,7 @@ def _spawn(
             file=sys.stderr,
         )
         return _RC_TIMED_OUT
-    return rc
+    return 1 if role_warnings else rc
 
 
 @dataclass(frozen=True)
@@ -390,7 +422,7 @@ class ReviewSpec:
     title: str | None = None
     commit: str | None = None
     instructions: str | None = None
-    model: str | None = None
+    model: str | None = _DISPATCH.slug
     effort: str | None = None
     sandbox: str | None = None
 
@@ -509,7 +541,7 @@ def _review_argv(spec: ReviewSpec) -> list[str]:
     sub-agent's is hard-set to `Never` at `review.rs:121`, so passing one would
     be a flag that does nothing, which is the defect #678 was about.
     """
-    argv = ["codex", "review", "--base", spec.base]
+    argv = ["codex", "review", "--strict-config", "--base", spec.base]
     if spec.title and spec.commit:
         argv += ["--title", spec.title]
     if spec.sandbox:
@@ -642,7 +674,11 @@ def run(argv: list[str] | None = None) -> int:
         action="store_true",
         help="allow network egress; implies --write, since the flag is a write-sandbox key",
     )
-    parser.add_argument("--effort", default="xhigh", help="model_reasoning_effort (default: xhigh)")
+    parser.add_argument(
+        "--effort",
+        default=_DISPATCH.effort,
+        help=f"model_reasoning_effort (default: {_DISPATCH.effort})",
+    )
     parser.add_argument(
         "--sandbox",
         default=None,
@@ -668,7 +704,7 @@ def run(argv: list[str] | None = None) -> int:
     parser.add_argument("--title", default=None, help="review title; needs --commit to apply")
     parser.add_argument(
         "--model",
-        default=None,
+        default=_DISPATCH.slug,
         help="model override, e.g. gpt-6.1-sol or gpt-6-astra; in --review mode "
         "this is sent as `-c review_model=`, the only channel that exists (#678)",
     )

@@ -25,7 +25,7 @@ import json
 from pathlib import Path
 
 import pytest
-from kb_setup import model_limits
+from kb_setup import model_limits, models
 from kb_setup.result import Rc
 
 # The real shape, trimmed to the three rows the parser reads. Kept verbatim in
@@ -555,3 +555,7 @@ def test_observed_at_refuses_a_flag_as_its_value() -> None:
     """
     assert "--observed-at" in model_limits._parse_argv(["--write", "--observed-at", "--nope"]).error
     assert model_limits._parse_argv(["--write", "--observed-at", "2026-08-17"]).error == ""
+
+
+def test_default_aliases_read_the_reviewed_registry():
+    assert models.claude_api("model_limits") == model_limits.DEFAULT_ALIASES

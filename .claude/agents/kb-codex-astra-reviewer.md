@@ -81,8 +81,11 @@ mise run kb-codex -- \
   --sandbox read-only \
   --timeout 3000 \
   --output "$KB_LANE/review.md" \
-  < "$KB_LANE/method.txt"
+  < "$KB_LANE/method.txt" > "$KB_LANE/lane.log" 2>&1; rc=$?
+mise run codex-log-check -- "$KB_LANE/lane.log"; echo "$?" > "$KB_LANE/lane.log.rolecheck"; exit "$rc"
 ```
+
+A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role.
 
 `method.txt` names the report paths, asks for findings as severity + one-line
 claim + file:line (or "unverified"), and says nothing about what the analysis is
@@ -115,8 +118,11 @@ mise run kb-codex -- --review \
   --sandbox read-only \
   --timeout 3600 \
   --output .agent/kb/review/reports/review-<HEAD SHA>-cold.md \
-  < "$KB_LANE/method.txt"
+  < "$KB_LANE/method.txt" > "$KB_LANE/lane.log" 2>&1; rc=$?
+mise run codex-log-check -- "$KB_LANE/lane.log"; echo "$?" > "$KB_LANE/lane.log.rolecheck"; exit "$rc"
 ```
+
+A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role.
 
 Run it as a **background** call and poll; 3–5× Sol puts a real review past the
 harness's ~600s foreground cap, so a foreground call will be killed and look

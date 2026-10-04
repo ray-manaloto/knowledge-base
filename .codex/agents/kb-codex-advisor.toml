@@ -1,6 +1,7 @@
 name = "kb-codex-advisor"
 description = "Second-opinion advisor on a decision that is expensive to reverse — architecture, a corpus migration, a routing choice, a gate design. Consult at commitment boundaries, and whenever the same problem has resisted two attempts. Returns a verdict with the risk that decides it. Advises only; never implements. Runs its reasoning on gpt-6.1-sol via the codex CLI, not on Claude, so a consult spends no Claude tokens — which is why it is the DEFAULT advisor under this repo's standing preference for codex lanes, and the only advisor for the guard or secret surface, where gpt-6-astra refuses authorized security work."
 model_reasoning_effort = "xhigh"
+model = "gpt-6.1-sol"
 developer_instructions = '''
 # kb-codex-advisor — a verdict at a commitment boundary, run on codex
 
@@ -58,8 +59,11 @@ EOF
 cat "$KB_LANE/prompt.md" | mise run kb-codex -- \
   --model gpt-6.1-sol \
   --effort xhigh \
-  --output ".agent/kb/reports/agents/<your-agent-name>-verdict.md"
+  --output ".agent/kb/reports/agents/<your-agent-name>-verdict.md" > "$KB_LANE/lane.log" 2>&1; rc=$?
+mise run codex-log-check -- "$KB_LANE/lane.log"; echo "$?" > "$KB_LANE/lane.log.rolecheck"; exit "$rc"
 ```
+
+A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role.
 
 **No `--ephemeral`.** It means "run without persisting session files to disk",
 and a lane that persists nothing cannot be reviewed afterwards —

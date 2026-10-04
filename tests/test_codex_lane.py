@@ -324,12 +324,12 @@ def test_review_forwards_the_reasoning_effort() -> None:
     assert "-c model_reasoning_effort=xhigh" in _review(effort="xhigh")
 
 
-def test_review_omits_both_keys_when_neither_is_asked_for() -> None:
+def test_review_omits_override_keys_when_spec_explicitly_uses_none() -> None:
     """The control arm: the probe above discriminates, rather than always passing."""
-    argv = _review()
+    argv = _review(model=None, effort=None)
     assert "review_model" not in argv
     assert "model_reasoning_effort" not in argv
-    assert argv == "codex review --base origin/main"
+    assert argv == "codex review --strict-config --base origin/main"
 
 
 def test_review_never_grows_an_output_flag() -> None:
@@ -387,7 +387,7 @@ def test_print_argv_pins_the_whole_review_shape(
     assert rc == Rc.OK
     printed = capsys.readouterr().out.strip()
     assert printed == (
-        "codex review --base origin/main "
+        "codex review --strict-config --base origin/main "
         '-c review_model="gpt-6-astra" '
         "-c model_reasoning_effort=xhigh"
     )
@@ -837,3 +837,25 @@ def test_run_review_does_not_touch_evidence_when_output_is_omitted(
 
     assert codex_run.run(["--review"]) == 0
     assert seen["output_path"] is None
+
+
+def test_lane_default_model_and_effort_read_the_registry():
+    from kb_setup import models
+
+    dispatch = models.load_registry().codex.dispatch["kb_codex"]
+    argv = codex_run._codex_argv(codex_run.LaneSpec())
+    assert argv[argv.index("--model") + 1] == dispatch.slug
+    assert f"model_reasoning_effort={dispatch.effort}" in argv
+
+
+def test_malformed_stderr_changes_a_successful_lane_to_failure():
+    argv = [
+        sys.executable,
+        "-c",
+        (
+            "import sys; "
+            "print('Ignoring malformed agent role definition: fixture-role', file=sys.stderr)"
+        ),
+    ]
+    assert codex_run._spawn(argv) == 1
+    assert codex_run._spawn([sys.executable, "-c", "print('clean')"]) == 0

@@ -64,7 +64,7 @@ def _print_usage() -> int:
         "code-intel [--lanes a,b] [--out PATH] [--format chunk|json] | "
         "insights [--top N] | graph-size | funnel | manifest-audit | graphify-catalog | "
         "lock-drift | docs refresh <site>|all | docs check | ccdocs refresh|check | "
-        "mod-runtime-check [--arms] | worktree-ready [--target PATH] | "
+        "worktree-ready [--target PATH] | "
         "telemetry-prune | serve | serve-memory | env-refresh [--sentinel] | "
         "codex-config-check | "
         "instruction-edit-guard | "
@@ -116,6 +116,8 @@ def _print_usage() -> int:
         "detect-census [--output .agent/<path>.json] | "
         "source-groups-check [path] | "
         "artifact-download --provider P --source O/R --revision SHA --destination PATH | "
+        "fnhook-gates | claude-types-refresh | claude-types-check | "
+        "models [check|apply|ship-check|classify-launch] | codex-log-check <LOG> | "
         "ensure-deps | version"
     )
     return 0
@@ -250,16 +252,6 @@ def _run(argv: list[str] | None = None) -> int:
         # has neither and two end-to-end tests fail there and pass in the main
         # checkout at the same base.
         return worktree.main(repo_root, rest)
-    if cmd == "mod-runtime-check":
-        from kb_setup import mod_runtime
-
-        # A bare arm on `funnel`'s precedent, and it takes `rest` — which is why
-        # it is HERE rather than in `_dispatch_lint` beside the other two guard
-        # checks: `--arms` is a real argument, and that dispatcher takes no argv.
-        # Unlike every other gate in this chain it SHELLS OUT to the installed
-        # `claude` (deliberately — see the module docstring), generating into a
-        # temp CWD so the repo tree is never written.
-        return mod_runtime.main(repo_root, rest)
     if cmd == "manifest-audit":
         from kb_setup import manifest_audit
 
@@ -724,6 +716,23 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
 
         return fetch_mod.fetch_verify_main(repo_root, [Path(arg) for arg in rest])
 
+    if cmd == "fnhook-gates":
+        from kb_setup import fnhook_gates
+
+        return fnhook_gates.fnhook_gates_main(rest, repo_root=repo_root)
+    if cmd in {"claude-types-refresh", "claude-types-check"}:
+        from kb_setup import claude_types
+
+        return claude_types.main(repo_root, rest, do_refresh=cmd == "claude-types-refresh")
+    if cmd == "models":
+        from kb_setup import models
+
+        return models.main(repo_root, rest)
+    if cmd == "codex-log-check":
+        from kb_setup import codex_log
+
+        return codex_log.main(rest)
+
     print(
         f"kb-setup: unknown command {cmd!r} "
         "(build | update [name] | prose | query <question> [--prose] | "
@@ -740,7 +749,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "guard-inventory-check | guard-codegen | guard-codegen-check | "
         "handoff-check [path] | gates [task...] [--stop] | "
         "check <path...> | funnel | "
-        "graphify-catalog | lock-drift | mod-runtime-check [--arms] | "
+        "graphify-catalog | lock-drift | "
         "plugin-validate <marketplace root> | "
         "research-trackers <OWNER/REPO> <term> [--out PATH] | "
         "research-links <URL...> [--out PATH] | "

@@ -42,8 +42,10 @@ verdict reported as partial is worth something; one reported as complete is not.
 **Refuse and hand back** when:
 
 - 🔴 **The question is about the guard or secret surface.** The Sol lane was
+<!-- models-apply: off -->
   chosen as OpenAI's cybersecurity model when it ran `gpt-5.6-sol` (not yet
   re-measured for `gpt-6.1-sol`) and Astra rejects some *authorized* security work
+<!-- models-apply: on -->
   outright — five independent upstream reports (openai/codex issues 43163,
   43781, 43131, 43208, 42939) describe `invalid_prompt` or a usage-policy
   rejection, recorded in `.claude/skills/kb-review/SKILL.md:182-189`. Anything
@@ -130,8 +132,11 @@ cat "$KB_LANE/prompt.md" | mise run kb-codex -- \
   --effort xhigh \
   --sandbox read-only \
   --timeout 1800 \
-  --output ".agent/kb/reports/agents/<your-agent-name>-verdict.md"
+  --output ".agent/kb/reports/agents/<your-agent-name>-verdict.md" > "$KB_LANE/lane.log" 2>&1; rc=$?
+mise run codex-log-check -- "$KB_LANE/lane.log"; echo "$?" > "$KB_LANE/lane.log.rolecheck"; exit "$rc"
 ```
+
+A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role.
 
 Run it as a **background** call and poll. Astra is 3–5× Sol (OpenAI's model card
 rates it Speed 2/5), which puts a real consult past the harness's ~600s

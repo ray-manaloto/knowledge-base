@@ -101,6 +101,7 @@ class Report:
         return Rc.FINDINGS if self.findings else Rc.OK
 
 
+# models-apply: off
 def join_continuations(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
     r"""Fold backslash-continued shell lines into one logical command.
 
@@ -135,6 +136,7 @@ def join_continuations(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
     read as two tokens and the flag this gate exists to catch slipped through
     split across a continuation.
     """
+    # models-apply: on
     joined: list[tuple[int, str]] = []
     start: int | None = None
     previous: int | None = None
