@@ -1,5 +1,15 @@
 # Signer isolation for the graphify live receipt: research report
 
+> **Caller's annotation, 2026-10-03 (PR #865 review). The original text below is unchanged.**
+>
+> **What this annotation corrects:** three overstatements in P-B and P-G, flagged by CodeRabbit and checked against Yubico's docs.
+>
+> 1. **A signature proves key provenance, not host attestation.** SSHSIG verification checks the signature against an authorized key; it does not bind the signature to *this Mac*. That matters because a YubiKey FIDO key can be used from any machine it is plugged into. Read P-B's "a signature proves 'made on this Mac by that user'" as "made by whoever holds or can invoke that key". A host claim would need separate attestation.
+> 2. **A FIDO touch proves *presence*, not identity.** Read P-G's "the signature means 'the owner was present' honestly" as "a human touched the key". Who touched it is not established.
+> 3. **The per-provider claims in P-B are provisional.** They are untested on this host, as the report's own "Unverified" section already says. These include `ssh-keygen -Y sign` with a Secure Enclave key from a LaunchDaemon, and Secretive's no-auth mode.
+>
+> **Status:** none of these changes the outcome. Option C (the signer) is ON HOLD (#824), and Ray's later ruling is #864.
+
 Research subagent, 2026-10-03. Read-only: nothing in the repo, settings, accounts, keychain, GitHub or system was changed, and no secret value was printed.
 
 **Inputs read:**

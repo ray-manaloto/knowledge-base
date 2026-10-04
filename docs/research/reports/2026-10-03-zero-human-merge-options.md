@@ -110,6 +110,15 @@ Research subagent (Opus), received 2026-10-03. This copy is persisted by the cal
 
 ## Recommendation
 
+> **Caller's annotation, 2026-10-03 (PR #865 review). The original text below is unchanged.**
+>
+> **What this annotation adds:** P3's fallback is missing a step.
+>
+> - `kb-land` (`python/src/kb_setup/pr.py`) sets no token of its own; it inherits the caller's `gh` credentials. For the ruleset bypass to apply, the merge must authenticate as the bypass App, which means minting and passing an App installation token. If the merge runs under a P7 fine-grained PAT, the App bypass does not apply, and the unmet check still blocks.
+> - Any P3 build must specify that token handoff.
+>
+> **Status:** this does not affect the current plan. Ray's final ruling replaced P3 with a guarded admin-bypass mode (#864), which uses the existing admin credential and puts P7 (dotfiles#1613) on hold.
+
 1. Do P7 first. Only Ray can, and until then every other option is policy only.
 2. Do P4 next. It clears #837-class PRs, after one last bootstrap merge.
 3. For real extraction changes, build P1 properly: a separate OS user that runs the cases and holds the key and the evidence-branch credential, reusing the unmerged `live_receipt_produce.py`. Do not ship P1-weak.
