@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hands-Free Merge Options</title>
+<style>
+/* layout: one screen — a headline finding, a five-row option ladder, the ask */
+:root{
+  --bg:#f6f8f7; --card:#ffffff; --ink:#18231f; --muted:#56635d;
+  --line:#d5ddd9; --go:#1d6b45; --warn:#9a5a00; --stop:#a3322b; --accent:#2c5d8f;
+  --display:"Fraunces", Georgia, serif; --body:"IBM Plex Sans", system-ui, sans-serif;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;padding-block:20px;padding-inline:16px}
+.wrap{max-width:780px;margin:0 auto;display:grid;gap:14px}
+h1{font-family:var(--display);font-weight:600;font-size:1.7rem;margin:0;text-wrap:balance}
+.alert{background:#fff4f2;border:1px solid #e7b8b2;border-radius:8px;padding:10px 14px;color:var(--ink)}
+.alert b{color:var(--stop)}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-block;font-size:.78rem;font-weight:600;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.go{background:#e3f1e9;color:var(--go)} .warn{background:#fbefdc;color:var(--warn)} .stop{background:#f8e3e1;color:var(--stop)}
+.ask{background:var(--card);border:2px solid var(--accent);border-radius:8px;padding:10px 14px}
+.ask b{color:var(--accent)}
+.scroll{overflow-x:auto}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+</head>
+<body>
+<div class="wrap">
+  <h1>Merging with no human step</h1>
+  <div class="alert"><b>Found first:</b> the GitHub login your agents use is already an admin, so an agent could switch off protection today. Only rules stop it, not permissions.</div>
+  <div class="scroll"><table>
+    <tr><th>Option</th><th>What it does</th><th>Verdict</th></tr>
+    <tr><td><b>A. Smaller agent login</b></td><td>Give agents a login that can open and merge PRs but can't change protection. Only you can do this.</td><td><span class="pill go">Do first</span></td></tr>
+    <tr><td><b>B. Fix false alarms</b></td><td>The check fires on harmless edits, like a new command or task. Make it fire only for real graph-building changes.</td><td><span class="pill go">Do next</span></td></tr>
+    <tr><td><b>C. Separate signer</b></td><td>A locked-away helper on your Mac runs the real tests and signs the result, so the check passes on its own.</td><td><span class="pill go">Real fix</span></td></tr>
+    <tr><td><b>D. One trusted app</b></td><td>A single GitHub app may skip that one check. No switching off per merge (it replaces today's protection rule once), but the check is skipped, not passed, and whoever holds the app key can merge anything.</td><td><span class="pill warn">Fallback</span></td></tr>
+    <tr><td><b>E. Auto off→merge→on</b></td><td>A crash leaves protection off, and anyone with that login can merge anything.</td><td><span class="pill stop">No</span></td></tr>
+  </table></div>
+  <p style="margin:0;color:var(--muted);font-size:.85rem">Corrected 2026-10-03 after review: option D originally said "nothing is ever switched off". Later ruling: a guarded auto-toggle, #864.</p>
+  <div class="ask"><b>What I need from you:</b> a choice of path, asked in the terminal. A is a settings change only you can make.</div>
+</div>
+</body>
+</html>
