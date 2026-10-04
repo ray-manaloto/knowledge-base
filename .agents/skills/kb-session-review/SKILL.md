@@ -100,7 +100,7 @@ ending in a handoff. An unknown value for either now THROWS rather than silently
 falling back — a run that swept four lanes because one was misspelled reports as
 confidently as one that swept five.
 
-Ten lanes sweep independently, the highest-cost findings are adversarially
+Nine lanes sweep independently, the highest-cost findings are adversarially
 refuted, then one ranked synthesis. It returns findings; it changes nothing. The
 two lanes the 2026-08-18 directive added carry their own preflight needs:
 `bot-reviews` discovers the window's PRs itself with `gh`, and `pending-work`
@@ -115,7 +115,6 @@ spent 78 agents and died before writing its report:
 |---|---|
 | `context`, `unpinned` | `haiku` / `medium` — registry lookups and counting jq |
 | `forgotten`, `bot-reviews`, `pending-work`, `tooling-gap`, `contradicted` | `sonnet` / `high` |
-| `telemetry` | `sonnet` / `medium` — jq field extraction over the raw-API-body sink at `.agent/telemetry/`, never a Read of a file body |
 | `circles` | `opus` / `high` — the round's highest-value lane, and judgment-heavy |
 | `extraction-readiness` | `opus` / `high` — its failure mode is a ~$65, ten-hour run that stages 58/58 failed |
 | Cross-check | `kb-adversarial-verifier` (the roster's own refuter, opus/high) |
@@ -127,11 +126,11 @@ switching cannot escape it.
 
 **The cross-check is capped** at `MAX_REFUTERS`, DERIVED rather than a fixed
 literal — `Math.max(6, 25 - 2 - ACTIVE_LANES.length - JUDGE_AGENTS_WORST)`.
-With today's lane sets this evaluates to **11** in both output modes; the
+With today's lane sets this evaluates to **12** in both output modes; the
 exact figure moves with the lane count, so read `run_meta.max_refuters` on
 the return rather than assuming a number. The `Math.max(6, …)` floor keeps a
 narrowed run's cross-check from starving to zero, at a stated price: it can
-only bind past roughly 14-16 active lanes (far beyond today's ten), and once
+only bind past roughly 14-16 active lanes (far beyond today's nine), and once
 it does the worst-case agent count is no longer guaranteed under the 25-agent
 advisory ceiling — see the comment beside `MAX_REFUTERS` in `session-review.js`
 for the exact thresholds per output mode.
@@ -257,7 +256,7 @@ recollect; they read.
 ```text
 mise run kb-session-select -- --current
 Workflow({ name: 'session-review', args: {
-  output: 'handoff',          // the ARTIFACT; `lanes` defaults to the eight below
+  output: 'handoff',          // the ARTIFACT; `lanes` defaults to the seven below
   handoffOut: '.agent/plans/session-<date>-<letter>.md',
   reportDir: '.agent/kb/reports/agents/<date>-session-review',   // DATED — the root default
                                                                   // overwrote prior evidence twice (#431)
@@ -275,12 +274,11 @@ this workflow), `extraction-readiness` (whether the pinned graphify deep
 extraction would actually work if run again — added 2026-08-22 for the same
 reason a second time, and a worse version of it: that lane was never in the
 lane list AT ALL, so the ad-hoc run that found the #426 P0 could not repeat and
-five of its thirteen findings sat unfiled until a fresh sweep re-derived them),
-and `telemetry` (cost attribution over `.agent/telemetry/`, joined 2026-08-23
-for the same reason: a lane not in the default set runs zero times, and this
-lane's whole purpose — closing #461's "a 2.5 GB sink nobody reads" — only
-matters on the path this workflow is actually invoked from). `unpinned` and
-`context` are round-level and stand down.
+five of its thirteen findings sat unfiled until a fresh sweep re-derived them).
+`unpinned` and `context` are round-level and stand down.
+The `telemetry` lane joined handoff mode on 2026-08-23 because the raw-API sink
+had no consumer (the #461 shape); it was retired 2026-10-04 after #870 retired
+the sink.
 
 The composer is told the shape `kb-handoff-check` parses — branch in the lead,
 every gate claim carrying its commit with the sha backticked, `(absent)` on any

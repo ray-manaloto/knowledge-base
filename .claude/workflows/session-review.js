@@ -240,7 +240,6 @@ const HANDOFF_LANES = new Set([
   'bot-reviews',
   'tooling-gap',
   'extraction-readiness',
-  'telemetry',
 ])
 
 // `sessions` REPLACES `transcriptDir` + `since`, and comes from
@@ -623,110 +622,10 @@ makes it succeed. Say which of your findings are observations and which are infe
 End with the COVERAGE line L6 requires: which issues you did not open, which modules you
 did not read, and which claims you could not arm.`,
   },
-  {
-    key: 'telemetry',
-    // Sonnet/medium: this lane is jq field-extraction over ~4.7k small JSON
-    // files, closer to `unpinned`'s registry lookups than to `circles`'
-    // judgment. NOT haiku: `context`'s own history above (:448-450) is a haiku
-    // agent ignoring a StructuredOutput rejection seven times running on a
-    // comparably mechanical job — this lane needs a model that reads its own
-    // tool error and corrects rather than repeating it.
-    //
-    // IN HANDOFF_LANES DELIBERATELY, joined 2026-08-23 for the SAME reason
-    // `tooling-gap` and `extraction-readiness` did: a lane not in the default
-    // set runs zero times, and the path this workflow is ACTUALLY invoked from
-    // is handoff mode via `/clear-prep`. Leaving this opt-in would answer
-    // #461's "a 2.5 GB sink nobody reads" with a lane that never runs on the
-    // one path that matters, which is the exact mistake `extraction-readiness`'s
-    // own comment above already made once about itself.
-    model: 'sonnet',
-    effort: 'medium',
-    prompt: `Find what the transcripts CANNOT show: report on Claude Code's native raw-API-body
-sink at .agent/telemetry/ (~4.7k <uuid>.request.json, ~2.47 GB total; ~4.7k
-req_<id>.response.json, ~16 MB total — LIVE, it grows every request, so state
-the count you actually saw rather than any number quoted in this prompt).
-
-NEVER read a telemetry file into context. Every figure comes from field
-extraction — jq -c '{...}', ls -S, stat -f %z, wc -c — never a Read of a file's
-body. Requests run up to 2.4 MB each and total roughly 2.5 GB; responses are
-~3.5 KB each and total roughly 16 MB, so read ALL responses in one jq pass and
-extract ONLY named fields from requests, never a whole request body.
-
-SCOPE to the sessions under review by .metadata.user_id — a JSON STRING
-containing "session_id":"<uuid>":
-  jq -r '.metadata.user_id' *.request.json | grep -o 'session_id[^,}]*'
-Report requests matched per session, and requests matching none. Control-arm
-this: a session id you KNOW is under review must match more than zero requests
-— if it matches zero, the probe is broken, not the corpus.
-
-PER REQUEST extract: model, output_config.effort, thinking.type, max_tokens,
-(.messages|length), (.system|tostring|length), (.tools|length), and the file's
-own byte size. PER RESPONSE extract: id (the join key the pairing step below
-needs to build its {response.id -> file} map — do not skip it), model,
-stop_reason, and usage TAKEN WHOLE — it carries eleven keys (cache_creation, an object;
-cache_creation_input_tokens; cache_read_input_tokens; inference_geo;
-input_tokens; iterations; output_tokens; output_tokens_details;
-server_tool_use; service_tier; speed) — sum the four token counts for a total
-and keep the rest for the report rather than discarding them.
-
-PAIRING IS KNOWN, use it: a request's diagnostics.previous_message_id equals
-the id (msg_...) of the PRECEDING response. The response FILENAME
-(req_<id>.response.json) is NOT that id, even though the two share an
-8-character prefix — NEVER join on the filename. Build a {response.id -> file}
-map from the cheap response side first (one jq pass, ~16 MB), then join each
-request's previous_message_id against it. Responses carry no metadata or
-session_id, so a per-session usage total is reachable ONLY through this chain.
-TWO classes are unjoinable and must be counted and reported SEPARATELY —
-neither is a broken join: a request whose previous_message_id is null (the
-first request of a conversation), and the last response of a session (it has
-no successor request).
-
-A SECOND, FORWARD PAIRING EXISTS TOO, and it is what turns the terminal-
-response class above from a bound into an exact count: each request's
-system[0].text contains the literal cc_prev_req=req_<id>, and that id IS the
-response FILENAME (req_<id>.response.json — the filename, NOT the response's
-own id field) of the PREVIOUS request's response in the same thread. Extract
-it with jq -r '.system[0].text | tostring' | grep -o
-'cc_prev_req=req_[A-Za-z0-9]*' — never load the system prompt itself into the
-report or a finding; the PII rule stands even for this one line inside it.
-Not every request carries the literal (a session's first request may not) —
-treat a miss the same as the backward join's null case, not as a broken
-probe, and control-arm it the same way: a request you KNOW has a predecessor
-must match.
-
-So a request R_k's OWN response is the response FILE named by its successor
-R_{k+1}'s cc_prev_req — which is what makes "the effort R_k ran at vs the size
-of R_k's own response" computable per request, and what makes the terminal-
-response class EXACTLY countable rather than only bounded: it is whichever
-response file no later request's cc_prev_req ever names.
-
-DO NOT MIX THE TWO KEYS. The backward join above compares a response's id
-field (msg_...) against a request's diagnostics.previous_message_id. This
-forward join compares a response's FILENAME (req_...) against a request's
-cc_prev_req. They are different identifier spaces that happen to share the
-same 8-character-prefix shape — run and report them as two separate joins,
-never zipped together as if they were one field.
-
-FINDINGS ARE COST-SHAPED, ranked by cost: the top-5 largest requests with
-their message counts (the O(n^2) context-resend pattern, measured elsewhere at
-roughly 1.17 MB/request and 95.7 MB over one long round); calls made at
-effort xhigh/max whose paired response was trivial (small output_tokens,
-stop_reason end_turn); large requests with cache_read_input_tokens == 0; the
-model mix per session.
-
-REPORT session_id ONLY. NEVER copy account_uuid, device_id, message content,
-system prompts, or tool schemas into the report or into any finding — those
-stay in the source files and do not belong in what you write.
-
-Write ${reportDir}/telemetry.md AS YOU GO, like every lane, and end with the
-standard COVERAGE line: files examined of files present (state the count you
-actually saw, since the sink is live), fields you could not read, and sessions
-you could not match.`,
-  },
 ]
 
 // Filtered ONCE, here, and every downstream count derives from `ACTIVE_LANES`
-// rather than `LANES` — otherwise handoff mode reports three lanes as
+// rather than `LANES` — otherwise handoff mode reports two lanes as
 // "did not return" when they were never dispatched, which is precisely the
 // never-ran-vs-ran-and-found-nothing conflation this file exists to refuse.
 // LANES are chosen INDEPENDENTLY of the output shape. `cfg.lanes` wins; failing
@@ -868,7 +767,7 @@ const stated = (value) => (typeof value === 'string' ? value.trim() : '')
 // would have made the synthesis call a finished review partial forever.
 //
 // So compare the field's FIRST CLAUSE, not the whole string. "None — complete."
-// and "none." are an explicit nothing; "None of the telemetry was reached" is a
+// and "none." are an explicit nothing; "None of the transcripts were reached" is a
 // real gap and must stay partial, which is why the split is on a separator: that
 // phrase has none before "of", so it never collapses to "none".
 //
@@ -929,7 +828,7 @@ const live = lanes.flatMap((l) => l.findings.filter((f) => f.still_live).map((f)
 // TOTAL agent count stays <= 23 (25 minus a margin of 2) — not any particular
 // refuter count. Two things changed the arithmetic since the old "8 sweeps +
 // MAX_REFUTERS + 1 synthesise <= 25" sentence, which was already stale (the
-// file has NINE sweep lanes, :632 says "all nine", now TEN with `telemetry`)
+// file has NINE sweep lanes)
 // and wrong in kind: `judge()` dispatches up to TWO agents per call (the fable
 // attempt, then the opus fallback), and handoff mode now makes TWO judge calls
 // (compose-handoff, then synthesise) where report mode makes one — so the
@@ -942,18 +841,18 @@ const live = lanes.flatMap((l) => l.findings.filter((f) => f.still_live).map((f)
 // `OUTPUT` and `ACTIVE_LANES` are both declared above this point, so the
 // formula can read them directly rather than re-deriving either. By
 // construction: 1 sweep agent per active lane + MAX_REFUTERS +
-// JUDGE_AGENTS_WORST <= 23. With TODAY's ten lanes (report mode) / eight lanes
-// (handoff mode, after `telemetry` joined `HANDOFF_LANES`) this evaluates to
-// 11 in BOTH modes — but do NOT hardcode 11 anywhere that reads this: a
+// JUDGE_AGENTS_WORST <= 23. With TODAY's nine lanes (report mode) / seven lanes
+// (handoff mode) this evaluates to
+// 12 in BOTH modes — but do NOT hardcode 12 anywhere that reads this: a
 // narrowed run (e.g. `cfg.lanes: ['circles']`) correctly raises the cap to 20
-// (1 + 20 + 2 = 23), and a reader who was told "11" will "fix" that back down.
+// (1 + 20 + 2 = 23), and a reader who was told "12" will "fix" that back down.
 //
 // THE FLOOR OF 6 DOES NOT PROTECT A NARROWED LANE SET — say this precisely,
 // because the opposite reading is the natural one and it is backwards.
 // Narrowing SHRINKS `ACTIVE_LANES.length`, which makes the raw formula
 // `25 - 2 - L - J` LARGER, not smaller — a narrowed run needs the floor least
 // of all. The floor can only bind when L is unusually LARGE: past 15 lanes in
-// report mode (J=2) or past 13 in handoff mode (J=4) — far beyond today's ten.
+// report mode (J=2) or past 13 in handoff mode (J=4) — far beyond today's nine.
 // It exists to guard a FUTURE lane explosion from starving the cross-check to
 // zero refuters, and it has a stated price: once it actually binds, the
 // worst-case total BREAKS the <= 23 invariant above (16 lanes + 6 refuters +
@@ -961,8 +860,8 @@ const live = lanes.flatMap((l) => l.findings.filter((f) => f.still_live).map((f)
 // than a run slightly over budget — but the invariant is no longer absolute
 // past that lane count, and a reader relying on it there must know so.
 //
-// The price of the extra lane, stated rather than discovered later: NOT
-// TRIAGED grows by 3 under the default lane sets (14 -> 11) relative to the
+// The price of the derived budget, stated rather than discovered later: NOT
+// TRIAGED grows by 2 under the default lane sets (14 -> 12) relative to the
 // fixed literal this replaces.
 //
 // This is deliberately the SIMPLEST bound that works — rank by cost_rank, refute
