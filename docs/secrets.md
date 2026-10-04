@@ -165,7 +165,7 @@ python **3.14.4**, which mise no longer has installed; control-armed both times,
 **not** the wrapper's friendly "run `uv sync`" message, because its guard tests
 `[[ ! -x "$_bin" ]]` (`50-mde-secrets.zsh:46`) and `mde-py` *is* executable — it
 is the interpreter in its shebang that is gone. Evidence:
-`docs/research/reports/dotfiles-secret-management.md:331-355`.
+`docs/research/reports/dotfiles-secret-management.md:331-355` (deleted 2026-10-04 under the stale-docs ruling; recoverable at `26a84f7f`).
 
 **Fix before using this path:** `cd "$MDE_PROJECT_DIR" && uv sync`. Until then
 the nine-step procedure above is not a fallback, it is THE path — it depends on
@@ -209,7 +209,7 @@ paragraph carried it.** Since mde#83 (squash-merged as `716b17d`)
 `bootstrap-config` **reconciles declarations through `fnox`** rather than
 rewriting the config from a template — `grep -c _reconcile_declarations
 src/mde/secrets/manage.py` → **2**, control a bogus symbol → **0**
-(`docs/research/reports/dotfiles-secret-management.md:59-65`). That matters
+(`docs/research/reports/dotfiles-secret-management.md:59-65`, deleted 2026-10-04 under the stale-docs ruling; recoverable at `26a84f7f`). That matters
 because the old wording is what made "regenerating everything" sound like the
 risk being traded off, when the fixed code no longer does it. Caught by
 CodeRabbit on #453. **Do not

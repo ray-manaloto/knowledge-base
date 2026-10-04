@@ -72,7 +72,8 @@ _STRIP_BACKEND_ENV = (
 # (`docs/environments/index.md:170`) that never touches the environment handed to
 # a child. v2026.5.6 widened the blast radius by propagating it to children. This
 # is expected upstream behaviour with no fix pending — evidence, control arms and
-# the release-note sweep in `docs/research/reports/mise-path-research.md` § Q4.
+# the release-note sweep were in `docs/research/reports/mise-path-research.md` § Q4
+# (deleted 2026-10-04 under the stale-docs ruling; recoverable at `26a84f7f`).
 #
 # A PREFIX and not a name list, deliberately. A name list is a token-spelling
 # bound (`probes-need-a-control-arm.md`): it protects against the two blobs that

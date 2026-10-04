@@ -5,6 +5,12 @@ during research, it MUST walk this preference chain top-to-bottom and use
 the first option that returns the answer. Lower steps cost more tokens
 (per-query or per-conversation) — never skip a step that would have worked.
 
+⛔ **Mintlify is retired (Ray, 2026-10-04) — never look for it.** Do not search
+for, fetch, recreate or cite any Mintlify doc site, cache, catalog, skill or MCP
+URL; its copies were stale and could teach wrong facts. Mentions surviving in
+record trees (`docs/research/reports/`, `sources/media/`, `sources/extractions/`,
+`graphify-out/memory/`) are history, not sources — never follow one.
+
 ## The chain
 
 0. **Query the graph first.** This repo *is* the cache — the graph and the
