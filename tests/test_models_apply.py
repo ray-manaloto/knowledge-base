@@ -18,7 +18,8 @@ def _repo(root: Path, content: dict[str, str]) -> models_apply.SitesConfig:
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
-    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    if content:
+        subprocess.run(["git", "add", "--", *content], cwd=root, check=True)
     for name, data in models_apply.plugin_bytes().items():
         path = root / ".claude/skills/model-registry" / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -221,6 +222,261 @@ def test_cli_apply_check_never_runs_post_apply(tmp_path: Path):
     assert models.main(tmp_path, ["apply", "--check", "--sites", "models-sites.toml"]) == 0
 
 
+def _wrapper_sites_file(tmp_path: Path, extra: str = "") -> Path:
+    path = tmp_path / "models-sites.toml"
+    path.write_text(
+        "[[wrapper_logs]]\n"
+        'glob = ".claude/agents/codex-sol-*.md"\n'
+        'launch = "codex exec"\n'
+        "lane_log = '\"$LOG\"'\n"
+        "lane_rc = '\"$LOG.rc\"'\n"
+        "rolecheck = '\"$LOG.rolecheck\"'\n"
+        'check = "test -s"\n'
+        'note = "A custom rolecheck failure is a FAIL."\n' + extra
+    )
+    return path
+
+
+def test_wrapper_log_sites_use_consumer_launch_paths_and_check(tmp_path: Path):
+    sites = models_apply.load_sites(_wrapper_sites_file(tmp_path))
+    source = '```bash\ncodex exec - > "$LOG" 2>&1; echo "$?" > "$LOG.rc"\n```\n'
+    registry = models.load_registry()
+    name = ".claude/agents/codex-sol-advisor.md"
+    rendered = models_apply.render(name, source, sites, registry)
+    assert 'test -s "$LOG"; echo "$?" > "$LOG.rolecheck"; exit "$rc"\n' in rendered
+    assert 'echo "$rc" > "$LOG.rc"' in rendered
+    assert sites.wrapper_logs[0].note in rendered
+    assert "$KB_LANE" not in rendered
+    assert "codex-log-check" not in rendered
+    assert models_apply.render(name, rendered, sites, registry) == rendered
+    astra = ".claude/agents/codex-astra-advisor.md"
+    unsited = models_apply.render(astra, source, models_apply.SitesConfig(), registry)
+    assert models_apply.render(astra, source, sites, registry) == unsited
+
+
+@pytest.mark.parametrize(
+    "name", [".claude/agents/codex-sol-advisor.md", ".claude/agents/kb-codex-advisor.md"]
+)
+def test_removing_wrapper_log_site_adds_no_check(tmp_path: Path, name: str):
+    path = _wrapper_sites_file(tmp_path)
+    path.write_text("")
+    source = "```bash\nmise run kb-codex -- --write\n```\n"
+    sites = models_apply.load_sites(path)
+    rendered = models_apply.render(name, source, sites, models.load_registry())
+    assert rendered == source
+    assert "rolecheck" not in rendered
+
+
+def test_wrapper_log_site_rejects_unknown_keys(tmp_path: Path):
+    path = _wrapper_sites_file(tmp_path, 'unknown = "must fail"\n')
+    with pytest.raises(TypeError, match="unknown"):
+        models_apply.load_sites(path)
+    assert models.main(tmp_path, ["apply", "--check", "--sites", str(path)]) == 1
+
+
+def _owned_wrapper_sites_file(tmp_path: Path, content: dict[str, str]) -> Path:
+    _repo(tmp_path, content)
+    path = _wrapper_sites_file(tmp_path)
+    path.write_text(
+        '[[owned]]\nglob = "owned*.md"\n'
+        + path.read_text().replace(".claude/agents/codex-sol-*.md", "owned*.md")
+    )
+    return path
+
+
+def _assert_wrapper_load_failure(
+    path: Path, field: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises((TypeError, ValueError), match=field):
+        models_apply.load_sites(path)
+    assert models.main(path.parent, ["apply", "--check", "--sites", str(path)]) == 1
+    captured = capsys.readouterr()
+    assert "(h) models-apply load/check failure:" in captured.out
+    assert field in captured.out
+    assert "Traceback" not in captured.err
+
+
+@pytest.mark.parametrize("lane_rc", [None, 'lane_rc = ""\n'], ids=["unset", "empty"])
+def test_f1_wrapper_lane_rc_is_required_and_nonempty(tmp_path: Path, capsys, lane_rc):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": "No launch here.\n"})
+    path.write_text(path.read_text().replace("lane_rc = '\"$LOG.rc\"'\n", lane_rc or ""))
+    _assert_wrapper_load_failure(path, "lane_rc", capsys)
+
+
+@pytest.mark.parametrize(
+    ("glob", "content", "expected"),
+    [
+        (
+            "other.md",
+            {"owned.md": "No launch here.\n", "other.md": "```bash\ncodex exec -\n```\n"},
+            "(b) wrapper log glob does not resolve: other.md",
+        ),
+        (
+            "owned*.md",
+            {
+                "owned.md": (
+                    "Mention `codex exec`.\n```python\ncodex exec -\n```\n"
+                    "```bash\necho no-launch\n```\n"
+                ),
+                "owned-control.md": "```bash\ncodex exec --strict-config -\n```\n",
+            },
+            "(b) owned.md: wrapper launch does not resolve: codex exec",
+        ),
+    ],
+    ids=["owned-miss", "launch-miss"],
+)
+def test_f2_wrapper_site_requires_owned_files_and_each_fenced_launch(
+    tmp_path, glob, content, expected
+):
+    path = _owned_wrapper_sites_file(tmp_path, content)
+    text = path.read_text()
+    start = text.index("[[wrapper_logs]]")
+    path.write_text(text[:start] + text[start:].replace("owned*.md", glob))
+    sites = models_apply.load_sites(path)
+    findings = models.check_pin_sites(tmp_path, sites, models.load_registry())
+    assert expected in findings
+    assert not any("owned-control.md: wrapper launch" in finding for finding in findings)
+
+
+@pytest.mark.parametrize("field", ["lane_log", "lane_rc", "rolecheck"])
+@pytest.mark.parametrize("value", ["'\"\"'", "'\"unclosed'"], ids=["empty-word", "unclosed"])
+def test_wrapper_path_fields_must_parse_to_a_path(tmp_path: Path, capsys, field, value):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": "No launch here.\n"})
+    text = path.read_text()
+    line = next(row for row in text.splitlines() if row.startswith(f"{field} = "))
+    path.write_text(text.replace(line, f"{field} = {value}"))
+    _assert_wrapper_load_failure(path, field, capsys)
+
+
+_LAUNCHING = "```bash\ncodex exec --strict-config -\n```\n"
+
+
+@pytest.mark.parametrize("arm", ["excluded", "control"])
+def test_wrapper_exclude_keeps_new_launchers_bound(tmp_path: Path, arm: str):
+    """N1: an exclusion, not a narrowed glob, so a NEW launching file stays bound."""
+    content = {"owned-lane.md": "You ARE the lane.\n", "owned-new.md": _LAUNCHING}
+    path = _owned_wrapper_sites_file(tmp_path, content)
+    excluded = arm == "excluded"
+    if excluded:
+        path.write_text(path.read_text() + 'exclude = ["owned-lane.md"]\n')
+    findings = models.check_pin_sites(
+        tmp_path, models_apply.load_sites(path), models.load_registry()
+    )
+    launchless = "(b) owned-lane.md: wrapper launch does not resolve: codex exec"
+    assert (launchless in findings) is not excluded
+    assert "(a) owned-new.md: differs from models-apply render" in findings
+
+
+def test_wrapper_exclude_that_matches_nothing_is_reported(tmp_path: Path):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": _LAUNCHING})
+    path.write_text(path.read_text() + 'exclude = ["owned-typo.md"]\n')
+    findings = models.check_pin_sites(
+        tmp_path, models_apply.load_sites(path), models.load_registry()
+    )
+    assert "(b) wrapper log exclude does not resolve: owned-typo.md" in findings
+
+
+@pytest.mark.parametrize("value", ['""', '[""]', "[5]"], ids=["str", "empty", "non-str"])
+def test_wrapper_exclude_rejects_invalid_values(tmp_path: Path, capsys, value: str):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": _LAUNCHING})
+    path.write_text(path.read_text() + f"exclude = {value}\n")
+    _assert_wrapper_load_failure(path, "exclude", capsys)
+
+
+@pytest.mark.parametrize(
+    "unknown",
+    ["[[wrapper_log]]\n", "[unknown]\nvalue = 1\n", "unknown = 1\n"],
+    ids=["misspelt-table", "unknown-table", "unknown-key"],
+)
+def test_f3_wrapper_site_rejects_unknown_top_level_keys(tmp_path: Path, capsys, unknown):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": "No launch here.\n"})
+    if unknown.startswith("[[wrapper_log]]"):
+        path.write_text(path.read_text().replace("[[wrapper_logs]]", unknown.strip()))
+        field = "wrapper_log"
+    else:
+        path.write_text(unknown + path.read_text())
+        field = "unknown"
+    _assert_wrapper_load_failure(path, field, capsys)
+
+
+@pytest.mark.parametrize("field", ["launch", "check", "lane_log", "rolecheck", "lane_rc"])
+@pytest.mark.parametrize("value", ['""', "1"], ids=["empty", "non-str"])
+def test_f4_wrapper_site_fields_require_nonempty_strings(tmp_path, capsys, field, value):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": "```bash\ncodex exec -\n```\n"})
+    path.write_text(
+        re.sub(rf"^{field} = .*", f"{field} = {value}", path.read_text(), flags=re.MULTILINE)
+    )
+    _assert_wrapper_load_failure(path, field, capsys)
+
+
+def test_f5_empty_wrapper_lane_log_returns_load_finding_without_traceback(tmp_path: Path, capsys):
+    path = _owned_wrapper_sites_file(tmp_path, {"owned.md": "```bash\ncodex exec -\n```\n"})
+    path.write_text(path.read_text().replace("lane_log = '\"$LOG\"'", 'lane_log = ""'))
+    assert models.main(tmp_path, ["apply", "--check", "--sites", str(path)]) == 1
+    captured = capsys.readouterr()
+    assert "(h) models-apply load/check failure:" in captured.out
+    assert "lane_log" in captured.out
+    assert "Traceback" not in captured.err
+
+
+def test_wrapper_log_site_must_resolve_against_tracked_files(tmp_path: Path):
+    _repo(tmp_path, {"owned.md": "No wrapper here.\n"})
+    sites = models_apply.load_sites(_wrapper_sites_file(tmp_path))
+    assert any(
+        "wrapper log glob does not resolve" in finding
+        for finding in models.check_pin_sites(tmp_path, sites, models.load_registry())
+    )
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        " &",
+        ' | tee "$LOG"',
+        ' > "$LOG" 2>&1; echo "$?" > "$LOG.rc"',
+        " > out.txt",
+        " 2> errors.txt",
+        ' &> "${LOG}"',
+        ' >> "${LOG}"',
+    ],
+)
+def test_consumer_wrapper_log_sites_preserve_shell_failure_and_redirects(
+    tmp_path: Path, suffix: str
+):
+    stub = tmp_path / "codex"
+    stub.write_text("#!/bin/sh\necho output\necho warning >&2\nexit 7\n")
+    stub.chmod(0o755)
+    log = tmp_path / "consumer.log"
+    log.write_text("retained\n")
+    sites = models_apply.load_sites(_wrapper_sites_file(tmp_path))
+    source = f"```bash\ncodex exec -{suffix}\n```\n"
+    name = ".claude/agents/codex-sol-advisor.md"
+    registry = models.load_registry()
+    rendered = models_apply.render(name, source, sites, registry)
+    assert models_apply.render(name, rendered, sites, registry) == rendered
+    block = re.search(r"```bash\n(.*?)```", rendered, re.DOTALL)
+    assert block is not None
+    result = subprocess.run(
+        ["bash", "-c", block[1]],
+        cwd=tmp_path,
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}", "LOG": str(log)},
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 7, rendered
+    assert (tmp_path / "consumer.log.rolecheck").read_text() == "0\n"
+    if "out.txt" in suffix:
+        assert (tmp_path / "out.txt").read_text() == "output\n"
+        assert log.read_text() == "warning\n"
+    elif "errors.txt" in suffix:
+        assert (tmp_path / "errors.txt").read_text() == "warning\n"
+        assert log.read_text() == "output\n"
+    if ">>" in suffix:
+        assert log.read_text().startswith("retained\noutput\n")
+    if "LOG.rc" in suffix:
+        assert (tmp_path / "consumer.log.rc").read_text() == "7\n"
+
+
 def test_both_codex_builders_place_strict_after_the_subcommand():
     from kb_setup import codex_run
 
@@ -252,9 +508,8 @@ def test_rendered_wrapper_preserves_lane_failure(tmp_path: Path):
         ".codex/agents/kb-codex-astra-reviewer.toml",
     ):
         source = (root / name).read_text()
-        rendered = models_apply.render(
-            name, source, models_apply.SitesConfig(), models.load_registry()
-        )
+        sites = models_apply.load_sites(root / "models-sites.toml")
+        rendered = models_apply.render(name, source, sites, models.load_registry())
         for block in re.findall(r"```bash\n(.*?)```", rendered, re.DOTALL):
             launch = re.search(r"^(?:cat .*?\| )?mise run kb-codex --", block, re.MULTILINE)
             if launch:
@@ -320,7 +575,7 @@ def test_lane_logging_preserves_authored_stream_redirects(tmp_path: Path, redire
     stub.chmod(0o755)
     source = f"```bash\nmise run kb-codex -- {redirect}\n```\n"
     name = ".claude/agents/kb-codex-advisor.md"
-    sites = models_apply.SitesConfig()
+    sites = models_apply.load_sites(Path(__file__).resolve().parents[1] / "models-sites.toml")
     registry = models.load_registry()
     rendered = models_apply.render(name, source, sites, registry)
     assert models_apply.render(name, rendered, sites, registry) == rendered
@@ -398,8 +653,9 @@ def test_n8_lane_shell_shapes_preserve_redirect_and_failure(tmp_path, suffix):
     stub.chmod(0o755)
     (tmp_path / "lane.log").write_text("retained\n")
     line = "mise run kb-codex -- --write" + suffix + "\n"
-    rendered = models_apply._lane_launch_end(line)
-    assert models_apply._lane_launch_end(rendered) == rendered
+    sites = models_apply.load_sites(Path(__file__).resolve().parents[1] / "models-sites.toml")
+    rendered = models_apply._lane_launch_end(line, sites.wrapper_logs[0])
+    assert models_apply._lane_launch_end(rendered, sites.wrapper_logs[0]) == rendered
     assert suffix.strip() in rendered
     syntax = subprocess.run(
         ["bash", "-n"], input=rendered, text=True, capture_output=True, check=False
