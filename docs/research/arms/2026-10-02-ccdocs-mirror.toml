@@ -1,6 +1,7 @@
 # Mutation arms for the vendored Claude Code docs mirror refresh/staleness (#829), lane KB2 2026-10-02.
 # Run: mise run kb-arms -- docs/research/arms/2026-10-02-ccdocs-mirror.toml
 suites = [
+  "tests/test_docs_mirror.py",
   "tests/test_ccdocs_mirror.py",
   "tests/test_vendored_claude_code_docs.py",
 ]
@@ -8,7 +9,7 @@ suites = [
 [[arm]]
 id = "C0"
 control = true
-file = "python/src/kb_setup/ccdocs_mirror.py"
+file = "python/src/kb_setup/docs_mirror.py"
 old = '''        if not urls:'''
 new = '''        if not urls:  # (control)'''
 
@@ -17,14 +18,14 @@ new = '''        if not urls:  # (control)'''
 id = "W1"
 test = "test_the_sessionstart_currency_check_runs_the_staleness_probe"
 file = "python/src/kb_setup/currency/run.py"
-old = '''    ccdocs_mirror.report_staleness(repo_root)'''
+old = '''    docs_mirror.report_staleness(repo_root)'''
 new = '''    pass'''
 
 # Accept any 200 as a page — an HTML redirect target would overwrite a real page.
 [[arm]]
 id = "M1"
 test = "test_an_html_answer_is_not_accepted_as_a_page"
-file = "python/src/kb_setup/ccdocs_mirror.py"
+file = "python/src/kb_setup/docs_mirror.py"
 old = '''resp.status == HTTPStatus.OK and "markdown" in ctype:'''
 new = '''resp.status == HTTPStatus.OK:'''
 
@@ -32,7 +33,7 @@ new = '''resp.status == HTTPStatus.OK:'''
 [[arm]]
 id = "K1"
 test = "test_a_failed_page_keeps_its_previous_copy_and_row"
-file = "python/src/kb_setup/ccdocs_mirror.py"
+file = "python/src/kb_setup/docs_mirror.py"
 old = '''        elif url in old and target.is_file():'''
 new = '''        elif False:'''
 
@@ -40,7 +41,7 @@ new = '''        elif False:'''
 [[arm]]
 id = "E1"
 test = "test_an_inventory_listing_no_pages_is_unreadable"
-file = "python/src/kb_setup/ccdocs_mirror.py"
+file = "python/src/kb_setup/docs_mirror.py"
 old = '''        if not urls:'''
 new = '''        if False:'''
 
@@ -49,7 +50,7 @@ new = '''        if False:'''
 [[arm]]
 id = "R1"
 test = "test_main_exits_findings_when_a_page_is_missing"
-file = "python/src/kb_setup/ccdocs_mirror.py"
+file = "python/src/kb_setup/docs_mirror.py"
 old = '''    if not out.stamped:'''
 new = '''    if False:'''
 
@@ -57,9 +58,11 @@ new = '''    if False:'''
 [[arm]]
 id = "S1"
 test = "test_staleness_reports_an_old_mirror"
-file = "python/src/kb_setup/ccdocs_mirror.py"
-old = '''    if age >= STALE_AFTER_DAYS:'''
-new = '''    if age > 10_000:'''
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''    if age >= STALE_AFTER_DAYS:
+        return f"{site.mirror}: fetched {age} days ago — run `mise run {site.refresh_task}`"'''
+new = '''    if age > 10_000:
+        return f"{site.mirror}: fetched {age} days ago — run `mise run {site.refresh_task}`"'''
 
 # ---- Round-2 fixes (cold review of 4979b5e4): each arm reverts one fix. ----
 
@@ -67,23 +70,23 @@ new = '''    if age > 10_000:'''
 [[arm]]
 id = "F1"
 test = "test_a_refresh_that_fetched_nothing_does_not_advance_the_stamp"
-file = "python/src/kb_setup/ccdocs_mirror.py"
-old = '''    if writes and not stale_md and not out.missing:'''
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''    if (writes or out.retired) and not stale_pages and not out.missing:'''
 new = '''    if True:'''
 
 # P2: a kept md page no longer holds the stamp back.
 [[arm]]
 id = "F2"
 test = "test_one_stale_md_page_holds_the_stamp_back"
-file = "python/src/kb_setup/ccdocs_mirror.py"
-old = '''            stale_md += old[url].method == "md"'''
-new = '''            stale_md += 0'''
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''            stale_pages += old[url].method != "webclaw" or url not in site.grandfathered'''
+new = '''            stale_pages += 0'''
 
 # P2: a naive or wrong-typed stamp escapes as a traceback again.
 [[arm]]
 id = "F3"
 test = "test_an_unusable_stamp_is_unknown_never_fresh"
-file = "python/src/kb_setup/ccdocs_mirror.py"
+file = "python/src/kb_setup/docs_mirror.py"
 old = '''    except (OSError, ValueError, KeyError, TypeError) as e:'''
 new = '''    except (OSError, ValueError, KeyError) as e:'''
 
@@ -91,7 +94,7 @@ new = '''    except (OSError, ValueError, KeyError) as e:'''
 [[arm]]
 id = "F4"
 test = "test_an_unusable_stamp_is_unknown_never_fresh"
-file = "python/src/kb_setup/ccdocs_mirror.py"
+file = "python/src/kb_setup/docs_mirror.py"
 old = '''    except (OSError, ValueError, KeyError, TypeError) as e:'''
 new = '''    except OSError as e:'''
 
@@ -99,15 +102,17 @@ new = '''    except OSError as e:'''
 [[arm]]
 id = "F5"
 test = "test_an_unusable_stamp_is_unknown_never_fresh"
-file = "python/src/kb_setup/ccdocs_mirror.py"
-old = '''    if age < 0:'''
-new = '''    if False:'''
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''    if age < 0:
+        return unknown.format("stamp is in the future")'''
+new = '''    if False:
+        return unknown.format("stamp is in the future")'''
 
 # P3: HTTPException escapes fetch().
 [[arm]]
 id = "F6"
 test = "test_fetch_turns_an_http_protocol_error_into_a_response"
-file = "python/src/kb_setup/ccdocs_mirror.py"
+file = "python/src/kb_setup/docs_mirror.py"
 old = '''    except (OSError, TimeoutError, http.client.HTTPException) as e:'''
 new = '''    except (OSError, TimeoutError) as e:'''
 
@@ -115,31 +120,96 @@ new = '''    except (OSError, TimeoutError) as e:'''
 [[arm]]
 id = "F7"
 test = "test_a_crash_mid_loop_leaves_the_mirror_untouched"
-file = "python/src/kb_setup/ccdocs_mirror.py"
-old = '''            writes[target] = resp.body'''
-new = '''            target.write_bytes(resp.body)
-            writes[target] = resp.body'''
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''    state.writes[target] = page.body'''
+new = '''    target.write_bytes(page.body)
+    state.writes[target] = page.body'''
 
 # P3 (X4): any status accepted as a page — a 404 body overwrites a real page.
 [[arm]]
 id = "F8"
 test = "test_a_404_served_as_markdown_is_not_a_page"
-file = "python/src/kb_setup/ccdocs_mirror.py"
-old = '''        if not resp.error and resp.status == HTTPStatus.OK and "markdown" in ctype:'''
-new = '''        if not resp.error and "markdown" in ctype:'''
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''    if not resp.error and resp.status == HTTPStatus.OK and "markdown" in ctype:'''
+new = '''    if not resp.error and "markdown" in ctype:'''
 
 # P3: trailing slash kept — the same page mirrored twice.
 [[arm]]
 id = "F9"
 test = "test_a_trailing_slash_url_is_the_same_page"
-file = "python/src/kb_setup/ccdocs_mirror.py"
-old = '''.removesuffix(".md").rstrip("/") for u'''
-new = '''.removesuffix(".md") for u'''
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''.removesuffix(".md").strip("/")'''
+new = '''.removesuffix(".md").lstrip("/")'''
 
 # P3: a malformed fetch.tsv crashes instead of NOT_RUN.
 [[arm]]
 id = "F10"
 test = "test_a_malformed_fetch_tsv_is_not_run_and_writes_nothing"
-file = "python/src/kb_setup/ccdocs_mirror.py"
+file = "python/src/kb_setup/docs_mirror.py"
 old = '''    except (InventoryUnavailableError, MirrorUnreadableError) as exc:'''
 new = '''    except InventoryUnavailableError as exc:'''
+
+# Count alone cannot retire a page before seven days have elapsed.
+[[arm]]
+id = "T1"
+test = "test_retirement_requires_count_and_elapsed_age"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''    if miss.count >= RETIRE_AFTER and age >= RETIRE_MIN_AGE:'''
+new = '''    if miss.count >= RETIRE_AFTER:'''
+
+# A fallback redirect must not overwrite the requested page with another page.
+[[arm]]
+id = "B1"
+test = "test_webclaw_rejects_a_different_final_url"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''    if normalise(site, page.final_url) != url:'''
+new = '''    if False:'''
+
+# A 404 must remain a gap, even if webclaw offers plausible markdown.
+[[arm]]
+id = "B2"
+test = "test_webclaw_never_runs_on_not_found_server_or_network_failure"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''    if not eligible or not (resp.status == HTTPStatus.OK or same_page_redirect):'''
+new = '''    if not eligible:'''
+
+# Round-1 fixes (cold review of 8e40ed1b), each armed against its own test.
+# Dot/empty segments accepted again — one page mirrored under two names.
+[[arm]]
+id = "X1"
+test = "test_dot_and_empty_segments_are_not_pages"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''    if any(part in {"", ".", ".."} for part in path.split("/")):'''
+new = '''    if False:'''
+
+# A row that is not a page reaches page_name and crashes instead of NOT_RUN.
+[[arm]]
+id = "X2"
+test = "test_a_row_that_is_not_a_page_refuses_before_writing"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''        if normalise(site, url) != url:'''
+new = '''        if False:'''
+
+# Orphan miss records survive forever.
+[[arm]]
+id = "X3"
+test = "test_an_orphan_miss_is_pruned"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''        del misses[url]'''
+new = '''        pass'''
+
+# A mirror with pages but no stamp reads as silent (the pre-fix weakening).
+[[arm]]
+id = "X4"
+test = "test_a_mirror_with_pages_but_no_stamp_is_unknown"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''or any(mirror.glob("*.md"))'''
+new = '''or False'''
+
+# SessionStart asks the codex pin again (a git spawn on a stat-only path).
+[[arm]]
+id = "X5"
+test = "test_sessionstart_staleness_never_asks_the_codex_pin"
+file = "python/src/kb_setup/docs_mirror.py"
+old = '''include_codex: bool = False'''
+new = '''include_codex: bool = True'''

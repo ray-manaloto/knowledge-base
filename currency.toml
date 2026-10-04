@@ -1993,6 +1993,14 @@ version_pattern = '^v?(\d+\.\d+\.\d+)$'
 # `mise_key`) moves this row onto the code path that actually asks the binary.
 manifest = "sources/antigravity-cli.manifest"
 
+[tool.webclaw]
+# Repo-local pin closes the former user-global-only docs discovery gap (#837).
+mise_key = "github:0xMassi/webclaw"
+binary = "webclaw"
+github = "0xMassi/webclaw"
+tag_prefix = "v"
+version_pattern = '^webclaw (\d+\.\d+\.\d+)'
+
 [tool.agnix]
 # The agent-documentation validator. Ray, 2026-08-19: "make a critical/currency
 # dependency / make github repo a graphify source it syncs with".

@@ -114,6 +114,12 @@ gitleaks = "8.30.1"
 # valid. Do not drop below 0.44.0 to "match dotfiles" — bump dotfiles instead.
 # 0.45.0 additionally accepts parameterized ids such as `claude-opus-5[effort=high]`.
 "github:agent-sh/agnix" = "0.52.1"
+# webclaw: the third docs inventory and guarded HTML-to-markdown fallback
+# (#837/#847). The user-global-only pin was #829's reproducibility gap: a
+# checkout or CI runner could not rely on it. Pin the measured version here;
+# discovery uses the origin's sitemap without crawl fallback, and the engine
+# validates redirect targets before accepting a fallback page.
+"github:0xMassi/webclaw" = "0.6.23"
 # fnox: the credential tool the shell's secrets come from (jdx/fnox, in mise's
 # registry as `github:jdx/fnox`). Pinned here rather than left to the user's
 # GLOBAL mise, which at the time installed into a directory literally named
@@ -240,8 +246,8 @@ gh = "2.98.0"
 # 2026-10-01): claude, codex and agy come ONLY from their native installers on
 # this Mac (`~/.local/bin/{codex,agy}`, self-updating), and every mise name for
 # them is in `[settings] disable_tools` below. Nothing else needs the pin: this
-# repo's only CI workflow (graphify-live-receipt.yml) runs bare python3, and there
-# is no image. Their currency rows in currency.toml are self-managed (`expected`,
+# repo's CI workflows (graphify-live-receipt.yml, docs-refresh.yml) install only
+# what they name, and there is no image. Their currency rows in currency.toml are self-managed (`expected`,
 # no `mise_key`). The comments above describe the retired pins' history.
 "npm:ctx7" = { version = "0.5.9", minimum_release_age = "0s" }
 "npm:firecrawl-cli" = "1.23.3"
@@ -1190,8 +1196,10 @@ description = "Re-fetch the vendored Claude Code docs mirror (sources/media/clau
 # pin, so nothing else ever updates it: 107 of 231 pages changed in its first
 # day. Re-fetches every page as native .md, adds pages llms.txt/sitemap.xml newly
 # list, keeps a previous copy (and says so) when a fetch fails, and exits 1 when
-# a listed page can be neither fetched nor kept. An unreadable inventory exits
-# 127 and writes nothing. Logic in kb_setup.ccdocs_mirror; commit the result.
+# a listed page can be neither fetched nor kept. An unreadable inventory — the
+# webclaw map included, so a missing `webclaw` binary too — exits 127 and writes
+# nothing. Logic in kb_setup.docs_mirror (ccdocs_mirror is its Claude Code
+# compatibility layer, #837); `kb-docs-refresh` runs every site. Commit the result.
 run = "uv run kb-setup ccdocs refresh"
 timeout = "15m"
 
@@ -1200,6 +1208,21 @@ description = "Offline: is the vendored Claude Code docs mirror older than 7 day
 # The same probe `kb-currency-check` prints at SessionStart, as a task with a
 # real exit code.
 run = "uv run kb-setup ccdocs check"
+timeout = "30s"
+
+[tasks.kb-avdocs-refresh]
+description = "Refresh the agentsview offline docs mirror with completeness checks"
+run = "uv run kb-setup docs refresh agentsview"
+timeout = "15m"
+
+[tasks.kb-docs-refresh]
+description = "Refresh every offline docs mirror with guarded fallback and retirement"
+run = "uv run kb-setup docs refresh all"
+timeout = "30m"
+
+[tasks.kb-docs-check]
+description = "Offline freshness of every docs mirror and the Codex docs pin"
+run = "uv run kb-setup docs check"
 timeout = "30s"
 
 [tasks.kb-graphify-catalog]

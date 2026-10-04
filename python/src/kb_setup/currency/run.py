@@ -23,7 +23,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from kb_setup import ccdocs_mirror
+from kb_setup import docs_mirror
 from kb_setup.currency import (
     baseline,
     config,
@@ -129,10 +129,11 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
     # walk over `wiki/`, 35.6-63.3 ms) is paid at stamp time, after an operation
     # that already took minutes.
     views.report(views.check_views(repo_root, spec) for spec in _specs(repo_root, only))
-    # The vendored Claude Code docs mirror (#829) has no pin for any check above
-    # to compare, so its only freshness signal is its own stamp. Offline (one
-    # small JSON read), and silent in a repo that vendors no mirror.
-    ccdocs_mirror.report_staleness(repo_root)
+    # The vendored docs mirrors (#829/#837) have no pin for any check above to
+    # compare, so their only freshness signal is their own stamps. Offline (one
+    # small JSON read each), silent for a site never fetched, and NO subprocess:
+    # the codex-docs pin age needs `git`, so it lives in `kb-docs-check` instead.
+    docs_mirror.report_staleness(repo_root)
     if stale:
         print("[currency] tracked docs pages not verified recently (this is not drift):")
         for tool, finding in stale:
