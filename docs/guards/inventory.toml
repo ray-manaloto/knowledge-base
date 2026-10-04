@@ -353,8 +353,8 @@ reviewed_digest = "ae5405077906b0e5"
 # what is one hook, so it is compared as a reviewed ATTRIBUTE instead.
 #
 # reviewed_scope_cases is the REAL coverage denominator. Expanding every matcher
-# alternative and refining Edit|Write through its `if` gives 28 effective cases
-# across these 18 registrations, so a migration graded against 18 can drop 10
+# alternative and refining Edit|Write through its `if` gives 26 effective cases
+# across these 17 registrations, so a migration graded against 17 can drop 9
 # cases and still read complete.
 [[registrations]]
 id = "hook.pretool.graphify-search"
@@ -636,29 +636,6 @@ path = ".claude/settings.json"
 event = "SessionStart"
 matcher = "startup|resume"
 command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-currency-check"
-reviewed_timeout_seconds = 30
-
-[[registrations.reviewed_scope_cases]]
-tool = "startup"
-
-[[registrations.reviewed_scope_cases]]
-tool = "resume"
-
-[[registrations]]
-id = "hook.sessionstart.kb-telemetry-prune"
-current_surface = "classic-hook"
-disposition = "classic-hook"
-owner_kind = "repository"
-owner_ref = "kb-telemetry-prune"
-module_ids = []
-state = "enabled"
-evidence = "measured-this-session"
-note = "A lifecycle hook has no function-hook equivalent: there is no tool call to intercept."
-[registrations.source]
-path = ".claude/settings.json"
-event = "SessionStart"
-matcher = "startup|resume"
-command = "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-telemetry-prune"
 reviewed_timeout_seconds = 30
 
 [[registrations.reviewed_scope_cases]]

@@ -1041,34 +1041,6 @@ description = 'Print what the graph already computed: surprises, questions, god 
 # whole-file count of `"confidence":` over-counts — five AST nodes carry the field.
 run = "uv run kb-setup insights"
 
-[tasks.kb-telemetry-prune]
-description = "Bound the raw-API-body telemetry sink (.agent/telemetry/) by size, then age"
-# The other half of enabling `OTEL_LOG_RAW_API_BODIES` (Ray, 2026-08-17: maximum
-# capture). That sink writes the ENTIRE conversation on EVERY request and nothing
-# in Claude Code rotates it, so a long round costs O(n^2) bytes in one day.
-#
-# SIZE first, age second — an age-only rule cannot see a single round that wrote
-# gigabytes today. `kb-reclaim` cannot own this: it refuses by design to act
-# inside the repository, and that refusal is worth keeping.
-#
-# Wired into SessionSTART, not SessionEnd, and that is not a preference. Every
-# SessionEnd hook shares ONE budget — "the overall budget is automatically raised
-# to the highest per-hook timeout configured in settings files, up to 60 seconds"
-# (hooks.md:2948, re-probed live at 2.1.234, control: `SessionEnd` x15 on the
-# same page). It is 60 s across ALL of them, not 60 s each, and
-# `currency.toml`'s `sessionend-hooks-share-a-1.5s-budget` calls that number
-# load-bearing for the transcript audit. A third consumer would have competed
-# with the audit for it, and a killed SessionEnd hook is SILENT — the failure
-# mode is an audit that quietly stops existing.
-#
-# Start is also the better moment on its own merits: the sink writes DURING a
-# session, so reaping first bounds the directory ahead of the growth rather than
-# after it.
-#
-# Always exits 0: a hook that can fail a session over disk tidiness is a hook
-# people turn off.
-run = "uv run kb-setup telemetry-prune"
-
 [tasks.graph-size]
 description = "Gate: is graph.json still small enough for graphify to READ it?"
 # A SHIP GATE, not a report, and that is the whole change (Ray, 2026-08-17).

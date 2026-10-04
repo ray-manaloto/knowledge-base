@@ -65,7 +65,7 @@ def _print_usage() -> int:
         "insights [--top N] | graph-size | funnel | manifest-audit | graphify-catalog | "
         "lock-drift | docs refresh <site>|all | docs check | ccdocs refresh|check | "
         "worktree-ready [--target PATH] | "
-        "telemetry-prune | serve | serve-memory | env-refresh [--sentinel] | "
+        "serve | serve-memory | env-refresh [--sentinel] | "
         "codex-config-check | "
         "instruction-edit-guard | "
         "instruction-shell-write | "
@@ -259,7 +259,7 @@ def _run(argv: list[str] | None = None) -> int:
         # (registry <-> manifest pin agreement + coverage), no graph write, no
         # `_GRAPH_WRITERS` membership.
         return manifest_audit.main(repo_root, rest)
-    if cmd in {"insights", "graph-size", "telemetry-prune"}:
+    if cmd in {"insights", "graph-size"}:
         return _dispatch_graph_hygiene(repo_root, cmd, rest)
     if cmd == "env-refresh":
         from kb_setup import env_refresh
@@ -391,26 +391,20 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
 
 
 def _dispatch_graph_hygiene(repo_root: Path, cmd: str, rest: list[str]) -> int:
-    """Report on, or bound, what the graph and its telemetry have grown into.
+    """Report on what the graph has grown into.
 
-    Grouped on `_dispatch_registry`'s precedent rather than left as three arms of
-    the main chain, which had reached its statement ceiling. They belong together
-    on more than length: each answers "how big has this got, and is that still
-    all right" — `insights` reports, `graph-size` gates the ceiling graphify will
-    refuse to read past, and `telemetry-prune` bounds the raw-body sink nothing
-    else rotates.
+    Grouped on `_dispatch_registry`'s precedent rather than left as arms of the
+    main chain, which had reached its statement ceiling. Both answer "how big has
+    this got, and is that still all right" — `insights` reports and `graph-size`
+    gates the ceiling graphify will refuse to read past.
     """
     if cmd == "insights":
         from kb_setup import insights
 
         return insights.report(repo_root, rest)
-    if cmd == "graph-size":
-        from kb_setup import graph_size
+    from kb_setup import graph_size
 
-        return graph_size.main(repo_root)
-    from kb_setup import telemetry
-
-    return telemetry.main(repo_root)
+    return graph_size.main(repo_root)
 
 
 def _dispatch_registry(repo_root: Path, cmd: str, rest: list[str]) -> int:

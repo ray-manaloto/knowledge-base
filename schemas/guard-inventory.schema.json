@@ -116,7 +116,7 @@
           "type": "string"
         }
       },
-      "$comment": "ONE effective enforcement case: a single tool, optionally narrowed to a path scope. This is the real coverage denominator. Expanding every matcher alternative and refining `Edit|Write` through its `if` gives 28 effective cases across 18 registrations \u2014 so a migration graded against 18 can drop 10 cases and still read complete. That is the programme's own failure mode #8, 'raw registration counts are not the denominator', as an arithmetic fact."
+      "$comment": "ONE effective enforcement case: a single tool, optionally narrowed to a path scope. This is the real coverage denominator. Expanding every matcher alternative and refining `Edit|Write` through its `if` gives 26 effective cases across 17 registrations \u2014 so a migration graded against 17 can drop 9 cases and still read complete. That is the programme's own failure mode #8, 'raw registration counts are not the denominator', as an arithmetic fact."
     },
     "RegistrationSource": {
       "title": "RegistrationSource",
