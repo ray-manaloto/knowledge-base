@@ -31,6 +31,24 @@ glob = ".claude/agents/kb-codex-*.md"
 flag = "--model"
 value = "{by-agent-role}"
 
+[[wrapper_logs]]
+glob = ".claude/agents/kb-codex-*.md"
+launch = "mise run kb-codex --"
+lane_log = '"$KB_LANE/lane.log"'
+lane_rc = '"$KB_LANE/lane.rc"'
+rolecheck = '"$KB_LANE/lane.log.rolecheck"'
+check = "mise run codex-log-check --"
+note = "A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role."
+
+[[wrapper_logs]]
+glob = ".codex/agents/kb-codex-*.toml"
+launch = "mise run kb-codex --"
+lane_log = '"$KB_LANE/lane.log"'
+lane_rc = '"$KB_LANE/lane.rc"'
+rolecheck = '"$KB_LANE/lane.log.rolecheck"'
+check = "mise run codex-log-check --"
+note = "A non-zero `lane.log.rolecheck` is a FAIL; report the malformed role."
+
 [exempt]
 globs = ["docs/**", "sources/**", "graphify-out/**", "tests/**"]
 

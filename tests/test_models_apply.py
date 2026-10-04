@@ -18,7 +18,8 @@ def _repo(root: Path, content: dict[str, str]) -> models_apply.SitesConfig:
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
-    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    if content:
+        subprocess.run(["git", "add", "--", *content], cwd=root, check=True)
     for name, data in models_apply.plugin_bytes().items():
         path = root / ".claude/skills/model-registry" / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -221,6 +222,116 @@ def test_cli_apply_check_never_runs_post_apply(tmp_path: Path):
     assert models.main(tmp_path, ["apply", "--check", "--sites", "models-sites.toml"]) == 0
 
 
+def _wrapper_sites_file(tmp_path: Path, extra: str = "") -> Path:
+    path = tmp_path / "models-sites.toml"
+    path.write_text(
+        "[[wrapper_logs]]\n"
+        'glob = ".claude/agents/codex-sol-*.md"\n'
+        'launch = "codex exec"\n'
+        "lane_log = '\"$LOG\"'\n"
+        "lane_rc = '\"$LOG.rc\"'\n"
+        "rolecheck = '\"$LOG.rolecheck\"'\n"
+        'check = "test -s"\n'
+        'note = "A custom rolecheck failure is a FAIL."\n' + extra
+    )
+    return path
+
+
+def test_wrapper_log_sites_use_consumer_launch_paths_and_check(tmp_path: Path):
+    sites = models_apply.load_sites(_wrapper_sites_file(tmp_path))
+    source = '```bash\ncodex exec - > "$LOG" 2>&1; echo "$?" > "$LOG.rc"\n```\n'
+    registry = models.load_registry()
+    name = ".claude/agents/codex-sol-advisor.md"
+    rendered = models_apply.render(name, source, sites, registry)
+    assert 'test -s "$LOG"; echo "$?" > "$LOG.rolecheck"; exit "$rc"\n' in rendered
+    assert 'echo "$rc" > "$LOG.rc"' in rendered
+    assert sites.wrapper_logs[0].note in rendered
+    assert "$KB_LANE" not in rendered
+    assert "codex-log-check" not in rendered
+    assert models_apply.render(name, rendered, sites, registry) == rendered
+    astra = ".claude/agents/codex-astra-advisor.md"
+    unsited = models_apply.render(astra, source, models_apply.SitesConfig(), registry)
+    assert models_apply.render(astra, source, sites, registry) == unsited
+
+
+@pytest.mark.parametrize(
+    "name", [".claude/agents/codex-sol-advisor.md", ".claude/agents/kb-codex-advisor.md"]
+)
+def test_removing_wrapper_log_site_adds_no_check(tmp_path: Path, name: str):
+    path = _wrapper_sites_file(tmp_path)
+    path.write_text("")
+    source = "```bash\nmise run kb-codex -- --write\n```\n"
+    sites = models_apply.load_sites(path)
+    rendered = models_apply.render(name, source, sites, models.load_registry())
+    assert rendered == source
+    assert "rolecheck" not in rendered
+
+
+def test_wrapper_log_site_rejects_unknown_keys(tmp_path: Path):
+    path = _wrapper_sites_file(tmp_path, 'unknown = "must fail"\n')
+    with pytest.raises(TypeError, match="unknown"):
+        models_apply.load_sites(path)
+    assert models.main(tmp_path, ["apply", "--check", "--sites", str(path)]) == 1
+
+
+def test_wrapper_log_site_must_resolve_against_tracked_files(tmp_path: Path):
+    _repo(tmp_path, {"owned.md": "No wrapper here.\n"})
+    sites = models_apply.load_sites(_wrapper_sites_file(tmp_path))
+    assert any(
+        "wrapper log glob does not resolve" in finding
+        for finding in models.check_pin_sites(tmp_path, sites, models.load_registry())
+    )
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        " &",
+        ' | tee "$LOG"',
+        ' > "$LOG" 2>&1; echo "$?" > "$LOG.rc"',
+        " > out.txt",
+        " 2> errors.txt",
+        ' &> "${LOG}"',
+        ' >> "${LOG}"',
+    ],
+)
+def test_consumer_wrapper_log_sites_preserve_shell_failure_and_redirects(
+    tmp_path: Path, suffix: str
+):
+    stub = tmp_path / "codex"
+    stub.write_text("#!/bin/sh\necho output\necho warning >&2\nexit 7\n")
+    stub.chmod(0o755)
+    log = tmp_path / "consumer.log"
+    log.write_text("retained\n")
+    sites = models_apply.load_sites(_wrapper_sites_file(tmp_path))
+    source = f"```bash\ncodex exec -{suffix}\n```\n"
+    name = ".claude/agents/codex-sol-advisor.md"
+    registry = models.load_registry()
+    rendered = models_apply.render(name, source, sites, registry)
+    assert models_apply.render(name, rendered, sites, registry) == rendered
+    block = re.search(r"```bash\n(.*?)```", rendered, re.DOTALL)
+    assert block is not None
+    result = subprocess.run(
+        ["bash", "-c", block[1]],
+        cwd=tmp_path,
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}", "LOG": str(log)},
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 7, rendered
+    assert (tmp_path / "consumer.log.rolecheck").read_text() == "0\n"
+    if "out.txt" in suffix:
+        assert (tmp_path / "out.txt").read_text() == "output\n"
+        assert log.read_text() == "warning\n"
+    elif "errors.txt" in suffix:
+        assert (tmp_path / "errors.txt").read_text() == "warning\n"
+        assert log.read_text() == "output\n"
+    if ">>" in suffix:
+        assert log.read_text().startswith("retained\noutput\n")
+    if "LOG.rc" in suffix:
+        assert (tmp_path / "consumer.log.rc").read_text() == "7\n"
+
+
 def test_both_codex_builders_place_strict_after_the_subcommand():
     from kb_setup import codex_run
 
@@ -252,9 +363,8 @@ def test_rendered_wrapper_preserves_lane_failure(tmp_path: Path):
         ".codex/agents/kb-codex-astra-reviewer.toml",
     ):
         source = (root / name).read_text()
-        rendered = models_apply.render(
-            name, source, models_apply.SitesConfig(), models.load_registry()
-        )
+        sites = models_apply.load_sites(root / "models-sites.toml")
+        rendered = models_apply.render(name, source, sites, models.load_registry())
         for block in re.findall(r"```bash\n(.*?)```", rendered, re.DOTALL):
             launch = re.search(r"^(?:cat .*?\| )?mise run kb-codex --", block, re.MULTILINE)
             if launch:
@@ -320,7 +430,7 @@ def test_lane_logging_preserves_authored_stream_redirects(tmp_path: Path, redire
     stub.chmod(0o755)
     source = f"```bash\nmise run kb-codex -- {redirect}\n```\n"
     name = ".claude/agents/kb-codex-advisor.md"
-    sites = models_apply.SitesConfig()
+    sites = models_apply.load_sites(Path(__file__).resolve().parents[1] / "models-sites.toml")
     registry = models.load_registry()
     rendered = models_apply.render(name, source, sites, registry)
     assert models_apply.render(name, rendered, sites, registry) == rendered
@@ -398,8 +508,9 @@ def test_n8_lane_shell_shapes_preserve_redirect_and_failure(tmp_path, suffix):
     stub.chmod(0o755)
     (tmp_path / "lane.log").write_text("retained\n")
     line = "mise run kb-codex -- --write" + suffix + "\n"
-    rendered = models_apply._lane_launch_end(line)
-    assert models_apply._lane_launch_end(rendered) == rendered
+    sites = models_apply.load_sites(Path(__file__).resolve().parents[1] / "models-sites.toml")
+    rendered = models_apply._lane_launch_end(line, sites.wrapper_logs[0])
+    assert models_apply._lane_launch_end(rendered, sites.wrapper_logs[0]) == rendered
     assert suffix.strip() in rendered
     syntax = subprocess.run(
         ["bash", "-n"], input=rendered, text=True, capture_output=True, check=False

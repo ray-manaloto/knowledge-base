@@ -42,6 +42,19 @@ class ArgvSite:
 
 
 @dataclass(frozen=True)
+class WrapperLogSite:
+    """A consumer's wrapper launch and shell expressions for retained logs."""
+
+    glob: str
+    launch: str
+    lane_log: str
+    rolecheck: str
+    check: str
+    lane_rc: str = ""
+    note: str = ""
+
+
+@dataclass(frozen=True)
 class SitesConfig:
     """Reviewed inventory; all patterns resolve against Git's tracked files."""
 
@@ -50,6 +63,7 @@ class SitesConfig:
     exempt: tuple[str, ...] = ()
     agent_pairs: tuple[str, ...] = ()
     argv_sites: tuple[ArgvSite, ...] = ()
+    wrapper_logs: tuple[WrapperLogSite, ...] = ()
     post_apply: tuple[str, ...] = ()
     effort_excluded: tuple[str, ...] = ()
     codex_config: tuple[str, ...] | None = None
@@ -64,6 +78,7 @@ def load_sites(path: Path) -> SitesConfig:
         exempt=tuple(data.get("exempt", {}).get("globs", [])),
         agent_pairs=tuple(row["glob"] for row in data.get("agent_pairs", [])),
         argv_sites=tuple(ArgvSite(**row) for row in data.get("argv_site", [])),
+        wrapper_logs=tuple(WrapperLogSite(**row) for row in data.get("wrapper_logs", [])),
         post_apply=tuple(row["task"] for row in data.get("post_apply", [])),
         effort_excluded=tuple(data.get("effort_excluded", {}).get("globs", [])),
         codex_config=tuple(data["codex_config"]["allow"]) if "codex_config" in data else None,
@@ -288,9 +303,23 @@ def _argv_render(text: str, site: ArgvSite, name: str, registry: Registry) -> st
     return _strict_commands(text, name=name) if site.strict else text
 
 
-def _lane_streams(line: str) -> tuple[str, bool]:
+def _shell_path_pattern(expression: str) -> str:
+    """Recognize quoted paths and equivalent $VAR/${VAR} spellings."""
+    path = shlex.split(expression)[0]
+    parts = []
+    start = 0
+    for match in re.finditer(r"\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)", path):
+        parts.append(re.escape(path[start : match.start()]))
+        variable = match[1] or match[2]
+        parts.append(r"\$(?:" + variable + r"|\{" + variable + r"\})")
+        start = match.end()
+    parts.append(re.escape(path[start:]))
+    return r"[\"\']?" + "".join(parts) + r"[\"\']?"
+
+
+def _lane_streams(line: str, site: WrapperLogSite) -> tuple[str, bool]:
     """Log unredirected streams while preserving authored destinations."""
-    log = r"[\"\']?\$(?:KB_LANE|\{KB_LANE\})/lane\.log[\"\']?"
+    log = _shell_path_pattern(site.lane_log)
     combined = rf"(?<![\d>])1?>\s*{log}\s+2>&1|&>\s*{log}"
     # Tokenize without changing quote spelling. Any existing redirect belongs
     # to the author; tee also owns its output. Never append a competing one.
@@ -315,75 +344,74 @@ def _lane_streams(line: str) -> tuple[str, bool]:
             )
             line = line[:position].rstrip() + " 2>&1 " + line[position:]
         elif not stdout and not pipeline:
-            line += ' > "$KB_LANE/lane.log"'
+            line += f" > {site.lane_log}"
             if not stderr:
                 line += " 2>&1"
         elif stdout and not stderr and not pipeline:
             if re.search(rf"1?>>?\s*{log}", line):
                 line += " 2>&1"
             else:
-                line += ' 2> "$KB_LANE/lane.log"'
+                line += f" 2> {site.lane_log}"
     return line, pipeline
 
 
-def _lane_launch_end(line: str) -> str:
+def _lane_launch_end(line: str, site: WrapperLogSite) -> str:
     """Preserve redirects, wait for background lanes, and retain pipeline rc."""
     line = line.rstrip("\n")
-    artifact = r'; (?:rc=\$\?; )?echo "rc=\$(?:\?|rc)" > "\$KB_LANE/lane\.rc"'
-    record_rc = bool(re.search(artifact, line))
-    line = re.sub(artifact, "", line)
+    record_rc = None
+    if site.lane_rc:
+        artifact = r'; (?:rc=\$\?; )?echo "(rc=)?\$(?:\?|rc)" > ' + _shell_path_pattern(
+            site.lane_rc
+        )
+        record_rc = re.search(artifact, line)
+        line = re.sub(artifact, "", line)
     line = re.sub(r"; rc=\$\?$", "", line)
     line = re.sub(r' & wait "\$!"$', " &", line)
     background = line.rstrip().endswith("&") and not line.rstrip().endswith("&&")
     if background:
         line = line.rstrip()[:-1].rstrip()
-    line, pipeline = _lane_streams(line)
+    line, pipeline = _lane_streams(line, site)
     if pipeline and not line.startswith("set -o pipefail; "):
         line = "set -o pipefail; " + line
     if background:
         line += ' & wait "$!"'
     line += "; rc=$?"
     if record_rc:
-        line += '; echo "rc=$rc" > "$KB_LANE/lane.rc"'
+        line += f'; echo "{record_rc[1] or ""}$rc" > {site.lane_rc}'
     return line + "\n"
 
 
-def _wrapper_logs(text: str) -> str:
-    """Bind every fenced KB wrapper to a retained stderr log and rolecheck rc."""
+def _wrapper_logs(text: str, site: WrapperLogSite) -> str:
+    """Bind selected fenced launches to the consumer's log-check template."""
     lines = text.splitlines(keepends=True)
     output: list[str] = []
     in_block = False
     launching = False
     checked_block = False
+    check = f'{site.check} {site.lane_log}; echo "$?" > {site.rolecheck}; exit "$rc"\n'
     for index, original_line in enumerate(lines):
         line = original_line
         if line.lstrip().startswith("```"):
             in_block = not in_block
             if not in_block and checked_block:
                 output.append(line)
-                note = "\nA non-zero `lane.log.rolecheck` is a FAIL; report the malformed role.\n"
-                if note.strip() not in "".join(lines[index + 1 : index + 4]):
+                note = f"\n{site.note}\n"
+                if site.note and note.strip() not in "".join(lines[index + 1 : index + 4]):
                     output.append(note)
                 checked_block = False
                 continue
-        if in_block and "mise run codex-log-check" in line:
+        if in_block and site.check in line:
             checked_block = True
-            line = (
-                'mise run codex-log-check -- "$KB_LANE/lane.log"; '
-                'echo "$?" > "$KB_LANE/lane.log.rolecheck"; exit "$rc"\n'
-            )
-        if in_block and "mise run kb-codex --" in line:
+            line = check
+        if in_block and site.launch in line:
             launching = True
         if launching and not line.rstrip().endswith("\\"):
-            line = _lane_launch_end(line)
-            if index + 1 < len(lines) and "mise run codex-log-check" in lines[index + 1]:
+            line = _lane_launch_end(line, site)
+            if index + 1 < len(lines) and site.check in lines[index + 1]:
                 launching = False
             else:
                 output.append(line)
-                output.append(
-                    'mise run codex-log-check -- "$KB_LANE/lane.log"; '
-                    'echo "$?" > "$KB_LANE/lane.log.rolecheck"; exit "$rc"\n'
-                )
+                output.append(check)
                 checked_block = True
                 launching = False
                 continue
@@ -400,8 +428,9 @@ def render(name: str, source: str, sites: SitesConfig, registry: Registry) -> st
             if fnmatch.fnmatchcase(name, site.glob):
                 text = _argv_render(text, site, name, registry)
         text = _strict_commands(text, name=name)
-        if name.startswith((".claude/agents/kb-codex-", ".codex/agents/kb-codex-")):
-            text = _wrapper_logs(text)
+        for site in sites.wrapper_logs:
+            if fnmatch.fnmatchcase(name, site.glob):
+                text = _wrapper_logs(text, site)
         return text
 
     text = _active(source, transform)
@@ -563,6 +592,11 @@ def check_pin_sites(root: Path, sites: SitesConfig, registry: Registry) -> list[
     findings.extend(
         f"(b) argv glob does not resolve: {site.glob}"
         for site in sites.argv_sites
+        if not any(fnmatch.fnmatchcase(name, site.glob) for name in names)
+    )
+    findings.extend(
+        f"(b) wrapper log glob does not resolve: {site.glob}"
+        for site in sites.wrapper_logs
         if not any(fnmatch.fnmatchcase(name, site.glob) for name in names)
     )
     findings.extend(check_aliases_only(root, sites))
