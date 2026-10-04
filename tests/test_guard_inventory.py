@@ -226,10 +226,10 @@ def test_an_unparsable_if_condition_is_never_silently_widened() -> None:
     assert expand_scope_cases("Edit|Write", "this is not a condition") is None
 
 
-def test_the_live_settings_expand_to_twenty_eight_effective_cases() -> None:
-    """18 registrations, 28 effective cases — the real denominator.
+def test_the_live_settings_expand_to_twenty_six_effective_cases() -> None:
+    """17 registrations, 26 effective cases — the real denominator.
 
-    A migration graded against 18 can drop 10 cases and read complete.
+    A migration graded against 17 can drop 9 cases and read complete.
     """
     settings = json.loads((REPO / SETTINGS_PATH).read_text(encoding="utf-8"))
     total = 0
@@ -239,7 +239,7 @@ def test_the_live_settings_expand_to_twenty_eight_effective_cases() -> None:
                 cases = expand_scope_cases(group.get("matcher") or "", hook.get("if") or "")
                 assert cases is not None
                 total += len(cases)
-    assert total == 28
+    assert total == 26
 
 
 # --- the FAIL directions the ticket names ----------------------------------
