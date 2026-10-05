@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 from kb_setup import manifest
 
@@ -262,19 +262,39 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
     assert_public_sdk(pinned)
 
 
-def _shown_url(value: object) -> object:
-    """Hide userinfo and unparsable URLs so refusals cannot leak credentials to CI logs."""
+def _shown_url(value: object) -> str:
+    """Display only bounded origin URLs, without userinfo, ports or URL parameters."""
     if not isinstance(value, str):
-        return value
+        return "<non-string url>"
     try:
         parts = urlsplit(value)
+        hostname = parts.hostname
     except ValueError:
         return "<unparsable url>"
-    if parts.username is not None or parts.password is not None:
-        return urlunsplit(parts._replace(netloc=parts.hostname or ""))
-    if "@" in value:
-        return "<unparsable url>"
-    return value
+    if (
+        parts.scheme not in {"https", "http", "ssh", "git"}
+        or not hostname
+        or parts.query != ""
+        or parts.fragment != ""
+        or ("@" in value and parts.username is None and parts.password is None)
+        or not re.fullmatch(r"[A-Za-z0-9._/-]{0,200}", parts.path)
+    ):
+        return "<redacted url>"
+    return f"{parts.scheme}://{hostname}{parts.path}"
+
+
+def _shown_commit(value: object) -> str:
+    """Display only immutable lowercase commit SHAs."""
+    if isinstance(value, str) and re.fullmatch(r"[0-9a-f]{40}", value):
+        return value
+    return "<redacted>"
+
+
+def _shown_vcs(value: object) -> str:
+    """Display only known VCS names, never arbitrary record values."""
+    if isinstance(value, str) and value in {"git", "hg", "svn", "bzr"}:
+        return value
+    return "<redacted>"
 
 
 def assert_installed_graphify_origin(repo_root: Path) -> None:
@@ -287,8 +307,10 @@ def assert_installed_graphify_origin(repo_root: Path) -> None:
     try:
         pin = manifest.load(manifest_path)
     except OSError, ValueError:
-        raise SystemExit(f"[graphify] REFUSING: cannot load manifest {manifest_path}") from None
-    expected = f"url={_shown_url(pin.url)!r}, commit={pin.commit!r}"
+        pin = None
+    if pin is None:
+        raise SystemExit(f"[graphify] REFUSING: cannot load manifest {manifest_path}")
+    expected = f"url={_shown_url(pin.url)!r}, commit={_shown_commit(pin.commit)!r}"
     if not re.fullmatch(r"[0-9a-f]{40}", pin.commit):
         raise SystemExit(
             f"[graphify] REFUSING: manifest must pin 40 lowercase hex characters; {expected}"
@@ -301,13 +323,16 @@ def assert_installed_graphify_origin(repo_root: Path) -> None:
             f"observed {len(directories)} directories: {directories}"
         )
     direct_url_path = directories[0] / "direct_url.json"
+    load_failed = object()
     try:
         direct_url = json.loads(direct_url_path.read_text(encoding="utf-8"))
     except OSError, ValueError:
+        direct_url = load_failed
+    if direct_url is load_failed:
         raise SystemExit(
             f"[graphify] REFUSING: expected {expected}; "
             f"cannot read valid JSON from {direct_url_path}"
-        ) from None
+        )
     if not isinstance(direct_url, dict):
         raise SystemExit(
             f"[graphify] REFUSING: expected {expected}; {direct_url_path} is not an object"
@@ -316,7 +341,8 @@ def assert_installed_graphify_origin(repo_root: Path) -> None:
     if not isinstance(vcs_info, dict):
         raise SystemExit(
             f"[graphify] REFUSING: expected {expected}; "
-            f"observed url={_shown_url(direct_url.get('url'))!r}, invalid vcs_info={vcs_info!r}"
+            f"observed url={_shown_url(direct_url.get('url'))!r}, "
+            f"invalid vcs_info type={type(vcs_info).__name__}"
         )
     if (
         direct_url.get("url") != pin.url
@@ -328,8 +354,8 @@ def assert_installed_graphify_origin(repo_root: Path) -> None:
         raise SystemExit(
             f"[graphify] REFUSING: expected git install with {expected}; "
             f"observed url={_shown_url(direct_url.get('url'))!r}, "
-            f"commit={vcs_info.get('commit_id')!r}, "
-            f"vcs={vcs_info.get('vcs')!r}, dir_info={'dir_info' in direct_url}, "
+            f"commit={_shown_commit(vcs_info.get('commit_id'))!r}, "
+            f"vcs={_shown_vcs(vcs_info.get('vcs'))!r}, dir_info={'dir_info' in direct_url}, "
             f"archive_info={'archive_info' in direct_url}"
         )
 

@@ -446,6 +446,119 @@ def test_installed_graphify_origin_refusal_hides_url_credentials(
     assert "github.com/ray-manaloto/graphify" in str(exc.value)
 
 
+@pytest.mark.parametrize(
+    ("field", "form"),
+    [
+        ("url", "list"),
+        ("url", "dict"),
+        ("vcs_info", "string"),
+        ("vcs_info", "list"),
+        ("commit_id", "string"),
+        ("vcs", "string"),
+    ],
+)
+def test_installed_graphify_origin_refusal_hides_untrusted_fields(
+    graphify_origin_repo: Path, field: str, form: str
+) -> None:
+    marker = "MARKER" + "4711"
+    credential_url = f"https://user:{marker}@github.com/ray-manaloto/graphify"
+    value = {
+        "list": [credential_url],
+        "dict": {"nested": credential_url},
+        "string": credential_url,
+    }[form]
+    direct_url_path = _origin_record(graphify_origin_repo)
+    payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    target = payload if field in {"url", "vcs_info"} else payload["vcs_info"]
+    target[field] = value
+    direct_url_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING") as exc:
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+    assert marker not in str(exc.value)
+    if field == "vcs_info":
+        assert f"invalid vcs_info type={type(value).__name__}" in str(exc.value)
+    for chained in (exc.value.__context__, exc.value.__cause__):
+        if chained is not None:
+            assert marker not in str(chained)
+
+
+def test_installed_graphify_origin_refusal_hides_manifest_commit(
+    graphify_origin_repo: Path,
+) -> None:
+    marker = "MARKER" + "4711"
+    commit = marker + "xyz@"
+    manifest_path = graphify_origin_repo / "sources" / "graphify.manifest"
+    manifest_path.write_text(
+        manifest_path.read_text(encoding="utf-8").replace(_ORIGIN_COMMIT, commit),
+        encoding="utf-8",
+    )
+    # Mirror the invalid pin so only the shape check can refuse this install.
+    direct_url_path = _origin_record(graphify_origin_repo)
+    payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    payload["vcs_info"]["commit_id"] = commit
+    direct_url_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING") as exc:
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+    assert marker not in str(exc.value)
+    for chained in (exc.value.__context__, exc.value.__cause__):
+        if chained is not None:
+            assert marker not in str(chained)
+
+
+@pytest.mark.parametrize("where", ["manifest", "record"])
+@pytest.mark.parametrize("form", ["query", "fragment", "path"])
+def test_installed_graphify_origin_refusal_hides_url_components(
+    graphify_origin_repo: Path, where: str, form: str
+) -> None:
+    marker = "MARKER" + "4711"
+    suffix = {"query": "?access_token=" + marker, "fragment": "#" + marker, "path": "/~" + marker}[
+        form
+    ]
+    url = _ORIGIN_URL + suffix
+    if where == "manifest":
+        manifest_path = graphify_origin_repo / "sources" / "graphify.manifest"
+        manifest_path.write_text(
+            manifest_path.read_text(encoding="utf-8").replace(_ORIGIN_URL, url),
+            encoding="utf-8",
+        )
+    else:
+        direct_url_path = _origin_record(graphify_origin_repo)
+        payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+        payload["url"] = url
+        direct_url_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING") as exc:
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+    assert "<redacted url>" in str(exc.value)
+    assert marker not in str(exc.value)
+    for chained in (exc.value.__context__, exc.value.__cause__):
+        if chained is not None:
+            assert marker not in str(chained)
+
+
+@pytest.mark.parametrize("where", ["manifest", "record"])
+def test_installed_graphify_origin_refusal_hides_load_error_context(
+    graphify_origin_repo: Path, where: str
+) -> None:
+    marker = "MARKER" + "4711"
+    if where == "manifest":
+        manifest_path = graphify_origin_repo / "sources" / "graphify.manifest"
+        manifest_path.write_text(
+            manifest_path.read_text(encoding="utf-8") + f"build = {marker}\n",
+            encoding="utf-8",
+        )
+    else:
+        _origin_record(graphify_origin_repo).write_text('{"url": "' + marker, encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING") as exc:
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+    assert marker not in str(exc.value)
+    assert exc.value.__context__ is None
+    assert exc.value.__cause__ is None
+
+
 @pytest.mark.parametrize("where", ["manifest", "record"])
 @pytest.mark.parametrize("form", ["fullwidth_colon", "schemeless"])
 def test_installed_graphify_origin_refusal_hides_unparsable_url_credentials(
@@ -472,7 +585,8 @@ def test_installed_graphify_origin_refusal_hides_unparsable_url_credentials(
 
     with pytest.raises(SystemExit, match="REFUSING") as exc:
         graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
-    assert "<unparsable url>" in str(exc.value)
+    placeholder = "<unparsable url>" if form == "fullwidth_colon" else "<redacted url>"
+    assert placeholder in str(exc.value)
     assert marker not in str(exc.value)
     for chained in (exc.value.__context__, exc.value.__cause__):
         if chained is not None:
@@ -484,7 +598,7 @@ def test_installed_graphify_origin_refusal_hides_unparsable_url_credentials(
     [
         ("fullwidth_colon", "<unparsable url>"),
         ("fullwidth_at", "<unparsable url>"),
-        ("schemeless", "<unparsable url>"),
+        ("schemeless", "<redacted url>"),
         ("empty_username", "https://host/repo"),
         ("plain", "https://host/repo"),
     ],
@@ -503,6 +617,82 @@ def test_shown_url_hides_unparsable_credentials(form: str, expected: str) -> Non
 
     assert shown == expected
     assert marker not in str(shown)
+
+
+@pytest.mark.parametrize("value", [["x"], {"a": 1}, None])
+def test_shown_url_redacts_non_strings(value: object) -> None:
+    assert graphify_env._shown_url(value) == "<non-string url>"
+
+
+@pytest.mark.parametrize("scheme", ["https", "http", "ssh", "git"])
+def test_shown_url_preserves_allowed_origins(scheme: str) -> None:
+    marker = "MARKER" + "4711"
+    plain = f"{scheme}://github.com/ray-manaloto/graphify"
+    assert graphify_env._shown_url(plain) == plain
+    assert (
+        graphify_env._shown_url(f"{scheme}://user:{marker}@github.com:443/ray-manaloto/graphify")
+        == plain
+    )
+    assert graphify_env._shown_url(f"{scheme}://github.com:443") == f"{scheme}://github.com"
+    path = "/" + "a" * 199
+    assert graphify_env._shown_url(f"{scheme}://github.com{path}") == f"{scheme}://github.com{path}"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "ftp://host/repo",
+        "https:///repo",
+        "https://host/repo@other",
+        "https://host/~repo",
+        "https://host/repo%20name",
+        "https://host/repo?query",
+        "https://host/repo#fragment",
+        "https://host/" + "a" * 200,
+    ],
+)
+def test_shown_url_redacts_disallowed_components(url: str) -> None:
+    assert graphify_env._shown_url(url) == "<redacted url>"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (_ORIGIN_COMMIT, _ORIGIN_COMMIT),
+        (["x"], "<redacted>"),
+        ({"a": 1}, "<redacted>"),
+        (None, "<redacted>"),
+        (123, "<redacted>"),
+        ("git", "<redacted>"),
+        ("@:/", "<redacted>"),
+        ("a" * 65, "<redacted>"),
+        ("A" * 40, "<redacted>"),
+        (_ORIGIN_COMMIT + "\n", "<redacted>"),
+    ],
+)
+def test_shown_commit_allows_only_lowercase_sha(value: object, expected: str) -> None:
+    assert graphify_env._shown_commit(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("git", "git"),
+        ("hg", "hg"),
+        ("svn", "svn"),
+        ("bzr", "bzr"),
+        (["git"], "<redacted>"),
+        ({"vcs": "git"}, "<redacted>"),
+        (None, "<redacted>"),
+        (123, "<redacted>"),
+        ("GIT", "<redacted>"),
+        ("@:/", "<redacted>"),
+        ("a" * 65, "<redacted>"),
+        (_ORIGIN_COMMIT, "<redacted>"),
+    ],
+)
+def test_shown_vcs_allows_only_known_names(value: object, expected: str) -> None:
+    assert graphify_env._shown_vcs(value) == expected
 
 
 def _fake_claude_dir(tmp_path: Path, name: str) -> Path:
