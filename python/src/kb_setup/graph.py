@@ -214,6 +214,47 @@ _EXPECTED_UNCLASSIFIED = (
         # lose, and no extractor could produce one.
         classification=ReviewedClassification.reviewed_binary_docs_asset,
     ),
+    # --- agentsview and hk, reviewed for the detect preflight (#884).
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="agentsview",
+        relative_path="docker/debian-mirrors.list",
+        content_sha256="41f9bd663ee0a1ff6bbf238824230c192e0026c8ad81b79402c637794f8dbc58",
+        pinned_commit="ff8fb4e84823b9583eba417afc243140caabdcb0",
+        # Debian mirrors read by Dockerfile via mirror+file:; build config has no nodes.
+        classification=ReviewedClassification.reviewed_build_toolchain_config,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="agentsview",
+        relative_path="docker/debian-security-mirrors.list",
+        content_sha256="0905a5d6fed2827d21654a5aed2da1fe02d47e938a6e0e01da6661435cca0343",
+        pinned_commit="ff8fb4e84823b9583eba417afc243140caabdcb0",
+        # Debian mirrors read by Dockerfile via mirror+file:; build config has no nodes.
+        classification=ReviewedClassification.reviewed_build_toolchain_config,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/.vitepress/fonts/LiberationMono-Bold.ttf",
+        content_sha256="626655e94dd82f3f42549daf995c921b0915fa8ab1f4b839559e8892ea41d240",
+        pinned_commit="bb2303bf2a138c4d5d27eac9604ade1ff2fc50de",
+        # TrueType binary for hk's VitePress docs site; no source nodes to extract.
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/.vitepress/fonts/LiberationMono-Regular.ttf",
+        content_sha256="395fa5ab8d40c8eba390ced528744ea75a7f69aabf3e68b6f925ca0e39a27370",
+        pinned_commit="bb2303bf2a138c4d5d27eac9604ade1ff2fc50de",
+        # TrueType binary for hk's VitePress docs site; no source nodes to extract.
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="hk",
+        relative_path="docs/.vitepress/fonts/SpaceGrotesk.ttf",
+        content_sha256="acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
+        pinned_commit="bb2303bf2a138c4d5d27eac9604ade1ff2fc50de",
+        # Same TrueType docs font as mise's reviewed entry above; no source nodes.
+        classification=ReviewedClassification.reviewed_binary_docs_asset,
+    ),
 )
 
 # `Attacca` emits EIGHT metadata-only JSON files, which is why the truncation

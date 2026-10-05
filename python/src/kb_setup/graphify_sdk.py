@@ -1070,6 +1070,7 @@ _NON_SOURCE_SUFFIXES = frozenset(
         ".stderr",
         ".spv",
         ".tsbuildinfo",
+        ".vtt",  # WebVTT plain-text chapter markers, not source code.
         ".wasm",
         ".whl",
         ".woff",
@@ -1186,6 +1187,7 @@ _UNSUPPORTED_LANGUAGE_SUFFIXES = frozenset(
         ".cbl",
         ".cfg",
         ".cmd",
+        ".command",  # macOS bash launchers Graphify cannot parse; count the loss.
         ".conf",
         ".Processor",
         ".cpy",

@@ -39,6 +39,7 @@ def _write(root: Path, relative: str, body: str = "x") -> str:
         "uv.lock",
         "docs/assets/favicon.ico",
         "dist/thing.whl",
+        "docs/public/showreel-chapters.vtt",
     ],
 )
 def test_non_source_class_is_absorbed_silently(tmp_path: Path, relative: str) -> None:
@@ -61,6 +62,8 @@ def test_non_source_class_is_absorbed_silently(tmp_path: Path, relative: str) ->
         "notebooks/bench.ipynb",
         "default.nix",
         "Cargo.toml",
+        "start-agentsview.command",
+        "start-agentsview-dev.command",
         "Dockerfile",
         "Dockerfile.alpine",
         "Makefile",
