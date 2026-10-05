@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -10,6 +11,8 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+
+from kb_setup import manifest
 
 # Env vars graphify's `detect_backend()` keys off, in its priority order:
 #   gemini -> kimi -> claude -> openai -> deepseek -> azure -> bedrock -> ollama.
@@ -256,6 +259,75 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
     from kb_setup.graphify_sdk import assert_public_sdk
 
     assert_public_sdk(pinned)
+
+
+def _shown_commit(value: object) -> str:
+    """Display only immutable lowercase commit SHAs."""
+    if isinstance(value, str) and re.fullmatch(r"[0-9a-f]{40}", value):
+        return value
+    return "<redacted>"
+
+
+def _shown_vcs(value: object) -> str:
+    """Display only known VCS names, never arbitrary record values."""
+    if isinstance(value, str) and value in {"git", "hg", "svn", "bzr"}:
+        return value
+    return "<redacted>"
+
+
+def assert_installed_graphify_origin(repo_root: Path) -> None:
+    """Prove the project venv's fork origin and commit for T11 CI.
+
+    Version-match is not origin-match: our fork carries patches without changing
+    its version, so only the manifest URL and immutable commit identify the pin.
+    """
+    manifest_path = repo_root / "sources" / "graphify.manifest"
+    try:
+        pin = manifest.load(manifest_path)
+    except OSError, ValueError:
+        pin = None
+    if pin is None:
+        raise SystemExit("[graphify] REFUSING: cannot load sources/graphify.manifest")
+    if not re.fullmatch(r"[0-9a-f]{40}", pin.commit):
+        raise SystemExit("[graphify] REFUSING: manifest commit is not 40 lowercase hex")
+    pattern = "lib/python*/site-packages/graphifyy-*.dist-info"
+    directories = [path for path in (repo_root / ".venv").glob(pattern) if path.is_dir()]
+    if len(directories) != 1:
+        raise SystemExit(
+            "[graphify] REFUSING: expected exactly one graphifyy dist-info in the project "
+            f"venv, found {len(directories)}"
+        )
+    direct_url_path = directories[0] / "direct_url.json"
+    load_failed = object()
+    try:
+        direct_url = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    except OSError, ValueError:
+        direct_url = load_failed
+    if direct_url is load_failed:
+        raise SystemExit("[graphify] REFUSING: direct_url.json unreadable or not valid JSON")
+    if not isinstance(direct_url, dict):
+        raise SystemExit("[graphify] REFUSING: direct_url.json is not an object")
+    vcs_info = direct_url.get("vcs_info")
+    if not isinstance(vcs_info, dict):
+        raise SystemExit("[graphify] REFUSING: vcs_info missing or not an object")
+    vcs = vcs_info.get("vcs")
+    installed = vcs_info.get("commit_id")
+    checks = (
+        (direct_url.get("url") != pin.url, "manifest url does not match installed url"),
+        ("dir_info" in direct_url, "local/editable install (dir_info)"),
+        ("archive_info" in direct_url, "archive install (archive_info)"),
+        (vcs != "git", f"installed vcs is {_shown_vcs(vcs)}, not git"),
+        (
+            installed != pin.commit,
+            (
+                f"installed commit {_shown_commit(installed)} does not match "
+                f"manifest commit {_shown_commit(pin.commit)}"
+            ),
+        ),
+    )
+    reasons = [reason for failed, reason in checks if failed]
+    if reasons:
+        raise SystemExit("[graphify] REFUSING: " + "; ".join(reasons))
 
 
 def _imports_graphify(py: Path) -> bool:

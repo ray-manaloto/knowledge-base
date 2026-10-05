@@ -14,7 +14,11 @@ never set the variable — so each strip arm SETS the variable first.
 
 from __future__ import annotations
 
+import json
 import os
+import shutil
+import traceback
+import uuid
 from pathlib import Path
 
 import pytest
@@ -219,6 +223,371 @@ def test_gate_refuses_public_sdk_signature_drift(
     monkeypatch.setattr(graphify_sdk, "assert_public_sdk", drift)
     with pytest.raises(RuntimeError, match="signature changed"):
         graphify_env.assert_pinned_graphify(tmp_path)
+
+
+_ORIGIN_URL = "https://github.com/ray-manaloto/graphify"
+_ORIGIN_COMMIT = "3c9b930f386f80c393fe658e1afb685030828c6a"
+
+
+def _origin_record(repo_root: Path) -> Path:
+    return (
+        repo_root / ".venv/lib/python3.14/site-packages/graphifyy-0.9.57.dist-info/direct_url.json"
+    )
+
+
+def _origin_repo(repo_root: Path) -> Path:
+    """Build one good project install, including beneath an untrusted root name."""
+    manifest_path = repo_root / "sources" / "graphify.manifest"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        f"url = {_ORIGIN_URL}\nref = fork-branch\ncommit = {_ORIGIN_COMMIT}\n",
+        encoding="utf-8",
+    )
+    direct_url_path = _origin_record(repo_root)
+    direct_url_path.parent.mkdir(parents=True)
+    direct_url_path.write_text(
+        json.dumps(
+            {
+                "url": _ORIGIN_URL,
+                "vcs_info": {
+                    "vcs": "git",
+                    "commit_id": _ORIGIN_COMMIT,
+                    "requested_revision": "different-requested-revision",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return repo_root
+
+
+@pytest.fixture
+def graphify_origin_repo(tmp_path: Path) -> Path:
+    """One good project install, shared by the positive and single-change arms."""
+    return _origin_repo(tmp_path)
+
+
+def test_installed_graphify_origin_matches_real_project() -> None:
+    assert (
+        graphify_env.assert_installed_graphify_origin(Path(__file__).resolve().parents[1]) is None
+    )
+
+
+def test_installed_graphify_origin_matches_fixture(graphify_origin_repo: Path) -> None:
+    assert graphify_env.assert_installed_graphify_origin(graphify_origin_repo) is None
+
+
+def test_installed_graphify_origin_refuses_wrong_commit(graphify_origin_repo: Path) -> None:
+    direct_url_path = _origin_record(graphify_origin_repo)
+    payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    wrong_commit = "0" * 40
+    payload["vcs_info"]["commit_id"] = wrong_commit
+    direct_url_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING") as exc:
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+    assert _ORIGIN_COMMIT in str(exc.value)
+    assert wrong_commit in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("url", f"{_ORIGIN_URL}.git"),
+        ("dir_info", {}),
+        ("dir_info", {"editable": True}),
+        ("archive_info", {}),
+        ("vcs_info", None),
+        ("vcs_info", []),
+        ("vcs_info", "git"),
+    ],
+)
+def test_installed_graphify_origin_refuses_record_mutation(
+    graphify_origin_repo: Path, field: str, value: object
+) -> None:
+    direct_url_path = _origin_record(graphify_origin_repo)
+    payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    payload[field] = value
+    direct_url_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING"):
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+
+def test_installed_graphify_origin_refuses_non_git_vcs(graphify_origin_repo: Path) -> None:
+    direct_url_path = _origin_record(graphify_origin_repo)
+    payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    payload["vcs_info"]["vcs"] = "hg"
+    direct_url_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING"):
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+
+def test_installed_graphify_origin_reports_every_failure_reason(
+    graphify_origin_repo: Path,
+) -> None:
+    direct_url_path = _origin_record(graphify_origin_repo)
+    payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    payload["url"] = f"{_ORIGIN_URL}.git"
+    payload["dir_info"] = {}
+    payload["archive_info"] = {}
+    payload["vcs_info"] = {"vcs": "hg", "commit_id": "0" * 40}
+    direct_url_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc:
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+    assert str(exc.value) == (
+        "[graphify] REFUSING: manifest url does not match installed url; "
+        "local/editable install (dir_info); archive install (archive_info); "
+        "installed vcs is hg, not git; "
+        f"installed commit {'0' * 40} does not match manifest commit {_ORIGIN_COMMIT}"
+    )
+
+
+@pytest.mark.parametrize("field", ["url", "vcs_info", "vcs", "commit_id"])
+def test_installed_graphify_origin_refuses_missing_field(
+    graphify_origin_repo: Path, field: str
+) -> None:
+    direct_url_path = _origin_record(graphify_origin_repo)
+    payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    del (payload if field in {"url", "vcs_info"} else payload["vcs_info"])[field]
+    direct_url_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING"):
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+
+def test_installed_graphify_origin_refuses_no_dist_info(graphify_origin_repo: Path) -> None:
+    shutil.rmtree(_origin_record(graphify_origin_repo).parent)
+
+    with pytest.raises(SystemExit, match="REFUSING"):
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+
+@pytest.mark.parametrize("with_record", [True, False])
+def test_installed_graphify_origin_refuses_two_dist_infos(
+    graphify_origin_repo: Path, *, with_record: bool
+) -> None:
+    direct_url_path = _origin_record(graphify_origin_repo)
+    second = direct_url_path.parent.with_name("graphifyy-0.9.58.dist-info")
+    second.mkdir()
+    if with_record:
+        shutil.copyfile(direct_url_path, second / "direct_url.json")
+
+    with pytest.raises(SystemExit, match="REFUSING"):
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+
+def test_installed_graphify_origin_refuses_missing_record(
+    graphify_origin_repo: Path,
+) -> None:
+    _origin_record(graphify_origin_repo).unlink()
+
+    with pytest.raises(SystemExit, match="REFUSING"):
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+
+@pytest.mark.parametrize("content", ["{", "null", "[]", '"git"', "123"])
+def test_installed_graphify_origin_refuses_invalid_json(
+    graphify_origin_repo: Path, content: str
+) -> None:
+    _origin_record(graphify_origin_repo).write_text(content, encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING"):
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+
+def test_installed_graphify_origin_refuses_unreadable_record(
+    graphify_origin_repo: Path,
+) -> None:
+    direct_url_path = _origin_record(graphify_origin_repo)
+    direct_url_path.unlink()
+    direct_url_path.mkdir()
+
+    with pytest.raises(SystemExit, match="REFUSING"):
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+
+def test_installed_graphify_origin_refuses_missing_manifest(
+    graphify_origin_repo: Path,
+) -> None:
+    (graphify_origin_repo / "sources" / "graphify.manifest").unlink()
+
+    with pytest.raises(SystemExit, match="REFUSING"):
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+
+@pytest.mark.parametrize("commit", ["abc", "A" * 40, "g" * 40, "0" * 41, ""])
+def test_installed_graphify_origin_refuses_invalid_manifest_commit(
+    graphify_origin_repo: Path, commit: str
+) -> None:
+    manifest_path = graphify_origin_repo / "sources" / "graphify.manifest"
+    manifest_path.write_text(
+        manifest_path.read_text(encoding="utf-8").replace(_ORIGIN_COMMIT, commit),
+        encoding="utf-8",
+    )
+    # The install records the SAME bad commit, so the commit comparison agrees
+    # and only the manifest-shape check can refuse; without this mirror, deleting
+    # that check left every case here green.
+    direct_url_path = _origin_record(graphify_origin_repo)
+    payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    payload["vcs_info"]["commit_id"] = commit
+    direct_url_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING"):
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+
+
+def test_installed_graphify_origin_ignores_a_stray_dist_info_file(
+    graphify_origin_repo: Path,
+) -> None:
+    """Only DIRECTORIES are installs; a same-named regular file is not a second one."""
+    stray = _origin_record(graphify_origin_repo).parent.with_name("graphifyy-0.9.58.dist-info")
+    stray.write_text("not an install", encoding="utf-8")
+
+    assert graphify_env.assert_installed_graphify_origin(graphify_origin_repo) is None
+
+
+@pytest.mark.parametrize(
+    ("field", "form", "reason"),
+    [
+        ("manifest_url", "userinfo", "manifest url does not match installed url"),
+        ("manifest_url", "encoded_userinfo", "manifest url does not match installed url"),
+        ("manifest_url", "query", "manifest url does not match installed url"),
+        ("manifest_url", "fragment", "manifest url does not match installed url"),
+        ("record_url", "userinfo", "manifest url does not match installed url"),
+        ("record_url", "encoded_userinfo", "manifest url does not match installed url"),
+        ("record_url", "query", "manifest url does not match installed url"),
+        ("record_url", "fragment", "manifest url does not match installed url"),
+        ("record_url", "list", "manifest url does not match installed url"),
+        ("record_url", "dict", "manifest url does not match installed url"),
+        ("vcs_info", "string", "vcs_info missing or not an object"),
+        ("vcs_info", "list", "vcs_info missing or not an object"),
+        ("commit_id", "string", "installed commit <redacted> does not match manifest commit"),
+        ("vcs", "string", "installed vcs is <redacted>, not git"),
+        ("manifest_commit", "string", "manifest commit is not 40 lowercase hex"),
+        ("manifest_load", "invalid_build", "cannot load sources/graphify.manifest"),
+        ("record_load", "invalid_json", "direct_url.json unreadable or not valid JSON"),
+        (
+            "dist_info",
+            "directory",
+            "expected exactly one graphifyy dist-info in the project venv, found 2",
+        ),
+        ("repo_root", "path", "local/editable install (dir_info)"),
+    ],
+)
+def test_installed_graphify_origin_refusals_name_only_field_and_reason(
+    tmp_path: Path, field: str, form: str, reason: str
+) -> None:
+    marker = "M" + uuid.uuid4().hex
+    # Every arm also carries the marker in its root, exposing any printed path.
+    repo_root = _origin_repo(tmp_path / marker)
+    manifest_path = repo_root / "sources" / "graphify.manifest"
+    manifest_content = manifest_path.read_text(encoding="utf-8")
+    direct_url_path = _origin_record(repo_root)
+    payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    urls = {
+        "userinfo": f"https://user:{marker}@host/repo",
+        "encoded_userinfo": f"https://user%3A{marker}%40host/repo",
+        "query": f"{_ORIGIN_URL}?q={marker}",
+        "fragment": f"{_ORIGIN_URL}#{marker}",
+    }
+    if field == "manifest_url":
+        manifest_content = manifest_content.replace(_ORIGIN_URL, urls[form])
+    elif field == "record_url":
+        payload["url"] = {**urls, "list": [urls["userinfo"]], "dict": {"u": marker}}[form]
+    elif field == "vcs_info":
+        payload[field] = marker if form == "string" else [marker]
+    elif field in {"commit_id", "vcs"}:
+        payload["vcs_info"][field] = "ghp_" + marker
+    elif field == "manifest_commit":
+        commit = "ghp_" + marker
+        manifest_content = manifest_content.replace(_ORIGIN_COMMIT, commit)
+        # Only the manifest-shape check refuses: the record holds the same value.
+        payload["vcs_info"]["commit_id"] = commit
+    elif field == "manifest_load":
+        manifest_content += f"build = {marker}\n"
+    elif field == "dist_info":
+        direct_url_path.parent.with_name(f"graphifyy-{marker}.dist-info").mkdir()
+    elif field == "repo_root":
+        # The marker occurs only in the root path in this arm.
+        payload["dir_info"] = {}
+    manifest_path.write_text(manifest_content, encoding="utf-8")
+    record_content = '{"url": "' + marker if field == "record_load" else json.dumps(payload)
+    direct_url_path.write_text(record_content, encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc:
+        graphify_env.assert_installed_graphify_origin(repo_root)
+
+    message = str(exc.value)
+    assert message.startswith("[graphify] REFUSING:")
+    assert reason in message
+    assert marker not in message
+    assert marker not in repr(exc.value)
+    assert marker not in "".join(traceback.format_exception(exc.value))
+
+
+@pytest.mark.parametrize("where", ["manifest", "record"])
+def test_installed_graphify_origin_refusal_hides_load_error_context(
+    graphify_origin_repo: Path, where: str
+) -> None:
+    marker = "MARKER" + "4711"
+    if where == "manifest":
+        manifest_path = graphify_origin_repo / "sources" / "graphify.manifest"
+        manifest_path.write_text(
+            manifest_path.read_text(encoding="utf-8") + f"build = {marker}\n",
+            encoding="utf-8",
+        )
+    else:
+        _origin_record(graphify_origin_repo).write_text('{"url": "' + marker, encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING") as exc:
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+    assert marker not in str(exc.value)
+    assert exc.value.__context__ is None
+    assert exc.value.__cause__ is None
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (_ORIGIN_COMMIT, _ORIGIN_COMMIT),
+        (["x"], "<redacted>"),
+        ({"a": 1}, "<redacted>"),
+        (None, "<redacted>"),
+        (123, "<redacted>"),
+        ("git", "<redacted>"),
+        ("@:/", "<redacted>"),
+        ("a" * 65, "<redacted>"),
+        ("A" * 40, "<redacted>"),
+        (_ORIGIN_COMMIT + "\n", "<redacted>"),
+    ],
+)
+def test_shown_commit_allows_only_lowercase_sha(value: object, expected: str) -> None:
+    assert graphify_env._shown_commit(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("git", "git"),
+        ("hg", "hg"),
+        ("svn", "svn"),
+        ("bzr", "bzr"),
+        (["git"], "<redacted>"),
+        ({"vcs": "git"}, "<redacted>"),
+        (None, "<redacted>"),
+        (123, "<redacted>"),
+        ("GIT", "<redacted>"),
+        ("@:/", "<redacted>"),
+        ("a" * 65, "<redacted>"),
+        (_ORIGIN_COMMIT, "<redacted>"),
+    ],
+)
+def test_shown_vcs_allows_only_known_names(value: object, expected: str) -> None:
+    assert graphify_env._shown_vcs(value) == expected
 
 
 def _fake_claude_dir(tmp_path: Path, name: str) -> Path:
