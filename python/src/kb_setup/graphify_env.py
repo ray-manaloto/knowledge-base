@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -10,6 +11,9 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
+
+from kb_setup import manifest
 
 # Env vars graphify's `detect_backend()` keys off, in its priority order:
 #   gemini -> kimi -> claude -> openai -> deepseek -> azure -> bedrock -> ollama.
@@ -256,6 +260,77 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
     from kb_setup.graphify_sdk import assert_public_sdk
 
     assert_public_sdk(pinned)
+
+
+def _shown_url(value: object) -> object:
+    """``value`` with any ``user:password@`` removed, for a refusal message.
+
+    The message lands in CI logs; a credential-bearing URL in the manifest or in
+    a hand-made ``direct_url.json`` must not ride along. Non-strings pass through.
+    """
+    if not isinstance(value, str):
+        return value
+    parts = urlsplit(value)
+    if not parts.username and not parts.password:
+        return value
+    return urlunsplit(parts._replace(netloc=parts.hostname or ""))
+
+
+def assert_installed_graphify_origin(repo_root: Path) -> None:
+    """Prove the project venv's fork origin and commit for T11 CI.
+
+    Version-match is not origin-match: our fork carries patches without changing
+    its version, so only the manifest URL and immutable commit identify the pin.
+    """
+    manifest_path = repo_root / "sources" / "graphify.manifest"
+    try:
+        pin = manifest.load(manifest_path)
+    except OSError, ValueError:
+        raise SystemExit(f"[graphify] REFUSING: cannot load manifest {manifest_path}") from None
+    expected = f"url={_shown_url(pin.url)!r}, commit={pin.commit!r}"
+    if not re.fullmatch(r"[0-9a-f]{40}", pin.commit):
+        raise SystemExit(
+            f"[graphify] REFUSING: manifest must pin 40 lowercase hex characters; {expected}"
+        )
+    pattern = "lib/python*/site-packages/graphifyy-*.dist-info"
+    directories = [path for path in (repo_root / ".venv").glob(pattern) if path.is_dir()]
+    if len(directories) != 1:
+        raise SystemExit(
+            f"[graphify] REFUSING: expected one project-venv dist-info with {expected}; "
+            f"observed {len(directories)} directories: {directories}"
+        )
+    direct_url_path = directories[0] / "direct_url.json"
+    try:
+        direct_url = json.loads(direct_url_path.read_text(encoding="utf-8"))
+    except OSError, ValueError:
+        raise SystemExit(
+            f"[graphify] REFUSING: expected {expected}; "
+            f"cannot read valid JSON from {direct_url_path}"
+        ) from None
+    if not isinstance(direct_url, dict):
+        raise SystemExit(
+            f"[graphify] REFUSING: expected {expected}; {direct_url_path} is not an object"
+        )
+    vcs_info = direct_url.get("vcs_info")
+    if not isinstance(vcs_info, dict):
+        raise SystemExit(
+            f"[graphify] REFUSING: expected {expected}; "
+            f"observed url={_shown_url(direct_url.get('url'))!r}, invalid vcs_info={vcs_info!r}"
+        )
+    if (
+        direct_url.get("url") != pin.url
+        or "dir_info" in direct_url
+        or "archive_info" in direct_url
+        or vcs_info.get("vcs") != "git"
+        or vcs_info.get("commit_id") != pin.commit
+    ):
+        raise SystemExit(
+            f"[graphify] REFUSING: expected git install with {expected}; "
+            f"observed url={_shown_url(direct_url.get('url'))!r}, "
+            f"commit={vcs_info.get('commit_id')!r}, "
+            f"vcs={vcs_info.get('vcs')!r}, dir_info={'dir_info' in direct_url}, "
+            f"archive_info={'archive_info' in direct_url}"
+        )
 
 
 def _imports_graphify(py: Path) -> bool:
