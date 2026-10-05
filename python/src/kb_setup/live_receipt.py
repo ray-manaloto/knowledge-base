@@ -97,7 +97,8 @@ def _sha256(value: object, label: str) -> None:
 
 def _safe_ref(ref: str) -> bool:
     # The ref is only compared; keep this standalone check stdlib/subprocess-free.
-    # git check-ref-format admits leading '-' components and a far wider charset.
+    # git check-ref-format admits a '-'-leading component after the first, and a far
+    # wider charset; this deliberate subset refuses both.
     components = ref.split("/")
     return (
         re.fullmatch(r"[A-Za-z0-9._/-]+", ref) is not None
