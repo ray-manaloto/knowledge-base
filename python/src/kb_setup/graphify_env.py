@@ -263,17 +263,18 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
 
 
 def _shown_url(value: object) -> object:
-    """``value`` with any ``user:password@`` removed, for a refusal message.
-
-    The message lands in CI logs; a credential-bearing URL in the manifest or in
-    a hand-made ``direct_url.json`` must not ride along. Non-strings pass through.
-    """
+    """Hide userinfo and unparsable URLs so refusals cannot leak credentials to CI logs."""
     if not isinstance(value, str):
         return value
-    parts = urlsplit(value)
-    if not parts.username and not parts.password:
-        return value
-    return urlunsplit(parts._replace(netloc=parts.hostname or ""))
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        return "<unparsable url>"
+    if parts.username is not None or parts.password is not None:
+        return urlunsplit(parts._replace(netloc=parts.hostname or ""))
+    if "@" in value:
+        return "<unparsable url>"
+    return value
 
 
 def assert_installed_graphify_origin(repo_root: Path) -> None:

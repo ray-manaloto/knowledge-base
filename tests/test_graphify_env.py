@@ -446,6 +446,65 @@ def test_installed_graphify_origin_refusal_hides_url_credentials(
     assert "github.com/ray-manaloto/graphify" in str(exc.value)
 
 
+@pytest.mark.parametrize("where", ["manifest", "record"])
+@pytest.mark.parametrize("form", ["fullwidth_colon", "schemeless"])
+def test_installed_graphify_origin_refusal_hides_unparsable_url_credentials(
+    graphify_origin_repo: Path, where: str, form: str
+) -> None:
+    # Removing either the parser handler or the unmatched-@ check must fail its arm.
+    marker = "MARKER" + "4711"
+    malformed_url = (
+        f"https://user:{marker}@github.com\uff1a443/ray-manaloto/graphify"
+        if form == "fullwidth_colon"
+        else f"user:{marker}@github.com/ray-manaloto/graphify"
+    )
+    if where == "manifest":
+        manifest_path = graphify_origin_repo / "sources" / "graphify.manifest"
+        manifest_path.write_text(
+            manifest_path.read_text(encoding="utf-8").replace(_ORIGIN_URL, malformed_url),
+            encoding="utf-8",
+        )
+    else:
+        direct_url_path = _origin_record(graphify_origin_repo)
+        payload = json.loads(direct_url_path.read_text(encoding="utf-8"))
+        payload["url"] = malformed_url
+        direct_url_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="REFUSING") as exc:
+        graphify_env.assert_installed_graphify_origin(graphify_origin_repo)
+    assert "<unparsable url>" in str(exc.value)
+    assert marker not in str(exc.value)
+    for chained in (exc.value.__context__, exc.value.__cause__):
+        if chained is not None:
+            assert marker not in str(chained)
+
+
+@pytest.mark.parametrize(
+    ("form", "expected"),
+    [
+        ("fullwidth_colon", "<unparsable url>"),
+        ("fullwidth_at", "<unparsable url>"),
+        ("schemeless", "<unparsable url>"),
+        ("empty_username", "https://host/repo"),
+        ("plain", "https://host/repo"),
+    ],
+)
+def test_shown_url_hides_unparsable_credentials(form: str, expected: str) -> None:
+    marker = "MARKER" + "4711"
+    urls = {
+        "fullwidth_colon": f"https://user:{marker}@host\uff1a443/repo",
+        "fullwidth_at": f"https://user:{marker}\uff20host/repo",
+        "schemeless": f"user:{marker}@host/repo",
+        "empty_username": f"https://:{marker}@host/repo",
+        "plain": "https://host/repo",
+    }
+
+    shown = graphify_env._shown_url(urls[form])
+
+    assert shown == expected
+    assert marker not in str(shown)
+
+
 def _fake_claude_dir(tmp_path: Path, name: str) -> Path:
     """A directory holding an EXECUTABLE `claude`, as `shutil.which` requires.
 
