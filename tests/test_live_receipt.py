@@ -15,7 +15,15 @@ from kb_setup import live_receipt
 NOW = datetime(2026, 9, 27, 4, 0, tzinfo=UTC)
 HEAD = "a" * 40
 FORK = "b" * 40
-REF = "kb-openai-cli-backend-v0.9.69-baa50674"
+REF = "kb-pin/openai-cli-backend-v0.9.57"
+
+
+def _manifest_identity(ref: str) -> tuple[str, str]:
+    manifest = (
+        "url = https://github.com/ray-manaloto/graphify\n"
+        f"kind = code\nref = {ref}\ncommit = {FORK}\n"
+    ).encode()
+    return live_receipt.manifest_identity(manifest)
 
 
 def _digest(data: bytes) -> str:
@@ -121,6 +129,44 @@ def _verify(candidate: Path, trusted: Path) -> dict:
         expected=live_receipt.ExpectedPullRequest(813, HEAD),
         now=NOW,
     )
+
+
+@pytest.mark.parametrize(
+    "ref",
+    [
+        "kb-pin/openai-cli-backend-v0.9.57",
+        "kb-pin/openai-cli-backend-v0.9.76",
+        "kb-openai-cli-backend-v0.9.69-baa50674",
+        "v0.9.76",
+    ],
+)
+def test_git_refname_safe_refs_are_accepted(ref: str) -> None:
+    assert _manifest_identity(ref) == (ref, FORK)
+
+
+@pytest.mark.parametrize(
+    "ref",
+    [
+        pytest.param("kb-pin/../x", id="dotdot"),
+        pytest.param("kb-pin..x", id="dotdot-no-slash"),
+        pytest.param("-kb-pin/x", id="leading-dash"),
+        pytest.param("kb-pin/-x", id="component-dash"),
+        pytest.param("kb-pin//x", id="double-slash"),
+        pytest.param("kb-pin/x/", id="trailing-slash"),
+        pytest.param("/kb-pin/x", id="leading-slash"),
+        pytest.param("kb-pin/x.lock", id="lock-suffix"),
+        pytest.param("kb-pin.lock/x", id="lock-component"),
+        pytest.param("kb-pin/.x", id="dot-component"),
+        pytest.param("kb-pin/x.", id="trailing-dot"),
+        pytest.param("kb pin/x", id="space"),
+        pytest.param("kb-pin/x@{1}", id="reflog-syntax"),
+        pytest.param("kb-pin/xé", id="non-ascii"),
+        pytest.param("", id="empty"),
+    ],
+)
+def test_unsafe_refs_are_refused(ref: str) -> None:
+    with pytest.raises(live_receipt.ReceiptError, match="unsafe Graphify ref"):
+        _manifest_identity(ref)
 
 
 def test_signed_eight_case_receipt_passes(signed_run: tuple[Path, Path, Path, dict]) -> None:

@@ -95,6 +95,21 @@ def _sha256(value: object, label: str) -> None:
     )
 
 
+def _safe_ref(ref: str) -> bool:
+    # The ref is only compared; keep this standalone check stdlib/subprocess-free.
+    # git check-ref-format admits a '-'-leading component after the first, and a far
+    # wider charset; this deliberate subset refuses both.
+    components = ref.split("/")
+    return (
+        re.fullmatch(r"[A-Za-z0-9._/-]+", ref) is not None
+        and all(components)
+        and all(not component.startswith(("-", ".")) for component in components)
+        and all(not component.endswith(".lock") for component in components)
+        and ".." not in ref
+        and not ref.endswith(".")
+    )
+
+
 def _same_keys(value: object, expected: set[str], label: str) -> dict[str, Any]:
     _require(isinstance(value, dict) and set(value) == expected, f"{label} fields differ")
     return cast("dict[str, Any]", value)
@@ -140,7 +155,7 @@ def manifest_identity(raw: bytes) -> tuple[str, str]:
     )
     _require(values.get("kind") == "code", "Graphify manifest is not code")
     ref, commit = values.get("ref", ""), values.get("commit", "")
-    _require(bool(ref) and re.fullmatch(r"[A-Za-z0-9._-]+", ref) is not None, "unsafe Graphify ref")
+    _require(_safe_ref(ref), "unsafe Graphify ref")
     _require(GIT_SHA.fullmatch(commit) is not None, "Graphify manifest commit is not exact")
     return ref, commit
 
