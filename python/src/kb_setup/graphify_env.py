@@ -11,7 +11,6 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
-from urllib.parse import urlsplit
 
 from kb_setup import manifest
 
@@ -262,27 +261,6 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
     assert_public_sdk(pinned)
 
 
-def _shown_url(value: object) -> str:
-    """Display only bounded origin URLs, without userinfo, ports or URL parameters."""
-    if not isinstance(value, str):
-        return "<non-string url>"
-    try:
-        parts = urlsplit(value)
-        hostname = parts.hostname
-    except ValueError:
-        return "<unparsable url>"
-    if (
-        parts.scheme not in {"https", "http", "ssh", "git"}
-        or not hostname
-        or parts.query != ""
-        or parts.fragment != ""
-        or ("@" in value and parts.username is None and parts.password is None)
-        or not re.fullmatch(r"[A-Za-z0-9._/-]{0,200}", parts.path)
-    ):
-        return "<redacted url>"
-    return f"{parts.scheme}://{hostname}{parts.path}"
-
-
 def _shown_commit(value: object) -> str:
     """Display only immutable lowercase commit SHAs."""
     if isinstance(value, str) and re.fullmatch(r"[0-9a-f]{40}", value):
@@ -309,18 +287,15 @@ def assert_installed_graphify_origin(repo_root: Path) -> None:
     except OSError, ValueError:
         pin = None
     if pin is None:
-        raise SystemExit(f"[graphify] REFUSING: cannot load manifest {manifest_path}")
-    expected = f"url={_shown_url(pin.url)!r}, commit={_shown_commit(pin.commit)!r}"
+        raise SystemExit("[graphify] REFUSING: cannot load sources/graphify.manifest")
     if not re.fullmatch(r"[0-9a-f]{40}", pin.commit):
-        raise SystemExit(
-            f"[graphify] REFUSING: manifest must pin 40 lowercase hex characters; {expected}"
-        )
+        raise SystemExit("[graphify] REFUSING: manifest commit is not 40 lowercase hex")
     pattern = "lib/python*/site-packages/graphifyy-*.dist-info"
     directories = [path for path in (repo_root / ".venv").glob(pattern) if path.is_dir()]
     if len(directories) != 1:
         raise SystemExit(
-            f"[graphify] REFUSING: expected one project-venv dist-info with {expected}; "
-            f"observed {len(directories)} directories: {directories}"
+            "[graphify] REFUSING: expected exactly one graphifyy dist-info in the project "
+            f"venv, found {len(directories)}"
         )
     direct_url_path = directories[0] / "direct_url.json"
     load_failed = object()
@@ -329,35 +304,30 @@ def assert_installed_graphify_origin(repo_root: Path) -> None:
     except OSError, ValueError:
         direct_url = load_failed
     if direct_url is load_failed:
-        raise SystemExit(
-            f"[graphify] REFUSING: expected {expected}; "
-            f"cannot read valid JSON from {direct_url_path}"
-        )
+        raise SystemExit("[graphify] REFUSING: direct_url.json unreadable or not valid JSON")
     if not isinstance(direct_url, dict):
-        raise SystemExit(
-            f"[graphify] REFUSING: expected {expected}; {direct_url_path} is not an object"
-        )
+        raise SystemExit("[graphify] REFUSING: direct_url.json is not an object")
     vcs_info = direct_url.get("vcs_info")
     if not isinstance(vcs_info, dict):
-        raise SystemExit(
-            f"[graphify] REFUSING: expected {expected}; "
-            f"observed url={_shown_url(direct_url.get('url'))!r}, "
-            f"invalid vcs_info type={type(vcs_info).__name__}"
-        )
-    if (
-        direct_url.get("url") != pin.url
-        or "dir_info" in direct_url
-        or "archive_info" in direct_url
-        or vcs_info.get("vcs") != "git"
-        or vcs_info.get("commit_id") != pin.commit
-    ):
-        raise SystemExit(
-            f"[graphify] REFUSING: expected git install with {expected}; "
-            f"observed url={_shown_url(direct_url.get('url'))!r}, "
-            f"commit={_shown_commit(vcs_info.get('commit_id'))!r}, "
-            f"vcs={_shown_vcs(vcs_info.get('vcs'))!r}, dir_info={'dir_info' in direct_url}, "
-            f"archive_info={'archive_info' in direct_url}"
-        )
+        raise SystemExit("[graphify] REFUSING: vcs_info missing or not an object")
+    vcs = vcs_info.get("vcs")
+    installed = vcs_info.get("commit_id")
+    checks = (
+        (direct_url.get("url") != pin.url, "manifest url does not match installed url"),
+        ("dir_info" in direct_url, "local/editable install (dir_info)"),
+        ("archive_info" in direct_url, "archive install (archive_info)"),
+        (vcs != "git", f"installed vcs is {_shown_vcs(vcs)}, not git"),
+        (
+            installed != pin.commit,
+            (
+                f"installed commit {_shown_commit(installed)} does not match "
+                f"manifest commit {_shown_commit(pin.commit)}"
+            ),
+        ),
+    )
+    reasons = [reason for failed, reason in checks if failed]
+    if reasons:
+        raise SystemExit("[graphify] REFUSING: " + "; ".join(reasons))
 
 
 def _imports_graphify(py: Path) -> bool:
