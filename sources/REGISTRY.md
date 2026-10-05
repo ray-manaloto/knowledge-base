@@ -69,7 +69,7 @@ not just ingested).
 | 43 | [martinfowler/Böckeler — harness engineering](https://martinfowler.com/articles/harness-engineering.html) | article | T1 | prose | Foundational harness-engineering overview (user-side). Extracted 2026-07-23. |
 | 44 | [agent-engineering.dev — harness engineering 2026](https://www.agent-engineering.dev/article/harness-engineering-in-2026-the-discipline-that-makes-ai-agents-production-ready) | article | T1 | prose | Harness = 3rd maturity phase; 5 layers. Extracted 2026-07-23. |
 | 45 | [humanlayer — skill-issue harness engineering](https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents) | article | T1 | prose | Most agent failures = config skill-issues, not model weights. Extracted 2026-07-23. |
-| 46 | [platform.claude — code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool) | docs | T1 | prose | Sandboxed Python/bash; powers PTC + dynamic filtering. Fetched via mintlify `.md`. Extracted 2026-07-23. |
+| 46 | [platform.claude — code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool) | docs | T1 | prose | Sandboxed Python/bash; powers PTC + dynamic filtering. Fetched via the `.md` page route. Extracted 2026-07-23. |
 | 47 | [openai — harness engineering (Codex)](https://openai.com/index/harness-engineering/) | article | T1 | prose | Codex agent-first (Ryan Lopopolo): repo-knowledge as system of record, AGENTS.md-as-TOC, increasing autonomy, entropy GC / golden principles. FULL text recovered via logged-in Chrome (graphify fetch got TOC only; WebFetch 403'd). 2026-07-23. |
 | 48 | [platform.claude — programmatic tool calling (PTC)](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling) | docs | T1 | prose | PTC: Claude writes Python calling tools as async fns; 20-40% fewer tokens. Vendored + extracted 2026-07-23. |
 | 49 | framework plan — long-running autonomous framework (ladybug) | designdoc | T1 | prose | OUR design: kb_search read-through, G1 staleness, single-writer lock, quarantine gate, compounding loop. Vendored 2026-07-23. |
@@ -84,7 +84,7 @@ not just ingested).
 | 58 | [claude.com — Claude models explained: choosing the best model](https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case) | article | T1 | prose | **Advisor-strategy economics, quantified.** Start with the most intelligent model + dial effort; cost-per-task often LOWER for smarter models. Mythos/Fable vs Opus vs Sonnet vs Haiku selection rubric. SWE-bench Pro: Sonnet 5 + Fable 5 advisor = within 10% of Fable 5 at 63% of the price. Same fetch path as #57. 2026-07-24. |
 | 59 | [claude.com — Building verification loops in Claude Code with skills](https://claude.com/blog/building-verification-loops-in-claude-code-with-skills) | article | T1 | prose | **Names our seam's missing taxonomy.** Verification loop = agent checks own work + fixes before moving on. Four kickoff modes: standalone / embedded / chained / on-every-PR. Built-ins: /verify, toolchain, Code Review preview, GH Actions, spec validation, CMA rubrics + grader agent. Same fetch path as #57. 2026-07-22. |
 | 60 | [cerebras.ai — How We Built Our Knowledge Base](https://www.cerebras.ai/blog/how-we-built-our-knowledge-base) | article | T1 | prose | **The KB-architecture benchmark for our gap analysis.** 15k questions/day. One Postgres embeddings table + one connector per source; LLM thread distillation (embed the artifact, not the transcript); bursting (IDF≥4.0, ≥200 chars, reactions); hybrid FTS+vector+IDF+age-decay; CocoIndex language-aware recursive code chunking w/ incremental re-embed; planner→executor→synthesis; RRF k=60 → 0-10 reranker → post-rank context expansion; MCP exposes primitives (Claude Code is the orchestrator); projects = scoped search. **HTTP 500 to ALL non-browser clients; recovered via Chrome.** 2026-07-15. |
-| 61 | [jdx/mise](https://github.com/jdx/mise) | repo | T2 | pending | **The dependency that gates every other one here** — every workflow is a `mise run` task, and it self-updates out-of-band. Read extensively 2026-07-27 (all 604 release notes + `docs/templates.md`, `docs/tasks/**`, `docs/environments/**`, the JSON schema) while pinning it; findings in `docs/research/agents/mise-currency.md` and `mise-path-research.md`, and now tracked in `currency.toml` `[tool.mise]`. Registered per `research-repo-enumeration.md`. **T2 not T1**: what we needed was release notes and schema, which are versioned artifacts a manifest pins better than a prose extraction — ingest the repo for AST if a future question needs the source, not to re-answer this one. |
+| 61 | [jdx/mise](https://github.com/jdx/mise) | repo | T2 | pending | **The dependency that gates every other one here** — every workflow is a `mise run` task, and it self-updates out-of-band. Read extensively 2026-07-27 (all 604 release notes + `docs/templates.md`, `docs/tasks/**`, `docs/environments/**`, the JSON schema) while pinning it; findings in `docs/research/agents/mise-currency.md` and `mise-path-research.md` (deleted 2026-10-04 under the stale-docs ruling; recoverable at `26a84f7f`), and now tracked in `currency.toml` `[tool.mise]`. Registered per `research-repo-enumeration.md`. **T2 not T1**: what we needed was release notes and schema, which are versioned artifacts a manifest pins better than a prose extraction — ingest the repo for AST if a future question needs the source, not to re-answer this one. |
 | 62 | [gregceccarelli.com — Goal Engineering](https://www.gregceccarelli.com/goal-engineering) | article | T1 | prose | **The goal+rider convention this repo's `docs/goals/` adopts.** Two files per round: a goal capped at 4,000 chars (the `/goal` payload) + an unbounded rider. Headline-word test, posture-as-negations, the preserve list ("the agent's permission slip" against Goodhart), the eleven-phase depth-test loop, V1-CANDIDATES as overflow valve. Carries the sharpest published critique of `/goal` itself: an LLM-as-judge inside the same harness is "opinion, not evidence" — his `dr-gate` re-runs the checks and signs results with a secret the agent cannot read. Vendored `sources/media/goal-engineering-ceccarelli.md`; extracted 2026-07-27. |
 | 63 | [sabrina.dev — 6 INSANE Projects to Learn Claude Fable and /goal](https://www.sabrina.dev/p/6-insane-projects-to-learn-claude-fable-loop-engineering) | article | T1 | prose | **The 5-part condition template** — TASK / WHY / OUTCOME / CONSTRAINTS / VERIFICATION — plus six worked VERIFICATION lines. "'Make it good' isn't a finish line. 'Scores over 8+ out of 10 using my custom grading skill' is." Names both failure directions: without VERIFICATION an agent "either stops too early or loops forever guessing". Free post (HTTP 200, `audience:everyone`), verified not paywalled. Caveat: the URL slug says loop-engineering but the mechanics live in a separate prior post, NOT fetched. Vendored `sources/media/loop-engineering-sabrina.md`; extracted 2026-07-27. |
 | 64 | [code.claude.com/docs/en/goal.md](https://code.claude.com/docs/en/goal.md) | docs | T1 | prose | **The authority on `/goal` semantics, and the only one that changes under us.** The evaluator "does not call tools, so it can only judge what Claude has already surfaced in the conversation" — the constraint every clause in a goal condition must satisfy. Also the 4,000-char cap, the turn clause as the only bound, `{ok, reason}` with the reason fed back as Claude's next instruction, and resume semantics. Fingerprinted in `currency.toml` `[tool.claude-code]` `docs_watch` so a revision surfaces as DOCS DRIFT rather than silently staling the `goal-engineering` skill. Vendored `sources/media/claude-code-goal-docs.md`; extracted 2026-07-27. |
@@ -253,7 +253,7 @@ crowding prose out of the query budget (#12). `kind = docs` is the path.
 
 - **2026-07-22 — Claude docs enumerated (wave-1 vendored).** Parsed both Claude
   sitemaps → **173 on-topic English pages** (`sources/claude-docs-backlog.txt`).
-  14 crown-jewel pages fetched (Mintlify `.md`) to the **transient** cache
+  14 crown-jewel pages fetched (`.md` page route) to the **transient** cache
   `sources/raw/claude-docs/` (gitignored): multiagent-orchestration, managed-agents
   overview/define-outcomes, prompting-claude-fable-5, introducing-fable-5,
   choosing-a-model, whats-new-4-8, agent-sdk overview/subagents/cost-tracking/skills,
@@ -331,9 +331,9 @@ crowding prose out of the query budget (#12). `kind = docs` is the path.
   - **Still deferred:** the ~151-page code.claude.com long tail (#2, T2 API/SDK ref), the T2
     catalogs #16/#17/#18 prose, #19 mindstudio tag set, #20/#21 X timelines (T3).
 
-### Freshness policy (mintlify / refetchable prose)
+### Freshness policy (refetchable prose)
 
-Mintlify doc mirrors go stale — do NOT commit raw `.md` as frozen sources. The
+Fetched doc pages go stale — do NOT commit raw `.md` as frozen sources. The
 durable artifact is the **extraction chunk** (records `source_url` + `captured_at`).
 Raw fetches live in gitignored `sources/raw/`. Refetch + re-extract when a
 doc-sourced node is **> 1 month** past its `captured_at`. Going forward, query the
@@ -399,7 +399,8 @@ the next reader will hit them:
 
 Surfaced by the `aggregated-research` skill's self-referential run
 (`docs/research/reports/2026-08-27-aggregated-research-prior-art.md`, P3 of the
-Aggregated round). All three are published agent prompts that mechanize a
+Aggregated round; deleted 2026-10-04 under the stale-docs ruling, recoverable at
+`26a84f7f`). All three are published agent prompts that mechanize a
 negative control — the discipline `.claude/rules/probes-need-a-control-arm.md`
 states in prose and `kb_setup.arms` implements. **Read once, not yet ingested.**
 
@@ -511,7 +512,7 @@ sources: `tarqd/skills`, `nq-rdl/agent-extensions`, `a5c-ai/babysitter`,
   2026-08-28: `main` only, one plugin (`mise-toolkit`), 0 tags, last push 2026-04-08. T2
   `pending` — becomes a manifest once the plugin lands there.
 
-### 2026-08-28 — the aggregated-research plugin round (`docs/research/reports/2026-08-28-{codex-plugin-cc-anatomy,mcp-1to1-and-lsp,mise-oci-container-ci,plugin-bundle-spec,cli-plugin-anatomy}.md`)
+### 2026-08-28 — the aggregated-research plugin round (`docs/research/reports/2026-08-28-{codex-plugin-cc-anatomy,mcp-1to1-and-lsp,mise-oci-container-ci,plugin-bundle-spec}.md`; `cli-plugin-anatomy.md` (deleted 2026-10-04 under the stale-docs ruling; recoverable at `26a84f7f`))
 
 - <https://github.com/openai/codex-plugin-cc> — OpenAI's Claude Code plugin for Codex
   (installed here as `codex@openai-codex` 1.0.6): the `codex app-server` broker

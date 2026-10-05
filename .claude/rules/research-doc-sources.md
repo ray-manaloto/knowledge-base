@@ -5,9 +5,16 @@ during research, it MUST walk this preference chain top-to-bottom and use
 the first option that returns the answer. Lower steps cost more tokens
 (per-query or per-conversation) — never skip a step that would have worked.
 
+⛔ **Mintlify is retired (Ray, 2026-10-04) — never look for it.** Do not search
+for, fetch, recreate or cite any Mintlify doc site, cache, catalog, skill or MCP
+URL; its copies were stale and could teach wrong facts. Mentions surviving in
+record trees (`docs/research/reports/`, `sources/media/`, `sources/extractions/`,
+`graphify-out/memory/`) are history, not sources — never follow one.
+
 ## The chain
 
-0. **Query the graph first.** This repo *is* the cache. Run
+0. **Query the graph first.** This repo *is* the cache — the graph and the
+   offline `sources/` corpus it is built from. Run
    `mise run kb-query -- "<question>"` (deterministic BFS/DFS, no LLM,
    source-cited) before any network call — the answer may already be ingested,
    and a graph read spends **zero** LLM tokens. `graphify path "A" "B"` and
@@ -38,16 +45,17 @@ the first option that returns the answer. Lower steps cost more tokens
    page. The cheapest *remote* lookup. `grep` the output to pick the page(s)
    you want.
 
-2. **`curl <site>/<path>.md`** — for mintlify-hosted sites, appending `.md` to
-   any visible page URL returns clean markdown (no HTML chrome, no JS). Use
-   this once step 1 has told you which page you want.
+2. **`curl <site>/<path>.md`** — many docs sites return a page as clean
+   markdown (no HTML chrome, no JS) when `.md` is appended to its URL. Use
+   this once step 1 has told you which page you want, and check the body: an
+   HTML error page served for every input is a 404, not content.
 
    **Do NOT guess a project's docs domain.** A plausible-looking domain that
    404s is not evidence the docs don't exist — it is a probe with no control
    arm.
 
-3. **`ctx7`** — for libraries whose docs live outside mintlify, or where
-   `llms.txt`/`.md` doesn't cover what you need. It is a **direct
+3. **`ctx7`** — for libraries whose docs serve no `llms.txt`/`.md`, or where
+   those don't cover what you need. It is a **direct
    doc-fetcher**; call it straight, in two steps:
 
    ```bash
@@ -146,22 +154,11 @@ source. Append it to `sources/REGISTRY.md` at minimum
 (`research-repo-enumeration.md`), and prefer a `sources/<name>.manifest` when the
 examples are worth querying later.
 
-## Why per-repo mintlify MCP URLs are NOT in the chain
+## Third-party doc mirrors are NOT in the chain
 
-`https://mintlify.com/<owner>/<repo>/mcp` URLs are **GET-only preview
-descriptors** auto-generated for every repo Mintlify indexes. `curl GET`
-returns a JSON tool-schema descriptor; POST (which `mcp2cli` sends to speak MCP
-protocol) returns `404 Not found`. There is no live MCP server behind the
-descriptor.
-
-Live mintlify MCP servers exist only at the customer's own documentation
-domain (e.g. `docs.anthropic.com/mcp`). Mintlify's central MCP at
-`https://mintlify.com/docs/mcp` works but is scope-limited to Mintlify's own
-platform docs — it does not search per-repo customer sites. **An API key does
-not unlock this path**: Mintlify keys are organization-scoped.
-
-`mcp2cli` itself remains fine for **other** MCP servers, including a customer-
-domain MCP. The ban is specifically on per-repo mintlify subpath URLs.
+Fetch a project's docs from its **own** domain or its pinned repo, never from a
+third-party mirror or indexer (Ray, 2026-10-04): a mirror goes stale silently
+and can serve old or wrong information while looking authoritative.
 
 ## `mcp2cli`-first, but MCP registration is allowed when required
 
